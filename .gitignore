@@ -1,0 +1,16 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Odoo runtime artefacts (belong in the Docker volume, not the repo)
+filestore/
+sessions/
+*.log
+
+# Secrets
+.env
+
+# Odoo config — contains passwords, never commit
+config/odoo.conf

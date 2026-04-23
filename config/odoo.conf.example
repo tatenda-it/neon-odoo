@@ -1,0 +1,54 @@
+[options]
+; ─────────────────────────────────────────────────────────────
+; Neon Events Elements — Odoo 17 Community configuration
+; Phase 1 CRM build
+; ─────────────────────────────────────────────────────────────
+
+; Master password for database management screen.
+; CHANGE THIS before exposing Odoo to anyone outside localhost.
+admin_passwd = CHANGE_ME_TO_STRONG_PASSWORD
+
+; ─── Database connection ────────────────────────────────────
+db_host = db
+db_port = 5432
+db_user = odoo
+db_password = CHANGE_ME_TO_MATCH_DOCKER_COMPOSE
+
+; ─── Addons path ────────────────────────────────────────────
+; /mnt/extra-addons is mapped to ./addons on the host.
+; Drop any custom or third-party Odoo modules in there.
+addons_path = /mnt/extra-addons,/usr/lib/python3/dist-packages/odoo/addons
+
+; ─── Data directory ─────────────────────────────────────────
+data_dir = /var/lib/odoo
+
+; ─── Network ────────────────────────────────────────────────
+xmlrpc_port = 8069
+longpolling_port = 8072
+
+; ─── Logging ────────────────────────────────────────────────
+log_level = info
+logfile = False
+
+; ─── Performance (development defaults) ─────────────────────
+; workers = 0 runs Odoo in single-process mode. Good for local
+; development and for enabling the debugger. For production on
+; a server, raise this to (2 * CPU cores) + 1.
+workers = 0
+max_cron_threads = 1
+
+; ─── Request limits ─────────────────────────────────────────
+limit_time_cpu = 600
+limit_time_real = 1200
+limit_memory_hard = 2684354560
+limit_memory_soft = 2147483648
+
+; ─── Proxy / TLS ────────────────────────────────────────────
+; Enable only when Odoo sits behind Nginx / Traefik with HTTPS.
+proxy_mode = False
+
+; ─── Database listing ───────────────────────────────────────
+; Leave True during Phase 1 setup so Munashe can create/manage
+; the Neon database from the web UI. Switch to False + set
+; db_name once you go live.
+list_db = True
