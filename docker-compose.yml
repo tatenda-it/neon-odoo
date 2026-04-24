@@ -39,6 +39,9 @@ services:
       - odoo-web-data:/var/lib/odoo
       - ./config:/etc/odoo
       - ./addons:/mnt/extra-addons
+      - ./oca/queue:/mnt/oca-queue
+      - ./oca/server-tools:/mnt/oca-server-tools
+      - ./oca/web:/mnt/oca-web
     restart: unless-stopped
     networks:
       - neon-net

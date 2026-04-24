@@ -1,0 +1,12 @@
+[submodule "oca/queue"]
+	path = oca/queue
+	url = https://github.com/OCA/queue.git
+	branch = 17.0
+[submodule "oca/server-tools"]
+	path = oca/server-tools
+	url = https://github.com/OCA/server-tools.git
+	branch = 17.0
+[submodule "oca/web"]
+	path = oca/web
+	url = https://github.com/OCA/web.git
+	branch = 17.0

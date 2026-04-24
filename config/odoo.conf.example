@@ -17,7 +17,7 @@ db_password = CHANGE_ME_TO_MATCH_DOCKER_COMPOSE
 ; ─── Addons path ────────────────────────────────────────────
 ; /mnt/extra-addons is mapped to ./addons on the host.
 ; Drop any custom or third-party Odoo modules in there.
-addons_path = /mnt/extra-addons,/usr/lib/python3/dist-packages/odoo/addons
+addons_path = /mnt/extra-addons,/mnt/oca-queue,/mnt/oca-server-tools,/mnt/oca-web,/usr/lib/python3/dist-packages/odoo/addons
 
 ; ─── Data directory ─────────────────────────────────────────
 data_dir = /var/lib/odoo
