@@ -14,3 +14,8 @@ sessions/
 
 # Odoo config — contains passwords, never commit
 config/odoo.conf
+
+# Python bytecode — never commit
+__pycache__/
+*.pyc
+*.pyo
