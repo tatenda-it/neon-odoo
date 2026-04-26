@@ -29,7 +29,8 @@ Module is the foundation for Sections 4-6 of the M1 Action Plan
         "mail",
     ],
     "data": [
-        "security/ir.model.access.csv",
+    "security/ir.model.access.csv",
+    "views/crm_lead_views.xml",
     ],
     "installable": True,
     "application": False,
