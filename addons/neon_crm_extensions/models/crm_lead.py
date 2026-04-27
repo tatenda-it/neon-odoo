@@ -127,3 +127,26 @@ class CrmLead(models.Model):
                 lead.x_lead_score = 2
             else:
                 lead.x_lead_score = 1
+    # ────────────────────────────────────────────────────────────────
+    # SLA Tracking Hook (Section 4)
+    # ────────────────────────────────────────────────────────────────
+
+    def message_post(self, **kwargs):
+        """Stamp x_first_response_time the first time an internal user
+        posts a real message on this lead. The x_sla_breached compute
+        recalculates automatically once the timestamp is set.
+        """
+        # Always call super first so the message actually gets posted
+        message = super().message_post(**kwargs)
+
+        # Only stamp on the first qualifying response
+        for lead in self:
+            if lead.x_first_response_time:
+                continue
+            if self.env.user.share:
+                continue
+            if not kwargs.get("body"):
+                continue
+            lead.x_first_response_time = fields.Datetime.now()
+
+        return message
