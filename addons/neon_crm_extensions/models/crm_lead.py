@@ -288,3 +288,278 @@ class CrmLead(models.Model):
         if digits.startswith("0"):
             digits = digits[1:]
         return digits
+    # ════════════════════════════════════════════════════════════════
+    # Automation Rules (Section 6 — first wave, no WhatsApp dependency)
+    # ════════════════════════════════════════════════════════════════
+    #
+    # Each rule is a private method that:
+    #   - searches for matching crm.lead records
+    #   - creates a mail.activity for each match (Round J)
+    #   - skips records that already have an active activity of the same kind
+    #   - logs a summary line at the end
+    #
+    # Activity duplication is prevented via summary-prefix matching: if a
+    # lead already has an open activity whose summary starts with
+    # "[Neon Rule N]" then we don't create another one. This is the
+    # idempotency guard — daily reruns won't spam users.
+
+    @api.model
+    def _neon_recent_message_cutoff(self, days):
+        """Return a datetime that is `days` ago from now."""
+        return fields.Datetime.now() - timedelta(days=days)
+
+    @api.model
+    def _neon_last_message_before(self, lead, cutoff):
+        """Return True if the lead's most recent mail.message is older
+        than the cutoff datetime, OR if the lead has no messages at all
+        (then we use create_date as a stand-in)."""
+        last_message = self.env["mail.message"].search(
+            [
+                ("model", "=", "crm.lead"),
+                ("res_id", "=", lead.id),
+                ("message_type", "in", ("comment", "email")),
+            ],
+            order="date desc",
+            limit=1,
+        )
+        if last_message:
+            return last_message.date <= cutoff
+        return lead.create_date and lead.create_date <= cutoff
+
+    @api.model
+    def _neon_has_open_activity(self, lead, summary_prefix):
+        """Return True if the lead already has an open mail.activity whose
+        summary starts with `summary_prefix`. Used to prevent duplicate
+        activities when a rule re-fires."""
+        existing = self.env["mail.activity"].search_count([
+            ("res_model", "=", "crm.lead"),
+            ("res_id", "=", lead.id),
+            ("summary", "=like", summary_prefix + "%"),
+        ])
+        return existing > 0
+
+    @api.model
+    def _neon_create_activity(self, lead, summary, note, user_id, deadline_days=1):
+        """Create a mail.activity on a lead record. Uses the generic
+        'Mark Done' (TODO) activity type from mail.mail_activity_data_todo.
+        Returns the created activity record."""
+        todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        if not todo_type:
+            return self.env["mail.activity"]
+        return self.env["mail.activity"].create({
+            "res_model_id": self.env.ref("crm.model_crm_lead").id,
+            "res_id": lead.id,
+            "activity_type_id": todo_type.id,
+            "summary": summary,
+            "note": note,
+            "user_id": user_id,
+            "date_deadline": fields.Date.today() + timedelta(days=deadline_days),
+        })
+
+    @api.model
+    def _neon_md_user_id(self):
+        """Return Munashe's user id for escalations. Falls back to the
+        admin user if Munashe's account is not found (defensive)."""
+        munashe = self.env["res.users"].search([("login", "=", "munashe@neonhiring.co.zw")], limit=1)
+        if munashe:
+            return munashe.id
+        return self.env.ref("base.user_admin").id
+
+    # --- Rule 3 -----------------------------------------------------
+
+    @api.model
+    def _neon_rule3_quote_followup_d3(self):
+        """Rule 3 — leads at Quote Sent stage with no chatter for 3+ days.
+        Creates a TODO activity for the assigned salesperson asking them
+        to chase the client."""
+        cutoff = self._neon_recent_message_cutoff(3)
+        leads = self.search([
+            ("active", "=", True),
+            ("type", "=", "opportunity"),
+            ("stage_id.name", "=", "Quote Sent"),
+            ("write_date", "<=", cutoff),
+        ])
+        matched = leads.filtered(lambda l: self._neon_last_message_before(l, cutoff))
+        prefix = "[Neon Rule 3]"
+        created = 0
+        for lead in matched:
+            if self._neon_has_open_activity(lead, prefix):
+                continue
+            self._neon_create_activity(
+                lead=lead,
+                summary=f"{prefix} Chase quote — Day 3",
+                note=(
+                    "<p>The quote you sent has had no client activity for 3 days. "
+                    "Follow up with a friendly chase message.</p>"
+                ),
+                user_id=lead.user_id.id or self._neon_md_user_id(),
+                deadline_days=1,
+            )
+            created += 1
+        import logging
+        logging.getLogger(__name__).info(
+            "[Neon Rule 3] Quote followup D3: scanned %d, %d matched, %d activities created",
+            len(leads), len(matched), created,
+        )
+        return matched
+
+    # --- Rule 4 -----------------------------------------------------
+
+    @api.model
+    def _neon_rule4_quote_followup_d7(self):
+        """Rule 4 — leads at Quote Sent with no chatter for 7+ days.
+        Escalates to Munashe (MD), not the assigned salesperson."""
+        cutoff = self._neon_recent_message_cutoff(7)
+        leads = self.search([
+            ("active", "=", True),
+            ("type", "=", "opportunity"),
+            ("stage_id.name", "=", "Quote Sent"),
+            ("write_date", "<=", cutoff),
+        ])
+        matched = leads.filtered(lambda l: self._neon_last_message_before(l, cutoff))
+        prefix = "[Neon Rule 4]"
+        created = 0
+        md_id = self._neon_md_user_id()
+        for lead in matched:
+            if self._neon_has_open_activity(lead, prefix):
+                continue
+            self._neon_create_activity(
+                lead=lead,
+                summary=f"{prefix} Quote ESCALATION — Day 7",
+                note=(
+                    "<p><strong>Escalation:</strong> Quote has had no activity "
+                    "for 7 days. Salesperson reminder fired at Day 3 and was "
+                    "not actioned. Personal review recommended.</p>"
+                ),
+                user_id=md_id,
+                deadline_days=1,
+            )
+            created += 1
+        import logging
+        logging.getLogger(__name__).info(
+            "[Neon Rule 4] Quote followup D7 escalation: scanned %d, %d matched, %d activities created",
+            len(leads), len(matched), created,
+        )
+        return matched
+
+    # --- Rule 5 -----------------------------------------------------
+
+    @api.model
+    def _neon_rule5_stuck_deal(self):
+        """Rule 5 — any active lead in any non-terminal stage with 7+ days
+        of no chatter. Surfaced on Munashe's dashboard via activity."""
+        cutoff = self._neon_recent_message_cutoff(7)
+        leads = self.search([
+            ("active", "=", True),
+            ("type", "=", "opportunity"),
+            ("stage_id.name", "!=", "Confirmed"),
+            ("probability", ">", 0),
+            ("write_date", "<=", cutoff),
+        ])
+        matched = leads.filtered(lambda l: self._neon_last_message_before(l, cutoff))
+        prefix = "[Neon Rule 5]"
+        created = 0
+        md_id = self._neon_md_user_id()
+        for lead in matched:
+            if self._neon_has_open_activity(lead, prefix):
+                continue
+            self._neon_create_activity(
+                lead=lead,
+                summary=f"{prefix} Stuck deal — review",
+                note=(
+                    "<p>This deal has had no activity for 7+ days and is still "
+                    "open. Decide whether to push it forward or mark as Lost.</p>"
+                ),
+                user_id=md_id,
+                deadline_days=2,
+            )
+            created += 1
+        import logging
+        logging.getLogger(__name__).info(
+            "[Neon Rule 5] Stuck deal scan: scanned %d, %d matched, %d activities created",
+            len(leads), len(matched), created,
+        )
+        return matched
+
+    # --- Rule 8 -----------------------------------------------------
+
+    @api.model
+    def _neon_rule8_annual_client(self):
+        """Rule 8 — leads tagged 'Annual Client' with no activity for
+        9+ months (~270 days). Triggers a personal-outreach reminder
+        for the original salesperson."""
+        cutoff = self._neon_recent_message_cutoff(9 * 30)
+        tag = self.env["crm.tag"].search([("name", "=", "Annual Client")], limit=1)
+        if not tag:
+            import logging
+            logging.getLogger(__name__).warning(
+                "[Neon Rule 8] No 'Annual Client' tag found — skipping run"
+            )
+            return self.browse()
+        leads = self.search([
+            ("type", "=", "opportunity"),
+            ("tag_ids", "in", tag.id),
+            ("write_date", "<=", cutoff),
+        ])
+        matched = leads.filtered(lambda l: self._neon_last_message_before(l, cutoff))
+        prefix = "[Neon Rule 8]"
+        created = 0
+        for lead in matched:
+            if self._neon_has_open_activity(lead, prefix):
+                continue
+            self._neon_create_activity(
+                lead=lead,
+                summary=f"{prefix} Annual client check-in",
+                note=(
+                    "<p>Annual client check-in due. Send a personal WhatsApp "
+                    "or call — do <strong>not</strong> send a mass email.</p>"
+                    "<p>Suggested message: 'Hi [Name], hope all is well — "
+                    "your annual [event] should be coming up. Can we assist "
+                    "with production this year?'</p>"
+                ),
+                user_id=lead.user_id.id or self._neon_md_user_id(),
+                deadline_days=3,
+            )
+            created += 1
+        import logging
+        logging.getLogger(__name__).info(
+            "[Neon Rule 8] Annual client re-engagement: scanned %d, %d matched, %d activities created",
+            len(leads), len(matched), created,
+        )
+        return matched
+
+    # --- Rule 9 -----------------------------------------------------
+
+    @api.model
+    def _neon_rule9_duplicate_warning(self):
+        """Rule 9 — leads currently flagged as duplicates by Section 5's
+        scheduled check. Creates a TODO activity asking the salesperson
+        to investigate and merge or dismiss."""
+        leads = self.search([
+            ("active", "=", True),
+            ("type", "=", "opportunity"),
+            ("x_duplicate_flag", "=", True),
+        ])
+        prefix = "[Neon Rule 9]"
+        created = 0
+        for lead in leads:
+            if self._neon_has_open_activity(lead, prefix):
+                continue
+            self._neon_create_activity(
+                lead=lead,
+                summary=f"{prefix} Possible duplicate — review",
+                note=(
+                    "<p>This lead shares a phone or email with another active "
+                    "lead. Open both records and decide whether to merge "
+                    "(via the Action menu) or dismiss the warning.</p>"
+                ),
+                user_id=lead.user_id.id or self._neon_md_user_id(),
+                deadline_days=1,
+            )
+            created += 1
+        import logging
+        logging.getLogger(__name__).info(
+            "[Neon Rule 9] Duplicate warning: %d flagged leads, %d activities created",
+            len(leads), created,
+        )
+        return leads

@@ -23,6 +23,66 @@
             <field name="numbercall">-1</field>
             <field name="active" eval="True"/>
         </record>
+        <!--
+            Section 6 automation rules — Round I (detection only).
+            All five rules log their findings to the Odoo log but do
+            NOT yet create activities or send notifications. Round J
+            will add real side effects.
+        -->
 
+        <record id="ir_cron_neon_rule3_quote_d3" model="ir.cron">
+            <field name="name">Neon Rule 3: Quote follow-up Day 3</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">code</field>
+            <field name="code">model._neon_rule3_quote_followup_d3()</field>
+            <field name="interval_number">12</field>
+            <field name="interval_type">hours</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="ir_cron_neon_rule4_quote_d7" model="ir.cron">
+            <field name="name">Neon Rule 4: Quote follow-up Day 7 escalation</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">code</field>
+            <field name="code">model._neon_rule4_quote_followup_d7()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="ir_cron_neon_rule5_stuck_deal" model="ir.cron">
+            <field name="name">Neon Rule 5: Stuck deal alert</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">code</field>
+            <field name="code">model._neon_rule5_stuck_deal()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="ir_cron_neon_rule8_annual_client" model="ir.cron">
+            <field name="name">Neon Rule 8: Annual client re-engagement</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">code</field>
+            <field name="code">model._neon_rule8_annual_client()</field>
+            <field name="interval_number">7</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="ir_cron_neon_rule9_duplicate_warning" model="ir.cron">
+            <field name="name">Neon Rule 9: Duplicate lead warning</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">code</field>
+            <field name="code">model._neon_rule9_duplicate_warning()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>
