@@ -19,3 +19,6 @@ config/odoo.conf
 __pycache__/
 *.pyc
 *.pyo
+
+# Database backups — local only, never push to GitHub
+backups/
