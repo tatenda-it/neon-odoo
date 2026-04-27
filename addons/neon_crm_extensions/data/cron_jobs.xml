@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Daily deduplication scan.
+
+            Runs once a day, scans all active opportunities, and sets
+            x_duplicate_flag on any lead that shares a phone or email
+            with another active lead.
+
+            noupdate="1" means: on module upgrade, do NOT overwrite the
+            user's customisations to schedule (e.g. if Robin or Tatenda
+            edits the cron interval in the UI, that won't be reverted).
+        -->
+        <record id="ir_cron_neon_dedup_check" model="ir.cron">
+            <field name="name">Neon: Daily lead deduplication check</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">code</field>
+            <field name="code">model._neon_run_dedup_check()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

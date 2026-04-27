@@ -22,11 +22,20 @@
         <field name="arch" type="xml">
 
             <xpath expr="//widget[@name='web_ribbon'][1]" position="before">
+                <field name="x_alert_label" invisible="1"/>
+                <field name="x_alert_color" invisible="1"/>
+                <widget name="web_ribbon"
+                        title="SLA + DUPLICATE"
+                        bg_color="text-bg-danger"
+                        invisible="x_alert_label != 'SLA + DUPLICATE'"/>
                 <widget name="web_ribbon"
                         title="SLA Breached"
                         bg_color="text-bg-danger"
-                        invisible="not x_sla_breached"/>
-                <field name="x_sla_breached" invisible="1"/>
+                        invisible="x_alert_label != 'SLA Breached'"/>
+                <widget name="web_ribbon"
+                        title="Possible Duplicate"
+                        bg_color="text-bg-warning"
+                        invisible="x_alert_label != 'Possible Duplicate'"/>
             </xpath>
 
             <xpath expr="//div[hasclass('o_lead_opportunity_form_inline_fields')]/field[@name='priority']" position="after">

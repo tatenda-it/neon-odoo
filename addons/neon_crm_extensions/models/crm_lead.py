@@ -56,7 +56,21 @@ class CrmLead(models.Model):
             "typically happens. Drives the 9-month re-engagement check."
         ),
     )
+    # ────────────────────────────────────────────────────────────────
+    # Round F — Deduplication flag (set by daily scheduled action in §5)
+    # ────────────────────────────────────────────────────────────────
 
+    x_duplicate_flag = fields.Boolean(
+        string="Possible Duplicate",
+        default=False,
+        copy=False,
+        help=(
+            "True when the daily deduplication check found another active lead "
+            "with matching phone or email. Set by scheduled action — do not edit "
+            "manually. Lead remains flagged until the underlying duplicate is "
+            "merged or one record is archived/lost."
+        ),
+    )
     # ────────────────────────────────────────────────────────────────
     # Round B — SLA tracking datetime (set by message_post hook in §4)
     # ────────────────────────────────────────────────────────────────
@@ -127,6 +141,49 @@ class CrmLead(models.Model):
                 lead.x_lead_score = 2
             else:
                 lead.x_lead_score = 1
+    
+    # ────────────────────────────────────────────────────────────────
+    # Combined alert ribbon (Round H+) — priority-aware ribbon driver
+    # ────────────────────────────────────────────────────────────────
+
+    x_alert_label = fields.Char(
+        string="Alert Label",
+        compute="_compute_alert",
+        store=True,
+        help="Display text for the unified alert ribbon. Auto-computed.",
+    )
+
+    x_alert_color = fields.Selection(
+        selection=[
+            ("none", "None"),
+            ("warning", "Warning (yellow)"),
+            ("danger", "Danger (red)"),
+        ],
+        string="Alert Color",
+        compute="_compute_alert",
+        store=True,
+        default="none",
+        help="Background colour of the unified alert ribbon. Auto-computed.",
+    )
+
+    @api.depends("x_sla_breached", "x_duplicate_flag")
+    def _compute_alert(self):
+        """Combine the two ribbon-worthy flags into a single label/color
+        so they can share one web_ribbon slot. SLA dominates duplicate
+        when both are true."""
+        for lead in self:
+            if lead.x_sla_breached and lead.x_duplicate_flag:
+                lead.x_alert_label = "SLA + DUPLICATE"
+                lead.x_alert_color = "danger"
+            elif lead.x_sla_breached:
+                lead.x_alert_label = "SLA Breached"
+                lead.x_alert_color = "danger"
+            elif lead.x_duplicate_flag:
+                lead.x_alert_label = "Possible Duplicate"
+                lead.x_alert_color = "warning"
+            else:
+                lead.x_alert_label = False
+                lead.x_alert_color = "none"
     # ────────────────────────────────────────────────────────────────
     # SLA Tracking Hook (Section 4)
     # ────────────────────────────────────────────────────────────────
@@ -150,3 +207,84 @@ class CrmLead(models.Model):
             lead.x_first_response_time = fields.Datetime.now()
 
         return message
+    # ────────────────────────────────────────────────────────────────
+    # Deduplication detection (Section 5)
+    # ────────────────────────────────────────────────────────────────
+
+    @api.model
+    def _neon_run_dedup_check(self):
+        """Daily scheduled action — flag leads that share a phone or email
+        with another active lead.
+
+        Strategy:
+        1. Fetch all active leads with at least a phone or email
+        2. Build two lookup maps: normalised phone -> lead IDs, lowered email -> lead IDs
+        3. Any phone or email mapping to 2+ leads marks all those leads as duplicates
+        4. Leads that no longer match anything get their flag cleared
+        """
+        # 1. Fetch candidates
+        leads = self.search([
+            ("active", "=", True),
+            ("type", "=", "opportunity"),
+            "|", ("phone", "!=", False), ("email_from", "!=", False),
+        ])
+
+        # 2. Build lookup maps
+        phone_map = {}    # normalised phone -> set of lead IDs
+        email_map = {}    # lowered email -> set of lead IDs
+
+        for lead in leads:
+            if lead.phone:
+                normalised = self._neon_normalise_phone(lead.phone)
+                if normalised:
+                    phone_map.setdefault(normalised, set()).add(lead.id)
+            if lead.email_from:
+                lowered = lead.email_from.strip().lower()
+                if lowered:
+                    email_map.setdefault(lowered, set()).add(lead.id)
+
+        # 3. Collect all duplicate IDs
+        flagged_ids = set()
+        for ids in phone_map.values():
+            if len(ids) >= 2:
+                flagged_ids.update(ids)
+        for ids in email_map.values():
+            if len(ids) >= 2:
+                flagged_ids.update(ids)
+
+        # 4. Update flags. Use sudo() to bypass any record rules; this is a
+        # system-level scan that must see all leads regardless of ownership.
+        all_active = self.search([("active", "=", True), ("type", "=", "opportunity")])
+        to_flag = all_active.filtered(lambda r: r.id in flagged_ids)
+        to_unflag = all_active.filtered(
+            lambda r: r.id not in flagged_ids and r.x_duplicate_flag
+        )
+        if to_flag:
+            to_flag.write({"x_duplicate_flag": True})
+        if to_unflag:
+            to_unflag.write({"x_duplicate_flag": False})
+
+        return {
+            "scanned": len(leads),
+            "flagged": len(to_flag),
+            "unflagged": len(to_unflag),
+        }
+
+    @api.model
+    def _neon_normalise_phone(self, phone):
+        """Strip non-digits, drop a leading 0 if present, drop a leading
+        country code 263 if present. Used only for duplicate matching;
+        does not modify the stored phone value."""
+        if not phone:
+            return ""
+        # Keep only digits
+        digits = "".join(ch for ch in phone if ch.isdigit())
+        if not digits:
+            return ""
+        # Drop leading country code 263 (Zimbabwe)
+        if digits.startswith("263"):
+            digits = digits[3:]
+        # Drop leading 0
+        if digits.startswith("0"):
+            digits = digits[1:]
+        return digits

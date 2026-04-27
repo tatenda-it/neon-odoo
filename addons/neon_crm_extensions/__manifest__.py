@@ -30,6 +30,7 @@ Module is the foundation for Sections 4-6 of the M1 Action Plan
     ],
     "data": [
     "security/ir.model.access.csv",
+    "data/cron_jobs.xml",
     "views/crm_lead_views.xml",
     ],
     "installable": True,
