@@ -339,9 +339,12 @@ class CrmLead(models.Model):
         return existing > 0
 
     @api.model
-    def _neon_create_activity(self, lead, summary, note, user_id, deadline_days=1):
+    def _neon_create_activity(self, lead, summary, note, user_id, deadline_days=1, tier="red"):
         """Create a mail.activity on a lead record. Uses the generic
         'Mark Done' (TODO) activity type from mail.mail_activity_data_todo.
+        The `tier` argument classifies urgency for digest delivery —
+        Section 6 rules pass 'red' (immediate); future M2 work will
+        use 'amber' (daily digest) or 'green' (weekly digest).
         Returns the created activity record."""
         todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
         if not todo_type:
@@ -354,6 +357,7 @@ class CrmLead(models.Model):
             "note": note,
             "user_id": user_id,
             "date_deadline": fields.Date.today() + timedelta(days=deadline_days),
+            "x_alert_tier": tier,
         })
 
     @api.model
