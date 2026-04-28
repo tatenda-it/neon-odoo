@@ -5,7 +5,26 @@ Runs Odoo 17 Community + PostgreSQL 15 in Docker, accessible at
 **http://localhost:8069**.
 
 ---
+## Current Milestone
 
+**M14a — Hosting Foundation** (in progress, started 28 April 2026)
+
+Working on a feature branch: `feat/m14a-hosting`. Sequencing decisions
+recorded in `docs/SEQUENCING.md`.
+
+| Status | Milestone | Notes |
+|---|---|---|
+| ✅ | M0 — Foundation | Local Docker, Postgres, Odoo 17 |
+| ✅ | M1 — CRM core | 9 fields, 5 rules, SLA hook, dedup engine |
+| 🚧 | **M14a — Hosting Foundation** | **CURRENT** — Oracle Cloud + Cloudflare + Nginx |
+| ⏸ | M14a §9 — Zoho CRM migration | Deferred to a future migration milestone |
+| ⏳ | M2 — Channel integration | Queued after M14a |
+| ⏳ | M6-M11 — Finance Phase 1B | Queued after M2-M5 |
+| ⏳ | M14b — Cutover | Final milestone |
+
+See `docs/SEQUENCING.md` for the deviation from Master Brief Section 11.
+
+---
 ## 1. Prerequisites
 
 - Docker Desktop (Windows / macOS) **or** Docker Engine + Docker Compose plugin (Linux)
