@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_whatsapp_config_user,neon.whatsapp.config user,model_neon_whatsapp_config,base.group_user,1,0,0,0
+access_neon_whatsapp_config_manager,neon.whatsapp.config manager,model_neon_whatsapp_config,base.group_system,1,1,1,1
+access_neon_whatsapp_message_user,neon.whatsapp.message user,model_neon_whatsapp_message,base.group_user,1,0,0,0
+access_neon_whatsapp_message_manager,neon.whatsapp.message manager,model_neon_whatsapp_message,base.group_system,1,1,1,1

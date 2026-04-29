@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- WhatsApp Config Form View -->
+    <record id="view_neon_whatsapp_config_form" model="ir.ui.view">
+        <field name="name">neon.whatsapp.config.form</field>
+        <field name="model">neon.whatsapp.config</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Configuration">
+                <header>
+                    <button name="action_test_connection"
+                            string="Test Connection"
+                            type="object"
+                            class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group string="API Credentials">
+                        <field name="name"/>
+                        <field name="phone_number_id"/>
+                        <field name="whatsapp_business_account_id"/>
+                        <field name="access_token" password="True"/>
+                        <field name="verify_token"/>
+                        <field name="webhook_url"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- WhatsApp Config Tree View -->
+    <record id="view_neon_whatsapp_config_tree" model="ir.ui.view">
+        <field name="name">neon.whatsapp.config.tree</field>
+        <field name="model">neon.whatsapp.config</field>
+        <field name="arch" type="xml">
+            <tree string="WhatsApp Configurations">
+                <field name="name"/>
+                <field name="phone_number_id"/>
+                <field name="webhook_url"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- WhatsApp Message Tree View -->
+    <record id="view_neon_whatsapp_message_tree" model="ir.ui.view">
+        <field name="name">neon.whatsapp.message.tree</field>
+        <field name="model">neon.whatsapp.message</field>
+        <field name="arch" type="xml">
+            <tree string="WhatsApp Messages">
+                <field name="create_date"/>
+                <field name="direction"/>
+                <field name="phone_number"/>
+                <field name="message_body"/>
+                <field name="message_type"/>
+                <field name="state"/>
+                <field name="lead_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- WhatsApp Message Form View -->
+    <record id="view_neon_whatsapp_message_form" model="ir.ui.view">
+        <field name="name">neon.whatsapp.message.form</field>
+        <field name="model">neon.whatsapp.message</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Message">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="direction"/>
+                        <field name="phone_number"/>
+                        <field name="message_type"/>
+                        <field name="state"/>
+                        <field name="lead_id"/>
+                    </group>
+                    <group string="Message Content">
+                        <field name="message_body"/>
+                    </group>
+                    <group string="Raw Data">
+                        <field name="raw_payload"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Actions -->
+    <record id="action_neon_whatsapp_config" model="ir.actions.act_window">
+        <field name="name">WhatsApp Configuration</field>
+        <field name="res_model">neon.whatsapp.config</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="action_neon_whatsapp_messages" model="ir.actions.act_window">
+        <field name="name">WhatsApp Messages</field>
+        <field name="res_model">neon.whatsapp.message</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- Menu Items -->
+    <menuitem id="menu_neon_whatsapp_root"
+              name="WhatsApp"
+              parent="crm.crm_menu_root"
+              sequence="20"/>
+
+    <menuitem id="menu_neon_whatsapp_messages"
+              name="Messages"
+              parent="menu_neon_whatsapp_root"
+              action="action_neon_whatsapp_messages"
+              sequence="1"/>
+
+    <menuitem id="menu_neon_whatsapp_config"
+              name="Configuration"
+              parent="menu_neon_whatsapp_root"
+              action="action_neon_whatsapp_config"
+              sequence="2"/>
+
+</odoo>
