@@ -19,6 +19,7 @@
     'data': [
         'security/ir.model.access.csv',
         'views/whatsapp_config_views.xml',
+        'views/login_template.xml',
     ],
     'installable': True,
     'application': False,

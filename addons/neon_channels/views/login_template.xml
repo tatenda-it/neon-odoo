@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="neon_login_footer" inherit_id="web.login" name="Neon Login - Hide Footer">
+        <xpath expr="//div[hasclass('o_login_footer')]" position="replace">
+            <div class="o_login_footer" style="display:none !important;"/>
+        </xpath>
+    </template>
+</odoo>
