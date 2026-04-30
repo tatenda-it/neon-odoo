@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template id="neon_login_footer" inherit_id="web.login" name="Neon Login - Hide Footer">
-        <xpath expr="//footer" position="replace">
-            <footer style="display:none !important;"/>
+        <xpath expr="//div[contains(@class,'o_login_auth')]" position="after">
+            <style>
+                .o_database_list, a[href='/web/database/manager'], .o_login_footer { display: none !important; }
+            </style>
         </xpath>
     </template>
 </odoo>
