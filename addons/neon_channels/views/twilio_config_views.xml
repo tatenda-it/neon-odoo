@@ -33,12 +33,12 @@
         <field name="name">twilio.config.list</field>
         <field name="model">twilio.config</field>
         <field name="arch" type="xml">
-            <list string="Twilio Configuration">
+            <tree string="Twilio Configuration">
                 <field name="name"/>
                 <field name="account_sid"/>
                 <field name="phone_number"/>
                 <field name="whatsapp_number"/>
-            </list>
+            </tree>
         </field>
     </record>
 
