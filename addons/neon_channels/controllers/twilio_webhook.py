@@ -29,7 +29,8 @@ class TwilioWebhookController(http.Controller):
             twilio_config = request.env['twilio.config'].sudo().search([], limit=1)
             authorised_numbers = []
             if twilio_config:
-                authorised_numbers = [n.strip() for n in (twilio_config.authorised_numbers or '').split(',') if n.strip()]
+                authorised_numbers = [n.strip() for n in re.split(r'[,
+]', twilio_config.authorised_numbers or '') if n.strip()]
 
             if authorised_numbers and from_number in authorised_numbers:
                 # Process as bot command
