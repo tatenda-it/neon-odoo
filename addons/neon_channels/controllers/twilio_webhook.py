@@ -82,7 +82,7 @@ class TwilioWebhookController(http.Controller):
                 'message_body': body,
                 'direction': 'inbound',
                 'message_type': 'text',
-                'status': 'received',
+                
                 'lead_id': lead.id,
             })
             return f'Thank you for contacting Neon Events Elements. We will respond within 2 hours. Reference: {lead_name}'
