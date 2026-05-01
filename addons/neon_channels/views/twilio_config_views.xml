@@ -50,7 +50,7 @@
 
     <menuitem id="menu_twilio_config"
         name="Twilio"
-        parent="menu_neon_channels_root"
+        parent="menu_neon_whatsapp_root"
         action="action_twilio_config"
         sequence="20"/>
 </odoo>
