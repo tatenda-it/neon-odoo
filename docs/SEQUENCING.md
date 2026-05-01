@@ -118,3 +118,25 @@ generation. We accept this for the resilience benefit.
 algorithm). They are NOT reused from any existing context (e.g.
 GitHub SSH keys). All three public keys go into the VM's
 `/root/.ssh/authorized_keys` file at provisioning time.
+
+## Deviation 5 — Pipeline stages revised (28 April 2026)
+
+**Original CRM Phase 1 Brief:** 8 stages (New Enquiry → Contacted →
+Qualifying → Quote Sent → Negotiating → Deposit Pending → Confirmed → Lost)
+
+**Final agreed pipeline:** 5 stages confirmed by Robin on 28 April 2026:
+1. New
+2. Proposal Sent
+3. Negotiation
+4. Closed Won
+5. Lost
+
+**Rationale:** Simpler pipeline matches how the sales team actually works.
+Deposit Pending and Confirmed collapsed into Closed Won. Contacted and
+Qualifying removed as separate stages.
+
+**Impact on automation rules:** Rules 3, 4 (Quote Sent triggers) need
+updating to use Proposal Sent stage instead. Rules 5 (stuck deal) and
+8 (annual client) are stage-agnostic — unaffected.
+**Action required:** Update automation rule stage references in
+neon_crm_extensions before M2 go-live.
