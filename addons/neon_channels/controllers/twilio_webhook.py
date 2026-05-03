@@ -13,7 +13,7 @@ class TwilioWebhookController(http.Controller):
     def twilio_webhook(self, **kwargs):
         """Handle incoming Twilio WhatsApp messages."""
         try:
-            from_number = kwargs.get('From', '').replace('whatsapp:', '')
+            from_number = kwargs.get('From', '').replace('whatsapp:', '').replace(' ', '+').strip()
             body = kwargs.get('Body', '').strip()
             profile_name = kwargs.get('ProfileName', '')
 
@@ -89,6 +89,7 @@ class TwilioWebhookController(http.Controller):
                 'message_body': body,
                 'direction': 'inbound',
                 'message_type': 'text',
+                'name': f'WhatsApp from {from_number}',
                 'lead_id': lead.id,
             })
             return f'Thank you for contacting Neon Events Elements. We will respond shortly. Reference: {lead_name}'
