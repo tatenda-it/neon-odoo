@@ -1,1 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_payment_confirm_wizard_sales,access.neon.payment.confirm.wizard.sales,model_neon_payment_confirm_wizard,sales_team.group_sale_salesman,1,1,1,1
+access_neon_payment_confirm_wizard_finance,access.neon.payment.confirm.wizard.finance,model_neon_payment_confirm_wizard,neon_crm_extensions.group_neon_finance_manager,1,1,1,1

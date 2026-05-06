@@ -36,11 +36,16 @@ Module is the foundation for Sections 4-6 of the M1 Action Plan
         "phone_validation",
         "mail",
     ],
+    "external_dependencies": {
+        "python": ["requests"],
+    },
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/cron_jobs.xml",
         "data/crm_stages.xml",
+        "data/system_parameters.xml",
+        "wizards/payment_confirm_wizard_views.xml",
         "views/crm_lead_views.xml",
     ],
     "installable": True,
