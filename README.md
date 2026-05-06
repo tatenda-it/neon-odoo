@@ -38,6 +38,33 @@ neon-odoo/
 
 ## 3. Start the Stack
 
+### 3.1 Bootstrap a fresh clone
+
+Two pieces of state are deliberately not committed to git and must be set up once after cloning:
+
+**Initialise OCA submodules.** The `oca/queue`, `oca/server-tools`, and `oca/web` directories are git submodules that ship the `queue_job`, `auditlog`, and `web_responsive` modules respectively. Without them, the database will boot but those modules log `not installable, skipped` and the responsive grid layout / theme switcher disappear.
+
+```bash
+git submodule update --init --recursive
+```
+
+**Create the Odoo config from the template.** `config/odoo.conf` is gitignored because it carries the master and Postgres passwords. Copy the example and fill in real values:
+
+```bash
+cp config/odoo.conf.example config/odoo.conf
+```
+
+Then edit `config/odoo.conf`:
+
+- `admin_passwd` — strong master password before exposing Odoo to anyone outside localhost.
+- `db_password` — must match `POSTGRES_PASSWORD` in `docker-compose.yml` (default `odoo`).
+
+Without this file the container falls back to Odoo defaults and the `/mnt/extra-addons` addons path is **not** loaded — no custom or OCA modules will be visible.
+
+> **Note for existing developers:** if you ever need to apply host changes to a long-running Odoo container (new module dropped under `addons/`, freshly initialised submodule, edited conf), use `docker compose up -d --force-recreate odoo`. Plain `restart` does not refresh bind mounts on Docker Desktop for Windows.
+
+### 3.2 Bring up the stack
+
 From inside the `neon-odoo/` directory:
 
 ```bash
