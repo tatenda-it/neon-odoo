@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Day 11 — OpenClaw WhatsApp configuration.
+
+            These three system parameters drive the WhatsApp notification
+            sent to Munashe when a payment claim is submitted via the
+            Confirm Payment wizard.
+
+            Fill in the real values under
+                Settings → Technical → Parameters → System Parameters
+            after the OpenClaw account is provisioned. Empty values are
+            fine — the wizard logs a warning and skips the call rather
+            than blocking the payment claim.
+
+            noupdate="1" means real values entered through the UI are
+            preserved across module upgrades.
+        -->
+        <record id="ir_config_param_openclaw_api_url" model="ir.config_parameter">
+            <field name="key">neon_crm_extensions.openclaw_api_url</field>
+            <field name="value"></field>
+        </record>
+
+        <record id="ir_config_param_openclaw_api_token" model="ir.config_parameter">
+            <field name="key">neon_crm_extensions.openclaw_api_token</field>
+            <field name="value"></field>
+        </record>
+
+        <record id="ir_config_param_munashe_whatsapp_number" model="ir.config_parameter">
+            <field name="key">neon_crm_extensions.munashe_whatsapp_number</field>
+            <field name="value"></field>
+        </record>
+
+    </data>
+</odoo>

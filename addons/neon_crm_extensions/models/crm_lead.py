@@ -8,7 +8,8 @@ with future Odoo upstream fields.
 """
 
 from datetime import timedelta
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import AccessError
 
 
 class CrmLead(models.Model):
@@ -54,6 +55,39 @@ class CrmLead(models.Model):
         help=(
             "For Annual Client tagged contacts — the month their event "
             "typically happens. Drives the 9-month re-engagement check."
+        ),
+    )
+    # ────────────────────────────────────────────────────────────────
+    # Day 11 — Payment confirmation lifecycle
+    # ────────────────────────────────────────────────────────────────
+    #
+    # Field name does NOT carry the x_ prefix used by other Neon custom
+    # fields. The Day 11 brief specifies this exact name because it is
+    # the contract the Zoho Books bridge will read when it syncs.
+    #
+    # Lifecycle:
+    #   none      — no claim raised yet (default)
+    #   claimed   — sales user submitted the Confirm Payment wizard
+    #   verified  — Zoho Books bridge reconciled the payment. Cannot be
+    #               set manually through the UI; the write() guard below
+    #               restricts the transition to the Finance Manager group
+    #               (the bridge runs as a service user in that group).
+
+    payment_claim_status = fields.Selection(
+        selection=[
+            ("none", "None"),
+            ("claimed", "Claimed"),
+            ("verified", "Verified"),
+        ],
+        string="Payment Claim Status",
+        default="none",
+        copy=False,
+        tracking=True,
+        help=(
+            "Tracks payment claim lifecycle. 'Claimed' is set when a "
+            "salesperson submits the Confirm Payment wizard. 'Verified' "
+            "is set only by the Zoho Books bridge after reconciliation "
+            "and is restricted to the Finance Manager group."
         ),
     )
     # ────────────────────────────────────────────────────────────────
@@ -184,6 +218,28 @@ class CrmLead(models.Model):
             else:
                 lead.x_alert_label = False
                 lead.x_alert_color = "none"
+    # ────────────────────────────────────────────────────────────────
+    # Day 11 — Verified status guard
+    # ────────────────────────────────────────────────────────────────
+
+    def write(self, vals):
+        """Block manual transitions to payment_claim_status='verified'.
+
+        Only the Finance Manager group may write this value, and the
+        intended caller is the Zoho Books reconciliation bridge running
+        as a service user in that group. Superuser writes (sudo, tests,
+        migrations) bypass the check."""
+        if vals.get("payment_claim_status") == "verified" and not self.env.su:
+            if not self.env.user.has_group(
+                "neon_crm_extensions.group_neon_finance_manager"
+            ):
+                raise AccessError(_(
+                    "Only the Finance Manager role can mark a payment as "
+                    "Verified. This is normally set automatically by the "
+                    "Zoho Books bridge after reconciliation."
+                ))
+        return super().write(vals)
+
     # ────────────────────────────────────────────────────────────────
     # SLA Tracking Hook (Section 4)
     # ────────────────────────────────────────────────────────────────

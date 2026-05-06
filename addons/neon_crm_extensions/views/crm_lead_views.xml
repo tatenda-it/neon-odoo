@@ -21,6 +21,27 @@
         <field name="inherit_id" ref="crm.crm_lead_view_form"/>
         <field name="arch" type="xml">
 
+            <!--
+                Day 11 — Confirm Payment Received header button.
+
+                Visible only to members of sales_team.group_sale_salesman
+                and hidden once the payment has been verified by the
+                Zoho Books bridge.
+            -->
+            <xpath expr="//header" position="inside">
+                <button name="%(neon_crm_extensions.action_neon_payment_confirm_wizard)d"
+                        type="action"
+                        string="Confirm Payment Received"
+                        class="oe_highlight"
+                        groups="sales_team.group_sale_salesman"
+                        invisible="payment_claim_status == 'verified'"
+                        context="{'active_model': 'crm.lead', 'active_id': id}"/>
+                <field name="payment_claim_status"
+                       widget="statusbar"
+                       options="{'clickable': '0'}"
+                       readonly="1"/>
+            </xpath>
+
             <xpath expr="//widget[@name='web_ribbon'][1]" position="before">
                 <field name="x_alert_label" invisible="1"/>
                 <field name="x_alert_color" invisible="1"/>

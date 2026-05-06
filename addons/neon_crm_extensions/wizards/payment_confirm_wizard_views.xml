@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_payment_confirm_wizard_form" model="ir.ui.view">
+        <field name="name">neon.payment.confirm.wizard.form</field>
+        <field name="model">neon.payment.confirm.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirm Payment Received">
+                <sheet>
+                    <group>
+                        <field name="lead_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <group string="Payment">
+                            <field name="amount"/>
+                            <field name="payment_method"/>
+                            <field name="reference"/>
+                            <field name="payment_date"/>
+                        </group>
+                        <group string="Detail">
+                            <field name="notes" nolabel="1" placeholder="Optional context for the verification team"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_payment"
+                            type="object"
+                            string="Confirm Payment"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_payment_confirm_wizard" model="ir.actions.act_window">
+        <field name="name">Confirm Payment Received</field>
+        <field name="res_model">neon.payment.confirm.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="crm.model_crm_lead"/>
+    </record>
+
+</odoo>
