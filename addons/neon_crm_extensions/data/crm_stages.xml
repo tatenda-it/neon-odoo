@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Day 11 — Payment Pending Verification stage.
+
+            Sits between the existing "Closed Won" / "Confirmed" stage
+            and final closure. is_won = False because money has not yet
+            been reconciled in Zoho Books — only when the bridge flips
+            payment_claim_status to 'verified' is the deal truly closed.
+
+            sequence = 60 places it after a typical Won (50) and before
+            any post-payment / reporting stage. Adjust in the UI under
+            CRM → Configuration → Pipeline Stages if your numbering
+            differs.
+
+            Note on colour: crm.stage has no built-in colour field in
+            Odoo 17 Community. The amber/orange visual treatment is set
+            on the kanban view in the UI by Robin or Tatenda after
+            installation. The legend_* fields below give the stage a
+            distinct in-stage label set so users can see at a glance
+            what each kanban_state means while the deal is parked here.
+
+            noupdate="1" preserves any user edits to this record on
+            module upgrade.
+        -->
+        <record id="stage_payment_pending_verification" model="crm.stage">
+            <field name="name">Payment Pending Verification</field>
+            <field name="sequence">60</field>
+            <field name="is_won" eval="False"/>
+            <field name="fold" eval="False"/>
+            <field name="probability">99.0</field>
+            <field name="legend_normal">Awaiting Zoho Books reconciliation</field>
+            <field name="legend_done">Payment verified — ready to close</field>
+            <field name="legend_blocked">Payment claim disputed or refunded</field>
+        </record>
+
+    </data>
+</odoo>
