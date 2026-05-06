@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--
+            Day 11 — Finance Manager group.
+
+            Members of this group are the only users (other than admins
+            running with sudo) permitted to write payment_claim_status
+            = 'verified' on a crm.lead. The intended principal caller
+            is the Zoho Books reconciliation bridge, which will run as
+            a service user added to this group.
+
+            Tatenda (Finance) is the canonical human member. Robin (MD)
+            inherits via Settings group membership rather than being
+            added here directly.
+        -->
+        <record id="group_neon_finance_manager" model="res.groups">
+            <field name="name">Neon: Finance Manager</field>
+            <field name="category_id" ref="base.module_category_accounting"/>
+            <field name="comment">Permitted to mark a payment claim as Verified. The Zoho Books bridge runs as a service user in this group.</field>
+        </record>
+
+    </data>
+</odoo>
