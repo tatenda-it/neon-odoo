@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Inherit the standard contact form view.
+        Adds a "Financial Overview" group with:
+            - x_outstanding_balance (Float, manual)
+            - x_last_invoice_date   (Date, manual)
+    -->
+    <record id="view_partner_form_neon" model="ir.ui.view">
+        <field name="name">res.partner.form.neon.extensions</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//sheet/notebook" position="before">
+                <group string="Financial Overview" name="neon_financial_overview">
+                    <field name="x_outstanding_balance"/>
+                    <field name="x_last_invoice_date"/>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

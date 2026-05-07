@@ -1,6 +1,6 @@
 {
     "name": "Neon CRM Extensions",
-    "version": "17.0.1.1.0",
+    "version": "17.0.1.2.0",
     "summary": "Neon-specific custom fields and workflow extensions for CRM",
     "description": """
 Neon CRM Extensions
@@ -47,6 +47,7 @@ Module is the foundation for Sections 4-6 of the M1 Action Plan
         "data/system_parameters.xml",
         "wizards/payment_confirm_wizard_views.xml",
         "views/crm_lead_views.xml",
+        "views/res_partner_views.xml",
     ],
     "installable": True,
     "application": False,
