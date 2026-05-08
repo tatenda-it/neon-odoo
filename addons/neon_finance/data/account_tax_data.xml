@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <!--
+      ZIMRA VAT tax records for Neon Events Elements.
+
+      Standard rate: 15.5% effective 1 January 2026 per ZIMRA
+      Public Notice 07/2026 and Finance Act amendment.
+      Zero rate:      0% for exports and zero-rated supplies
+                      per VAT Act Chapter 23:12 Section 10.
+
+      Account mapping (split-account method):
+        Output VAT (sales)     → 251000 Tax Received
+        Input VAT  (purchases) → 131000 Tax Paid
+
+      Stale auto-seeded 15% records (ids 1, 2) deactivated
+      in Step B5.1 — preserved for audit, never selectable.
+    -->
+
+    <!-- ═══ Tax Groups ═══ -->
+
+    <record id="tax_group_vat_15_5" model="account.tax.group">
+        <field name="name">VAT 15.5%</field>
+        <field name="sequence">10</field>
+        <field name="country_id" ref="base.zw"/>
+    </record>
+
+    <record id="tax_group_vat_0" model="account.tax.group">
+        <field name="name">VAT 0% Zero-Rated</field>
+        <field name="sequence">20</field>
+        <field name="country_id" ref="base.zw"/>
+    </record>
+
+    <!-- ═══ VAT 15.5% — Sales ═══ -->
+
+    <record id="tax_vat_15_5_sale" model="account.tax">
+        <field name="name">VAT 15.5% (Sales)</field>
+        <field name="description">VAT 15.5%</field>
+        <field name="amount">15.5</field>
+        <field name="amount_type">percent</field>
+        <field name="type_tax_use">sale</field>
+        <field name="price_include" eval="False"/>
+        <field name="active" eval="True"/>
+        <field name="sequence">10</field>
+        <field name="tax_group_id" ref="tax_group_vat_15_5"/>
+        <field name="country_id" ref="base.zw"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="invoice_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_received')}),
+        ]"/>
+        <field name="refund_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_received')}),
+        ]"/>
+    </record>
+
+    <!-- ═══ VAT 15.5% — Purchases ═══ -->
+
+    <record id="tax_vat_15_5_purchase" model="account.tax">
+        <field name="name">VAT 15.5% (Purchases)</field>
+        <field name="description">VAT 15.5%</field>
+        <field name="amount">15.5</field>
+        <field name="amount_type">percent</field>
+        <field name="type_tax_use">purchase</field>
+        <field name="price_include" eval="False"/>
+        <field name="active" eval="True"/>
+        <field name="sequence">10</field>
+        <field name="tax_group_id" ref="tax_group_vat_15_5"/>
+        <field name="country_id" ref="base.zw"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="invoice_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_paid')}),
+        ]"/>
+        <field name="refund_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_paid')}),
+        ]"/>
+    </record>
+
+    <!-- ═══ VAT 0% Zero-Rated — Sales ═══ -->
+
+    <record id="tax_vat_zero_sale" model="account.tax">
+        <field name="name">VAT 0% Zero-Rated (Sales)</field>
+        <field name="description">VAT 0%</field>
+        <field name="amount">0</field>
+        <field name="amount_type">percent</field>
+        <field name="type_tax_use">sale</field>
+        <field name="price_include" eval="False"/>
+        <field name="active" eval="True"/>
+        <field name="sequence">20</field>
+        <field name="tax_group_id" ref="tax_group_vat_0"/>
+        <field name="country_id" ref="base.zw"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="invoice_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_received')}),
+        ]"/>
+        <field name="refund_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_received')}),
+        ]"/>
+    </record>
+
+    <!-- ═══ VAT 0% Zero-Rated — Purchases ═══ -->
+
+    <record id="tax_vat_zero_purchase" model="account.tax">
+        <field name="name">VAT 0% Zero-Rated (Purchases)</field>
+        <field name="description">VAT 0%</field>
+        <field name="amount">0</field>
+        <field name="amount_type">percent</field>
+        <field name="type_tax_use">purchase</field>
+        <field name="price_include" eval="False"/>
+        <field name="active" eval="True"/>
+        <field name="sequence">20</field>
+        <field name="tax_group_id" ref="tax_group_vat_0"/>
+        <field name="country_id" ref="base.zw"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="invoice_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'invoice', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_paid')}),
+        ]"/>
+        <field name="refund_repartition_line_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'base', 'factor_percent': 100}),
+            (0, 0, {'document_type': 'refund', 'repartition_type': 'tax',  'factor_percent': 100, 'account_id': ref('account.1_tax_paid')}),
+        ]"/>
+    </record>
+
+</odoo>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <!--
+      Claim ownership of the ZWG currency record (id=171, created
+      in P1.M1 via raw SQL). The xml_id was already registered
+      directly in ir_model_data; this <record> block makes it
+      managed via this module's data file going forward.
+
+      noupdate="1" means subsequent module upgrades will NOT
+      overwrite the values here, protecting any operational
+      rate adjustments made via the UI.
+    -->
+    <record id="currency_zwg" model="res.currency">
+        <field name="name">ZWG</field>
+        <field name="symbol">ZiG</field>
+        <field name="full_name">Zimbabwe Gold</field>
+        <field name="active" eval="True"/>
+        <field name="position">before</field>
+        <field name="rounding" eval="0.01"/>
+        <field name="decimal_places" eval="2"/>
+        <field name="currency_unit_label">Zimbabwe Gold</field>
+        <field name="currency_subunit_label">Cents</field>
+    </record>
+</odoo>
