@@ -1,6 +1,6 @@
 {
     "name": "Neon CRM Extensions",
-    "version": "17.0.1.2.0",
+    "version": "17.0.1.3.0",
     "summary": "Neon-specific custom fields and workflow extensions for CRM",
     "description": """
 Neon CRM Extensions
@@ -35,6 +35,7 @@ Module is the foundation for Sections 4-6 of the M1 Action Plan
         "sale_management",
         "phone_validation",
         "mail",
+        "account",
     ],
     "external_dependencies": {
         "python": ["requests"],
