@@ -26,7 +26,7 @@ Day 11 — Payment confirmation lifecycle:
 Module is the foundation for Sections 4-6 of the M1 Action Plan
 (SLA hook, deduplication, automation rules).
 """,
-    "author": "Neon Events Elements",
+    "author": "Neon Events Elements Pvt Ltd",
     "website": "https://neonhiring.com",
     "category": "Sales/CRM",
     "license": "LGPL-3",

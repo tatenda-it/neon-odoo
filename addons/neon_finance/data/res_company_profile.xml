@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!--
+      Set the legal company name on the main company record.
+
+      The legal entity name registered with ZIMRA and CABS is
+      "Neon Events Elements Pvt Ltd" (confirmed 8 May 2026).
+      The earlier short-form "Neon Events Elements" persisted from
+      Odoo's default DB initialisation and was not corrected
+      during P1.M2.A's profile-setup pass.
+
+      Same noupdate=true gotcha as data/res_company_logo.xml:
+      base.main_company has noupdate=true (set by base module),
+      so this <record> only fires on -i (fresh install — Hetzner
+      path). On -u (upgrade against an existing install) the
+      field write is silently skipped — see neon_finance/README.md
+      for the imperative shell snippet to apply on existing
+      installs.
+
+      Other profile fields (address, phone, email, VAT, TIN, BPN)
+      are still applied operationally via SQL during the original
+      P1.M2.A pass; only the legal name is declared here. Future
+      profile additions should follow the same pattern.
+    -->
+    <record id="base.main_company" model="res.company">
+        <field name="name">Neon Events Elements Pvt Ltd</field>
+    </record>
+</odoo>

@@ -133,7 +133,7 @@ See `git log` and the milestone tracker for a full record.
 ## Authors and ownership
 
 - **Maintainer:** Tatenda (`@tatenda-it`)
-- **Sponsor:** Neon Events Elements (Robin Goneso, MD)
+- **Sponsor:** Neon Events Elements Pvt Ltd (Robin Goneso, MD)
 - **License:** LGPL-3
 
 ## Support

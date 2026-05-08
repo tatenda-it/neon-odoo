@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.1.2.0',
+    'version': '17.0.1.3.0',
     'summary': 'Zimbabwe finance configuration for Neon Events Elements',
     'description': """
 Neon Finance
@@ -13,7 +13,7 @@ and supporting structure for Phase 1 Finance build.
 This module pairs with neon_crm_extensions but is functionally
 independent — it depends only on the upstream account module.
 """,
-    'author': 'Neon Events Elements',
+    'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://www.neonhiring.co.zw',
     'category': 'Accounting/Localizations',
     'license': 'LGPL-3',
@@ -24,6 +24,7 @@ independent — it depends only on the upstream account module.
     'data': [
         'data/res_currency_data.xml',
         'data/account_tax_data.xml',
+        'data/res_company_profile.xml',
         'data/res_company_logo.xml',
         'data/res_company_banks.xml',
         'views/res_partner_bank_views.xml',
