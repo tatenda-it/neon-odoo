@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!--
+      Add x_branch_name to the res.partner.bank form view, placed
+      immediately after bank_id so the branch reads alongside the
+      bank reference.
+    -->
+    <record id="view_partner_bank_form_neon" model="ir.ui.view">
+        <field name="name">res.partner.bank.form.neon.branch</field>
+        <field name="model">res.partner.bank</field>
+        <field name="inherit_id" ref="base.view_partner_bank_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='bank_id']" position="after">
+                <field name="x_branch_name" placeholder="e.g. Arundel"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

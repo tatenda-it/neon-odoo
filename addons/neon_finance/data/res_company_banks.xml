@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="0">
+    <!--
+      CABS bank + Neon's two CABS accounts (USD + ZWG).
+
+      Both accounts are approved as of 8 May 2026 (Tatenda).
+      Single branch — Arundel — for both accounts.
+
+      noupdate="0" so records load on both fresh install (-i) and
+      upgrade (-u). These are pure additions (no overwrite of
+      base records), so the base.main_company noupdate guard
+      from the logo wiring doesn't apply here.
+    -->
+
+    <!-- ═══ Bank ═══ -->
+
+    <record id="bank_cabs" model="res.bank">
+        <field name="name">CABS</field>
+        <field name="country" ref="base.zw"/>
+    </record>
+
+    <!-- ═══ USD account ═══ -->
+
+    <record id="bank_account_cabs_usd" model="res.partner.bank">
+        <field name="acc_holder_name">Neon Events Elements Pvt Ltd</field>
+        <field name="acc_number">1153245035</field>
+        <field name="bank_id" ref="bank_cabs"/>
+        <field name="partner_id" ref="base.main_partner"/>
+        <field name="currency_id" ref="base.USD"/>
+        <field name="x_branch_name">Arundel</field>
+    </record>
+
+    <!-- ═══ ZWG account ═══ -->
+
+    <record id="bank_account_cabs_zwg" model="res.partner.bank">
+        <field name="acc_holder_name">Neon Events Elements Pvt Ltd</field>
+        <field name="acc_number">1153244969</field>
+        <field name="bank_id" ref="bank_cabs"/>
+        <field name="partner_id" ref="base.main_partner"/>
+        <field name="currency_id" ref="neon_finance.currency_zwg"/>
+        <field name="x_branch_name">Arundel</field>
+    </record>
+
+</odoo>
