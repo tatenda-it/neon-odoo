@@ -57,6 +57,47 @@ SELECT setval('ir_sequence_001', <next_value> - 1, true);
 For id=1 / quote sequence, this was set to `setval(..., 1974, true)`
 during P1.M2.C so the first `nextval()` returns 1975.
 
+## Hetzner deployment requirement
+
+When deploying this module to a fresh Odoo instance, the
+company's fiscal country MUST be set to Zimbabwe before
+or immediately after install:
+
+```sql
+UPDATE res_company
+SET account_fiscal_country_id = (
+  SELECT id FROM res_country WHERE code = 'ZW')
+WHERE id = 1;
+```
+
+Without this, the VAT 15.5% and VAT 0% Zero-Rated tax
+records (which are country-scoped to ZW) will not appear
+in tax dropdowns on invoice line items, even though they
+exist in the database.
+
+## Invoice numbering implementation
+
+The customer invoice journal (id=1) uses two layered
+mechanisms to produce INV-NNNNNN format:
+
+1. Journal code is set to `INV-` (with trailing dash).
+   This becomes the prefix on auto-derived names.
+
+2. `sequence_override_regex` matches the format INV-NNNNNN
+   with optional suffix:
+
+   ```
+   ^(?P<prefix1>INV-)(?P<seq>\d{6})(?P<suffix>.*)$
+   ```
+
+   The suffix capture group exists specifically to allow
+   draft invoices (which use placeholder names like
+   `INV-000299/` or just `/`) to pass regex validation.
+
+The first invoice posted in this database was manually
+named `INV-000299` to anchor continuity from Zoho Books.
+All subsequent invoices auto-derive from there.
+
 | Item | Value |
 |------|-------|
 | Quote prefix | `QT-` |

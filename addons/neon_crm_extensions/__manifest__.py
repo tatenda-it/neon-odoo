@@ -1,6 +1,6 @@
 {
     "name": "Neon CRM Extensions",
-    "version": "17.0.1.4.0",
+    "version": "17.0.1.5.0",
     "summary": "Neon-specific custom fields and workflow extensions for CRM",
     "description": """
 Neon CRM Extensions

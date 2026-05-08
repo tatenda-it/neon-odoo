@@ -17,8 +17,10 @@ class ResPartner(models.Model):
         compute="_compute_x_outstanding_balance",
         currency_field="currency_id",
         store=True,
-        help="Sum of amount_residual across this partner's posted "
-             "customer invoices and refunds.",
+        help="Net outstanding receivable in company currency. Sums "
+             "amount_residual_signed across posted customer invoices "
+             "and refunds (the field is signed and already in company "
+             "currency, so multi-currency invoices add correctly).",
     )
 
     x_last_invoice_date = fields.Date(
@@ -31,7 +33,7 @@ class ResPartner(models.Model):
 
     @api.depends(
         "invoice_ids",
-        "invoice_ids.amount_residual",
+        "invoice_ids.amount_residual_signed",
         "invoice_ids.state",
     )
     def _compute_x_outstanding_balance(self):
@@ -42,7 +44,7 @@ class ResPartner(models.Model):
                 ("state", "=", "posted"),
             ])
             partner.x_outstanding_balance = sum(
-                m.amount_residual for m in moves
+                m.amount_residual_signed for m in moves
             )
 
     @api.depends(
