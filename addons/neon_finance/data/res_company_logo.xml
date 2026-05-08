@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!--
+      Set the Neon Events Elements logo on the main company record.
+
+      type="base64" file="..." reads the binary file at the given
+      module-relative path, base64-encodes it, and assigns the result
+      to the field. res.company.logo is related='partner_id.image_1920'
+      with readonly=False, so the write propagates to the partner's
+      image (an attachment-backed Image field), and Odoo auto-derives
+      the smaller thumbnail variants (image_1024 / 512 / 256 / 128)
+      from the master.
+
+      IMPORTANT — noupdate behaviour:
+      base.main_company has ir_model_data.noupdate=True (set by the
+      base module to protect the company record from accidental
+      overwrites by other modules). This means:
+
+        * Fresh install (-i neon_finance): runs in 'init' mode,
+          noupdate is ignored, the logo IS loaded.  ← Hetzner path.
+
+        * Upgrade on existing install (-u neon_finance): runs in
+          'update' mode, noupdate is honoured, the logo write is
+          silently skipped.
+
+      For an existing install, the logo must be set imperatively
+      (e.g. via odoo shell, see neon_finance/README.md) — the data
+      file alone won't apply on -u. By design: this is consistent
+      with treating logo as operational data Munashe may rotate
+      via the UI without being clobbered by upgrades.
+    -->
+    <record id="base.main_company" model="res.company">
+        <field name="logo" type="base64" file="neon_finance/static/src/img/neon_logo.png"/>
+    </record>
+</odoo>

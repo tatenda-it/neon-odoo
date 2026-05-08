@@ -98,6 +98,40 @@ The first invoice posted in this database was manually
 named `INV-000299` to anchor continuity from Zoho Books.
 All subsequent invoices auto-derive from there.
 
+## Company logo
+
+The Neon Events Elements logo lives at
+`static/src/img/neon_logo.png` (800×228, RGBA PNG) and is wired
+to `res.company.logo` via `data/res_company_logo.xml`, which in
+turn flows through to `res_partner.image_1920` (attachment-backed)
+on the company partner record.
+
+### Fresh-install path (Hetzner)
+
+`odoo -i neon_finance -d <db>` loads the data file in init mode;
+`base.main_company`'s `noupdate=true` flag is bypassed during
+init, and the logo is set automatically. No manual step needed.
+
+### Existing-install path (already-installed local DBs)
+
+`odoo -u neon_finance` runs in update mode and respects the
+`noupdate=true` flag on `base.main_company` — the data file's
+logo write is silently skipped. To apply or refresh the logo
+on an existing install, run an imperative ORM write:
+
+```python
+# docker exec ... odoo shell -d <db> --no-http
+import base64
+with open('/mnt/extra-addons/neon_finance/static/src/img/neon_logo.png', 'rb') as f:
+    logo_b64 = base64.b64encode(f.read())
+env['res.company'].browse(1).write({'logo': logo_b64})
+env.cr.commit()
+```
+
+This was used to set the logo on the local development DB on
+2026-05-08 (file size 74,960 bytes; auto-derived thumbnails
+filled image_1024 / 512 / 256 / 128 on the partner).
+
 | Item | Value |
 |------|-------|
 | Quote prefix | `QT-` |
