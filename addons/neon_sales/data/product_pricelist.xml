@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!-- ZWG pricelist for Zimbabwe Gold-denominated quotes.
+         Uses the company's main currency (USD) product list
+         prices and converts to ZWG via res.currency.rate at
+         quote date. Daily rate updates are operational
+         (Munashe maintains via Settings > Currencies > ZWG).
+    -->
+    <record id="pricelist_neon_zwg" model="product.pricelist">
+        <field name="name">Neon ZWG Pricelist</field>
+        <field name="currency_id"
+               ref="neon_finance.currency_zwg"/>
+        <field name="active" eval="True"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="discount_policy">without_discount</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- One catch-all rule: apply to all products, use
+         product list_price as base, no markup, no discount.
+         Odoo will auto-convert from USD (list_price currency)
+         to ZWG using the active currency rate at quote date. -->
+    <record id="pricelist_item_neon_zwg_default"
+            model="product.pricelist.item">
+        <field name="pricelist_id" ref="pricelist_neon_zwg"/>
+        <field name="applied_on">3_global</field>
+        <field name="base">list_price</field>
+        <field name="compute_price">formula</field>
+        <field name="price_discount" eval="0.0"/>
+        <field name="price_surcharge" eval="0.0"/>
+        <field name="price_round" eval="0.01"/>
+    </record>
+</odoo>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Sales',
-    'version': '17.0.1.1.0',
+    'version': '17.0.1.2.0',
     'category': 'Sales',
     'summary': 'Sales-cycle customisations for Neon Events Elements',
     'description': """
@@ -18,6 +18,7 @@ quoting and order workflow:
     'license': 'LGPL-3',
     'depends': ['sale_management', 'neon_finance'],
     'data': [
+        'data/product_pricelist.xml',
         'views/sale_order_views.xml',
         'views/sale_report_templates.xml',
     ],

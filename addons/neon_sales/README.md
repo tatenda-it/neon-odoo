@@ -27,3 +27,22 @@ Sales-cycle customisations for Neon Events Elements.
 |---|---|---|---|
 | sale.order | x_covering_letter_active | Boolean | Toggle visibility of covering letter on quote PDF |
 | sale.order | x_covering_letter_text | Html | Rich text content for the covering letter |
+
+## Daily ZWG Rate Update (Operational)
+
+The ZWG pricelist auto-converts USD list prices to ZWG
+using `res.currency.rate`. The rate must be updated daily
+for accurate quoting:
+
+1. Visit the Reserve Bank of Zimbabwe daily exchange rate
+   page (https://www.rbz.co.zw)
+2. Note the official ZiG/USD interbank rate for today
+3. In Odoo: Accounting → Configuration → Currencies → ZWG
+   → Rates tab → Add a new rate row with today's date and
+   the noted rate
+4. Verify by opening any draft quote, switching to the ZWG
+   pricelist, and confirming the displayed prices reflect
+   today's conversion
+
+This is a 30-second daily task. Future enhancement:
+automated daily import from RBZ (deferred).
