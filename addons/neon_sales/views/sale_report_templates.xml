@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_saleorder_document_neon_sales"
+              inherit_id="sale.report_saleorder_document">
+
+        <!-- 1. ZIMRA identifier strip — after #informations -->
+        <xpath expr="//div[@id='informations']" position="after">
+            <div class="row mt-2 mb-3" name="neon_zimra_strip"
+                 t-if="doc.company_id.x_zimra_tin or
+                       doc.company_id.x_zimra_bpn or
+                       doc.company_id.partner_id.vat">
+                <div class="col-12">
+                    <div class="p-2"
+                         style="background-color: #F4F2F8;
+                                border-left: 3px solid #7165AC;
+                                font-size: 0.85em;">
+                        <strong>Tax Information:</strong>
+                        <span t-if="doc.company_id.x_zimra_tin">
+                            TIN <t t-out="doc.company_id.x_zimra_tin"/>
+                        </span>
+                        <span t-if="doc.company_id.x_zimra_bpn"
+                              class="ms-3">
+                            BPN <t t-out="doc.company_id.x_zimra_bpn"/>
+                        </span>
+                        <span t-if="doc.company_id.partner_id.vat"
+                              class="ms-3">
+                            VAT <t t-out="doc.company_id.partner_id.vat"/>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- 2. Covering letter — before main line items table -->
+        <xpath expr="//table[hasclass('o_main_table')]"
+               position="before">
+            <div class="mt-3 mb-3" name="neon_covering_letter"
+                 t-if="doc.x_covering_letter_active and
+                       doc.x_covering_letter_text">
+                <div t-out="doc.x_covering_letter_text"/>
+            </div>
+        </xpath>
+
+        <!-- 3. Banking section — after totals summary -->
+        <xpath expr="//div[@name='so_total_summary']"
+               position="after">
+            <div class="mt-4 mb-3" name="neon_banking"
+                 t-if="doc.company_id.bank_ids">
+                <h5 style="color: #7165AC;
+                           border-bottom: 1px solid #7165AC;
+                           padding-bottom: 4px;">
+                    Banking Details
+                </h5>
+                <p class="text-muted" style="font-size: 0.85em;">
+                    Please use the account matching your
+                    quote currency for payment.
+                </p>
+                <div class="row">
+                    <t t-foreach="doc.company_id.bank_ids"
+                       t-as="bank">
+                        <t t-set="is_match"
+                           t-value="bank.currency_id and
+                                    bank.currency_id == doc.currency_id"/>
+                        <div class="col-6 mb-2">
+                            <div class="p-2"
+                                 t-attf-style="border: 1px solid {{
+                                     '#7165AC' if is_match
+                                     else '#DDDDDD'
+                                 }};
+                                 background-color: {{
+                                     '#F4F2F8' if is_match
+                                     else 'transparent'
+                                 }};
+                                 border-radius: 4px;">
+                                <div t-if="is_match"
+                                     style="font-size: 0.75em;
+                                            color: #7165AC;
+                                            font-weight: bold;">
+                                    ★ PAY IN THIS CURRENCY
+                                </div>
+                                <strong>
+                                    <t t-out="bank.currency_id.name
+                                              or 'Account'"/>
+                                </strong>
+                                <br/>
+                                <span style="font-size: 0.9em;">
+                                    Bank:
+                                    <t t-out="bank.bank_id.name
+                                              or ''"/>
+                                    <br/>
+                                    Branch:
+                                    <t t-out="bank.x_branch_name
+                                              or ''"/>
+                                    <br/>
+                                    Account Name:
+                                    <t t-out="bank.acc_holder_name
+                                              or doc.company_id.name"/>
+                                    <br/>
+                                    Account Number:
+                                    <t t-out="bank.acc_number"/>
+                                </span>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- 4. T&Cs placeholder — append to .page -->
+        <xpath expr="//div[hasclass('page')]" position="inside">
+            <div class="mt-4" name="neon_tcs_placeholder"
+                 style="font-size: 0.8em;
+                        color: #777777;
+                        border-top: 1px dashed #CCCCCC;
+                        padding-top: 8px;">
+                <strong>Standard Terms &amp; Conditions:</strong>
+                [Standard Neon Events Elements Pvt Ltd terms
+                apply — full Terms and Conditions available
+                on request from accounts@neonhiring.co.zw]
+            </div>
+        </xpath>
+
+    </template>
+</odoo>
