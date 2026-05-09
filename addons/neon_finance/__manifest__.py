@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.1.4.0',
+    'version': '17.0.1.5.0',
     'summary': 'Zimbabwe finance configuration for Neon Events Elements',
     'description': """
 Neon Finance
@@ -27,6 +27,7 @@ independent — it depends only on the upstream account module.
         'data/res_company_profile.xml',
         'data/res_company_logo.xml',
         'data/res_company_banks.xml',
+        'data/account_journal_data.xml',
         'views/res_partner_bank_views.xml',
     ],
     'installable': True,

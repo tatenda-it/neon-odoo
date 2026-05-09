@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!--
+      Customer Invoices journal regex.
+
+      P1.M2.C originally set this to:
+        ^(?P<prefix1>INV-)(?P<seq>\d{6})(?P<suffix>.*)$
+      via direct SQL (not version-controlled). That regex
+      enforced a strict INV-NNNNNN format and refused to match
+      Odoo's draft placeholder names (/, '', INV-) — which
+      crashed account.move._compute_split_sequence at
+      account/models/sequence_mixin.py:127 with
+      AttributeError: 'NoneType' object has no attribute 'start'
+      whenever a new draft invoice was created.
+
+      The replacement regex below mirrors Odoo's default
+      permissive shape (\d*, any prefix, any suffix) while
+      still capturing the INV- prefix when it is present.
+      Posted invoices retain INV-NNNNNN format because that
+      is driven by the journal `code` + ir.sequence padding,
+      NOT by this regex. The regex's only job here is to
+      parse existing names for the split-sequence compute and
+      the reset-period detection.
+
+      noupdate="0" intentional — drift on this field causes
+      hard crashes on draft invoice creation, so reapply on
+      every -u to keep production safe.
+    -->
+    <data noupdate="0">
+        <record id="account.1_sale" model="account.journal">
+            <field name="sequence_override_regex">^(?P&lt;prefix1&gt;(?:INV-)?)(?P&lt;seq&gt;\d*)(?P&lt;suffix&gt;.*)$</field>
+        </record>
+    </data>
+</odoo>

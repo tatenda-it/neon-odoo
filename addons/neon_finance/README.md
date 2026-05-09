@@ -83,20 +83,74 @@ mechanisms to produce INV-NNNNNN format:
 1. Journal code is set to `INV-` (with trailing dash).
    This becomes the prefix on auto-derived names.
 
-2. `sequence_override_regex` matches the format INV-NNNNNN
-   with optional suffix:
+2. `sequence_override_regex` parses existing names for the
+   split-sequence compute (`account.move.sequence_prefix` /
+   `sequence_number`) and the reset-period detection
+   (`_deduce_sequence_number_reset`). It does **not** enforce
+   posted-name format — that comes from the journal `code` +
+   `ir.sequence` padding above. The regex's only contract is:
+   *parse without crashing, for every name Odoo might assign,
+   including draft placeholders.*
+
+   Current value (loaded by `data/account_journal_data.xml`):
 
    ```
-   ^(?P<prefix1>INV-)(?P<seq>\d{6})(?P<suffix>.*)$
+   ^(?P<prefix1>(?:INV-)?)(?P<seq>\d*)(?P<suffix>.*)$
    ```
 
-   The suffix capture group exists specifically to allow
-   draft invoices (which use placeholder names like
-   `INV-000299/` or just `/`) to pass regex validation.
+   Group semantics:
+   - `prefix1` — captures `INV-` when present, empty string
+     otherwise (the `?:` non-capturing wrapper plus trailing
+     `?` makes the whole prefix optional)
+   - `seq` — `\d*` matches zero-or-more digits (mirrors Odoo's
+     default permissive regex). Empty for draft placeholders;
+     populated `000299`-style for posted invoices
+   - `suffix` — catches any trailing content (`/`, `/1`,
+     thread suffixes, etc.)
+
+   Names that all parse correctly under this regex:
+
+   | Name | prefix1 | seq | suffix |
+   |---|---|---|---|
+   | `INV-000299` | `INV-` | `000299` | `` |
+   | `INV-000300` | `INV-` | `000300` | `` |
+   | `INV-` | `INV-` | `` | `` |
+   | `/` | `` | `` | `/` |
+   | `` | `` | `` | `` |
 
 The first invoice posted in this database was manually
 named `INV-000299` to anchor continuity from Zoho Books.
 All subsequent invoices auto-derive from there.
+
+### Regex history (superseded values)
+
+| Version | Regex | Status |
+|---|---|---|
+| P1.M2.C original | `^(?P<prefix1>INV-)(?P<seq>\d{6})$` | Superseded — required exactly 6 digits, no suffix |
+| P1.M2.C revised | `^(?P<prefix1>INV-)(?P<seq>\d{6})(?P<suffix>.*)$` | Superseded — fix(p1.m2.c) — README claimed suffix group handled `/` placeholder, but `prefix1` still required literal `INV-` so `/` never matched |
+| **fix(p1.m2.c) journal regex (current)** | `^(?P<prefix1>(?:INV-)?)(?P<seq>\d*)(?P<suffix>.*)$` | Active. Parses every name Odoo can assign; never crashes. |
+
+### Known crash path (why this regex must stay permissive)
+
+`account/models/sequence_mixin.py:127` (`_compute_split_sequence`)
+runs whenever a `name` field updates on an `account.move`,
+including new drafts where `name='/'`:
+
+```python
+matching = re.match(regex, sequence)
+record.sequence_prefix = sequence[:matching.start(1)]
+```
+
+If `regex` does not match `sequence`, `matching` is `None` and
+the next line raises `AttributeError: 'NoneType' object has no
+attribute 'start'`. The same regex is used by the four
+`_sequence_*_regex` properties (account_move.py:93–105) when a
+journal override is set, so a strict override blocks every
+strategy.
+
+Future maintainers: do **not** tighten this regex to enforce
+format. Format enforcement belongs in journal code + sequence
+config, not here.
 
 ## Company logo
 
