@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Inherit the standard sale.order form view to add a "Covering
+      Letter" tab on the existing notebook, after the Order Lines
+      tab. The HTML editor field is conditionally visible — only
+      shown when the salesperson toggles x_covering_letter_active
+      on, reducing visual noise on quotes that don't need a
+      personalised preamble.
+    -->
+    <record id="view_order_form_neon_sales" model="ir.ui.view">
+        <field name="name">sale.order.form.neon.sales</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[@name='order_lines']"
+                   position="after">
+                <page string="Covering Letter"
+                      name="covering_letter">
+                    <group>
+                        <field name="x_covering_letter_active"/>
+                    </group>
+                    <field name="x_covering_letter_text"
+                           invisible="not x_covering_letter_active"
+                           options="{'collaborative': false}"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
