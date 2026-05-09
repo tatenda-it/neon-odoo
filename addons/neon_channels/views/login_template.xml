@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="neon_login_footer" inherit_id="web.login_layout" name="Neon Login - Hide Footer">
+        <xpath expr="//div[contains(@class,'text-center') and contains(@class,'border-top')]" position="replace"/>
+    </template>
+</odoo>

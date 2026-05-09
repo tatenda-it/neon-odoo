@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_whatsapp_config_user,whatsapp.config.user,model_neon_whatsapp_config,base.group_user,1,0,0,0
+access_whatsapp_config_manager,whatsapp.config.manager,model_neon_whatsapp_config,base.group_system,1,1,1,1
+access_whatsapp_message_user,whatsapp.message.user,model_neon_whatsapp_message,base.group_user,1,0,0,0
+access_whatsapp_message_manager,whatsapp.message.manager,model_neon_whatsapp_message,base.group_system,1,1,1,1
+access_twilio_config_user,twilio.config.user,model_twilio_config,base.group_user,1,0,0,0
+access_twilio_config_manager,twilio.config.manager,model_twilio_config,base.group_system,1,1,1,1
+access_bot_user_manager,bot.user.manager,model_neon_bot_user,base.group_system,1,1,1,1
