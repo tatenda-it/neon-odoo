@@ -10,3 +10,15 @@
 	path = oca/web
 	url = https://github.com/OCA/web.git
 	branch = 17.0
+[submodule "oca/sale-workflow"]
+	path = oca/sale-workflow
+	url = https://github.com/OCA/sale-workflow.git
+	branch = 17.0
+[submodule "oca/account-invoicing"]
+	path = oca/account-invoicing
+	url = https://github.com/OCA/account-invoicing.git
+	branch = 17.0
+[submodule "oca/server-backend"]
+	path = oca/server-backend
+	url = https://github.com/OCA/server-backend.git
+	branch = 17.0

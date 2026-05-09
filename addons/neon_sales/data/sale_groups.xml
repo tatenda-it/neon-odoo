@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!-- Grant per-line and global discount visibility to all
+         salespeople. Extends sales_team.group_sale_salesman in
+         place to imply:
+         - product.group_discount_per_so_line — controls
+           visibility of the Disc.% column on quote line tables
+         - base_global_discount.group_global_discount — required
+           to see the Global Discounts configuration menu and to
+           select / create global.discount records on quotes
+    -->
+    <record id="sales_team.group_sale_salesman" model="res.groups">
+        <field name="implied_ids"
+               eval="[(4, ref('product.group_discount_per_so_line')),
+                      (4, ref('base_global_discount.group_global_discount'))]"/>
+    </record>
+</odoo>

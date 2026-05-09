@@ -42,6 +42,9 @@ services:
       - ./oca/queue:/mnt/oca-queue
       - ./oca/server-tools:/mnt/oca-server-tools
       - ./oca/web:/mnt/oca-web
+      - ./oca/sale-workflow:/mnt/oca-sale-workflow
+      - ./oca/account-invoicing:/mnt/oca-account-invoicing
+      - ./oca/server-backend:/mnt/oca-server-backend
     restart: unless-stopped
     networks:
       - neon-net

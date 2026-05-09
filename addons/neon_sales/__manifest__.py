@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Sales',
-    'version': '17.0.1.2.0',
+    'version': '17.0.1.3.0',
     'category': 'Sales',
     'summary': 'Sales-cycle customisations for Neon Events Elements',
     'description': """
@@ -16,9 +16,10 @@ quoting and order workflow:
     'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://www.neonhiring.co.zw',
     'license': 'LGPL-3',
-    'depends': ['sale_management', 'neon_finance'],
+    'depends': ['sale_management', 'neon_finance', 'sale_global_discount'],
     'data': [
         'data/product_pricelist.xml',
+        'data/sale_groups.xml',
         'views/sale_order_views.xml',
         'views/sale_report_templates.xml',
     ],
