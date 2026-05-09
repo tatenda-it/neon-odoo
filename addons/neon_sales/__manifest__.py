@@ -14,7 +14,7 @@ quoting and order workflow:
   + branded layout)
     """,
     'author': 'Neon Events Elements Pvt Ltd',
-    'website': 'https://www.neonhiring.co.zw',
+    'website': 'https://neonhiring.com',
     'license': 'LGPL-3',
     'depends': ['sale_management', 'neon_finance', 'sale_global_discount'],
     'data': [

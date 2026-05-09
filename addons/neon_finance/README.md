@@ -141,3 +141,81 @@ filled image_1024 / 512 / 256 / 128 on the partner).
 | Invoice anchor name | `INV-000299` (manual on first post) |
 | Bill journal | default Odoo naming (revisit P1.M6) |
 | Credit notes | revisit P1.M4.5 — refund regex on journals |
+
+## VAT Rate History
+
+P1.M2.B initially configured Zimbabwe VAT at 15% per the
+pre-2026 ZIMRA rate. Effective 1 January 2026 the standard
+VAT rate increased to 15.5% (Zimbabwe Finance Act No. 7 of
+2025). The active sale/purchase taxes in this module now
+reflect the current 15.5% rate; the original 15% records
+(auto-seeded by Odoo's account chart-of-accounts) are
+archived and preserved for audit.
+
+Reference: https://www.zimra.co.zw — Public Notice 07 of
+2026.
+
+## Company contact information
+
+Per Neon Events Elements Pvt Ltd standard:
+- Website: `https://neonhiring.com` (.com — primary domain)
+- Team emails: `@neonhiring.co.zw` (.co.zw — operational)
+- Company general email: `admin@neonhiring.co.zw`
+- Company main phone: `+263775672250`
+
+This split is deliberate. Do NOT consolidate to a single
+domain without explicit approval from Robin.
+
+### report_footer drift
+
+`res.company.report_footer` is **independent** of `email` /
+`phone` / `website`. The Document Layout wizard writes a
+snapshot HTML string to `report_footer`, and that snapshot
+does NOT auto-update when the scalar contact fields change.
+Anyone changing `email` / `phone` / `website` on `res.company`
+must also update `report_footer` (either via this module's
+data file or manually via Settings → General Settings →
+Configure Document Layout). Otherwise PDFs render stale
+contact info even after the underlying fields are fixed.
+
+VAT / TIN / BPN are intentionally excluded from the footer —
+they are already prominent in the ZIMRA strip on the document
+body (P1.M3.C). Duplicating them in the footer adds clutter.
+
+### Existing-install fix-up: contact fields + footer
+
+`res.company` `email`, `phone`, `website`, and `report_footer`
+are all written via `data/res_company_profile.xml`. Same
+`base.main_company` `noupdate=true` gotcha — `odoo -u neon_finance`
+will silently skip the writes on existing installs. Apply
+imperatively:
+
+```python
+# docker exec ... odoo shell -d <db> --no-http
+env['res.company'].browse(1).write({
+    'email': 'admin@neonhiring.co.zw',
+    'phone': '+263775672250',
+    'website': 'https://neonhiring.com',
+    'report_footer': '<p>admin@neonhiring.co.zw • '
+                     'https://neonhiring.com • '
+                     '+263775672250</p>',
+})
+env.cr.commit()
+```
+
+### Existing-install fix-up: re-point company default taxes
+
+`res_company.account_sale_tax_id` / `account_purchase_tax_id`
+are written via `data/res_company_profile.xml`. Same
+`base.main_company` `noupdate=true` gotcha as the logo and
+legal name — `odoo -u neon_finance` will silently skip the
+write on existing installs. Apply imperatively via shell:
+
+```python
+# docker exec ... odoo shell -d <db> --no-http
+env['res.company'].browse(1).write({
+    'account_sale_tax_id': env.ref('neon_finance.tax_vat_15_5_sale').id,
+    'account_purchase_tax_id': env.ref('neon_finance.tax_vat_15_5_purchase').id,
+})
+env.cr.commit()
+```

@@ -25,4 +25,72 @@
     <record id="base.main_company" model="res.company">
         <field name="name">Neon Events Elements Pvt Ltd</field>
     </record>
+
+    <!--
+      Re-point the company default sale and purchase taxes at
+      the active 15.5% records owned by neon_finance.
+
+      P1.M2.B initially seeded 15% taxes (id=1, id=2) via Odoo's
+      account chart-of-accounts auto-seed (xml_ids
+      account.1_sale_tax_template / account.1_purchase_tax_template).
+      Those records were archived after the ZIMRA rate change
+      (15% -> 15.5% effective 1 January 2026) but res.company
+      still pointed at them, leaving a dangling default that
+      broke tax inference on new lines.
+
+      noupdate="0" on this <data> wrapper is intentional: company
+      default tax is critical infrastructure, drift is the bigger
+      risk than a manual override being overwritten on -u.
+
+      Same noupdate=true gotcha on base.main_company applies; an
+      existing-install fix-up requires the imperative shell snippet
+      documented in neon_finance/README.md.
+    -->
+    <data noupdate="0">
+        <record id="base.main_company" model="res.company">
+            <field name="account_sale_tax_id"
+                   ref="neon_finance.tax_vat_15_5_sale"/>
+            <field name="account_purchase_tax_id"
+                   ref="neon_finance.tax_vat_15_5_purchase"/>
+        </record>
+    </data>
+
+    <!--
+      Company contact information corrections.
+
+      P1.M2.A's operational SQL pass populated email / phone /
+      website with placeholder values that drifted from the Neon
+      standard:
+        - email was tatenda@neonhiring.co.zw (an individual address,
+          not the company general inbox)
+        - phone was a personal number, not the main switchboard
+        - website was www.neonhiring.co.zw (wrong domain)
+
+      Per Neon convention: .com domain for the public website,
+      .co.zw for operational team emails. Company main phone is
+      +263 77 567 2250.
+
+      report_footer is an independent HTML snapshot field that
+      the Document Layout wizard writes once and never updates
+      from email/phone/website. It must be rewritten alongside
+      the scalar contact fields, otherwise PDFs render stale
+      contact info even after the underlying fields are fixed.
+      VAT/TIN/BPN are intentionally excluded from the footer —
+      they are already prominent in the ZIMRA strip on the
+      document body (P1.M3.C); duplicating them clutters the
+      footer.
+
+      noupdate="0" intentional — these are company-identity fields
+      that should not silently drift; reapply on every -u.
+    -->
+    <data noupdate="0">
+        <record id="base.main_company" model="res.company">
+            <field name="email">admin@neonhiring.co.zw</field>
+            <field name="phone">+263775672250</field>
+            <field name="website">https://neonhiring.com</field>
+            <field name="report_footer" type="html">
+                <p>admin@neonhiring.co.zw • https://neonhiring.com • +263775672250</p>
+            </field>
+        </record>
+    </data>
 </odoo>
