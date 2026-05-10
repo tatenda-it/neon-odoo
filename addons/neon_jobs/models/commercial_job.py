@@ -380,8 +380,9 @@ class CommercialJob(models.Model):
         self.write({"state": "cancelled"})
 
     def action_archive_lost(self):
+        is_manager = self.env.user.has_group("neon_jobs.group_neon_jobs_manager")
         for rec in self:
-            if not rec.loss_reason:
+            if not rec.loss_reason and not is_manager:
                 raise UserError(_(
                     "Loss Reason is required before archiving. "
                     "Open the Loss Capture page, fill in why the job was lost, "
