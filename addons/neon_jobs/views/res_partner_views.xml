@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="res_partner_view_form_inherit_neon_jobs" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.neon_jobs</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="is_venue"/>
+            </xpath>
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Rooms" invisible="not is_venue">
+                    <field name="room_ids">
+                        <tree editable="bottom">
+                            <field name="name"/>
+                            <field name="capacity"/>
+                            <field name="floor"/>
+                            <field name="notes"/>
+                            <field name="active" invisible="1"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+    <record id="res_partner_action_venues" model="ir.actions.act_window">
+        <field name="name">Venues</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="domain">[('is_venue', '=', True)]</field>
+        <field name="context">{'default_is_venue': True, 'default_is_company': True}</field>
+    </record>
+
+</odoo>

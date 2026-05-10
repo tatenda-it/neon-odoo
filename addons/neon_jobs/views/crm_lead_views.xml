@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="crm_lead_view_form_inherit_neon_jobs" model="ir.ui.view">
+        <field name="name">crm.lead.form.inherit.neon_jobs</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_lead_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="%(commercial_job_action)d" type="action"
+                        class="oe_stat_button" icon="fa-briefcase"
+                        context="{'search_default_crm_lead_id': active_id}">
+                    <field name="commercial_job_count" widget="statinfo" string="Jobs"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

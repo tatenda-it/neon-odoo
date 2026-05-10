@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_job_view_tree" model="ir.ui.view">
+        <field name="name">commercial.job.tree</field>
+        <field name="model">commercial.job</field>
+        <field name="arch" type="xml">
+            <tree string="Commercial Jobs"
+                  decoration-info="state == 'pending'"
+                  decoration-success="state == 'active'"
+                  decoration-muted="state in ('completed','cancelled','archived')">
+                <field name="name"/>
+                <field name="event_date"/>
+                <field name="partner_id"/>
+                <field name="venue_id"/>
+                <field name="venue_room_id" optional="show"/>
+                <field name="master_contract_id" optional="hide"/>
+                <field name="quoted_value" widget="monetary" sum="Total Quoted"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-info="state == 'pending'"/>
+                <field name="commercial_status" widget="badge" optional="show"/>
+                <field name="finance_status" widget="badge" optional="show"/>
+                <field name="operational_status" widget="badge" optional="show"/>
+                <field name="gate_result" widget="badge" optional="hide"
+                       decoration-success="gate_result == 'pass'"
+                       decoration-warning="gate_result == 'warning'"
+                       decoration-danger="gate_result == 'reject'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_job_view_search" model="ir.ui.view">
+        <field name="name">commercial.job.search</field>
+        <field name="model">commercial.job</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="venue_id"/>
+                <field name="master_contract_id"/>
+                <separator/>
+                <filter string="Pending" name="filter_pending" domain="[('state', '=', 'pending')]"/>
+                <filter string="Active" name="filter_active" domain="[('state', '=', 'active')]"/>
+                <filter string="Completed" name="filter_completed" domain="[('state', '=', 'completed')]"/>
+                <filter string="Archived" name="filter_archived" domain="[('state', '=', 'archived')]"/>
+                <separator/>
+                <filter string="Sub-hire required" name="filter_subhire" domain="[('sub_hire_required', '=', True)]"/>
+                <filter string="Logistics flag" name="filter_logistics" domain="[('logistics_flag', '=', True)]"/>
+                <separator/>
+                <filter string="Event date this month" name="filter_this_month"
+                        domain="[('event_date', '>=', (context_today()).strftime('%Y-%m-01'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Client" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Venue" name="group_venue" context="{'group_by': 'venue_id'}"/>
+                    <filter string="Master Contract" name="group_master" context="{'group_by': 'master_contract_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="commercial_job_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.form</field>
+        <field name="model">commercial.job</field>
+        <field name="arch" type="xml">
+            <form string="Commercial Job">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,active,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="Client &amp; Source">
+                            <field name="partner_id" options="{'no_create_edit': True}"/>
+                            <field name="master_contract_id" options="{'no_create_edit': True}"
+                                   domain="[('partner_id','=',partner_id),('state','=','active')]"/>
+                            <field name="crm_lead_id" options="{'no_create_edit': True}"/>
+                            <field name="sale_order_id" options="{'no_create_edit': True}"/>
+                        </group>
+                        <group string="Money">
+                            <field name="currency_id" groups="base.group_multi_currency"/>
+                            <field name="quoted_value" widget="monetary"/>
+                            <field name="deposit_received" widget="monetary"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Where">
+                            <field name="venue_id" options="{'no_create_edit': True}"/>
+                            <field name="venue_room_id"
+                                   options="{'no_create_edit': True}"
+                                   domain="[('venue_id','=',venue_id)]"/>
+                        </group>
+                        <group string="When">
+                            <field name="event_date"/>
+                            <field name="event_end_date"/>
+                            <field name="soft_hold_until" readonly="state != 'pending'"/>
+                        </group>
+                    </group>
+
+                    <group string="Status Tracks">
+                        <group>
+                            <field name="commercial_status"/>
+                            <field name="finance_status"/>
+                            <field name="operational_status"/>
+                        </group>
+                        <group>
+                            <field name="sub_hire_required"/>
+                            <field name="logistics_flag"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Crew">
+                            <field name="crew_assignment_ids" context="{'default_job_id': active_id}">
+                                <tree editable="bottom"
+                                      decoration-warning="state == 'pending'"
+                                      decoration-success="state == 'confirmed'"
+                                      decoration-danger="state == 'declined'">
+                                    <field name="user_id"/>
+                                    <field name="role"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="assigned_on" readonly="1"/>
+                                    <field name="responded_on" readonly="1"/>
+                                    <field name="notification_sent" readonly="1"/>
+                                </tree>
+                            </field>
+                            <group>
+                                <group>
+                                    <field name="crew_total_count"/>
+                                    <field name="crew_confirmed_count"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Equipment">
+                            <group>
+                                <field name="equipment_count"/>
+                            </group>
+                            <field name="equipment_summary"
+                                   placeholder="Main items: e.g. 2x line array PA, 1x DJ booth, 16-channel monitor mix, 8x moving heads, 3x dimmer packs…"/>
+                        </page>
+                        <page string="Capacity Gate (P2.M4)">
+                            <group>
+                                <group>
+                                    <field name="gate_result" widget="badge"
+                                           decoration-success="gate_result == 'pass'"
+                                           decoration-warning="gate_result == 'warning'"
+                                           decoration-danger="gate_result == 'reject'"/>
+                                    <field name="gate_run_at"/>
+                                </group>
+                                <group>
+                                    <field name="gate_override_by"/>
+                                    <field name="gate_override_reason"/>
+                                </group>
+                            </group>
+                            <field name="gate_check_log" readonly="1"
+                                   placeholder="Populated when the Capacity Acceptance Gate runs (P2.M4 — not yet wired up)."/>
+                        </page>
+                        <page string="Loss Capture" invisible="state != 'archived'">
+                            <group>
+                                <group>
+                                    <field name="loss_reason" required="state == 'archived'"/>
+                                    <field name="lost_to_competitor"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="commercial_job_action" model="ir.actions.act_window">
+        <field name="name">Commercial Jobs</field>
+        <field name="res_model">commercial.job</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="commercial_job_view_search"/>
+        <field name="context">{'search_default_filter_pending': 1, 'search_default_filter_active': 1}</field>
+    </record>
+
+</odoo>

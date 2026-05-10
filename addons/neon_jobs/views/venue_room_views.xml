@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="venue_room_view_tree" model="ir.ui.view">
+        <field name="name">venue.room.tree</field>
+        <field name="model">venue.room</field>
+        <field name="arch" type="xml">
+            <tree string="Venue Rooms">
+                <field name="venue_id"/>
+                <field name="name"/>
+                <field name="capacity"/>
+                <field name="floor"/>
+                <field name="active" invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="venue_room_view_form" model="ir.ui.view">
+        <field name="name">venue.room.form</field>
+        <field name="model">venue.room</field>
+        <field name="arch" type="xml">
+            <form string="Venue Room">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="venue_id" options="{'no_create': True}"/>
+                            <field name="name"/>
+                            <field name="capacity"/>
+                        </group>
+                        <group>
+                            <field name="floor"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes">
+                            <field name="notes" placeholder="Parking, AV, accessibility, special considerations…"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="venue_room_action" model="ir.actions.act_window">
+        <field name="name">Venue Rooms</field>
+        <field name="res_model">venue.room</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

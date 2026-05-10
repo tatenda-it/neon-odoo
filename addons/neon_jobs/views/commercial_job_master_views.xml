@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_job_master_view_tree" model="ir.ui.view">
+        <field name="name">commercial.job.master.tree</field>
+        <field name="model">commercial.job.master</field>
+        <field name="arch" type="xml">
+            <tree string="Master Contracts" decoration-info="state == 'draft'" decoration-success="state == 'active'" decoration-muted="state in ('completed','cancelled')">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="partner_id"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="job_count"/>
+                <field name="value_target" widget="monetary"/>
+                <field name="value_realised" widget="monetary"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="state" widget="badge" decoration-success="state == 'active'" decoration-info="state == 'draft'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_job_master_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.master.form</field>
+        <field name="model">commercial.job.master</field>
+        <field name="arch" type="xml">
+            <form string="Master Contract">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(commercial_job_action)d" type="action" class="oe_stat_button" icon="fa-briefcase" context="{'search_default_master_contract_id': active_id}">
+                            <field name="job_count" widget="statinfo" string="Jobs"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h2><field name="title" placeholder="C Suite 2026 Events Programme"/></h2>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id" options="{'no_create_edit': True}"/>
+                            <field name="currency_id" groups="base.group_multi_currency"/>
+                            <field name="value_target" widget="monetary"/>
+                            <field name="value_realised" widget="monetary"/>
+                        </group>
+                        <group>
+                            <field name="start_date"/>
+                            <field name="end_date"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes">
+                            <field name="description" placeholder="Contract terms, key contacts, recurring patterns, etc."/>
+                        </page>
+                        <page string="Jobs">
+                            <field name="job_ids">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="event_date"/>
+                                    <field name="venue_id"/>
+                                    <field name="quoted_value" widget="monetary"/>
+                                    <field name="currency_id" invisible="1"/>
+                                    <field name="state" widget="badge"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="commercial_job_master_action" model="ir.actions.act_window">
+        <field name="name">Master Contracts</field>
+        <field name="res_model">commercial.job.master</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

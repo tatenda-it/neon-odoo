@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_operations_root"
+              name="Operations"
+              sequence="40"/>
+
+    <menuitem id="menu_commercial_job"
+              name="Commercial Jobs"
+              parent="menu_operations_root"
+              action="commercial_job_action"
+              sequence="10"/>
+
+    <menuitem id="menu_master_contract"
+              name="Master Contracts"
+              parent="menu_operations_root"
+              action="commercial_job_master_action"
+              sequence="20"/>
+
+    <menuitem id="menu_crew_assignments"
+              name="Crew Assignments"
+              parent="menu_operations_root"
+              action="commercial_job_crew_action"
+              sequence="30"/>
+
+    <menuitem id="menu_operations_config"
+              name="Configuration"
+              parent="menu_operations_root"
+              sequence="90"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_venues"
+              name="Venues"
+              parent="menu_operations_config"
+              action="res_partner_action_venues"
+              sequence="10"/>
+
+    <menuitem id="menu_venue_rooms"
+              name="Venue Rooms"
+              parent="menu_operations_config"
+              action="venue_room_action"
+              sequence="20"/>
+
+</odoo>

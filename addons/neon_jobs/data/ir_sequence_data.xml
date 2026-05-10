@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="seq_commercial_job" model="ir.sequence">
+            <field name="name">Commercial Job</field>
+            <field name="code">commercial.job</field>
+            <field name="prefix">JOB-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
+        <record id="seq_commercial_job_master" model="ir.sequence">
+            <field name="name">Master Contract</field>
+            <field name="code">commercial.job.master</field>
+            <field name="prefix">MC-</field>
+            <field name="padding">5</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
+    </data>
+</odoo>
