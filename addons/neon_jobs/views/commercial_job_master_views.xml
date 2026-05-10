@@ -26,6 +26,16 @@
         <field name="arch" type="xml">
             <form string="Master Contract">
                 <header>
+                    <button name="action_activate" type="object" string="Activate"
+                            class="oe_highlight" invisible="state != 'draft'"
+                            groups="neon_jobs.group_neon_jobs_user"/>
+                    <button name="action_complete" type="object" string="Complete"
+                            class="oe_highlight" invisible="state != 'active'"
+                            groups="neon_jobs.group_neon_jobs_user"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state not in ('draft','active')"
+                            confirm="Cancel this Master Contract?"
+                            groups="neon_jobs.group_neon_jobs_user"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active,completed"/>
                 </header>
                 <sheet>

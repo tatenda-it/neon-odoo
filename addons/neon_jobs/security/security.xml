@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Neon Operations module category.
+
+            Houses the access-rights dropdown that exposes the
+            two neon_jobs groups in the user form. Sequence 40
+            keeps it adjacent to the existing Operations cluster
+            in the Odoo settings layout.
+        -->
+        <record id="module_category_neon_operations" model="ir.module.category">
+            <field name="name">Neon Operations</field>
+            <field name="description">Access rights for the Neon Operations app — Commercial Jobs, Master Contracts, Crew, Venues.</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <!--
+            Neon Operations: User.
+
+            Default tier. Granted automatically to all internal
+            users (base.group_user implies this group). Read /
+            write / create on Commercial Jobs and related models;
+            no unlink and no override authority on state
+            transitions.
+        -->
+        <record id="group_neon_jobs_user" model="res.groups">
+            <field name="name">User</field>
+            <field name="category_id" ref="module_category_neon_operations"/>
+            <field name="comment">Default Operations access — read/write/create Commercial Jobs and Master Contracts. Cannot delete records and cannot override state-transition rules.</field>
+        </record>
+
+        <!--
+            Neon Operations: Manager.
+
+            MD/OD tier. Implies User. Adds unlink rights and
+            bypasses the state-transition matrix in commercial_job
+            and commercial_job_master (e.g. archive without
+            loss_reason, reopen completed jobs, jump non-linear
+            status track moves). Per Robin Q3 — either MD or OD
+            individually has override authority.
+        -->
+        <record id="group_neon_jobs_manager" model="res.groups">
+            <field name="name">Manager</field>
+            <field name="category_id" ref="module_category_neon_operations"/>
+            <field name="implied_ids" eval="[(4, ref('group_neon_jobs_user'))]"/>
+            <field name="comment">Override authority on state transitions and full CRUD including delete. Intended for Managing Director and Operational Director.</field>
+        </record>
+
+        <!--
+            base.group_user.implied_ids += group_neon_jobs_user is
+            applied imperatively in __init__.py:_post_init_hook and
+            in migrations/17.0.1.1.0/post-migrate.py — declarative
+            XML cannot update base.group_user because its
+            ir_model_data row carries noupdate=true from the base
+            module install.
+        -->
+
+    </data>
+</odoo>

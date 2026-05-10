@@ -1,5 +1,9 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_commercial_job_master_user,commercial.job.master user,model_commercial_job_master,base.group_user,1,1,1,1
-access_commercial_job_user,commercial.job user,model_commercial_job,base.group_user,1,1,1,1
-access_commercial_job_crew_user,commercial.job.crew user,model_commercial_job_crew,base.group_user,1,1,1,1
-access_venue_room_user,venue.room user,model_venue_room,base.group_user,1,1,1,1
+access_commercial_job_master_user,commercial.job.master user,model_commercial_job_master,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_commercial_job_master_manager,commercial.job.master manager,model_commercial_job_master,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_job_user,commercial.job user,model_commercial_job,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_commercial_job_manager,commercial.job manager,model_commercial_job,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_job_crew_user,commercial.job.crew user,model_commercial_job_crew,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_commercial_job_crew_manager,commercial.job.crew manager,model_commercial_job_crew,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_venue_room_user,venue.room user,model_venue_room,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_venue_room_manager,venue.room manager,model_venue_room,neon_jobs.group_neon_jobs_manager,1,1,1,1

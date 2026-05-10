@@ -67,6 +67,19 @@
         <field name="arch" type="xml">
             <form string="Commercial Job">
                 <header>
+                    <button name="action_activate" type="object" string="Activate"
+                            class="oe_highlight" invisible="state != 'pending'"
+                            groups="neon_jobs.group_neon_jobs_user"/>
+                    <button name="action_complete" type="object" string="Complete"
+                            class="oe_highlight" invisible="state != 'active'"
+                            groups="neon_jobs.group_neon_jobs_user"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state not in ('pending','active')"
+                            confirm="Cancel this Commercial Job?"
+                            groups="neon_jobs.group_neon_jobs_user"/>
+                    <button name="action_archive_lost" type="object" string="Archive Lost"
+                            invisible="state != 'pending'"
+                            groups="neon_jobs.group_neon_jobs_user"/>
                     <field name="state" widget="statusbar" statusbar_visible="pending,active,completed"/>
                 </header>
                 <sheet>
@@ -105,15 +118,11 @@
                     </group>
 
                     <group string="Status Tracks">
-                        <group>
-                            <field name="commercial_status"/>
-                            <field name="finance_status"/>
-                            <field name="operational_status"/>
-                        </group>
-                        <group>
-                            <field name="sub_hire_required"/>
-                            <field name="logistics_flag"/>
-                        </group>
+                        <field name="commercial_status" widget="statusbar" options="{'clickable': '1'}"/>
+                        <field name="finance_status" widget="statusbar" options="{'clickable': '1'}"/>
+                        <field name="operational_status" widget="statusbar" options="{'clickable': '1'}"/>
+                        <field name="sub_hire_required"/>
+                        <field name="logistics_flag"/>
                     </group>
 
                     <notebook>
@@ -162,10 +171,11 @@
                             <field name="gate_check_log" readonly="1"
                                    placeholder="Populated when the Capacity Acceptance Gate runs (P2.M4 — not yet wired up)."/>
                         </page>
-                        <page string="Loss Capture" invisible="state != 'archived'">
+                        <page string="Loss Capture" invisible="state not in ('pending','archived')">
                             <group>
                                 <group>
-                                    <field name="loss_reason" required="state == 'archived'"/>
+                                    <field name="loss_reason"
+                                           placeholder="Required before archiving — fill in why the job was lost (competitor, budget, timing, etc.)."/>
                                     <field name="lost_to_competitor"/>
                                 </group>
                             </group>

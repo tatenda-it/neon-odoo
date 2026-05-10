@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
+
+
+_MASTER_STATE_TRANSITIONS = {
+    "draft": ("active", "cancelled"),
+    "active": ("completed", "cancelled"),
+    "completed": (),
+    "cancelled": (),
+}
 
 
 class CommercialJobMaster(models.Model):
@@ -92,3 +101,40 @@ class CommercialJobMaster(models.Model):
                     or _("New")
                 )
         return super().create(vals_list)
+
+    # ============================================================
+    # === Write guard — enforce transition matrix
+    # ============================================================
+    def write(self, vals):
+        if "state" in vals:
+            is_manager = self.env.user.has_group(
+                "neon_jobs.group_neon_jobs_manager"
+            )
+            for rec in self:
+                old, new = rec.state, vals["state"]
+                if old == new or not old:
+                    continue
+                if new in _MASTER_STATE_TRANSITIONS.get(old, ()) or is_manager:
+                    continue
+                raise UserError(_(
+                    "Invalid Master Contract transition: %(old)s → %(new)s. "
+                    "Allowed from %(old)s: %(allowed)s. "
+                    "Manager override required for any other move."
+                ) % {
+                    "old": old,
+                    "new": new,
+                    "allowed": ", ".join(_MASTER_STATE_TRANSITIONS.get(old, ())) or "(none)",
+                })
+        return super().write(vals)
+
+    # ============================================================
+    # === Action buttons
+    # ============================================================
+    def action_activate(self):
+        self.write({"state": "active"})
+
+    def action_complete(self):
+        self.write({"state": "completed"})
+
+    def action_cancel(self):
+        self.write({"state": "cancelled"})

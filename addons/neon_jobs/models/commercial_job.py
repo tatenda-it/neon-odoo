@@ -1,6 +1,44 @@
 # -*- coding: utf-8 -*-
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
+
+
+# State transition matrix per P2.M1 Schema Sketch §3.2.
+# Manager group bypasses these — see _check_state_transition.
+_STATE_TRANSITIONS = {
+    "pending": ("active", "cancelled", "archived"),
+    "active": ("completed", "cancelled"),
+    "completed": (),
+    "cancelled": (),
+    "archived": (),
+}
+
+# Status-track transition rules. Linear forward progression for
+# operational; selectable lateral moves for commercial; mostly
+# automated later for finance but covered here for M2 manual UX.
+_COMMERCIAL_STATUS_TRANSITIONS = {
+    "negotiating": ("won", "lost", "on_hold"),
+    "on_hold": ("negotiating", "won", "lost"),
+    "won": ("on_hold",),
+    "lost": (),
+}
+_FINANCE_STATUS_TRANSITIONS = {
+    "quoted": ("deposit_pending",),
+    "deposit_pending": ("deposit_received", "overdue"),
+    "deposit_received": ("partial_paid", "fully_paid"),
+    "partial_paid": ("fully_paid", "overdue"),
+    "fully_paid": (),
+    "overdue": ("partial_paid", "fully_paid"),
+}
+_OPERATIONAL_STATUS_TRANSITIONS = {
+    "planning": ("soft_hold", "confirmed"),
+    "soft_hold": ("planning", "confirmed"),
+    "confirmed": ("pre_event",),
+    "pre_event": ("live", "confirmed"),
+    "live": ("wrapped",),
+    "wrapped": ("done",),
+    "done": (),
+}
 
 
 class CommercialJob(models.Model):
@@ -247,6 +285,9 @@ class CommercialJob(models.Model):
     # ============================================================
     @api.constrains("state", "loss_reason")
     def _check_loss_reason_when_archived(self):
+        # Managers may archive without loss_reason (Robin Q3 — MD/OD override).
+        if self.env.user.has_group("neon_jobs.group_neon_jobs_manager"):
+            return
         for rec in self:
             if rec.state == "archived" and not rec.loss_reason:
                 raise ValidationError(
@@ -282,6 +323,71 @@ class CommercialJob(models.Model):
                     fields.Date.today(), days=7
                 )
         return super().create(vals_list)
+
+    # ============================================================
+    # === Write guard — enforce transition matrix
+    # ============================================================
+    def _is_jobs_manager(self):
+        return self.env.user.has_group("neon_jobs.group_neon_jobs_manager")
+
+    def _check_transition(self, field_label, transitions, old, new):
+        if old == new or not old:
+            return
+        allowed = transitions.get(old, ())
+        if new in allowed:
+            return
+        if self._is_jobs_manager():
+            return
+        raise UserError(_(
+            "Invalid %(label)s transition: %(old)s → %(new)s. "
+            "Allowed from %(old)s: %(allowed)s. "
+            "Manager override required for any other move."
+        ) % {
+            "label": field_label,
+            "old": old,
+            "new": new,
+            "allowed": ", ".join(allowed) or "(none — terminal state)",
+        })
+
+    def write(self, vals):
+        guards = (
+            ("state", _("Lifecycle"), _STATE_TRANSITIONS),
+            ("commercial_status", _("Commercial Status"), _COMMERCIAL_STATUS_TRANSITIONS),
+            ("finance_status", _("Finance Status"), _FINANCE_STATUS_TRANSITIONS),
+            ("operational_status", _("Operational Status"), _OPERATIONAL_STATUS_TRANSITIONS),
+        )
+        for rec in self:
+            for field, label, table in guards:
+                if field in vals:
+                    rec._check_transition(label, table, rec[field], vals[field])
+        return super().write(vals)
+
+    # ============================================================
+    # === Action buttons — primary lifecycle
+    # ============================================================
+    def action_activate(self):
+        for rec in self:
+            # Capacity Gate evaluation lives in P2.M4. M2 just transitions.
+            rec.write({
+                "state": "active",
+                "soft_hold_until": False,
+            })
+
+    def action_complete(self):
+        self.write({"state": "completed"})
+
+    def action_cancel(self):
+        self.write({"state": "cancelled"})
+
+    def action_archive_lost(self):
+        for rec in self:
+            if not rec.loss_reason:
+                raise UserError(_(
+                    "Loss Reason is required before archiving. "
+                    "Open the Loss Capture page, fill in why the job was lost, "
+                    "then click Archive Lost again."
+                ))
+            rec.write({"state": "archived"})
 
     # ============================================================
     # === Onchange — UX helpers
