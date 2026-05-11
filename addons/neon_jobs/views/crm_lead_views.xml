@@ -13,6 +13,12 @@
                     <field name="commercial_job_count" widget="statinfo" string="Jobs"/>
                 </button>
             </xpath>
+            <xpath expr="//header" position="inside">
+                <button name="action_open_loss_wizard" type="object"
+                        string="Capture Loss Details"
+                        invisible="commercial_job_count == 0"
+                        groups="neon_jobs.group_neon_jobs_user"/>
+            </xpath>
         </field>
     </record>
 

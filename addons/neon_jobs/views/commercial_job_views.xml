@@ -8,6 +8,7 @@
             <tree string="Commercial Jobs"
                   decoration-info="state == 'pending'"
                   decoration-success="state == 'active'"
+                  decoration-warning="needs_attention"
                   decoration-muted="state in ('completed','cancelled','archived')">
                 <field name="name"/>
                 <field name="event_date"/>
@@ -27,6 +28,7 @@
                        decoration-success="gate_result == 'pass'"
                        decoration-warning="gate_result == 'warning'"
                        decoration-danger="gate_result == 'reject'"/>
+                <field name="needs_attention" invisible="1"/>
             </tree>
         </field>
     </record>
@@ -83,6 +85,12 @@
                     <field name="state" widget="statusbar" statusbar_visible="pending,active,completed"/>
                 </header>
                 <sheet>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not needs_attention">
+                        <strong>Needs attention:</strong>
+                        <field name="needs_attention_reason" nolabel="1" readonly="1"/>
+                    </div>
+                    <field name="needs_attention" invisible="1"/>
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
                         <h1><field name="name" readonly="1"/></h1>

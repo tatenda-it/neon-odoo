@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="partner_tbd_venue" model="res.partner">
+            <field name="name">TBD — Set Venue</field>
+            <field name="is_company">True</field>
+            <field name="is_venue">True</field>
+            <field name="comment">System placeholder used by neon_jobs when a Commercial Job is auto-created from a CRM lead without a real venue. Replace on the job as soon as the venue is known. Do not delete.</field>
+        </record>
+
+    </data>
+</odoo>

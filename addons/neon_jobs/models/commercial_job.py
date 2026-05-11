@@ -234,6 +234,28 @@ class CommercialJob(models.Model):
     )
     lost_to_competitor = fields.Char(string="Lost To Competitor")
 
+    # === Auto-create placeholder tracking (P2.M3) ===
+    event_date_is_placeholder = fields.Boolean(
+        string="Event Date Is Placeholder",
+        default=False,
+        copy=False,
+        help="Set True when neon_jobs auto-created this row from a CRM lead "
+        "without lead.date_deadline. Cleared automatically the first time "
+        "event_date is updated.",
+    )
+    needs_attention = fields.Boolean(
+        string="Needs Attention",
+        compute="_compute_needs_attention",
+        store=True,
+        help="True while either event_date or venue_id is still a placeholder. "
+        "Drives the warning banner and the tree decoration.",
+    )
+    needs_attention_reason = fields.Text(
+        string="Needs Attention Reason",
+        compute="_compute_needs_attention",
+        store=True,
+    )
+
     # === Capacity Acceptance Gate result ===
     gate_result = fields.Selection(
         [
@@ -278,6 +300,22 @@ class CommercialJob(models.Model):
             rec.crew_total_count = len(rec.crew_assignment_ids)
             rec.crew_confirmed_count = len(
                 rec.crew_assignment_ids.filtered(lambda c: c.state == "confirmed")
+            )
+
+    @api.depends("event_date_is_placeholder", "venue_id")
+    def _compute_needs_attention(self):
+        tbd = self.env.ref("neon_jobs.partner_tbd_venue", raise_if_not_found=False)
+        tbd_id = tbd.id if tbd else False
+        for rec in self:
+            reasons = []
+            if rec.event_date_is_placeholder:
+                reasons.append(_("event date is a placeholder (today + 14 days)"))
+            if tbd_id and rec.venue_id and rec.venue_id.id == tbd_id:
+                reasons.append(_("venue is the TBD placeholder"))
+            rec.needs_attention = bool(reasons)
+            rec.needs_attention_reason = (
+                _("Set the real values before the Capacity Gate runs: %s.") % "; ".join(reasons)
+                if reasons else False
             )
 
     # ============================================================
@@ -360,6 +398,10 @@ class CommercialJob(models.Model):
             for field, label, table in guards:
                 if field in vals:
                     rec._check_transition(label, table, rec[field], vals[field])
+        # Any explicit user-supplied event_date overrides the placeholder flag.
+        # If caller also sets the flag (e.g. the auto-create path), respect that.
+        if "event_date" in vals and "event_date_is_placeholder" not in vals:
+            vals = dict(vals, event_date_is_placeholder=False)
         return super().write(vals)
 
     # ============================================================

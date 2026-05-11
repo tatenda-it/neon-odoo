@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- NOT noupdate: function calls inside noupdate=1 only fire on first
+         install, but this module pre-dates the flag columns. Idempotent
+         re-application on every -u upgrade is harmless. -->
+
+    <!-- Tick the Quote Sent stage as the proposal trigger.
+         Driven off id, not name, so future renames stay safe. -->
+    <function model="crm.stage" name="write">
+        <value model="crm.stage" search="[('id', '=', 8)]"/>
+        <value eval="{'is_proposal_stage': True}"/>
+    </function>
+
+    <!-- Tick the Confirmed stage as the activation trigger.
+         Per Robin Q11 — confirmed (not won) is when the job goes operational. -->
+    <function model="crm.stage" name="write">
+        <value model="crm.stage" search="[('id', '=', 11)]"/>
+        <value eval="{'is_confirmation_stage': True}"/>
+    </function>
+
+</odoo>

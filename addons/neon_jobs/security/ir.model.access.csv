@@ -7,3 +7,5 @@ access_commercial_job_crew_user,commercial.job.crew user,model_commercial_job_cr
 access_commercial_job_crew_manager,commercial.job.crew manager,model_commercial_job_crew,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_venue_room_user,venue.room user,model_venue_room,neon_jobs.group_neon_jobs_user,1,1,1,0
 access_venue_room_manager,venue.room manager,model_venue_room,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_job_loss_wizard_user,commercial.job.loss.wizard user,model_commercial_job_loss_wizard,neon_jobs.group_neon_jobs_user,1,1,1,1
+access_commercial_job_loss_wizard_manager,commercial.job.loss.wizard manager,model_commercial_job_loss_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
