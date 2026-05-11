@@ -155,6 +155,21 @@ class CommercialJob(models.Model):
         default="planning",
         tracking=True,
     )
+    operational_status_color = fields.Integer(
+        string="Operational Status Color",
+        compute="_compute_operational_status_color",
+        store=True,
+        help="Odoo palette index (0–11) driven by operational_status. "
+        "Mapping (P2.M6 D2): planning=5, soft_hold=2, confirmed=10, "
+        "pre_event=3, live=11, wrapped=4, done=7, unset=0.",
+    )
+    calendar_display_name = fields.Char(
+        string="Calendar Tile Label",
+        compute="_compute_calendar_display_name",
+        store=False,
+        help="Used as the calendar tile title via create_name_field. "
+        "Prefixed by gate_result: reject=⚠, warning=▷, overridden=✓.",
+    )
 
     # === Dates ===
     event_date = fields.Date(
@@ -324,6 +339,35 @@ class CommercialJob(models.Model):
         for rec in self:
             rec.invoice_ids = rec.sale_order_id.invoice_ids if rec.sale_order_id else False
             rec.invoice_count = len(rec.invoice_ids)
+
+    _OPERATIONAL_STATUS_COLORS = {
+        "planning": 5,
+        "soft_hold": 2,
+        "confirmed": 10,
+        "pre_event": 3,
+        "live": 11,
+        "wrapped": 4,
+        "done": 7,
+    }
+    _GATE_TILE_PREFIXES = {
+        "reject": "⚠ ",
+        "warning": "▷ ",
+        "overridden": "✓ ",
+    }
+
+    @api.depends("operational_status")
+    def _compute_operational_status_color(self):
+        for rec in self:
+            rec.operational_status_color = self._OPERATIONAL_STATUS_COLORS.get(
+                rec.operational_status, 0
+            )
+
+    @api.depends("partner_id", "partner_id.name", "gate_result")
+    def _compute_calendar_display_name(self):
+        for rec in self:
+            base = rec.partner_id.name or _("Untitled")
+            prefix = self._GATE_TILE_PREFIXES.get(rec.gate_result, "")
+            rec.calendar_display_name = prefix + base
 
     @api.depends("state", "soft_hold_until")
     def _compute_soft_hold_state(self):

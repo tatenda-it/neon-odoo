@@ -75,6 +75,49 @@ After install, verify:
 - Master Contract auto-suggestion (3+ events in 12 months) is documented in
   the schema but the scheduled action is P2.M3.
 
+## Calendar (P2.M6)
+
+Two calendar views replace the prior FamCal workflow. Both live under
+**Operations** and share the same form/popover.
+
+| Menu | Domain | Default filters |
+|------|--------|-----------------|
+| Calendar — Live Pipeline | `state in (pending, active)` | Pending + Active |
+| Calendar — All Events | no filter | none |
+
+### Tile colour (operational_status)
+
+The tile background is the Odoo palette index of `operational_status_color`:
+
+| operational_status | Colour index |
+|---|---|
+| planning | 5 (light blue) |
+| soft_hold | 2 (orange) |
+| confirmed | 10 (light green) |
+| pre_event | 3 (yellow) |
+| live | 11 (purple) |
+| wrapped | 4 (teal) |
+| done | 7 (grey) |
+
+### Tile label prefixes (gate_result)
+
+The tile title is `calendar_display_name` — the client partner name with a
+prefix derived from the Capacity Gate result:
+
+| gate_result | Prefix |
+|---|---|
+| reject | ⚠ |
+| warning | ▷ |
+| overridden | ✓ |
+| pass / not_run | (none) |
+
+### Popover fields
+
+Clicking a tile opens the standard Odoo popover with venue, room,
+operational status, gate result, crew totals, equipment count, sub-hire,
+logistics, and soft hold state. The "Open" button links to the full form.
+Quick-create is disabled (required fields can't be filled in a popover).
+
 ## Author
 
 Neon Events Elements

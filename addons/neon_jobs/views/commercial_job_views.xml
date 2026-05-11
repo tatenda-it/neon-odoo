@@ -57,10 +57,19 @@
                 <filter string="Sub-hire required" name="filter_subhire" domain="[('sub_hire_required', '=', True)]"/>
                 <filter string="Logistics flag" name="filter_logistics" domain="[('logistics_flag', '=', True)]"/>
                 <separator/>
+                <filter string="Soft Hold Expiring Soon" name="filter_soft_hold_expiring_soon"
+                        domain="[('soft_hold_state', '=', 'expiring_soon')]"/>
+                <filter string="Gate Reject" name="filter_gate_reject"
+                        domain="[('gate_result', '=', 'reject')]"/>
+                <filter string="Gate Warning" name="filter_gate_warning"
+                        domain="[('gate_result', '=', 'warning')]"/>
+                <separator/>
                 <filter string="Event date this month" name="filter_this_month"
                         domain="[('event_date', '>=', (context_today()).strftime('%Y-%m-01'))]"/>
                 <group expand="0" string="Group By">
                     <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Operational Status" name="group_operational_status"
+                            context="{'group_by': 'operational_status'}"/>
                     <filter string="Client" name="group_partner" context="{'group_by': 'partner_id'}"/>
                     <filter string="Venue" name="group_venue" context="{'group_by': 'venue_id'}"/>
                     <filter string="Master Contract" name="group_master" context="{'group_by': 'master_contract_id'}"/>

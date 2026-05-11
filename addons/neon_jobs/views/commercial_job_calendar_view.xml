@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_job_view_calendar" model="ir.ui.view">
+        <field name="name">commercial.job.calendar</field>
+        <field name="model">commercial.job</field>
+        <field name="arch" type="xml">
+            <calendar string="Commercial Jobs"
+                      date_start="event_date"
+                      date_stop="event_end_date"
+                      color="operational_status_color"
+                      create_name_field="calendar_display_name"
+                      mode="month"
+                      quick_create="0"
+                      event_open_popup="1"
+                      hide_time="true">
+                <!-- calendar_display_name is the tile title (set via
+                     create_name_field). Mark invisible so it doesn't
+                     duplicate inside the popover. -->
+                <field name="calendar_display_name" invisible="1"/>
+                <field name="partner_id"/>
+                <field name="venue_id"/>
+                <field name="venue_room_id"/>
+                <field name="operational_status"/>
+                <field name="gate_result"/>
+                <field name="crew_total_count"/>
+                <field name="crew_confirmed_count"/>
+                <field name="equipment_count"/>
+                <field name="sub_hire_required"/>
+                <field name="logistics_flag"/>
+                <field name="soft_hold_state"/>
+            </calendar>
+        </field>
+    </record>
+
+    <record id="commercial_job_calendar_live_pipeline_action" model="ir.actions.act_window">
+        <field name="name">Live Pipeline</field>
+        <field name="res_model">commercial.job</field>
+        <field name="view_mode">calendar,kanban,tree,form</field>
+        <field name="domain">[('state', 'in', ['pending', 'active'])]</field>
+        <field name="context">{'search_default_filter_pending': 1, 'search_default_filter_active': 1}</field>
+        <field name="search_view_id" ref="commercial_job_view_search"/>
+    </record>
+
+    <record id="commercial_job_calendar_all_events_action" model="ir.actions.act_window">
+        <field name="name">All Events</field>
+        <field name="res_model">commercial.job</field>
+        <field name="view_mode">calendar,kanban,tree,form</field>
+        <field name="domain">[]</field>
+        <field name="context">{}</field>
+        <field name="search_view_id" ref="commercial_job_view_search"/>
+    </record>
+
+</odoo>

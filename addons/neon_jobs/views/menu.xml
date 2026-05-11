@@ -5,6 +5,18 @@
               name="Operations"
               sequence="40"/>
 
+    <menuitem id="menu_calendar_live_pipeline"
+              name="Calendar — Live Pipeline"
+              parent="menu_operations_root"
+              action="commercial_job_calendar_live_pipeline_action"
+              sequence="5"/>
+
+    <menuitem id="menu_calendar_all_events"
+              name="Calendar — All Events"
+              parent="menu_operations_root"
+              action="commercial_job_calendar_all_events_action"
+              sequence="7"/>
+
     <menuitem id="menu_commercial_job"
               name="Commercial Jobs"
               parent="menu_operations_root"
