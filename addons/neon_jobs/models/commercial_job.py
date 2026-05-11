@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
-from odoo import _, api, fields, models
+import logging
+
+from odoo import SUPERUSER_ID, _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 # State transition matrix per P2.M1 Schema Sketch §3.2.
@@ -167,6 +171,33 @@ class CommercialJob(models.Model):
         help="Auto-set to today + 7 days at pending creation. "
         "Cleared on activation.",
     )
+    soft_hold_extension_count = fields.Integer(
+        string="Soft Hold Extensions",
+        default=0,
+        tracking=True,
+        help="Number of times the soft hold has been extended. "
+        "Hard cap of 3 (P2.M5 D2).",
+    )
+    last_expiry_notification_date = fields.Date(
+        string="Last Expiry Notification",
+        copy=False,
+        help="Anchor used by the daily cron to avoid duplicate "
+        "soft-hold expiry notifications.",
+    )
+    soft_hold_state = fields.Selection(
+        [
+            ("none", "Not applicable"),
+            ("active", "Active"),
+            ("expiring_soon", "Expiring soon"),
+            ("expired", "Expired"),
+        ],
+        string="Soft Hold Status",
+        compute="_compute_soft_hold_state",
+        store=True,
+        help="Computed from state + soft_hold_until against today. "
+        "Stored: refreshed when those fields change or when the daily "
+        "cron processes the job. May go stale between cron runs.",
+    )
 
     # === Venue + Room ===
     venue_id = fields.Many2one(
@@ -293,6 +324,20 @@ class CommercialJob(models.Model):
         for rec in self:
             rec.invoice_ids = rec.sale_order_id.invoice_ids if rec.sale_order_id else False
             rec.invoice_count = len(rec.invoice_ids)
+
+    @api.depends("state", "soft_hold_until")
+    def _compute_soft_hold_state(self):
+        today = fields.Date.today()
+        soon_threshold = fields.Date.add(today, days=3)
+        for rec in self:
+            if rec.state != "pending" or not rec.soft_hold_until:
+                rec.soft_hold_state = "none"
+            elif rec.soft_hold_until < today:
+                rec.soft_hold_state = "expired"
+            elif rec.soft_hold_until <= soon_threshold:
+                rec.soft_hold_state = "expiring_soon"
+            else:
+                rec.soft_hold_state = "active"
 
     @api.depends("crew_assignment_ids", "crew_assignment_ids.state")
     def _compute_crew_counts(self):
@@ -428,6 +473,108 @@ class CommercialJob(models.Model):
     # ============================================================
     # === Onchange — UX helpers
     # ============================================================
+    # ============================================================
+    # === Soft Hold expiry (P2.M5)
+    # ============================================================
+    def _soft_hold_activity_user(self):
+        """Pick the user for a soft-hold expiry mail.activity.
+
+        Fallback chain (P2.M5 spec):
+        1. crm_lead_id.user_id (the salesperson on the lead)
+        2. create_uid if it is not the system superuser
+        3. First user in group_neon_jobs_manager (by id)
+        4. env.user (last resort)
+        """
+        self.ensure_one()
+        if self.crm_lead_id and self.crm_lead_id.user_id:
+            return self.crm_lead_id.user_id
+        if self.create_uid and self.create_uid.id != SUPERUSER_ID:
+            return self.create_uid
+        manager_group = self.env.ref(
+            "neon_jobs.group_neon_jobs_manager", raise_if_not_found=False
+        )
+        if manager_group:
+            manager = self.env["res.users"].sudo().search(
+                [("groups_id", "in", manager_group.id)],
+                limit=1,
+                order="id",
+            )
+            if manager:
+                return manager
+        return self.env.user
+
+    @api.model
+    def cron_process_soft_hold_expiry(self):
+        """Daily nudge: chatter + mail.activity for pending jobs whose soft
+        hold has reached or passed today. Idempotent via
+        last_expiry_notification_date."""
+        today = fields.Date.today()
+        # SQL prefilter on the easy bits; cross-field comparison
+        # (last_expiry_notification_date vs soft_hold_until) done in Python.
+        candidates = self.search([
+            ("state", "=", "pending"),
+            ("soft_hold_until", "!=", False),
+            ("soft_hold_until", "<=", today),
+        ])
+        jobs = candidates.filtered(
+            lambda j: not j.last_expiry_notification_date
+            or j.last_expiry_notification_date < j.soft_hold_until
+        )
+        if not jobs:
+            _logger.info("neon_jobs cron: no soft-hold expiries to notify.")
+            return True
+        activity_type = self.env.ref(
+            "mail.mail_activity_data_todo", raise_if_not_found=False
+        )
+        ir_model_id = self.env["ir.model"]._get("commercial.job").id
+        for job in jobs:
+            days_overdue = (today - job.soft_hold_until).days
+            if days_overdue == 0:
+                summary = _("Soft hold expires today on %s") % job.name
+                body = _(
+                    "Soft hold expires today — extend, activate, or close."
+                )
+            else:
+                summary = _("Soft hold expired on %s") % job.name
+                body = _(
+                    "Soft hold expired %d days ago — extend, activate, or close."
+                ) % days_overdue
+            assignee = job._soft_hold_activity_user()
+            job.message_post(body=body)
+            self.env["mail.activity"].sudo().create({
+                "res_model_id": ir_model_id,
+                "res_id": job.id,
+                "summary": summary,
+                "note": body,
+                "date_deadline": fields.Date.add(today, days=3),
+                "user_id": assignee.id,
+                "activity_type_id": activity_type.id if activity_type else False,
+            })
+            job.write({"last_expiry_notification_date": today})
+            # Recompute stored soft_hold_state so views reflect 'expired'
+            # without waiting for another write.
+            job.invalidate_recordset(["soft_hold_state"])
+            job._compute_soft_hold_state()
+        _logger.info(
+            "neon_jobs cron: notified %d soft-hold expiries.", len(jobs)
+        )
+        return True
+
+    def action_open_soft_hold_extend_wizard(self):
+        self.ensure_one()
+        if self.state != "pending":
+            raise UserError(_(
+                "Soft hold can only be extended on pending jobs."
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Extend Soft Hold"),
+            "res_model": "commercial.job.soft_hold.extend.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_job_id": self.id},
+        }
+
     @api.onchange("venue_id")
     def _onchange_venue_id(self):
         if self.venue_room_id and self.venue_room_id.venue_id != self.venue_id:

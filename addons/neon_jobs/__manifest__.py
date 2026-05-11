@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.1.3.0",
+    "version": "17.0.1.4.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -41,6 +41,7 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "data/ir_sequence_data.xml",
         "data/res_partner_data.xml",
         "data/crm_stage_data.xml",
+        "data/ir_cron_data.xml",
         "views/venue_room_views.xml",
         "views/res_partner_views.xml",
         "views/commercial_job_views.xml",
@@ -48,6 +49,7 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "views/commercial_job_crew_views.xml",
         "views/commercial_job_loss_wizard_views.xml",
         "views/commercial_job_gate_override_wizard_views.xml",
+        "views/commercial_job_soft_hold_extend_wizard_views.xml",
         "views/crm_lead_views.xml",
         "views/sale_order_views.xml",
         "views/menu.xml",

@@ -8,7 +8,8 @@
             <tree string="Commercial Jobs"
                   decoration-info="state == 'pending'"
                   decoration-success="state == 'active'"
-                  decoration-warning="needs_attention"
+                  decoration-warning="needs_attention or soft_hold_state == 'expiring_soon'"
+                  decoration-danger="soft_hold_state == 'expired'"
                   decoration-muted="state in ('completed','cancelled','archived')">
                 <field name="name"/>
                 <field name="event_date"/>
@@ -21,6 +22,11 @@
                 <field name="state" widget="badge"
                        decoration-success="state == 'active'"
                        decoration-info="state == 'pending'"/>
+                <field name="soft_hold_until" optional="show"/>
+                <field name="soft_hold_state" widget="badge" optional="show"
+                       decoration-success="soft_hold_state == 'active'"
+                       decoration-warning="soft_hold_state == 'expiring_soon'"
+                       decoration-danger="soft_hold_state == 'expired'"/>
                 <field name="commercial_status" widget="badge" optional="show"/>
                 <field name="finance_status" widget="badge" optional="show"/>
                 <field name="operational_status" widget="badge" optional="show"/>
@@ -82,6 +88,10 @@
                     <button name="action_archive_lost" type="object" string="Archive Lost"
                             invisible="state != 'pending'"
                             groups="neon_jobs.group_neon_jobs_user"/>
+                    <button name="action_open_soft_hold_extend_wizard" type="object"
+                            string="Extend Soft Hold"
+                            invisible="state != 'pending'"
+                            groups="neon_jobs.group_neon_jobs_user"/>
                     <button name="action_rerun_capacity_gate" type="object"
                             string="Re-run Capacity Gate"
                             invisible="state != 'active'"
@@ -104,6 +114,18 @@
                          invisible="not (state == 'active' and gate_result == 'warning')">
                         <strong>Capacity Gate warning on this active job.</strong>
                         See the Capacity Gate tab for details.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="soft_hold_state != 'expiring_soon'">
+                        <strong>Soft hold expiring soon:</strong>
+                        the hold runs out on or before
+                        <field name="soft_hold_until" nolabel="1" readonly="1" class="oe_inline"/>.
+                        Extend, activate, or close before then.
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="soft_hold_state != 'expired'">
+                        <strong>Soft hold has expired.</strong>
+                        Extend, activate, or close this job.
                     </div>
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
@@ -136,6 +158,13 @@
                             <field name="event_date"/>
                             <field name="event_end_date"/>
                             <field name="soft_hold_until" readonly="state != 'pending'"/>
+                            <field name="soft_hold_state" widget="badge"
+                                   decoration-success="soft_hold_state == 'active'"
+                                   decoration-warning="soft_hold_state == 'expiring_soon'"
+                                   decoration-danger="soft_hold_state == 'expired'"
+                                   invisible="soft_hold_state == 'none'"/>
+                            <field name="soft_hold_extension_count"
+                                   invisible="state != 'pending'"/>
                         </group>
                     </group>
 

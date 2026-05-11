@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_job_soft_hold_extend_wizard_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.soft_hold.extend.wizard.form</field>
+        <field name="model">commercial.job.soft_hold.extend.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Extend Soft Hold">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Extend the soft hold so the job can stay pending for longer.
+                        Hard cap: 3 extensions, 28 days total from job creation.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="job_id" readonly="1"/>
+                            <field name="current_expiry"/>
+                            <field name="extension_count"/>
+                        </group>
+                        <group>
+                            <field name="extension_days"/>
+                            <field name="new_expiry"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="reason"
+                               placeholder="Optional — why is the extension needed? (logged to chatter)"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object" string="Extend"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

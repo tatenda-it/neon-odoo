@@ -111,8 +111,6 @@ class CommercialJob(models.Model):
         if not self.event_date:
             return self.env["commercial.job"]
         my_end = self.event_end_date or self.event_date
-        # SQL-level prefilter on the upper bound; lower bound handled in
-        # Python so we can coalesce event_end_date to event_date cleanly.
         candidates = self.env["commercial.job"].search([
             ("id", "!=", self.id),
             ("state", "=", "active"),
@@ -122,34 +120,73 @@ class CommercialJob(models.Model):
             lambda j: (j.event_end_date or j.event_date) >= self.event_date
         )
 
+    def _other_overlapping_date_venue_jobs(self):
+        """Like _other_overlapping_active_jobs but also includes pending
+        jobs whose soft hold is still active (soft_hold_until >= today).
+        Used by check 1 (date/venue/room) per P2.M5 D2."""
+        self.ensure_one()
+        if not self.event_date:
+            return self.env["commercial.job"]
+        my_end = self.event_end_date or self.event_date
+        today = fields.Date.today()
+        candidates = self.env["commercial.job"].search([
+            ("id", "!=", self.id),
+            "|",
+            ("state", "=", "active"),
+            "&", ("state", "=", "pending"),
+                 ("soft_hold_until", ">=", today),
+            ("event_date", "<=", my_end),
+        ])
+        return candidates.filtered(
+            lambda j: (j.event_end_date or j.event_date) >= self.event_date
+        )
+
     def _gate_check_date_venue(self):
-        """Check 1: Date/Venue/Room overlap (Q-S4).
+        """Check 1: Date/Venue/Room overlap (Q-S4 + P2.M5 D2).
+        Includes active jobs AND pending jobs with active soft holds.
         Same venue + same room → REJECT. Same venue, different/unset room →
         WARNING (logistics overlap)."""
         self.ensure_one()
         if not self.venue_id or not self.event_date:
             return {"name": "date_venue", "result": "pass",
                     "message": _("No venue or event date set; conflict check skipped.")}
-        overlapping = self._other_overlapping_active_jobs().filtered(
+        overlapping = self._other_overlapping_date_venue_jobs().filtered(
             lambda j: j.venue_id == self.venue_id
         )
         if not overlapping:
             return {"name": "date_venue", "result": "pass",
                     "message": _("No venue or room conflict on this date.")}
+
+        def _label(job):
+            return (_("pending+soft-hold %s") % job.name
+                    if job.state == "pending" else job.name)
+
         if self.venue_room_id:
             same_room = overlapping.filtered(
                 lambda j: j.venue_room_id and j.venue_room_id == self.venue_room_id
             )
             if same_room:
-                names = ", ".join(same_room.mapped("name"))
+                labels = ", ".join(_label(j) for j in same_room)
+                if any(j.state == "pending" for j in same_room):
+                    return {"name": "date_venue", "result": "reject",
+                            "message": _(
+                                "Same venue + same room conflict with: %s — "
+                                "confirm with sales before activating."
+                            ) % labels}
                 return {"name": "date_venue", "result": "reject",
-                        "message": _("Same venue + same room conflict with: %s.") % names}
-        names = ", ".join(overlapping.mapped("name"))
+                        "message": _("Same venue + same room conflict with: %s.") % labels}
+        labels = ", ".join(_label(j) for j in overlapping)
+        if any(j.state == "pending" for j in overlapping):
+            return {"name": "date_venue", "result": "warning",
+                    "message": _(
+                        "Same venue same date as %s — pending job has soft hold; "
+                        "confirm with sales before activating."
+                    ) % labels}
         return {"name": "date_venue", "result": "warning",
                 "message": _(
                     "Same venue same date as %s — logistics overlap "
                     "(parking, loading, sound, shared crew)."
-                ) % names}
+                ) % labels}
 
     def _gate_check_crew(self):
         """Check 2: Crew double-booking.
