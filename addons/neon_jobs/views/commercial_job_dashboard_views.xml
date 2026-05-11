@@ -44,87 +44,90 @@
                         </button>
                     </div>
 
-                    <!-- Per-section top 3 previews -->
-                    <group string="Top 3 Gate Issues"
+                    <!-- Per-section top 3 previews.
+                         Separator + direct field (not <group>) so the
+                         inline tree spans the full sheet width instead
+                         of being squeezed into a 2-column group. -->
+                    <separator string="Top 3 Gate Issues"
+                               invisible="gate_issues_count == 0"/>
+                    <field name="gate_issues_top3" nolabel="1" readonly="1"
                            invisible="gate_issues_count == 0">
-                        <field name="gate_issues_top3" nolabel="1" readonly="1">
-                            <tree>
-                                <field name="name"/>
-                                <field name="event_date"/>
-                                <field name="partner_id"/>
-                                <field name="venue_id"/>
-                                <field name="gate_result" widget="badge"
-                                       decoration-warning="gate_result == 'warning'"
-                                       decoration-danger="gate_result == 'reject'"/>
-                            </tree>
-                        </field>
-                    </group>
+                        <tree>
+                            <field name="name"/>
+                            <field name="event_date"/>
+                            <field name="partner_id"/>
+                            <field name="venue_id"/>
+                            <field name="gate_result" widget="badge"
+                                   decoration-warning="gate_result == 'warning'"
+                                   decoration-danger="gate_result == 'reject'"/>
+                        </tree>
+                    </field>
                     <div class="text-muted" invisible="gate_issues_count != 0">
                         No gate issues — all active jobs pass or have not been evaluated yet.
                     </div>
 
-                    <group string="Top 3 Soft Hold Risks"
+                    <separator string="Top 3 Soft Hold Risks"
+                               invisible="soft_hold_count == 0"/>
+                    <field name="soft_hold_top3" nolabel="1" readonly="1"
                            invisible="soft_hold_count == 0">
-                        <field name="soft_hold_top3" nolabel="1" readonly="1">
-                            <tree>
-                                <field name="name"/>
-                                <field name="event_date"/>
-                                <field name="partner_id"/>
-                                <field name="soft_hold_until"/>
-                                <field name="soft_hold_state" widget="badge"
-                                       decoration-warning="soft_hold_state == 'expiring_soon'"
-                                       decoration-danger="soft_hold_state == 'expired'"/>
-                            </tree>
-                        </field>
-                    </group>
+                        <tree>
+                            <field name="name"/>
+                            <field name="event_date"/>
+                            <field name="partner_id"/>
+                            <field name="soft_hold_until"/>
+                            <field name="soft_hold_state" widget="badge"
+                                   decoration-warning="soft_hold_state == 'expiring_soon'"
+                                   decoration-danger="soft_hold_state == 'expired'"/>
+                        </tree>
+                    </field>
                     <div class="text-muted" invisible="soft_hold_count != 0">
                         No soft hold risks — no pending jobs are expiring soon or expired.
                     </div>
 
-                    <group string="Top 3 Crew Gaps"
+                    <separator string="Top 3 Crew Gaps"
+                               invisible="crew_gap_count == 0"/>
+                    <field name="crew_gap_top3" nolabel="1" readonly="1"
                            invisible="crew_gap_count == 0">
-                        <field name="crew_gap_top3" nolabel="1" readonly="1">
-                            <tree>
-                                <field name="name"/>
-                                <field name="event_date"/>
-                                <field name="partner_id"/>
-                                <field name="crew_confirmed_count" string="Confirmed"/>
-                                <field name="crew_total_count" string="Total"/>
-                            </tree>
-                        </field>
-                    </group>
+                        <tree>
+                            <field name="name"/>
+                            <field name="event_date"/>
+                            <field name="partner_id"/>
+                            <field name="crew_confirmed_count" string="Confirmed"/>
+                            <field name="crew_total_count" string="Total"/>
+                        </tree>
+                    </field>
                     <div class="text-muted" invisible="crew_gap_count != 0">
                         No crew gaps — every active upcoming job has all crew confirmed.
                     </div>
 
-                    <group string="Top 3 Needs Attention"
+                    <separator string="Top 3 Needs Attention"
+                               invisible="needs_attention_count == 0"/>
+                    <field name="needs_attention_top3" nolabel="1" readonly="1"
                            invisible="needs_attention_count == 0">
-                        <field name="needs_attention_top3" nolabel="1" readonly="1">
-                            <tree>
-                                <field name="name"/>
-                                <field name="event_date"/>
-                                <field name="partner_id"/>
-                                <field name="needs_attention_reason"/>
-                            </tree>
-                        </field>
-                    </group>
+                        <tree>
+                            <field name="name"/>
+                            <field name="event_date"/>
+                            <field name="partner_id"/>
+                            <field name="needs_attention_reason"/>
+                        </tree>
+                    </field>
                     <div class="text-muted" invisible="needs_attention_count != 0">
                         No jobs flagged as needing attention.
                     </div>
 
-                    <group string="Top 3 Cash-flow Watch"
+                    <separator string="Top 3 Cash-flow Watch"
+                               invisible="cash_flow_count == 0"/>
+                    <field name="cash_flow_top3" nolabel="1" readonly="1"
                            invisible="cash_flow_count == 0">
-                        <field name="cash_flow_top3" nolabel="1" readonly="1">
-                            <tree>
-                                <field name="name"/>
-                                <field name="event_date"/>
-                                <field name="partner_id"/>
-                                <field name="finance_status" widget="badge"/>
-                                <field name="quoted_value" widget="monetary"/>
-                                <field name="currency_id" invisible="1"/>
-                            </tree>
-                        </field>
-                    </group>
+                        <tree>
+                            <field name="name"/>
+                            <field name="event_date"/>
+                            <field name="partner_id"/>
+                            <field name="finance_status" widget="badge"/>
+                            <field name="quoted_value" widget="monetary"/>
+                            <field name="currency_id" invisible="1"/>
+                        </tree>
+                    </field>
                     <div class="text-muted" invisible="cash_flow_count != 0">
                         No cash-flow risks in the next 14 days.
                     </div>
@@ -173,37 +176,37 @@
                         </button>
                     </div>
 
-                    <group string="Upcoming Events"
+                    <separator string="Upcoming Events"
+                               invisible="my_upcoming_count == 0"/>
+                    <field name="my_upcoming_top3" nolabel="1" readonly="1"
                            invisible="my_upcoming_count == 0">
-                        <field name="my_upcoming_top3" nolabel="1" readonly="1">
-                            <tree>
-                                <field name="name"/>
-                                <field name="event_date"/>
-                                <field name="partner_id"/>
-                                <field name="venue_id"/>
-                                <field name="venue_room_id"/>
-                            </tree>
-                        </field>
-                    </group>
+                        <tree>
+                            <field name="name"/>
+                            <field name="event_date"/>
+                            <field name="partner_id"/>
+                            <field name="venue_id"/>
+                            <field name="venue_room_id"/>
+                        </tree>
+                    </field>
                     <div class="text-muted" invisible="my_upcoming_count != 0">
                         No upcoming events on your schedule.
                     </div>
 
-                    <group string="Pending My Confirmation"
+                    <separator string="Pending My Confirmation"
+                               invisible="my_pending_confirms_count == 0"/>
+                    <field name="my_pending_confirms_top3" nolabel="1" readonly="1"
                            invisible="my_pending_confirms_count == 0">
-                        <field name="my_pending_confirms_top3" nolabel="1" readonly="1">
-                            <tree>
-                                <field name="job_id"/>
-                                <field name="job_event_date"/>
-                                <field name="user_id"/>
-                                <field name="role"/>
-                                <button name="action_confirm" type="object" string="Confirm"
-                                        class="btn-success"/>
-                                <button name="action_open_decline_wizard" type="object"
-                                        string="Decline" class="btn-danger"/>
-                            </tree>
-                        </field>
-                    </group>
+                        <tree>
+                            <field name="job_id"/>
+                            <field name="job_event_date"/>
+                            <field name="user_id"/>
+                            <field name="role"/>
+                            <button name="action_confirm" type="object" string="Confirm"
+                                    class="btn-success"/>
+                            <button name="action_open_decline_wizard" type="object"
+                                    string="Decline" class="btn-danger"/>
+                        </tree>
+                    </field>
                     <div class="text-muted" invisible="my_pending_confirms_count != 0">
                         No assignments waiting for your response.
                     </div>
