@@ -266,12 +266,24 @@
         </field>
     </record>
 
+    <!-- P2.M7.7.3: action-level gate. The Operations menu_commercial_job
+         is already gated to user/manager/crew_leader, but deep links
+         like /web#action=<id>&model=commercial.job bypass menu
+         visibility. Adding groups_id on the action itself ensures the
+         Web client refuses to load it for crew tier even when the
+         action id is guessed or shared. Defense-in-depth pairs with
+         the new commercial_job_rule_crew_own ir.rule. -->
     <record id="commercial_job_action" model="ir.actions.act_window">
         <field name="name">Commercial Jobs</field>
         <field name="res_model">commercial.job</field>
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="commercial_job_view_search"/>
         <field name="context">{'search_default_filter_pending': 1, 'search_default_filter_active': 1}</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_jobs.group_neon_jobs_user'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
     </record>
 
 </odoo>

@@ -23,5 +23,30 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P2.M7.7.3 — deep-link defense for crew tier on
+            commercial.job. The action_window gate above blocks the
+            "Commercial Jobs" navigation entry, but a crew user could
+            still reach the model via constructed URLs. This rule
+            constrains crew reads to records where they are a confirmed
+            or pending crew member. Without this, crew tier could see
+            the full client roster, venues, and event metadata for
+            every job in the system — a real concern given Neon's mix
+            of permanent and freelance technicians.
+
+            Managers, sales reps, and crew leaders bypass via their
+            unrestricted CSV access (rules OR-combine per group).
+        -->
+        <record id="commercial_job_rule_crew_own" model="ir.rule">
+            <field name="name">Crew: own crewed jobs only</field>
+            <field name="model_id" ref="model_commercial_job"/>
+            <field name="domain_force">[('crew_assignment_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

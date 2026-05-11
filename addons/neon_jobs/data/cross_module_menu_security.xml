@@ -56,5 +56,34 @@
             ])]"/>
         </record>
 
+        <!-- P2.M7.7.3: standard Odoo Apps menus carry NO groups_id
+             out of the box in this build, so any internal user can
+             reach the module installer. Lock both Apps top-level
+             menus down to admin only. -->
+        <record id="base.menu_management" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('base.group_system'),
+            ])]"/>
+        </record>
+
+        <record id="base.menu_apps" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('base.group_system'),
+            ])]"/>
+        </record>
+
+        <!-- P2.M7.7.3: utm.menu_link_tracker_root is gated to
+             base.group_no_one ("Technical Features"), which in this
+             DB is implied by base.group_user thanks to a third-party
+             module — so every internal user sees Link Tracker. Tighten
+             to manager + admin without unwinding the upstream
+             implication. -->
+        <record id="utm.menu_link_tracker_root" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('base.group_system'),
+            ])]"/>
+        </record>
+
     </data>
 </odoo>

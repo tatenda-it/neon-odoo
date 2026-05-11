@@ -60,7 +60,7 @@
               name="Configuration"
               parent="menu_operations_root"
               sequence="90"
-              groups="base.group_system"/>
+              groups="base.group_system,neon_jobs.group_neon_jobs_manager"/>
 
     <menuitem id="menu_venues"
               name="Venues"

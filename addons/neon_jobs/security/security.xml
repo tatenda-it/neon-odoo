@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!--
+        NOTE on noupdate="1" + implied_ids:
+
+        The group records below carry implied_ids edges to standard
+        Odoo groups (Sales, Billing). Because this <data> block is
+        noupdate="1", Odoo only writes those edges on initial install.
+        Adding or changing an implied_ids entry on an existing
+        installation will be SILENTLY IGNORED on plain -u — the
+        record's other fields stay as they were.
+
+        Whenever you add or change an implied_ids edge below, also
+        add (or extend) a migration script that explicitly writes
+        the edge via env.ref(...).write({'implied_ids': [(4, ...)]}).
+        See migrations/17.0.1.7.3/post-migrate.py for the pattern.
+
+        Without the migration, existing databases will run with the
+        old implication graph and may exhibit role-leak bugs (see
+        P2.M7.6 / P2.M7.7 for the historical context).
+    -->
     <data noupdate="1">
 
         <!--
