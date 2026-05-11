@@ -57,5 +57,20 @@
             module install.
         -->
 
+        <!--
+            Neon Operations: Crew (P2.M7).
+
+            Limited tier for crew members who have Odoo logins (most
+            crew won't, but some will). Read-only access to their own
+            Commercial Job and Crew Assignment records via the
+            "My Schedule" dashboard. Independent of User and Manager —
+            crew is not a subset of either, and neither implies it.
+        -->
+        <record id="group_neon_jobs_crew" model="res.groups">
+            <field name="name">Crew Member (Limited Schedule View)</field>
+            <field name="category_id" ref="module_category_neon_operations"/>
+            <field name="comment">Read-only access to Commercial Jobs and Crew Assignments via "My Schedule". For crew members with Odoo logins. Independent of User/Manager — neither implies this group.</field>
+        </record>
+
     </data>
 </odoo>

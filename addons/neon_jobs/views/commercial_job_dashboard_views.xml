@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- =========================================================
+         Operations Dashboard
+         ========================================================= -->
+
+    <record id="commercial_job_dashboard_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.dashboard.form</field>
+        <field name="model">commercial.job.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Operations Dashboard" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="btn-primary" icon="fa-refresh"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Operations Dashboard</h1>
+                    </div>
+
+                    <!-- Stat strip -->
+                    <div class="o_horizontal_separator">Overview</div>
+                    <div class="d-flex flex-wrap">
+                        <button name="action_open_gate_issues" type="object"
+                                class="oe_stat_button" icon="fa-warning">
+                            <field name="gate_issues_count" widget="statinfo" string="Gate Issues"/>
+                        </button>
+                        <button name="action_open_soft_hold" type="object"
+                                class="oe_stat_button" icon="fa-hourglass">
+                            <field name="soft_hold_count" widget="statinfo" string="Soft Hold"/>
+                        </button>
+                        <button name="action_open_crew_gap" type="object"
+                                class="oe_stat_button" icon="fa-users">
+                            <field name="crew_gap_count" widget="statinfo" string="Crew Gaps"/>
+                        </button>
+                        <button name="action_open_needs_attention" type="object"
+                                class="oe_stat_button" icon="fa-flag">
+                            <field name="needs_attention_count" widget="statinfo" string="Needs Attention"/>
+                        </button>
+                        <button name="action_open_cash_flow" type="object"
+                                class="oe_stat_button" icon="fa-money">
+                            <field name="cash_flow_count" widget="statinfo" string="Cash-flow Watch"/>
+                        </button>
+                    </div>
+
+                    <!-- Per-section top 3 previews -->
+                    <group string="Top 3 Gate Issues"
+                           invisible="gate_issues_count == 0">
+                        <field name="gate_issues_top3" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="name"/>
+                                <field name="event_date"/>
+                                <field name="partner_id"/>
+                                <field name="venue_id"/>
+                                <field name="gate_result" widget="badge"
+                                       decoration-warning="gate_result == 'warning'"
+                                       decoration-danger="gate_result == 'reject'"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <div class="text-muted" invisible="gate_issues_count != 0">
+                        No gate issues — all active jobs pass or have not been evaluated yet.
+                    </div>
+
+                    <group string="Top 3 Soft Hold Risks"
+                           invisible="soft_hold_count == 0">
+                        <field name="soft_hold_top3" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="name"/>
+                                <field name="event_date"/>
+                                <field name="partner_id"/>
+                                <field name="soft_hold_until"/>
+                                <field name="soft_hold_state" widget="badge"
+                                       decoration-warning="soft_hold_state == 'expiring_soon'"
+                                       decoration-danger="soft_hold_state == 'expired'"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <div class="text-muted" invisible="soft_hold_count != 0">
+                        No soft hold risks — no pending jobs are expiring soon or expired.
+                    </div>
+
+                    <group string="Top 3 Crew Gaps"
+                           invisible="crew_gap_count == 0">
+                        <field name="crew_gap_top3" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="name"/>
+                                <field name="event_date"/>
+                                <field name="partner_id"/>
+                                <field name="crew_confirmed_count" string="Confirmed"/>
+                                <field name="crew_total_count" string="Total"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <div class="text-muted" invisible="crew_gap_count != 0">
+                        No crew gaps — every active upcoming job has all crew confirmed.
+                    </div>
+
+                    <group string="Top 3 Needs Attention"
+                           invisible="needs_attention_count == 0">
+                        <field name="needs_attention_top3" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="name"/>
+                                <field name="event_date"/>
+                                <field name="partner_id"/>
+                                <field name="needs_attention_reason"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <div class="text-muted" invisible="needs_attention_count != 0">
+                        No jobs flagged as needing attention.
+                    </div>
+
+                    <group string="Top 3 Cash-flow Watch"
+                           invisible="cash_flow_count == 0">
+                        <field name="cash_flow_top3" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="name"/>
+                                <field name="event_date"/>
+                                <field name="partner_id"/>
+                                <field name="finance_status" widget="badge"/>
+                                <field name="quoted_value" widget="monetary"/>
+                                <field name="currency_id" invisible="1"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <div class="text-muted" invisible="cash_flow_count != 0">
+                        No cash-flow risks in the next 14 days.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="operations_dashboard_action" model="ir.actions.act_window">
+        <field name="name">Operations Dashboard</field>
+        <field name="res_model">commercial.job.dashboard</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+
+    <!-- =========================================================
+         My Schedule (crew-tier)
+         ========================================================= -->
+
+    <record id="commercial_job_crew_schedule_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.crew.schedule.form</field>
+        <field name="model">commercial.job.crew.schedule</field>
+        <field name="arch" type="xml">
+            <form string="My Schedule" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"
+                            class="btn-primary" icon="fa-refresh"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>My Schedule</h1>
+                    </div>
+
+                    <div class="d-flex flex-wrap">
+                        <button name="action_open_my_upcoming" type="object"
+                                class="oe_stat_button" icon="fa-calendar-check-o">
+                            <field name="my_upcoming_count" widget="statinfo" string="Upcoming Events"/>
+                        </button>
+                        <button name="action_open_my_pending_confirms" type="object"
+                                class="oe_stat_button" icon="fa-bell">
+                            <field name="my_pending_confirms_count" widget="statinfo" string="Pending My Confirmation"/>
+                        </button>
+                    </div>
+
+                    <group string="Upcoming Events"
+                           invisible="my_upcoming_count == 0">
+                        <field name="my_upcoming_top3" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="name"/>
+                                <field name="event_date"/>
+                                <field name="partner_id"/>
+                                <field name="venue_id"/>
+                                <field name="venue_room_id"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <div class="text-muted" invisible="my_upcoming_count != 0">
+                        No upcoming events on your schedule.
+                    </div>
+
+                    <group string="Pending My Confirmation"
+                           invisible="my_pending_confirms_count == 0">
+                        <field name="my_pending_confirms_top3" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="job_id"/>
+                                <field name="job_event_date"/>
+                                <field name="role"/>
+                                <button name="action_confirm" type="object" string="Confirm"
+                                        class="btn-success"/>
+                                <button name="action_open_decline_wizard" type="object"
+                                        string="Decline" class="btn-danger"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <div class="text-muted" invisible="my_pending_confirms_count != 0">
+                        No assignments waiting for your response.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="my_schedule_action" model="ir.actions.act_window">
+        <field name="name">My Schedule</field>
+        <field name="res_model">commercial.job.crew.schedule</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+
+</odoo>

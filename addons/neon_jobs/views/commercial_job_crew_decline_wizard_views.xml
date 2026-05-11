@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_job_crew_decline_wizard_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.crew.decline.wizard.form</field>
+        <field name="model">commercial.job.crew.decline.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Decline Crew Assignment">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        Declining sends a notice to MD/OD so they can reassign.
+                        Please record why you can't take this job.
+                    </div>
+                    <group>
+                        <field name="crew_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="decline_reason" nolabel="1"
+                               placeholder="Why are you declining? (visible to MD/OD)"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object" string="Decline Assignment"
+                            class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

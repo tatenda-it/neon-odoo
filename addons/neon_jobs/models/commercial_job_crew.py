@@ -15,6 +15,16 @@ class CommercialJobCrew(models.Model):
         ondelete="cascade",
         tracking=True,
     )
+    # TODO (Phase 5 - Workshop): Crew identity should support
+    # non-Odoo-user freelancers. Currently user_id assumes the crew
+    # member has a res.users record, which only fits permanent crew
+    # with Odoo logins. Phase 5 should expand to either:
+    #   - Allow res.partner-based assignment (any partner record,
+    #     login optional)
+    #   - Or add separate partner_id field for freelancers, keep
+    #     user_id for logged-in crew
+    # See userMemory: crew = mix of permanent and freelance, most
+    # NOT Odoo users; notified via WhatsApp (neon_channels).
     user_id = fields.Many2one(
         "res.users",
         string="Crew Member",
@@ -95,6 +105,31 @@ class CommercialJobCrew(models.Model):
                 display = f"{rec.job_id.name} — {display}"
             result.append((rec.id, display))
         return result
+
+    # ============================================================
+    # === Crew response actions (P2.M7)
+    # Real Odoo + WhatsApp dispatch lives in P2.M2 stubs and remains
+    # for later. These methods are the minimum to wire the My Schedule
+    # confirm/decline buttons.
+    # ============================================================
+    def action_confirm(self):
+        for rec in self:
+            rec.write({
+                "state": "confirmed",
+                "responded_on": fields.Datetime.now(),
+            })
+        return True
+
+    def action_open_decline_wizard(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Decline Crew Assignment"),
+            "res_model": "commercial.job.crew.decline.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_crew_id": self.id},
+        }
 
     # ============================================================
     # === Capacity Gate re-trigger (P2.M4)
