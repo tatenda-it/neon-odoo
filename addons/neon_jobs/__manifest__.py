@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.1.6.2",
+    "version": "17.0.1.7.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -38,6 +38,7 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "security/ir_rule.xml",
         "data/ir_sequence_data.xml",
         "data/res_partner_data.xml",
         "data/crm_stage_data.xml",

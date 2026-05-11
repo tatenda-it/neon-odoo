@@ -9,15 +9,22 @@
               name="Operations Dashboard"
               parent="menu_operations_root"
               action="operations_dashboard_action"
-              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="1"/>
 
     <menuitem id="menu_my_schedule"
               name="My Schedule"
               parent="menu_operations_root"
               action="my_schedule_action"
-              groups="neon_jobs.group_neon_jobs_crew,neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager"
+              groups="neon_jobs.group_neon_jobs_crew,neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="2"/>
+
+    <menuitem id="menu_my_calendar"
+              name="My Calendar"
+              parent="menu_operations_root"
+              action="commercial_job_calendar_my_calendar_action"
+              groups="neon_jobs.group_neon_jobs_crew"
+              sequence="3"/>
 
     <menuitem id="menu_calendar_live_pipeline"
               name="Calendar — Live Pipeline"

@@ -72,5 +72,24 @@
             <field name="comment">Read-only access to Commercial Jobs and Crew Assignments via "My Schedule". For crew members with Odoo logins. Independent of User/Manager — neither implies this group.</field>
         </record>
 
+        <!--
+            Neon Operations: Crew Leader / Lead Tech (P2.M7.5).
+
+            Operational oversight tier: full CRUD on crew assignments,
+            read/write on Commercial Jobs (no create/delete). Sees the
+            Operations Dashboard MINUS the cash-flow section, plus the
+            Commercial Job form MINUS finance fields (quoted_value,
+            deposit_received, finance_status track). Sales reps cannot
+            assign crew; that authority lives here and with Managers.
+
+            Independent of User/Manager/Crew — none implies, none is
+            implied. Granted manually to specific users (Lead Techs).
+        -->
+        <record id="group_neon_jobs_crew_leader" model="res.groups">
+            <field name="name">Crew Leader / Lead Tech</field>
+            <field name="category_id" ref="module_category_neon_operations"/>
+            <field name="comment">Lead Tech / Crew Supervisor — operational oversight and crew assignment authority. No finance visibility.</field>
+        </record>
+
     </data>
 </odoo>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Crew tier (group_neon_jobs_crew) can read and write only
+            their own commercial.job.crew assignments. Combined with
+            the read+write (no create/unlink) CSV grant, this lets
+            crew confirm or decline their own assignments and surfaces
+            nothing else from the model.
+
+            Managers and Crew Leaders bypass this rule via their own
+            unrestricted CSV access (rules are OR-combined per group).
+        -->
+        <record id="rule_commercial_job_crew_own_only" model="ir.rule">
+            <field name="name">Crew: read+write own assignments only</field>
+            <field name="model_id" ref="model_commercial_job_crew"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

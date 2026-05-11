@@ -3,7 +3,7 @@ access_commercial_job_master_user,commercial.job.master user,model_commercial_jo
 access_commercial_job_master_manager,commercial.job.master manager,model_commercial_job_master,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_commercial_job_user,commercial.job user,model_commercial_job,neon_jobs.group_neon_jobs_user,1,1,1,0
 access_commercial_job_manager,commercial.job manager,model_commercial_job,neon_jobs.group_neon_jobs_manager,1,1,1,1
-access_commercial_job_crew_user,commercial.job.crew user,model_commercial_job_crew,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_commercial_job_crew_user,commercial.job.crew user (read-only — sales reps cannot assign crew per P2.M7.5),model_commercial_job_crew,neon_jobs.group_neon_jobs_user,1,0,0,0
 access_commercial_job_crew_manager,commercial.job.crew manager,model_commercial_job_crew,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_venue_room_user,venue.room user,model_venue_room,neon_jobs.group_neon_jobs_user,1,1,1,0
 access_venue_room_manager,venue.room manager,model_venue_room,neon_jobs.group_neon_jobs_manager,1,1,1,1
@@ -12,7 +12,7 @@ access_commercial_job_loss_wizard_manager,commercial.job.loss.wizard manager,mod
 access_commercial_job_gate_override_wizard_manager,commercial.job.gate.override.wizard manager,model_commercial_job_gate_override_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_commercial_job_soft_hold_extend_wizard_user,commercial.job.soft_hold.extend.wizard user,model_commercial_job_soft_hold_extend_wizard,neon_jobs.group_neon_jobs_user,1,1,1,1
 access_commercial_job_soft_hold_extend_wizard_manager,commercial.job.soft_hold.extend.wizard manager,model_commercial_job_soft_hold_extend_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
-access_commercial_job_crew_read_crew,commercial.job.crew read crew,model_commercial_job_crew,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_commercial_job_crew_read_crew,commercial.job.crew crew (read+write own via record rule),model_commercial_job_crew,neon_jobs.group_neon_jobs_crew,1,1,0,0
 access_commercial_job_read_crew,commercial.job read crew,model_commercial_job,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_commercial_job_dashboard_user,commercial.job.dashboard user,model_commercial_job_dashboard,neon_jobs.group_neon_jobs_user,1,1,1,1
 access_commercial_job_dashboard_manager,commercial.job.dashboard manager,model_commercial_job_dashboard,neon_jobs.group_neon_jobs_manager,1,1,1,1
@@ -22,3 +22,11 @@ access_commercial_job_crew_schedule_crew,commercial.job.crew.schedule crew,model
 access_commercial_job_crew_decline_wizard_user,commercial.job.crew.decline.wizard user,model_commercial_job_crew_decline_wizard,neon_jobs.group_neon_jobs_user,1,1,1,1
 access_commercial_job_crew_decline_wizard_manager,commercial.job.crew.decline.wizard manager,model_commercial_job_crew_decline_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_commercial_job_crew_decline_wizard_crew,commercial.job.crew.decline.wizard crew,model_commercial_job_crew_decline_wizard,neon_jobs.group_neon_jobs_crew,1,1,1,1
+access_commercial_job_crew_leader,commercial.job crew_leader (read+write existing — no create/unlink),model_commercial_job,neon_jobs.group_neon_jobs_crew_leader,1,1,0,0
+access_commercial_job_crew_crew_leader,commercial.job.crew crew_leader (full CRUD),model_commercial_job_crew,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_commercial_job_master_crew_leader,commercial.job.master crew_leader (read-only),model_commercial_job_master,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_venue_room_crew_leader,venue.room crew_leader (read-only),model_venue_room,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_commercial_job_dashboard_crew_leader,commercial.job.dashboard crew_leader,model_commercial_job_dashboard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_commercial_job_crew_schedule_crew_leader,commercial.job.crew.schedule crew_leader,model_commercial_job_crew_schedule,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_commercial_job_crew_decline_wizard_crew_leader,commercial.job.crew.decline.wizard crew_leader,model_commercial_job_crew_decline_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_commercial_job_soft_hold_extend_wizard_crew_leader,commercial.job.soft_hold.extend.wizard crew_leader,model_commercial_job_soft_hold_extend_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1

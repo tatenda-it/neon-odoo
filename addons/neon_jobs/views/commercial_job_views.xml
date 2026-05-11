@@ -17,8 +17,10 @@
                 <field name="venue_id"/>
                 <field name="venue_room_id" optional="show"/>
                 <field name="master_contract_id" optional="hide"/>
-                <field name="quoted_value" widget="monetary" sum="Total Quoted"/>
-                <field name="currency_id" invisible="1"/>
+                <field name="quoted_value" widget="monetary" sum="Total Quoted"
+                       groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager"/>
+                <field name="currency_id" invisible="1"
+                       groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'active'"
                        decoration-info="state == 'pending'"/>
@@ -28,7 +30,8 @@
                        decoration-warning="soft_hold_state == 'expiring_soon'"
                        decoration-danger="soft_hold_state == 'expired'"/>
                 <field name="commercial_status" widget="badge" optional="show"/>
-                <field name="finance_status" widget="badge" optional="show"/>
+                <field name="finance_status" widget="badge" optional="show"
+                       groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager"/>
                 <field name="operational_status" widget="badge" optional="show"/>
                 <field name="gate_result" widget="badge" optional="hide"
                        decoration-success="gate_result == 'pass'"
@@ -149,7 +152,8 @@
                             <field name="crm_lead_id" options="{'no_create_edit': True}"/>
                             <field name="sale_order_id" options="{'no_create_edit': True}"/>
                         </group>
-                        <group string="Money">
+                        <group string="Money"
+                               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager">
                             <field name="currency_id" groups="base.group_multi_currency"/>
                             <field name="quoted_value" widget="monetary"/>
                             <field name="deposit_received" widget="monetary"/>
@@ -179,15 +183,19 @@
 
                     <group string="Status Tracks">
                         <field name="commercial_status" widget="statusbar" options="{'clickable': '1'}"/>
-                        <field name="finance_status" widget="statusbar" options="{'clickable': '1'}"/>
+                        <field name="finance_status" widget="statusbar" options="{'clickable': '1'}"
+                               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager"/>
                         <field name="operational_status" widget="statusbar" options="{'clickable': '1'}"/>
                         <field name="sub_hire_required"/>
                         <field name="logistics_flag"/>
                     </group>
 
+                    <field name="can_edit_crew" invisible="1"/>
                     <notebook>
                         <page string="Crew">
-                            <field name="crew_assignment_ids" context="{'default_job_id': active_id}">
+                            <field name="crew_assignment_ids"
+                                   readonly="not can_edit_crew"
+                                   context="{'default_job_id': active_id}">
                                 <tree editable="bottom"
                                       decoration-warning="state == 'pending'"
                                       decoration-success="state == 'confirmed'"

@@ -315,6 +315,24 @@ class CommercialJob(models.Model):
         store=True,
     )
 
+    # === Role-aware UI helpers (P2.M7.5) ===
+    can_edit_crew = fields.Boolean(
+        string="Can Edit Crew Assignments",
+        compute="_compute_can_edit_crew",
+        store=False,
+        help="True if the current user can add/remove/edit crew on this "
+        "job. Managers and Crew Leaders qualify; Sales reps (User) and "
+        "Crew tier do not.",
+    )
+    is_my_crew_event = fields.Boolean(
+        string="On My Schedule",
+        compute="_compute_is_my_crew_event",
+        search="_search_is_my_crew_event",
+        store=False,
+        help="True when the current user has a confirmed crew assignment "
+        "on this job. Drives the My Calendar action's domain.",
+    )
+
     # === Capacity Acceptance Gate result ===
     gate_result = fields.Selection(
         [
@@ -408,6 +426,35 @@ class CommercialJob(models.Model):
             rec.crew_confirmed_count = len(
                 rec.crew_assignment_ids.filtered(lambda c: c.state == "confirmed")
             )
+
+    @api.depends_context("uid")
+    def _compute_can_edit_crew(self):
+        can_edit = (
+            self.env.user.has_group("neon_jobs.group_neon_jobs_manager")
+            or self.env.user.has_group("neon_jobs.group_neon_jobs_crew_leader")
+        )
+        for rec in self:
+            rec.can_edit_crew = can_edit
+
+    @api.depends_context("uid")
+    def _compute_is_my_crew_event(self):
+        uid = self.env.uid
+        for rec in self:
+            rec.is_my_crew_event = any(
+                c.user_id.id == uid and c.state == "confirmed"
+                for c in rec.crew_assignment_ids
+            )
+
+    @api.model
+    def _search_is_my_crew_event(self, operator, value):
+        if operator not in ("=", "!=") or not isinstance(value, bool):
+            return []
+        matching_ids = self.env["commercial.job.crew"].sudo().search([
+            ("user_id", "=", self.env.uid),
+            ("state", "=", "confirmed"),
+        ]).mapped("job_id.id")
+        positive = (operator == "=" and value) or (operator == "!=" and not value)
+        return [("id", "in" if positive else "not in", matching_ids)]
 
     @api.depends("event_date_is_placeholder", "venue_id")
     def _compute_needs_attention(self):

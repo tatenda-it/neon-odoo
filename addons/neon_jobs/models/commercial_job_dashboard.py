@@ -59,6 +59,13 @@ class CommercialJobDashboard(models.TransientModel):
         string="Top Cash-flow Risks",
     )
 
+    # === Role-aware UI hiding (P2.M7.5) ===
+    hide_cash_flow = fields.Boolean(
+        compute="_compute_hide_cash_flow",
+        help="True when the current user is a Crew Leader without "
+        "Manager — they see operational sections only, no finance.",
+    )
+
     # ============================================================
     # === Domain helpers
     # ============================================================
@@ -138,6 +145,16 @@ class CommercialJobDashboard(models.TransientModel):
         count = self.env["commercial.job"].search_count(self._cash_flow_domain())
         for rec in self:
             rec.cash_flow_count = count
+
+    @api.depends_context("uid")
+    def _compute_hide_cash_flow(self):
+        user = self.env.user
+        hide = (
+            user.has_group("neon_jobs.group_neon_jobs_crew_leader")
+            and not user.has_group("neon_jobs.group_neon_jobs_manager")
+        )
+        for rec in self:
+            rec.hide_cash_flow = hide
 
     # ============================================================
     # === Create override — populate top-3 previews on every open
