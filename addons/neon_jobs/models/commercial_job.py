@@ -168,7 +168,11 @@ class CommercialJob(models.Model):
         compute="_compute_calendar_display_name",
         store=False,
         help="Used as the calendar tile title via create_name_field. "
-        "Prefixed by gate_result: reject=⚠, warning=▷, overridden=✓.",
+        "Prefix by gate_result:\n"
+        "  ⚠  reject (pending job, activation blocked)\n"
+        "  ▷  warning (active job with non-blocking concerns)\n"
+        "  ✓  overridden (manager-approved despite reject)\n"
+        "  (none) pass or not_run",
     )
 
     # === Dates ===
@@ -180,6 +184,15 @@ class CommercialJob(models.Model):
         "Per Q-S3 — no Commercial Job exists without at least a tentative date.",
     )
     event_end_date = fields.Date(string="Event End Date")
+    event_end_date_calendar = fields.Date(
+        string="Event End Date (Calendar)",
+        compute="_compute_event_end_date_calendar",
+        store=True,
+        help="Calendar-rendering only. Returns event_end_date when set, "
+        "otherwise event_date so single-day events still render. Odoo 17's "
+        "calendar widget silently drops events when date_stop is NULL on "
+        "Date-type field pairs.",
+    )
     soft_hold_until = fields.Date(
         string="Soft Hold Until",
         tracking=True,
@@ -354,6 +367,11 @@ class CommercialJob(models.Model):
         "warning": "▷ ",
         "overridden": "✓ ",
     }
+
+    @api.depends("event_date", "event_end_date")
+    def _compute_event_end_date_calendar(self):
+        for rec in self:
+            rec.event_end_date_calendar = rec.event_end_date or rec.event_date
 
     @api.depends("operational_status")
     def _compute_operational_status_color(self):

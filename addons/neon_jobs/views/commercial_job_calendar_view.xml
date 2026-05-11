@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <calendar string="Commercial Jobs"
                       date_start="event_date"
-                      date_stop="event_end_date"
+                      date_stop="event_end_date_calendar"
                       color="operational_status_color"
                       create_name_field="calendar_display_name"
                       mode="month"
