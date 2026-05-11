@@ -164,14 +164,36 @@ class CommercialJobDashboard(models.TransientModel):
     # ============================================================
     # === Action methods
     # ============================================================
-    def action_refresh(self):
+    @api.model
+    def action_open(self):
+        """Open the dashboard. Server-action entry point used by the menu
+        and the Refresh button.
+
+        Pattern: create a persisted record server-side and return an
+        act_window targeting that record by id. The browser opens a
+        materialised record so all computed counts and top-3 previews
+        (populated by create()) are immediately visible. A plain new-
+        form act_window would show zeroed defaults instead, because the
+        form is unsaved and default_get returns nothing for computed
+        counters or M2Ms.
+
+        Per-user singleton: prior dashboard records for the calling
+        user are unlinked first so Refresh doesn't accumulate stale
+        transients.
+        """
+        self.search([("create_uid", "=", self.env.uid)]).unlink()
+        rec = self.create({})
         return {
             "type": "ir.actions.act_window",
             "name": _("Operations Dashboard"),
-            "res_model": "commercial.job.dashboard",
+            "res_model": self._name,
             "view_mode": "form",
+            "res_id": rec.id,
             "target": "current",
         }
+
+    def action_refresh(self):
+        return self.action_open()
 
     def _drilldown(self, name, domain):
         return {
@@ -219,19 +241,31 @@ class CommercialJobCrewSchedule(models.TransientModel):
     )
 
     # ============================================================
-    # === Helpers
+    # === Helpers — role-aware scoping (P2.M7 update)
+    #
+    # Crew-only users (have neon_jobs_crew, NOT user/manager) see their
+    # own assignments. User/manager users see all crew assignments
+    # across all users — the management oversight view. A user in both
+    # crew AND user/manager groups still sees the "all" view (the
+    # broader group dominates).
     # ============================================================
-    def _my_confirmed_job_ids(self):
-        return self.env["commercial.job.crew"].search([
-            ("user_id", "=", self.env.uid),
-            ("state", "=", "confirmed"),
-        ]).mapped("job_id.id")
+    def _is_crew_only(self):
+        return (
+            self.env.user.has_group("neon_jobs.group_neon_jobs_crew")
+            and not self.env.user.has_group("neon_jobs.group_neon_jobs_user")
+            and not self.env.user.has_group("neon_jobs.group_neon_jobs_manager")
+        )
 
-    def _my_pending_assignments(self):
-        return self.env["commercial.job.crew"].search([
-            ("user_id", "=", self.env.uid),
-            ("state", "=", "pending"),
-        ])
+    def _scoped_user_filter(self):
+        return ([("user_id", "=", self.env.uid)] if self._is_crew_only() else [])
+
+    def _scoped_confirmed_job_ids(self):
+        domain = [("state", "=", "confirmed")] + self._scoped_user_filter()
+        return self.env["commercial.job.crew"].search(domain).mapped("job_id.id")
+
+    def _scoped_pending_assignments(self):
+        domain = [("state", "=", "pending")] + self._scoped_user_filter()
+        return self.env["commercial.job.crew"].search(domain)
 
     def _upcoming_job_domain(self, job_ids):
         today = fields.Date.today()
@@ -245,9 +279,9 @@ class CommercialJobCrewSchedule(models.TransientModel):
             ("deposit_received", ">", 0),
         ]
 
-    def _my_relevant_pending_assignments(self):
+    def _scoped_relevant_pending_assignments(self):
         today = fields.Date.today()
-        candidates = self._my_pending_assignments()
+        candidates = self._scoped_pending_assignments()
         return candidates.filtered(
             lambda c: c.job_id.event_date and c.job_id.event_date >= today
             and (
@@ -261,7 +295,7 @@ class CommercialJobCrewSchedule(models.TransientModel):
     # ============================================================
     @api.depends_context("uid")
     def _compute_my_upcoming_count(self):
-        confirmed_jobs = self._my_confirmed_job_ids()
+        confirmed_jobs = self._scoped_confirmed_job_ids()
         count = self.env["commercial.job"].search_count(
             self._upcoming_job_domain(confirmed_jobs)
         )
@@ -270,7 +304,7 @@ class CommercialJobCrewSchedule(models.TransientModel):
 
     @api.depends_context("uid")
     def _compute_my_pending_confirms_count(self):
-        relevant = self._my_relevant_pending_assignments()
+        relevant = self._scoped_relevant_pending_assignments()
         for rec in self:
             rec.my_pending_confirms_count = len(relevant)
 
@@ -280,12 +314,12 @@ class CommercialJobCrewSchedule(models.TransientModel):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
-        confirmed_jobs = self._my_confirmed_job_ids()
+        confirmed_jobs = self._scoped_confirmed_job_ids()
         upcoming = self.env["commercial.job"].search(
             self._upcoming_job_domain(confirmed_jobs),
             order="event_date asc", limit=3,
         )
-        pending = self._my_relevant_pending_assignments()[:3]
+        pending = self._scoped_relevant_pending_assignments()[:3]
         for rec in records:
             rec.write({
                 "my_upcoming_top3": [(6, 0, upcoming.ids)],
@@ -296,17 +330,26 @@ class CommercialJobCrewSchedule(models.TransientModel):
     # ============================================================
     # === Action methods
     # ============================================================
-    def action_refresh(self):
+    @api.model
+    def action_open(self):
+        """Same singleton + persisted-record pattern as Operations
+        Dashboard. See CommercialJobDashboard.action_open."""
+        self.search([("create_uid", "=", self.env.uid)]).unlink()
+        rec = self.create({})
         return {
             "type": "ir.actions.act_window",
             "name": _("My Schedule"),
-            "res_model": "commercial.job.crew.schedule",
+            "res_model": self._name,
             "view_mode": "form",
+            "res_id": rec.id,
             "target": "current",
         }
 
+    def action_refresh(self):
+        return self.action_open()
+
     def action_open_my_upcoming(self):
-        confirmed_jobs = self._my_confirmed_job_ids()
+        confirmed_jobs = self._scoped_confirmed_job_ids()
         return {
             "type": "ir.actions.act_window",
             "name": _("My Upcoming Events"),
@@ -316,13 +359,11 @@ class CommercialJobCrewSchedule(models.TransientModel):
         }
 
     def action_open_my_pending_confirms(self):
+        domain = [("state", "=", "pending")] + self._scoped_user_filter()
         return {
             "type": "ir.actions.act_window",
             "name": _("Pending My Confirmation"),
             "res_model": "commercial.job.crew",
             "view_mode": "tree,form",
-            "domain": [
-                ("user_id", "=", self.env.uid),
-                ("state", "=", "pending"),
-            ],
+            "domain": domain,
         }

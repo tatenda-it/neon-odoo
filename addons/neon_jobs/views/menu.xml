@@ -16,7 +16,7 @@
               name="My Schedule"
               parent="menu_operations_root"
               action="my_schedule_action"
-              groups="neon_jobs.group_neon_jobs_crew"
+              groups="neon_jobs.group_neon_jobs_crew,neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager"
               sequence="2"/>
 
     <menuitem id="menu_calendar_live_pipeline"

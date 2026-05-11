@@ -133,11 +133,15 @@
         </field>
     </record>
 
-    <record id="operations_dashboard_action" model="ir.actions.act_window">
+    <!-- Server action: creates a persisted dashboard record (so computes
+         fire and M2Ms populate via create()) and returns an act_window
+         targeting it by res_id. A plain act_window on a TransientModel
+         would open an unsaved form with empty defaults. -->
+    <record id="operations_dashboard_action" model="ir.actions.server">
         <field name="name">Operations Dashboard</field>
-        <field name="res_model">commercial.job.dashboard</field>
-        <field name="view_mode">form</field>
-        <field name="target">current</field>
+        <field name="model_id" ref="model_commercial_job_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open()</field>
     </record>
 
     <!-- =========================================================
@@ -191,6 +195,7 @@
                             <tree>
                                 <field name="job_id"/>
                                 <field name="job_event_date"/>
+                                <field name="user_id"/>
                                 <field name="role"/>
                                 <button name="action_confirm" type="object" string="Confirm"
                                         class="btn-success"/>
@@ -207,11 +212,11 @@
         </field>
     </record>
 
-    <record id="my_schedule_action" model="ir.actions.act_window">
+    <record id="my_schedule_action" model="ir.actions.server">
         <field name="name">My Schedule</field>
-        <field name="res_model">commercial.job.crew.schedule</field>
-        <field name="view_mode">form</field>
-        <field name="target">current</field>
+        <field name="model_id" ref="model_commercial_job_crew_schedule"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open()</field>
     </record>
 
 </odoo>
