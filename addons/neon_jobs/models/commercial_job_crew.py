@@ -136,9 +136,15 @@ class CommercialJobCrew(models.Model):
     # commercial.job.write() can't see O2m changes from this side, so we
     # fire the parent's gate ourselves when an assignment touches an
     # active job.
+    #
+    # Crew tier (post P2.M7.6) lacks write on commercial.job — they can
+    # only confirm/decline their own assignment, and the gate refresh
+    # is a system-driven side effect, not direct user mutation. Elevate
+    # with sudo() so a crew member confirming their own assignment
+    # doesn't trip the access check on the parent job.
     # ============================================================
     def _retrigger_parent_gate(self, jobs):
-        for job in jobs.filtered(lambda j: j.state == "active"):
+        for job in jobs.filtered(lambda j: j.state == "active").sudo():
             result = job._evaluate_capacity_gate()
             job._persist_gate_result(result, post_change_chatter=True)
 
