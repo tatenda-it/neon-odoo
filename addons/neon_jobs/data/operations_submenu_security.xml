@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P2.M7.7 D1 — gate the five Operations sub-menus that previously
+        had empty groups_id (visible to anyone with a parent menu, i.e.
+        leaked to crew tier). After this gate, only user / manager /
+        crew_leader see them. Crew sees only My Schedule + My Calendar.
+
+        These records overlay menu definitions from this same module
+        (neon_jobs/views/menu.xml). We use <record> with the xml_id to
+        update the existing menu's groups_id.
+
+        Note: spec D6 listed Master Contracts as "already" gated; it
+        wasn't. P2.M7.7 closes that gap too.
+    -->
+    <data>
+
+        <record id="menu_calendar_live_pipeline" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_user'),
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ])]"/>
+        </record>
+
+        <record id="menu_calendar_all_events" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_user'),
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ])]"/>
+        </record>
+
+        <record id="menu_commercial_job" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_user'),
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ])]"/>
+        </record>
+
+        <record id="menu_master_contract" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_user'),
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ])]"/>
+        </record>
+
+        <record id="menu_crew_assignments" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_user'),
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ])]"/>
+        </record>
+
+    </data>
+</odoo>

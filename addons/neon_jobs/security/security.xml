@@ -28,7 +28,14 @@
         <record id="group_neon_jobs_user" model="res.groups">
             <field name="name">User</field>
             <field name="category_id" ref="module_category_neon_operations"/>
-            <field name="comment">Default Operations access — read/write/create Commercial Jobs and Master Contracts. Cannot delete records and cannot override state-transition rules.</field>
+            <field name="comment">Default Operations access — read/write/create Commercial Jobs and Master Contracts. Cannot delete records and cannot override state-transition rules. Implies Salesperson (all documents) for Sales + CRM module access.</field>
+            <!--
+                P2.M7.7: Neon sales reps must see Sales + CRM as well as
+                Operations. CRM has no separate user group — it's gated
+                by the Sales groups. salesman_all_leads (vs salesman) so
+                Lisa can see all leads in CRM, not only her own.
+            -->
+            <field name="implied_ids" eval="[(4, ref('sales_team.group_sale_salesman_all_leads'))]"/>
         </record>
 
         <!--
@@ -44,8 +51,17 @@
         <record id="group_neon_jobs_manager" model="res.groups">
             <field name="name">Manager</field>
             <field name="category_id" ref="module_category_neon_operations"/>
-            <field name="implied_ids" eval="[(4, ref('group_neon_jobs_user'))]"/>
-            <field name="comment">Override authority on state transitions and full CRUD including delete. Intended for Managing Director and Operational Director.</field>
+            <!--
+                Manager implies our User tier (which itself implies
+                Salesperson all-leads → Sales + CRM module access),
+                plus Sales Admin + Billing for full directorial reach.
+            -->
+            <field name="implied_ids" eval="[
+                (4, ref('group_neon_jobs_user')),
+                (4, ref('sales_team.group_sale_manager')),
+                (4, ref('account.group_account_invoice')),
+            ]"/>
+            <field name="comment">Override authority on state transitions and full CRUD including delete. Intended for Managing Director and Operational Director. Implies Sales Manager + Billing for finance + sales-admin reach.</field>
         </record>
 
         <!--

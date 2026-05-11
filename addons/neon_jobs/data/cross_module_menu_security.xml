@@ -37,10 +37,22 @@
             ])]"/>
         </record>
 
+        <!-- P2.M7.7 D4: Invoicing tightened to manager only. Sales reps
+             see invoice status via sale.order smart buttons; they don't
+             need direct Accounting/Invoicing menu access. -->
         <record id="account.menu_finance" model="ir.ui.menu">
             <field name="groups_id" eval="[(6, 0, [
-                ref('neon_jobs.group_neon_jobs_user'),
                 ref('neon_jobs.group_neon_jobs_manager'),
+            ])]"/>
+        </record>
+
+        <!-- P2.M7.7 D3: Spreadsheet Dashboards top-level menu was
+             unrestricted — visible to crew. Gate to manager + admin
+             only. -->
+        <record id="spreadsheet_dashboard.spreadsheet_dashboard_menu_root" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('base.group_system'),
             ])]"/>
         </record>
 
