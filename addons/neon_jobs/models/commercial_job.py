@@ -406,15 +406,8 @@ class CommercialJob(models.Model):
 
     # ============================================================
     # === Action buttons — primary lifecycle
+    # === (action_activate lives in commercial_job_gate.py — P2.M4)
     # ============================================================
-    def action_activate(self):
-        for rec in self:
-            # Capacity Gate evaluation lives in P2.M4. M2 just transitions.
-            rec.write({
-                "state": "active",
-                "soft_hold_until": False,
-            })
-
     def action_complete(self):
         self.write({"state": "completed"})
 

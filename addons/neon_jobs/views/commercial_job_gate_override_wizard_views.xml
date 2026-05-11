@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_job_gate_override_wizard_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.gate.override.wizard.form</field>
+        <field name="model">commercial.job.gate.override.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Override Capacity Gate">
+                <sheet>
+                    <div class="alert alert-danger" role="alert">
+                        <strong>Manager override required.</strong>
+                        The Capacity Gate rejected this activation. Review the failing
+                        checks below and record a justification before proceeding.
+                    </div>
+                    <group>
+                        <field name="job_id" readonly="1"/>
+                    </group>
+                    <group string="Failing checks">
+                        <field name="failing_checks_summary" nolabel="1" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="gate_override_reason" nolabel="1"
+                               placeholder="Why is the override justified? (recorded to the job's audit trail)"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object" string="Override and Activate"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

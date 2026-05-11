@@ -9,3 +9,4 @@ access_venue_room_user,venue.room user,model_venue_room,neon_jobs.group_neon_job
 access_venue_room_manager,venue.room manager,model_venue_room,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_commercial_job_loss_wizard_user,commercial.job.loss.wizard user,model_commercial_job_loss_wizard,neon_jobs.group_neon_jobs_user,1,1,1,1
 access_commercial_job_loss_wizard_manager,commercial.job.loss.wizard manager,model_commercial_job_loss_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_job_gate_override_wizard_manager,commercial.job.gate.override.wizard manager,model_commercial_job_gate_override_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1

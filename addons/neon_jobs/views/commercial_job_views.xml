@@ -82,6 +82,10 @@
                     <button name="action_archive_lost" type="object" string="Archive Lost"
                             invisible="state != 'pending'"
                             groups="neon_jobs.group_neon_jobs_user"/>
+                    <button name="action_rerun_capacity_gate" type="object"
+                            string="Re-run Capacity Gate"
+                            invisible="state != 'active'"
+                            groups="neon_jobs.group_neon_jobs_user"/>
                     <field name="state" widget="statusbar" statusbar_visible="pending,active,completed"/>
                 </header>
                 <sheet>
@@ -91,6 +95,16 @@
                         <field name="needs_attention_reason" nolabel="1" readonly="1"/>
                     </div>
                     <field name="needs_attention" invisible="1"/>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not (state == 'active' and gate_result == 'reject')">
+                        <strong>Capacity Gate is currently REJECTING this active job.</strong>
+                        Review the failing checks below and resolve, or escalate to MD/OD.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not (state == 'active' and gate_result == 'warning')">
+                        <strong>Capacity Gate warning on this active job.</strong>
+                        See the Capacity Gate tab for details.
+                    </div>
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
                         <h1><field name="name" readonly="1"/></h1>
@@ -162,22 +176,29 @@
                             <field name="equipment_summary"
                                    placeholder="Main items: e.g. 2x line array PA, 1x DJ booth, 16-channel monitor mix, 8x moving heads, 3x dimmer packs…"/>
                         </page>
-                        <page string="Capacity Gate (P2.M4)">
+                        <page string="Capacity Gate">
                             <group>
                                 <group>
                                     <field name="gate_result" widget="badge"
                                            decoration-success="gate_result == 'pass'"
                                            decoration-warning="gate_result == 'warning'"
-                                           decoration-danger="gate_result == 'reject'"/>
+                                           decoration-danger="gate_result == 'reject'"
+                                           decoration-info="gate_result == 'overridden'"/>
                                     <field name="gate_run_at"/>
                                 </group>
                                 <group>
-                                    <field name="gate_override_by"/>
-                                    <field name="gate_override_reason"/>
+                                    <field name="gate_override_by" readonly="1"/>
+                                    <field name="gate_override_reason" readonly="1"/>
                                 </group>
                             </group>
-                            <field name="gate_check_log" readonly="1"
-                                   placeholder="Populated when the Capacity Acceptance Gate runs (P2.M4 — not yet wired up)."/>
+                            <group string="Latest evaluation">
+                                <field name="gate_check_log_summary" nolabel="1" readonly="1"
+                                       placeholder="No evaluation yet — the gate fires automatically when the job is activated."/>
+                            </group>
+                            <group string="Raw JSON log" col="1">
+                                <field name="gate_check_log" nolabel="1" readonly="1"
+                                       placeholder="Raw JSON of the most recent evaluation."/>
+                            </group>
                         </page>
                         <page string="Loss Capture" invisible="state not in ('pending','archived')">
                             <group>

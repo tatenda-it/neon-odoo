@@ -95,3 +95,34 @@ class CommercialJobCrew(models.Model):
                 display = f"{rec.job_id.name} — {display}"
             result.append((rec.id, display))
         return result
+
+    # ============================================================
+    # === Capacity Gate re-trigger (P2.M4)
+    # commercial.job.write() can't see O2m changes from this side, so we
+    # fire the parent's gate ourselves when an assignment touches an
+    # active job.
+    # ============================================================
+    def _retrigger_parent_gate(self, jobs):
+        for job in jobs.filtered(lambda j: j.state == "active"):
+            result = job._evaluate_capacity_gate()
+            job._persist_gate_result(result, post_change_chatter=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        recs = super().create(vals_list)
+        self._retrigger_parent_gate(recs.mapped("job_id"))
+        return recs
+
+    def write(self, vals):
+        affecting = {"user_id", "state", "job_id"}.intersection(vals.keys())
+        old_jobs = self.mapped("job_id") if affecting else self.env["commercial.job"]
+        res = super().write(vals)
+        if affecting:
+            self._retrigger_parent_gate(old_jobs | self.mapped("job_id"))
+        return res
+
+    def unlink(self):
+        old_jobs = self.mapped("job_id")
+        res = super().unlink()
+        self._retrigger_parent_gate(old_jobs)
+        return res
