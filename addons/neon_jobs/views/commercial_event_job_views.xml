@@ -373,14 +373,13 @@
                             <field name="readiness_breakdown" nolabel="1" readonly="1"/>
                             <div class="text-muted" role="alert">
                                 Dimensions whose data isn't yet
-                                available (Checklist before P3.M5,
-                                Equipment until Phase 5, Risk
-                                placeholders for incidents / weather /
-                                equipment-repair) are excluded from
-                                the aggregate and their weight
-                                redistributes across the rest.
-                                'Dimensions Contributing' lists which
-                                dimensions counted toward today's score.
+                                available (Equipment until Phase 5,
+                                weather signals deferred, etc.) are
+                                excluded from the score and their
+                                weight is redistributed across active
+                                dimensions. 'Dimensions Contributing'
+                                lists which dimensions counted toward
+                                today's score.
                             </div>
                         </page>
 
