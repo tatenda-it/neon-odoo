@@ -53,8 +53,16 @@
                 Operations. CRM has no separate user group — it's gated
                 by the Sales groups. salesman_all_leads (vs salesman) so
                 Lisa can see all leads in CRM, not only her own.
+
+                P2.M7.8.1: also imply Billing — Neon sales reps issue
+                invoices as part of their workflow, not just managers.
+                Paired with the cross_module_menu_security.xml gate that
+                surfaces the Invoicing menu to neon_jobs_user.
             -->
-            <field name="implied_ids" eval="[(4, ref('sales_team.group_sale_salesman_all_leads'))]"/>
+            <field name="implied_ids" eval="[
+                (4, ref('sales_team.group_sale_salesman_all_leads')),
+                (4, ref('account.group_account_invoice')),
+            ]"/>
         </record>
 
         <!--

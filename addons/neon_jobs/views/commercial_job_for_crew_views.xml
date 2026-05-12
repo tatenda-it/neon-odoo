@@ -15,10 +15,21 @@
         Manager / Crew Leader keep the default views.
     -->
 
+    <!--
+        P2.M7.8.1 — groups_id + priority make this view "win" for crew
+        users by every navigation path: stat-button action, m2o
+        hyperlink, deep link, breadcrumb. Without these, only the
+        action_open_my_upcoming injection routed crew here, so a click
+        on a job_id link in any other tree fell through to the default
+        view. priority=1 keeps us ahead of any future view that lands
+        at the default 16; groups_id makes the view invisible to
+        non-crew so the default still wins for them.
+    -->
     <record id="commercial_job_view_tree_for_crew" model="ir.ui.view">
         <field name="name">commercial.job.tree.for.crew</field>
         <field name="model">commercial.job</field>
-        <field name="priority">99</field>
+        <field name="priority">1</field>
+        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
         <field name="arch" type="xml">
             <tree string="My Upcoming Events"
                   create="0" edit="0" delete="0"
@@ -38,7 +49,8 @@
     <record id="commercial_job_view_form_for_crew" model="ir.ui.view">
         <field name="name">commercial.job.form.for.crew</field>
         <field name="model">commercial.job</field>
-        <field name="priority">99</field>
+        <field name="priority">1</field>
+        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
         <field name="arch" type="xml">
             <form string="My Event"
                   create="0" edit="0" delete="0">

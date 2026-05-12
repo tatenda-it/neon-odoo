@@ -37,11 +37,15 @@
             ])]"/>
         </record>
 
-        <!-- P2.M7.7 D4: Invoicing tightened to manager only. Sales reps
-             see invoice status via sale.order smart buttons; they don't
-             need direct Accounting/Invoicing menu access. -->
+        <!-- P2.M7.8.1: reverses the earlier P2.M7.7 D4 narrowing. Sales
+             reps at Neon issue invoices as part of their workflow, so
+             they need the Invoicing menu. Crew + Crew Leader stay
+             excluded. Pairs with the security.xml implication
+             (neon_jobs_user → account.group_account_invoice) so the
+             menu actually leads somewhere they can act on. -->
         <record id="account.menu_finance" model="ir.ui.menu">
             <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_user'),
                 ref('neon_jobs.group_neon_jobs_manager'),
             ])]"/>
         </record>
