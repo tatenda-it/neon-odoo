@@ -11,6 +11,8 @@ execution. State machine (P3.M3) and Readiness Score compute
 (P3.M4) land in subsequent milestones; this milestone establishes
 the schema, security, and basic UI only.
 """
+from datetime import timedelta
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -55,6 +57,28 @@ _TRANSITIONS = {
     "completed":          {"from": ("returned",),           "groups": ("crew_leader", "manager"),         "crew_chief_path": False},
     "closed":             {"from": ("completed",),          "groups": ("manager",),                       "crew_chief_path": False},
 }
+
+# P3.M4 — readiness aggregation table. Weights total 1.0 per v4.1
+# Q4. dim_field is the stored Float on the model that mirrors the
+# individual score (0 when N/A, so the form has something to show).
+# Order is the order rendered in the Quality tab breakdown.
+_READINESS_DIMENSIONS = (
+    # key,             label,            weight, method,                          dim_field
+    ("finance",        "Finance",        0.20, "_compute_dim_finance",            "readiness_dimension_finance"),
+    ("equipment",      "Equipment",      0.25, "_compute_dim_equipment",          "readiness_dimension_equipment"),
+    ("crew",           "Crew",           0.20, "_compute_dim_crew",               "readiness_dimension_crew"),
+    ("schedule_venue", "Schedule/Venue", 0.15, "_compute_dim_schedule_venue",     "readiness_dimension_schedule_venue"),
+    ("checklist",      "Checklist",      0.10, "_compute_dim_checklist",          "readiness_dimension_checklist"),
+    ("risk",           "Risk",           0.10, "_compute_dim_risk",               "readiness_dimension_risk"),
+)
+# P3.M4 — readiness_state derivation thresholds (Q5).
+_READINESS_STATE_THRESHOLDS = (
+    (90.0, "ready"),
+    (70.0, "watchlist"),
+    (50.0, "at_risk"),
+)
+_READINESS_PASS_THRESHOLD = 70.0
+_READINESS_OVERRIDE_GROUPS = ("crew_leader", "manager")
 
 
 class CommercialEventJob(models.Model):
@@ -175,15 +199,75 @@ class CommercialEventJob(models.Model):
         "themselves for smaller events.",
     )
 
-    # === Readiness Score (P3.M4 will compute these) ===
-    readiness_score = fields.Float(string="Readiness Score", default=0.0)
-    readiness_dimension_finance = fields.Float(string="Readiness — Finance", default=0.0)
-    readiness_dimension_equipment = fields.Float(string="Readiness — Equipment", default=0.0)
-    readiness_dimension_crew = fields.Float(string="Readiness — Crew", default=0.0)
+    # === Readiness Score (P3.M4 — 6 weighted dimensions, proportional rescale) ===
+    # All 10 readiness fields share one compute (_compute_readiness_score)
+    # so the math runs in a single pass and the form never shows a stale
+    # aggregate vs. its components.
+    readiness_score = fields.Float(
+        string="Readiness Score",
+        compute="_compute_readiness_score",
+        store=True,
+        help="Weighted aggregate of 6 dimensions, rescaled to 100% "
+        "across the dimensions whose data is currently available.",
+    )
+    readiness_dimension_finance = fields.Float(
+        string="Readiness — Finance",
+        compute="_compute_readiness_score",
+        store=True,
+    )
+    readiness_dimension_equipment = fields.Float(
+        string="Readiness — Equipment",
+        compute="_compute_readiness_score",
+        store=True,
+    )
+    readiness_dimension_crew = fields.Float(
+        string="Readiness — Crew",
+        compute="_compute_readiness_score",
+        store=True,
+    )
     readiness_dimension_schedule_venue = fields.Float(
-        string="Readiness — Schedule/Venue", default=0.0)
-    readiness_dimension_checklist = fields.Float(string="Readiness — Checklist", default=0.0)
-    readiness_dimension_risk = fields.Float(string="Readiness — Risk", default=0.0)
+        string="Readiness — Schedule/Venue",
+        compute="_compute_readiness_score",
+        store=True,
+    )
+    readiness_dimension_checklist = fields.Float(
+        string="Readiness — Checklist",
+        compute="_compute_readiness_score",
+        store=True,
+    )
+    readiness_dimension_risk = fields.Float(
+        string="Readiness — Risk",
+        compute="_compute_readiness_score",
+        store=True,
+    )
+    readiness_state = fields.Selection(
+        [
+            ("ready", "Ready"),
+            ("watchlist", "Watchlist"),
+            ("at_risk", "At Risk"),
+            ("not_ready", "Not Ready"),
+        ],
+        string="Readiness State",
+        compute="_compute_readiness_score",
+        store=True,
+        help="Derived from readiness_score: >=90 ready, >=70 "
+        "watchlist, >=50 at_risk, <50 not_ready.",
+    )
+    readiness_dimensions_available = fields.Char(
+        string="Dimensions Contributing",
+        compute="_compute_readiness_score",
+        store=True,
+        help="Comma-separated list of dimensions whose data is "
+        "currently available. The aggregate score is rescaled to "
+        "100% across this subset (proportional rescale).",
+    )
+    readiness_breakdown = fields.Text(
+        string="Readiness Breakdown",
+        compute="_compute_readiness_score",
+        store=True,
+        help="Human-readable per-dimension explanation for the "
+        "current Readiness Score.",
+    )
 
     # === Equipment (placeholder for Phase 5 integration) ===
     equipment_summary = fields.Text(
@@ -344,6 +428,7 @@ class CommercialEventJob(models.Model):
     can_move_to_planning = fields.Boolean(compute="_compute_state_buttons")
     can_move_to_prep = fields.Boolean(compute="_compute_state_buttons")
     can_move_to_ready_for_dispatch = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_ready_for_dispatch_with_override = fields.Boolean(compute="_compute_state_buttons")
     can_move_to_dispatched = fields.Boolean(compute="_compute_state_buttons")
     can_move_to_in_progress = fields.Boolean(compute="_compute_state_buttons")
     can_move_to_strike = fields.Boolean(compute="_compute_state_buttons")
@@ -488,6 +573,7 @@ class CommercialEventJob(models.Model):
             rec.can_move_to_planning = False
             rec.can_move_to_prep = False
             rec.can_move_to_ready_for_dispatch = False
+            rec.can_move_to_ready_for_dispatch_with_override = False
             rec.can_move_to_dispatched = False
             rec.can_move_to_in_progress = False
             rec.can_move_to_strike = False
@@ -510,8 +596,21 @@ class CommercialEventJob(models.Model):
                     continue
                 if target == "closed" and not (rec.gear_reconciled and rec.finance_handoff_complete):
                     continue
-                # readiness gate (P3.M4 placeholder — see action method)
+                # P3.M4 readiness hard gate. Below threshold the regular
+                # button hides; the Override button surfaces instead.
+                if target == "ready_for_dispatch" and rec.readiness_score < _READINESS_PASS_THRESHOLD:
+                    continue
                 setattr(rec, "can_move_to_" + target, True)
+
+            # P3.M4 override path — only when the regular button is
+            # suppressed by the score gate. Authority is the same as
+            # the regular transition (crew_leader or manager).
+            if (
+                rec.state == "prep"
+                and rec.readiness_score < _READINESS_PASS_THRESHOLD
+                and rec._user_in_any_group(_READINESS_OVERRIDE_GROUPS)
+            ):
+                rec.can_move_to_ready_for_dispatch_with_override = True
 
             # Terminal transitions (manager only, from any non-terminal)
             is_mgr = rec.env.user.has_group(_GROUP_XMLIDS["manager"])
@@ -540,16 +639,93 @@ class CommercialEventJob(models.Model):
     def action_move_to_ready_for_dispatch(self):
         for rec in self:
             rec._check_authority("ready_for_dispatch")
-            # P3.M4 will enforce readiness_score >= 70 as a hard block.
-            # Until then, log a warning when the score is below the
-            # eventual threshold so the audit trail captures it.
-            if rec.readiness_score < 70:
-                rec.message_post(body=_(
-                    "Note: Readiness Score gate at 70 not yet enforced "
-                    "(P3.M4 placeholder). Proceeded with "
-                    "readiness_score=%s."
-                ) % rec.readiness_score)
+            # P3.M4 — hard readiness gate. Below 70 the transition is
+            # blocked; Manager / Crew Leader can override via
+            # action_move_to_ready_for_dispatch_with_override.
+            if rec.readiness_score < _READINESS_PASS_THRESHOLD:
+                raise UserError(_(
+                    "Readiness Score is %(score).1f, below the "
+                    "%(threshold).0f threshold required to move to "
+                    "Ready for Dispatch. Improve the score (confirm "
+                    "crew, lock the venue, raise the deposit), or "
+                    "use the 'Move to Ready (Override)' action — "
+                    "requires Manager or Crew Leader."
+                ) % {
+                    "score": rec.readiness_score,
+                    "threshold": _READINESS_PASS_THRESHOLD,
+                })
             rec._do_transition("ready_for_dispatch")
+
+    def action_move_to_ready_for_dispatch_with_override(self, reason):
+        """P3.M4 override path. Manager or Crew Leader may move a
+        prep-state Event Job to Ready for Dispatch even when the
+        readiness gate is below threshold, provided a written reason.
+        Reason is logged to chatter, attributed to the acting user.
+        """
+        if not reason or not str(reason).strip():
+            raise UserError(_(
+                "Override reason is required — the audit trail keeps "
+                "a record of who accepted the risk and why."
+            ))
+        reason = str(reason).strip()
+        for rec in self:
+            rec._check_authority("ready_for_dispatch")
+            if not rec._user_in_any_group(_READINESS_OVERRIDE_GROUPS):
+                raise UserError(_(
+                    "Only Managers or Crew Leaders can override the "
+                    "Readiness Score gate."
+                ))
+            score = rec.readiness_score
+            # Log the override BEFORE the transition so even if the
+            # transition raised for some other reason, the audit trail
+            # shows the attempt.
+            rec.sudo().message_post(
+                body=_(
+                    "Readiness Override by %(user)s: "
+                    "score=%(score).1f (below %(threshold).0f), "
+                    "reason: %(reason)s"
+                ) % {
+                    "user": rec.env.user.name,
+                    "score": score,
+                    "threshold": _READINESS_PASS_THRESHOLD,
+                    "reason": reason,
+                },
+                author_id=rec.env.user.partner_id.id,
+            )
+            rec._do_transition("ready_for_dispatch")
+        return True
+
+    def action_open_readiness_override_wizard(self):
+        """UI entry: opens the override wizard so the user can capture
+        their reason and confirm. Tests call the override action
+        directly with a reason argument."""
+        self.ensure_one()
+        if self.state != "prep":
+            raise UserError(_(
+                "Readiness override only applies when the Event Job "
+                "is in Prep state."
+            ))
+        if not self._user_in_any_group(_READINESS_OVERRIDE_GROUPS):
+            raise UserError(_(
+                "Only Managers or Crew Leaders can override the "
+                "Readiness Score gate."
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Override Readiness Gate"),
+            "res_model": "commercial.event.job.readiness.override.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_event_job_id": self.id},
+        }
+
+    def action_recompute_readiness(self):
+        """Manual recompute escape hatch. Useful when underlying data
+        that the depends graph can't track changes (other event_jobs'
+        crew assignments feed the risk crew_gaps component)."""
+        for rec in self:
+            rec._populate_readiness()
+        return True
 
     def action_move_to_dispatched(self):
         for rec in self:
@@ -620,6 +796,370 @@ class CommercialEventJob(models.Model):
             if not self.env.user.has_group(_GROUP_XMLIDS["manager"]):
                 raise UserError(_("Only Managers can release an Event Job."))
             rec._do_transition("released")
+
+    # ============================================================
+    # === P3.M4 — Readiness Score
+    #
+    # Six dimensions, each contributes 0–100 to its weighted slot;
+    # dimensions whose data isn't available yet return None and are
+    # excluded from the aggregate (the remaining weights are scaled
+    # back up to 100% — proportional rescale, v4.1 §Q5 wording).
+    #
+    # Per-dimension contract:
+    #   dict {"score": float | None, "breakdown": str}
+    #     score = None         → N/A, exclude from aggregate
+    #     score 0..100         → contributes (score * weight)
+    #   breakdown always populated for the Quality tab.
+    # ============================================================
+    def _compute_dim_finance(self):
+        """Finance dimension. Deposit-ratio with finance_status modifier.
+        Returns None when there is no quote to compare against — a
+        zero-value 'job' usually means data has not been entered yet,
+        and a zero score there would unfairly drag the aggregate
+        down."""
+        self.ensure_one()
+        quoted = self.commercial_job_id.quoted_value or 0.0
+        deposit = self.commercial_job_id.deposit_received or 0.0
+        if quoted <= 0:
+            return {
+                "score": None,
+                "breakdown": _("No quoted value on the Commercial Job — "
+                               "Finance dimension cannot be evaluated."),
+            }
+        ratio = max(0.0, min(1.0, deposit / quoted))
+        score = ratio * 100.0
+        status = self.commercial_job_id.finance_status
+        if status == "overdue":
+            score -= 30.0
+        elif status == "fully_paid":
+            score += 30.0
+        score = max(0.0, min(100.0, score))
+        return {
+            "score": score,
+            "breakdown": _(
+                "Deposit %(pct).0f%% of quote (%(deposit)s / %(quoted)s), "
+                "finance_status=%(status)s"
+            ) % {
+                "pct": ratio * 100.0,
+                "deposit": deposit,
+                "quoted": quoted,
+                "status": status or "—",
+            },
+        }
+
+    def _compute_dim_equipment(self):
+        """Equipment dimension. Phase 5 ships per-item readiness
+        checks; until then, a non-empty equipment_summary is read as
+        'data exists but unverified' (neutral 50pts). Empty summary
+        returns N/A so it doesn't drag a fresh draft below threshold."""
+        self.ensure_one()
+        if self.equipment_summary and self.equipment_summary.strip():
+            return {
+                "score": 50.0,
+                "breakdown": _(
+                    "Equipment summary present — Phase 5 will replace "
+                    "this with per-item readiness checks."
+                ),
+            }
+        return {
+            "score": None,
+            "breakdown": _(
+                "No equipment summary yet — N/A. Phase 5 ships the "
+                "per-item readiness check that drives this dimension."
+            ),
+        }
+
+    def _compute_dim_crew(self):
+        """Crew dimension. Confirmation ratio + crew_chief + lead_tech
+        bonuses. Zero crew assigned is genuinely Not Ready (score=0,
+        not N/A) — by the time we're scoring an event, somebody should
+        be assigned."""
+        self.ensure_one()
+        total = self.crew_total_count
+        if total == 0:
+            return {
+                "score": 0.0,
+                "breakdown": _("No crew assigned — confirmation ratio "
+                               "is 0/0, dimension fails."),
+            }
+        confirmed = self.crew_confirmed_count
+        score = (confirmed / total) * 100.0
+        if self.crew_chief_id:
+            score += 10.0
+        if self.lead_tech_id:
+            score += 10.0
+        score = max(0.0, min(100.0, score))
+        return {
+            "score": score,
+            "breakdown": _(
+                "Crew %(conf)d/%(tot)d confirmed; crew_chief=%(chief)s; "
+                "lead_tech=%(lead)s"
+            ) % {
+                "conf": confirmed,
+                "tot": total,
+                "chief": self.crew_chief_id.name if self.crew_chief_id else "—",
+                "lead": self.lead_tech_id.name if self.lead_tech_id else "—",
+            },
+        }
+
+    def _compute_dim_schedule_venue(self):
+        """Schedule/Venue dimension. Future-date base, venue lock,
+        room lock. Past event → 0 (the 'ready' concept is moot for an
+        event that's already over)."""
+        self.ensure_one()
+        today = fields.Date.context_today(self)
+        event_date = self.event_date
+        if not event_date:
+            return {
+                "score": 0.0,
+                "breakdown": _("Event date is not set."),
+            }
+        if event_date < today:
+            return {
+                "score": 0.0,
+                "breakdown": _(
+                    "Event date %s is in the past — readiness concept "
+                    "does not apply."
+                ) % event_date,
+            }
+        score = 50.0
+        bits = [_("event date %s set (in future)") % event_date]
+        tbd = self.env.ref(
+            "neon_jobs.partner_tbd_venue", raise_if_not_found=False
+        )
+        if self.venue_id and (not tbd or self.venue_id.id != tbd.id):
+            score += 25.0
+            bits.append(_("venue locked"))
+        else:
+            bits.append(_("venue is TBD / placeholder"))
+        if self.venue_room_id:
+            score += 25.0
+            bits.append(_("room locked"))
+        else:
+            bits.append(_("no room"))
+        return {
+            "score": score,
+            "breakdown": "; ".join(str(b) for b in bits),
+        }
+
+    def _compute_dim_checklist(self):
+        """Checklist dimension. P3.M5 will wire the actual checklist
+        completion check. Until then this dimension is N/A and its
+        weight redistributes."""
+        self.ensure_one()
+        return {
+            "score": None,
+            "breakdown": _(
+                "Checklist dimension activates in P3.M5 — N/A for now."
+            ),
+        }
+
+    # ----- Risk dimension — 6 components -----------------------------
+    # b/c/e have real compute; a/d/f are N/A placeholders until their
+    # underlying systems exist (incident model, weather integration,
+    # Phase 5 equipment maintenance).
+    def _risk_open_incidents(self):
+        # Phase 4 introduces the structured incident model. Until then
+        # there is no record to query.
+        return (None, _("Open incidents: N/A (no incident model yet)"))
+
+    def _risk_new_venue(self):
+        self.ensure_one()
+        if not self.venue_id:
+            return (None, _("New venue: N/A (no venue on the job)"))
+        tbd = self.env.ref(
+            "neon_jobs.partner_tbd_venue", raise_if_not_found=False
+        )
+        if tbd and self.venue_id.id == tbd.id:
+            return (None, _("New venue: N/A (venue is the TBD placeholder)"))
+        prior = self.env["commercial.job"].sudo().search_count([
+            ("venue_id", "=", self.venue_id.id),
+            ("id", "!=", self.commercial_job_id.id),
+        ])
+        score = 100.0 if prior >= 1 else 0.0
+        return (score, _(
+            "New venue: %(n)d prior event(s) at %(v)s — %(verdict)s"
+        ) % {
+            "n": prior,
+            "v": self.venue_id.name or "?",
+            "verdict": "known venue" if prior >= 1 else "first-ever booking",
+        })
+
+    def _risk_new_client(self):
+        self.ensure_one()
+        if not self.partner_id:
+            return (None, _("New client: N/A (no client on the job)"))
+        prior = self.env["commercial.job"].sudo().search_count([
+            ("partner_id", "=", self.partner_id.id),
+            ("id", "!=", self.commercial_job_id.id),
+        ])
+        score = 100.0 if prior >= 1 else 0.0
+        return (score, _(
+            "New client: %(n)d prior job(s) for %(p)s — %(verdict)s"
+        ) % {
+            "n": prior,
+            "p": self.partner_id.name or "?",
+            "verdict": "established client" if prior >= 1 else "first job for this client",
+        })
+
+    def _risk_weather(self):
+        # Outdoor-event weather alerts. No weather integration yet.
+        return (None, _("Weather: N/A (no weather integration yet)"))
+
+    def _risk_crew_gaps(self):
+        """% days in the 7-day pre-event window where one of this
+        event's confirmed crew is already booked on another event."""
+        self.ensure_one()
+        event_date = self.event_date
+        if not event_date:
+            return (None, _("Crew gaps: N/A (no event date)"))
+        crew_users = self.commercial_job_id.crew_assignment_ids.filtered(
+            lambda c: c.state == "confirmed"
+        ).mapped("user_id")
+        if not crew_users:
+            return (None, _("Crew gaps: N/A (no confirmed crew yet)"))
+        window_start = event_date - timedelta(days=7)
+        window_end = event_date - timedelta(days=1)
+        conflicting = self.env["commercial.job.crew"].sudo().search([
+            ("user_id", "in", crew_users.ids),
+            ("state", "=", "confirmed"),
+            ("job_id", "!=", self.commercial_job_id.id),
+            ("job_event_date", ">=", window_start),
+            ("job_event_date", "<=", window_end),
+        ])
+        conflict_days = {a.job_event_date for a in conflicting}
+        n_conflict = len(conflict_days)
+        score = max(0.0, 100.0 - (n_conflict / 7.0 * 100.0))
+        return (score, _(
+            "Crew gaps: %(n)d/7 pre-event days with a conflicting "
+            "confirmed assignment on another job"
+        ) % {"n": n_conflict})
+
+    def _risk_equipment_repair(self):
+        # Phase 5 — flag equipment recently sent for repair.
+        return (None, _("Equipment repair flags: N/A (Phase 5)"))
+
+    _RISK_COMPONENTS = (
+        ("open_incidents",  "_risk_open_incidents"),
+        ("new_venue",       "_risk_new_venue"),
+        ("new_client",      "_risk_new_client"),
+        ("weather",         "_risk_weather"),
+        ("crew_gaps",       "_risk_crew_gaps"),
+        ("equipment_repair", "_risk_equipment_repair"),
+    )
+
+    def _compute_dim_risk(self):
+        """Risk dimension. Average of available components. All six
+        components N/A → whole dimension N/A."""
+        self.ensure_one()
+        rows = []
+        scored = []
+        for label, method_name in self._RISK_COMPONENTS:
+            score, breakdown = getattr(self, method_name)()
+            rows.append((label, score, breakdown))
+            if score is not None:
+                scored.append(score)
+        if not scored:
+            return {
+                "score": None,
+                "breakdown": _(
+                    "Risk: all 6 components are placeholders awaiting "
+                    "later phases."
+                ),
+            }
+        avg = sum(scored) / len(scored)
+        bits = [
+            "%s=%s" % (
+                label,
+                "%.0f" % score if score is not None else "N/A",
+            )
+            for label, score, _bk in rows
+        ]
+        return {
+            "score": avg,
+            "breakdown": _(
+                "Risk avg of %(n)d available component(s): %(detail)s"
+            ) % {"n": len(scored), "detail": "; ".join(bits)},
+        }
+
+    # ----- Aggregator -------------------------------------------------
+    @api.depends(
+        "state",
+        "commercial_job_id.quoted_value",
+        "commercial_job_id.deposit_received",
+        "commercial_job_id.finance_status",
+        "commercial_job_id.crew_assignment_ids",
+        "commercial_job_id.crew_assignment_ids.state",
+        "commercial_job_id.crew_assignment_ids.is_crew_chief",
+        "lead_tech_id",
+        "crew_chief_id",
+        "event_date",
+        "venue_id",
+        "venue_room_id",
+        "equipment_summary",
+        "partner_id",
+    )
+    def _compute_readiness_score(self):
+        for rec in self:
+            rec._populate_readiness()
+
+    def _populate_readiness(self):
+        """Run all 6 dimensions, aggregate with proportional rescale,
+        then write the 10 readiness fields in one pass.
+
+        Split out from the @api.depends compute so the Recompute
+        Readiness button can call it directly. The button case writes
+        to DB; the depends case populates cache (Odoo decides which
+        based on the calling stack)."""
+        self.ensure_one()
+        weighted_sum = 0.0
+        available_weight = 0.0
+        available_labels = []
+        breakdown_lines = []
+        dim_field_values = {}
+
+        for key, label, weight, method_name, dim_field in _READINESS_DIMENSIONS:
+            result = getattr(self, method_name)()
+            score = result["score"]
+            breakdown = result["breakdown"]
+            pct = int(round(weight * 100))
+            if score is None:
+                dim_field_values[dim_field] = 0.0
+                breakdown_lines.append(
+                    "- %s (weight %d%%) — N/A: %s" % (label, pct, breakdown)
+                )
+                continue
+            clamped = max(0.0, min(100.0, float(score)))
+            dim_field_values[dim_field] = clamped
+            weighted_sum += clamped * weight
+            available_weight += weight
+            available_labels.append(label)
+            breakdown_lines.append(
+                "- %s (weight %d%%): %.0f/100 — %s" % (
+                    label, pct, clamped, breakdown,
+                )
+            )
+
+        if available_weight > 0:
+            aggregate = weighted_sum * (1.0 / available_weight)
+        else:
+            aggregate = 0.0
+        aggregate = round(aggregate, 1)
+
+        state = "not_ready"
+        for threshold, name in _READINESS_STATE_THRESHOLDS:
+            if aggregate >= threshold:
+                state = name
+                break
+
+        for fname, fval in dim_field_values.items():
+            self[fname] = fval
+        self.readiness_score = aggregate
+        self.readiness_state = state
+        self.readiness_dimensions_available = (
+            ", ".join(available_labels) if available_labels else ""
+        )
+        self.readiness_breakdown = "\n".join(breakdown_lines)
 
     # ============================================================
     # === Write block — protect the audit trail

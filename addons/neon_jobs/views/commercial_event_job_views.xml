@@ -107,6 +107,10 @@
                             string="Mark Ready for Dispatch"
                             class="oe_highlight"
                             invisible="not can_move_to_ready_for_dispatch"/>
+                    <button name="action_open_readiness_override_wizard" type="object"
+                            string="Move to Ready (Override)"
+                            class="btn-warning"
+                            invisible="not can_move_to_ready_for_dispatch_with_override"/>
                     <button name="action_move_to_dispatched" type="object"
                             string="Dispatch"
                             class="oe_highlight"
@@ -145,6 +149,7 @@
                     <field name="can_move_to_planning" invisible="1"/>
                     <field name="can_move_to_prep" invisible="1"/>
                     <field name="can_move_to_ready_for_dispatch" invisible="1"/>
+                    <field name="can_move_to_ready_for_dispatch_with_override" invisible="1"/>
                     <field name="can_move_to_dispatched" invisible="1"/>
                     <field name="can_move_to_in_progress" invisible="1"/>
                     <field name="can_move_to_strike" invisible="1"/>
@@ -327,22 +332,55 @@
                         <page string="Quality" name="page_quality">
                             <group>
                                 <group string="Aggregate">
-                                    <field name="readiness_score" readonly="1"/>
+                                    <field name="readiness_score" readonly="1"
+                                           widget="progressbar"/>
+                                    <field name="readiness_state" widget="badge"
+                                           decoration-success="readiness_state == 'ready'"
+                                           decoration-info="readiness_state == 'watchlist'"
+                                           decoration-warning="readiness_state == 'at_risk'"
+                                           decoration-danger="readiness_state == 'not_ready'"
+                                           readonly="1"/>
+                                    <field name="readiness_dimensions_available" readonly="1"/>
                                 </group>
-                                <group string="Dimensions">
-                                    <field name="readiness_dimension_finance" readonly="1"/>
-                                    <field name="readiness_dimension_equipment" readonly="1"/>
-                                    <field name="readiness_dimension_crew" readonly="1"/>
-                                    <field name="readiness_dimension_schedule_venue" readonly="1"/>
-                                    <field name="readiness_dimension_checklist" readonly="1"/>
-                                    <field name="readiness_dimension_risk" readonly="1"/>
+                                <group string="Actions">
+                                    <button name="action_recompute_readiness"
+                                            type="object"
+                                            string="Recompute Readiness"
+                                            class="btn-secondary"
+                                            help="Force-rerun the readiness compute. Useful when underlying data Odoo's depends graph cannot track (e.g. other event_jobs' crew assignments) has changed."/>
                                 </group>
                             </group>
+                            <separator string="Dimensions"/>
+                            <group>
+                                <group>
+                                    <field name="readiness_dimension_finance" readonly="1"
+                                           widget="progressbar"/>
+                                    <field name="readiness_dimension_equipment" readonly="1"
+                                           widget="progressbar"/>
+                                    <field name="readiness_dimension_crew" readonly="1"
+                                           widget="progressbar"/>
+                                </group>
+                                <group>
+                                    <field name="readiness_dimension_schedule_venue" readonly="1"
+                                           widget="progressbar"/>
+                                    <field name="readiness_dimension_checklist" readonly="1"
+                                           widget="progressbar"/>
+                                    <field name="readiness_dimension_risk" readonly="1"
+                                           widget="progressbar"/>
+                                </group>
+                            </group>
+                            <separator string="Breakdown"/>
+                            <field name="readiness_breakdown" nolabel="1" readonly="1"/>
                             <div class="text-muted" role="alert">
-                                Readiness Score and its six dimensions
-                                are placeholders. P3.M4 wires the
-                                compute against checklist completeness,
-                                crew coverage, gear staging, etc.
+                                Dimensions whose data isn't yet
+                                available (Checklist before P3.M5,
+                                Equipment until Phase 5, Risk
+                                placeholders for incidents / weather /
+                                equipment-repair) are excluded from
+                                the aggregate and their weight
+                                redistributes across the rest.
+                                'Dimensions Contributing' lists which
+                                dimensions counted toward today's score.
                             </div>
                         </page>
 
