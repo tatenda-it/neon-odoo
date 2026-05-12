@@ -55,5 +55,18 @@
             ])]"/>
         </record>
 
+        <!-- P2.M9.4 — My Schedule scoped to crew-only. The <menuitem>
+             groups="..." attribute parses to Command.link only (ADD),
+             so on -u of an already-installed module the previous
+             user/manager/leader entries stick. (6, 0, [...]) replaces
+             the set unambiguously. Fresh install also works because
+             menu.xml already declares groups="…group_neon_jobs_crew"
+             and this record overlays with the same single group. -->
+        <record id="menu_my_schedule" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_crew'),
+            ])]"/>
+        </record>
+
     </data>
 </odoo>

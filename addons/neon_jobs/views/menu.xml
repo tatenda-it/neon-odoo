@@ -12,11 +12,14 @@
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="1"/>
 
+    <!-- P2.M9.4 — My Schedule scoped to crew only. Management oversight
+         of crew activity is a Phase 8 analytics concern, not an
+         operational dashboard for User/Manager/Crew Leader. -->
     <menuitem id="menu_my_schedule"
               name="My Schedule"
               parent="menu_operations_root"
               action="my_schedule_action"
-              groups="neon_jobs.group_neon_jobs_crew,neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              groups="neon_jobs.group_neon_jobs_crew"
               sequence="2"/>
 
     <menuitem id="menu_my_calendar"

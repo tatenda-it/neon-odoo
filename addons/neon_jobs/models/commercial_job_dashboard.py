@@ -18,6 +18,17 @@ class CommercialJobDashboard(models.TransientModel):
     _name = "commercial.job.dashboard"
     _description = "Operations Dashboard (P2.M7)"
 
+    # P2.M9.4 — static computed name so Odoo's breadcrumb shows
+    # "Operations Dashboard" instead of "commercial.job.dashboard,14".
+    # TransientModels have no built-in name field, and the breadcrumb
+    # falls back to "<model>,<id>" when display_name isn't overridable.
+    name = fields.Char(string="Name", compute="_compute_name")
+
+    @api.depends_context("uid")
+    def _compute_name(self):
+        for rec in self:
+            rec.name = "Operations Dashboard"
+
     # === Counters (computed; cheap search_count queries) ===
     gate_issues_count = fields.Integer(compute="_compute_gate_issues_count")
     soft_hold_count = fields.Integer(compute="_compute_soft_hold_count")
@@ -241,6 +252,14 @@ class CommercialJobDashboard(models.TransientModel):
 class CommercialJobCrewSchedule(models.TransientModel):
     _name = "commercial.job.crew.schedule"
     _description = "My Schedule (P2.M7) — crew-tier dashboard"
+
+    # P2.M9.4 — same breadcrumb fix as CommercialJobDashboard.
+    name = fields.Char(string="Name", compute="_compute_name")
+
+    @api.depends_context("uid")
+    def _compute_name(self):
+        for rec in self:
+            rec.name = "My Schedule"
 
     my_upcoming_count = fields.Integer(compute="_compute_my_upcoming_count")
     my_upcoming_top3 = fields.Many2many(
