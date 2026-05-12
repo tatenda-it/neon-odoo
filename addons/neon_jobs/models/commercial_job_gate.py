@@ -57,6 +57,15 @@ class CommercialJob(models.Model):
         help="True when the calling user can fast-path this job: state is "
         "pending AND (partner is Rapid Ops eligible OR user is a Manager).",
     )
+    # P2.M8 17.0.1.9.2 — banner text discriminator. Surfaces partner-
+    # level eligibility as a flat Boolean on commercial.job so the
+    # form's invisible= expressions can branch (trusted-client vs
+    # manager-override message) without dot-walking into partner_id.
+    partner_is_rapid_ops_eligible = fields.Boolean(
+        related="partner_id.is_rapid_ops_eligible",
+        string="Partner is Rapid Ops Eligible",
+        readonly=True,
+    )
 
     @api.depends("state", "partner_id", "partner_id.is_rapid_ops_eligible")
     @api.depends_context("uid")

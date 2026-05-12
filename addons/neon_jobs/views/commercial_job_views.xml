@@ -121,17 +121,29 @@
                     <field name="state" widget="statusbar" statusbar_visible="pending,active,completed"/>
                 </header>
                 <sheet>
-                    <!-- P2.M8: Trusted-client banner. Surfaces the fast
-                         path so sales sees it before scrolling to the
-                         header buttons. -->
+                    <!-- P2.M8 (17.0.1.9.2): two-variant Rapid Activate
+                         banner. Same blue/info treatment, differentiated
+                         copy: "trusted fast path" when the partner is
+                         genuinely eligible, "manager override" when the
+                         partner is NOT eligible and a manager is the
+                         only reason can_rapid_activate is True. -->
+                    <field name="can_rapid_activate" invisible="1"/>
+                    <field name="partner_is_rapid_ops_eligible" invisible="1"/>
                     <div class="alert alert-info" role="alert"
-                         invisible="not (state == 'pending' and partner_id and can_rapid_activate)">
+                         invisible="state != 'pending' or not can_rapid_activate or not partner_is_rapid_ops_eligible">
                         <strong>⚡ Rapid Activate available</strong> —
                         this client is on the trusted fast path. Hard
                         safety checks still run; only soft warnings are
                         auto-passed.
                     </div>
-                    <field name="can_rapid_activate" invisible="1"/>
+                    <div class="alert alert-info" role="alert"
+                         invisible="state != 'pending' or not can_rapid_activate or partner_is_rapid_ops_eligible">
+                        <strong>⚡ Manager override available</strong> —
+                        this client is not on the trusted fast path,
+                        but you can rapid-activate as manager. Hard
+                        safety checks still run; only soft warnings
+                        are auto-passed.
+                    </div>
                     <div class="alert alert-warning" role="alert"
                          invisible="not needs_attention">
                         <strong>Needs attention:</strong>
