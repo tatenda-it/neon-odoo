@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.1.9.2",
+    "version": "17.0.1.9.3",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -44,8 +44,12 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "data/res_partner_data.xml",
         "data/crm_stage_data.xml",
         "data/ir_cron_data.xml",
+        # cross_module_menu_security patches menus from EXTERNAL
+        # modules (sale, crm, account, base, utm, spreadsheet_dashboard)
+        # which have already loaded — those records exist in the DB by
+        # the time we get here, so the patch updates groups_id cleanly
+        # on both -i and -u.
         "data/cross_module_menu_security.xml",
-        "data/operations_submenu_security.xml",
         "views/venue_room_views.xml",
         "views/res_partner_views.xml",
         "views/commercial_job_views.xml",
@@ -60,7 +64,15 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "views/commercial_job_dashboard_views.xml",
         "views/crm_lead_views.xml",
         "views/sale_order_views.xml",
+        # menu.xml defines our own menus (with required `name` field).
+        # operations_submenu_security.xml patches groups_id on those
+        # same menus, so it MUST load AFTER menu.xml — otherwise the
+        # patch records create rows with NULL name and Odoo aborts the
+        # install transaction. This bit P2.M9 Hetzner deploy because
+        # local dev DB always had neon_jobs installed (so -u worked) —
+        # the -i codepath was unexercised until production.
         "views/menu.xml",
+        "data/operations_submenu_security.xml",
     ],
     "installable": True,
     "application": True,
