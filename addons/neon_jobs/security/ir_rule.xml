@@ -48,5 +48,22 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P3.M1 — Event Job visibility for crew tier. Crew sees only
+            event_jobs whose parent commercial.job has them in
+            crew_assignment_ids. Other roles (user, manager,
+            crew_leader) get unrestricted access via their CSV grants.
+        -->
+        <record id="commercial_event_job_rule_crew_own" model="ir.rule">
+            <field name="name">Event Job: crew sees own events only</field>
+            <field name="model_id" ref="model_commercial_event_job"/>
+            <field name="domain_force">[('commercial_job_id.crew_assignment_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

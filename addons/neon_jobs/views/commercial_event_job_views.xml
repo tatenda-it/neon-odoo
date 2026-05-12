@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_event_job_view_tree" model="ir.ui.view">
+        <field name="name">commercial.event.job.tree</field>
+        <field name="model">commercial.event.job</field>
+        <field name="arch" type="xml">
+            <tree string="Event Jobs"
+                  decoration-info="state == 'draft'"
+                  decoration-warning="state in ('planning','prep')"
+                  decoration-success="state in ('ready_for_dispatch','dispatched','in_progress')"
+                  decoration-muted="state in ('completed','closed','cancelled','released')">
+                <field name="name"/>
+                <field name="commercial_job_id"/>
+                <field name="partner_id"/>
+                <field name="event_date"/>
+                <field name="venue_id"/>
+                <field name="venue_room_id" optional="show"/>
+                <field name="lead_tech_id"/>
+                <field name="crew_chief_id" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state in ('planning','prep')"
+                       decoration-success="state in ('ready_for_dispatch','dispatched','in_progress','completed','closed')"
+                       decoration-danger="state in ('cancelled','released')"/>
+                <field name="readiness_score" optional="show"/>
+                <field name="has_operational_scope" widget="boolean_toggle" optional="hide"/>
+                <field name="sub_hire_required" optional="hide"/>
+                <field name="logistics_flag" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_view_search" model="ir.ui.view">
+        <field name="name">commercial.event.job.search</field>
+        <field name="model">commercial.event.job</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="commercial_job_id"/>
+                <field name="partner_id"/>
+                <field name="venue_id"/>
+                <field name="lead_tech_id"/>
+                <field name="crew_chief_id"/>
+                <separator/>
+                <filter string="Open"
+                        name="filter_open"
+                        domain="[('state', 'not in', ('completed','closed','cancelled','released'))]"/>
+                <filter string="In Progress"
+                        name="filter_in_progress"
+                        domain="[('state', '=', 'in_progress')]"/>
+                <filter string="Completed (not closed)"
+                        name="filter_completed_not_closed"
+                        domain="[('state', '=', 'completed')]"/>
+                <filter string="No Operational Scope"
+                        name="filter_no_scope"
+                        domain="[('has_operational_scope', '=', False)]"/>
+                <separator/>
+                <filter string="Event date this month"
+                        name="filter_this_month"
+                        domain="[('event_date', '&gt;=', (context_today()).strftime('%Y-%m-01'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="State"
+                            name="group_state"
+                            context="{'group_by': 'state'}"/>
+                    <filter string="Lead Tech"
+                            name="group_lead_tech"
+                            context="{'group_by': 'lead_tech_id'}"/>
+                    <filter string="Client"
+                            name="group_partner"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter string="Venue"
+                            name="group_venue"
+                            context="{'group_by': 'venue_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_view_form" model="ir.ui.view">
+        <field name="name">commercial.event.job.form</field>
+        <field name="model">commercial.event.job</field>
+        <field name="arch" type="xml">
+            <form string="Event Job">
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,planning,prep,ready_for_dispatch,dispatched,in_progress,strike,returned,completed,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_commercial_job" type="object"
+                                class="oe_stat_button" icon="fa-folder-open">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Commercial Job</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="Event">
+                            <field name="commercial_job_id" readonly="1"
+                                   options="{'no_create': True}"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="event_date" readonly="1"/>
+                            <field name="event_end_date" readonly="1"/>
+                            <field name="venue_id" readonly="1"/>
+                            <field name="venue_room_id" readonly="1"/>
+                        </group>
+                        <group string="Scope &amp; Owners">
+                            <field name="has_operational_scope"/>
+                            <field name="lead_tech_id"
+                                   options="{'no_create': True}"/>
+                            <field name="crew_chief_id" readonly="1"/>
+                            <field name="sub_hire_required" readonly="1"/>
+                            <field name="logistics_flag" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Readiness">
+                            <group>
+                                <group string="Aggregate">
+                                    <field name="readiness_score"
+                                           help="P3.M4 will compute this. Field is editable by Lead Tech for now."/>
+                                </group>
+                                <group string="Dimensions">
+                                    <field name="readiness_dimension_finance"/>
+                                    <field name="readiness_dimension_equipment"/>
+                                    <field name="readiness_dimension_crew"/>
+                                    <field name="readiness_dimension_schedule_venue"/>
+                                    <field name="readiness_dimension_checklist"/>
+                                    <field name="readiness_dimension_risk"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Equipment">
+                            <group>
+                                <field name="equipment_count" readonly="1"/>
+                            </group>
+                            <field name="equipment_summary"
+                                   placeholder="Main items, sub-hire details, transport notes…"/>
+                        </page>
+                        <page string="Notes">
+                            <group>
+                                <field name="lead_tech_notes"
+                                       placeholder="Preparation notes, gear staging, briefing points…"/>
+                                <field name="crew_observations"
+                                       placeholder="On-site observations from the crew…"/>
+                                <field name="client_feedback"
+                                       placeholder="What the client said on the day, post-event feedback…"/>
+                                <field name="incidents_log"
+                                       placeholder="Free-form incident log (Phase 4 introduces a structured incident model)…"/>
+                            </group>
+                        </page>
+                        <page string="Closeout">
+                            <group>
+                                <group>
+                                    <field name="gear_reconciled"/>
+                                    <field name="finance_handoff_complete"/>
+                                </group>
+                                <group>
+                                    <field name="closeout_completed_at" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_action" model="ir.actions.act_window">
+        <field name="name">Event Jobs</field>
+        <field name="res_model">commercial.event.job</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="commercial_event_job_view_search"/>
+        <field name="context">{'search_default_filter_open': 1}</field>
+        <!-- P3.M1 — action gated to user/manager/crew_leader. Crew tier
+             reaches event_jobs only via the My Schedule action path
+             (P3.M8 will add this); the ir.rule above scopes them to
+             own crewed events when they get there. -->
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_jobs.group_neon_jobs_user'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
+    </record>
+
+</odoo>

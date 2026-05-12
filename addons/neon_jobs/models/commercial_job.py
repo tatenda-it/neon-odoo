@@ -257,6 +257,17 @@ class CommercialJob(models.Model):
         "job_id",
         string="Crew Assignments",
     )
+
+    # === Phase 3 — operational execution layer (P3.M1) ===
+    event_job_ids = fields.One2many(
+        "commercial.event.job",
+        "commercial_job_id",
+        string="Event Jobs",
+    )
+    event_job_count = fields.Integer(
+        string="Event Job Count",
+        compute="_compute_event_job_count",
+    )
     crew_total_count = fields.Integer(
         string="Crew Total",
         compute="_compute_crew_counts",
@@ -444,6 +455,11 @@ class CommercialJob(models.Model):
             else:
                 rec.soft_hold_state = "active"
 
+    @api.depends("event_job_ids")
+    def _compute_event_job_count(self):
+        for rec in self:
+            rec.event_job_count = len(rec.event_job_ids)
+
     @api.depends("crew_assignment_ids", "crew_assignment_ids.state")
     def _compute_crew_counts(self):
         for rec in self:
@@ -604,7 +620,19 @@ class CommercialJob(models.Model):
         # If caller also sets the flag (e.g. the auto-create path), respect that.
         if "event_date" in vals and "event_date_is_placeholder" not in vals:
             vals = dict(vals, event_date_is_placeholder=False)
-        return super().write(vals)
+        # P3.M1 — capture which records are about to transition into
+        # 'active' so we can auto-create their linked event_job once
+        # the new state is persisted. Filter before super().write() so
+        # we compare against the pre-write state.
+        going_active = self.env["commercial.job"]
+        if vals.get("state") == "active":
+            going_active = self.filtered(
+                lambda j: j.state != "active" and not j.event_job_ids
+            )
+        result = super().write(vals)
+        for rec in going_active:
+            rec._auto_create_event_job()
+        return result
 
     # ============================================================
     # === Action buttons — primary lifecycle
@@ -716,6 +744,39 @@ class CommercialJob(models.Model):
             "neon_jobs cron: notified %d soft-hold expiries.", len(jobs)
         )
         return True
+
+    # ============================================================
+    # === Event Job — operational execution layer (P3.M1)
+    # ============================================================
+    def _auto_create_event_job(self):
+        """Create a linked event_job once. Idempotent: if one exists,
+        returns it without creating a duplicate. Uses sudo() so the
+        gate's _do_activate_state path (which fires for the calling
+        user, not superuser) doesn't trip on ACL of res.users referenced
+        by the event_job's audit fields."""
+        self.ensure_one()
+        if self.event_job_ids:
+            return self.event_job_ids[:1]
+        return self.env["commercial.event.job"].sudo().create({
+            "commercial_job_id": self.id,
+        })
+
+    def action_open_event_job(self):
+        """Smart-button entry. If no event_job exists yet (e.g. because
+        the job was never activated), create one on the fly so the user
+        always lands on a usable record."""
+        self.ensure_one()
+        event_job = self.event_job_ids[:1]
+        if not event_job:
+            event_job = self._auto_create_event_job()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Event Job"),
+            "res_model": "commercial.event.job",
+            "view_mode": "form",
+            "res_id": event_job.id,
+            "target": "current",
+        }
 
     # ============================================================
     # === Crew-form thin wrappers (P2.M7.8)

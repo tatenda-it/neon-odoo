@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class CommercialJobCrew(models.Model):
@@ -76,6 +77,18 @@ class CommercialJobCrew(models.Model):
         help="Set to True once Odoo activity + WhatsApp message dispatched. "
         "Notification logic implemented in P2.M2+.",
     )
+    # P3.M1 — per-event Crew Chief flag. At most one crew assignment per
+    # job may carry this. Drives event_job.crew_chief_id (computed) and
+    # downstream state-transition authority in P3.M3 (Crew Chief moves
+    # dispatched → in_progress → strike → returned).
+    is_crew_chief = fields.Boolean(
+        string="Crew Chief",
+        default=False,
+        tracking=True,
+        help="Mark exactly one crew member as Crew Chief for this job. "
+        "The Crew Chief leads the team on site and may be the Lead Tech "
+        "themselves for smaller events.",
+    )
 
     # Convenience related fields for the tree view
     job_event_date = fields.Date(
@@ -96,6 +109,26 @@ class CommercialJobCrew(models.Model):
             "This crew member is already assigned to this job.",
         ),
     ]
+
+    @api.constrains("is_crew_chief", "job_id")
+    def _check_single_crew_chief(self):
+        for rec in self:
+            if not rec.is_crew_chief:
+                continue
+            other = self.sudo().search([
+                ("job_id", "=", rec.job_id.id),
+                ("is_crew_chief", "=", True),
+                ("id", "!=", rec.id),
+            ], limit=1)
+            if other:
+                raise ValidationError(_(
+                    "Only one Crew Chief is allowed per Commercial Job. "
+                    "%(existing)s is already marked Crew Chief on "
+                    "%(job)s."
+                ) % {
+                    "existing": other.user_id.name,
+                    "job": rec.job_id.name,
+                })
 
     def name_get(self):
         result = []

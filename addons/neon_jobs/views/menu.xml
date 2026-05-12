@@ -47,6 +47,16 @@
               action="commercial_job_action"
               sequence="10"/>
 
+    <!-- P3.M1 — Event Jobs (operational execution layer). Gated to
+         user/manager/crew_leader; crew tier reaches event_jobs only
+         via deep-link from their My Schedule path (P3.M8). -->
+    <menuitem id="menu_event_job"
+              name="Event Jobs"
+              parent="menu_operations_root"
+              action="commercial_event_job_action"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="15"/>
+
     <menuitem id="menu_master_contract"
               name="Master Contracts"
               parent="menu_operations_root"

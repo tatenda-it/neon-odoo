@@ -121,6 +121,20 @@
                     <field name="state" widget="statusbar" statusbar_visible="pending,active,completed"/>
                 </header>
                 <sheet>
+                    <!-- P3.M1: smart button to the linked event_job
+                         (operational execution layer). Visible once the
+                         commercial job is active (auto-created at that
+                         transition) or once an event_job already
+                         exists. -->
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_event_job" type="object"
+                                class="oe_stat_button" icon="fa-cogs"
+                                invisible="state != 'active' and event_job_count == 0"
+                                groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader">
+                            <field name="event_job_count" widget="statinfo"
+                                   string="Event Job"/>
+                        </button>
+                    </div>
                     <!-- P2.M8 (17.0.1.9.2): two-variant Rapid Activate
                          banner. Same blue/info treatment, differentiated
                          copy: "trusted fast path" when the partner is
@@ -235,6 +249,7 @@
                                       decoration-danger="state == 'declined'">
                                     <field name="user_id"/>
                                     <field name="role"/>
+                                    <field name="is_crew_chief" widget="boolean_toggle"/>
                                     <field name="state" widget="badge"/>
                                     <field name="assigned_on" readonly="1"/>
                                     <field name="responded_on" readonly="1"/>
