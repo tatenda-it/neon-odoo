@@ -211,10 +211,9 @@
                                     <field name="partner_phone" readonly="1"/>
                                 </group>
                             </group>
-                            <group string="Client Notes">
-                                <field name="client_notes" nolabel="1"
-                                       placeholder="VIP notes, preferences, sensitivities, brand standards…"/>
-                            </group>
+                            <separator string="Client Notes"/>
+                            <field name="client_notes" nolabel="1" colspan="2"
+                                   placeholder="VIP notes, preferences, sensitivities, brand standards…"/>
                         </page>
 
                         <!-- Tab 3 — Venue -->
@@ -227,14 +226,12 @@
                                            options="{'no_create': True}"/>
                                 </group>
                             </group>
-                            <group string="Access Notes">
-                                <field name="venue_access_notes" nolabel="1"
-                                       placeholder="Loading dock location, lift dimensions, security desk, time restrictions…"/>
-                            </group>
-                            <group string="Parking">
-                                <field name="parking_arrangements" nolabel="1"
-                                       placeholder="Crew parking, gear-truck parking, permits required…"/>
-                            </group>
+                            <separator string="Access Notes"/>
+                            <field name="venue_access_notes" nolabel="1" colspan="2"
+                                   placeholder="Loading dock location, lift dimensions, security desk, time restrictions…"/>
+                            <separator string="Parking"/>
+                            <field name="parking_arrangements" nolabel="1" colspan="2"
+                                   placeholder="Crew parking, gear-truck parking, permits required…"/>
                         </page>
 
                         <!-- Tab 4 — Schedule -->
@@ -261,10 +258,9 @@
                                     <field name="scope_complexity"/>
                                 </group>
                             </group>
-                            <group string="Equipment Summary">
-                                <field name="equipment_summary" nolabel="1"
-                                       placeholder="High-level kit list, sub-hire notes, special requirements…"/>
-                            </group>
+                            <separator string="Equipment Summary"/>
+                            <field name="equipment_summary" nolabel="1" colspan="2"
+                                   placeholder="High-level kit list, sub-hire notes, special requirements…"/>
                         </page>
 
                         <!-- Tab 6 — Finance (manager / sales only) -->
@@ -317,10 +313,9 @@
                                     <field name="logistics_flag" readonly="1"/>
                                 </group>
                             </group>
-                            <group string="Equipment Summary">
-                                <field name="equipment_summary" nolabel="1"
-                                       placeholder="Main items: line array PA, monitor mix, moving heads, dimmer packs, sub-hire…"/>
-                            </group>
+                            <separator string="Equipment Summary"/>
+                            <field name="equipment_summary" nolabel="1" colspan="2"
+                                   placeholder="Main items: line array PA, monitor mix, moving heads, dimmer packs, sub-hire…"/>
                             <div class="text-muted" role="alert">
                                 Phase 5 replaces this free-form summary
                                 with per-item equipment movement
@@ -362,22 +357,18 @@
                                     <field name="closeout_completed_at" readonly="1"/>
                                 </group>
                             </group>
-                            <group string="Lead Tech Notes">
-                                <field name="lead_tech_notes" nolabel="1"
-                                       placeholder="Prep notes, briefing points, on-the-day decisions…"/>
-                            </group>
-                            <group string="Crew Observations">
-                                <field name="crew_observations" nolabel="1"
-                                       placeholder="What the crew saw on site — what worked, what didn't…"/>
-                            </group>
-                            <group string="Client Feedback">
-                                <field name="client_feedback" nolabel="1"
-                                       placeholder="What the client said on the day, post-event feedback…"/>
-                            </group>
-                            <group string="Incidents Log">
-                                <field name="incidents_log" nolabel="1"
-                                       placeholder="Free-form incident notes. Phase 4 introduces a structured incident model."/>
-                            </group>
+                            <separator string="Lead Tech Notes"/>
+                            <field name="lead_tech_notes" nolabel="1" colspan="2"
+                                   placeholder="Prep notes, briefing points, on-the-day decisions…"/>
+                            <separator string="Crew Observations"/>
+                            <field name="crew_observations" nolabel="1" colspan="2"
+                                   placeholder="What the crew saw on site — what worked, what didn't…"/>
+                            <separator string="Client Feedback"/>
+                            <field name="client_feedback" nolabel="1" colspan="2"
+                                   placeholder="What the client said on the day, post-event feedback…"/>
+                            <separator string="Incidents Log"/>
+                            <field name="incidents_log" nolabel="1" colspan="2"
+                                   placeholder="Free-form incident notes. Phase 4 introduces a structured incident model."/>
                         </page>
                     </notebook>
                 </sheet>
