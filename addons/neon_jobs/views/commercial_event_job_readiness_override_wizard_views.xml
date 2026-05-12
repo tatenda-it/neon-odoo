@@ -19,11 +19,15 @@
                                widget="progressbar"/>
                     </group>
                     <separator string="Current Breakdown"/>
-                    <field name="readiness_breakdown" nolabel="1" colspan="2"
-                           readonly="1"/>
+                    <group col="1">
+                        <field name="readiness_breakdown" nolabel="1"
+                               readonly="1"/>
+                    </group>
                     <separator string="Override Reason"/>
-                    <field name="override_reason" nolabel="1" colspan="2"
-                           placeholder="Why is the override justified? (recorded to the Event Job's chatter)"/>
+                    <group col="1">
+                        <field name="override_reason" nolabel="1"
+                               placeholder="Why is the override justified? (recorded to the Event Job's chatter)"/>
+                    </group>
                 </sheet>
                 <footer>
                     <button name="action_confirm" type="object"
