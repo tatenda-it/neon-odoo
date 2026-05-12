@@ -77,6 +77,13 @@
         </field>
     </record>
 
+    <!--
+        P3.M2 — Event Job form organised per v4.1 §6 into 10 named
+        tabs. Top summary section stays visible across tabs; tabs
+        themselves cluster by operational concern. FINANCE tab is
+        gated to user/manager (Lead Tech and Crew Leader don't see
+        the money fields).
+    -->
     <record id="commercial_event_job_view_form" model="ir.ui.view">
         <field name="name">commercial.event.job.form</field>
         <field name="model">commercial.event.job</field>
@@ -100,71 +107,213 @@
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
 
+                    <!-- Top summary: always visible above the tabs -->
                     <group>
-                        <group string="Event">
+                        <group>
                             <field name="commercial_job_id" readonly="1"
                                    options="{'no_create': True}"/>
+                            <field name="has_operational_scope"/>
+                        </group>
+                        <group>
                             <field name="partner_id" readonly="1"/>
                             <field name="event_date" readonly="1"/>
-                            <field name="event_end_date" readonly="1"/>
-                            <field name="venue_id" readonly="1"/>
-                            <field name="venue_room_id" readonly="1"/>
-                        </group>
-                        <group string="Scope &amp; Owners">
-                            <field name="has_operational_scope"/>
-                            <field name="lead_tech_id"
-                                   options="{'no_create': True}"/>
-                            <field name="crew_chief_id" readonly="1"/>
-                            <field name="sub_hire_required" readonly="1"/>
-                            <field name="logistics_flag" readonly="1"/>
                         </group>
                     </group>
 
                     <notebook>
-                        <page string="Readiness">
+                        <!-- Tab 1 — Identity -->
+                        <page string="Identity" name="page_identity">
                             <group>
-                                <group string="Aggregate">
-                                    <field name="readiness_score"
-                                           help="P3.M4 will compute this. Field is editable by Lead Tech for now."/>
+                                <group string="Reference">
+                                    <field name="name" readonly="1"/>
+                                    <field name="commercial_job_id" readonly="1"/>
+                                    <field name="has_operational_scope"/>
                                 </group>
-                                <group string="Dimensions">
-                                    <field name="readiness_dimension_finance"/>
-                                    <field name="readiness_dimension_equipment"/>
-                                    <field name="readiness_dimension_crew"/>
-                                    <field name="readiness_dimension_schedule_venue"/>
-                                    <field name="readiness_dimension_checklist"/>
-                                    <field name="readiness_dimension_risk"/>
+                                <group string="Where &amp; When">
+                                    <field name="partner_id" readonly="1"/>
+                                    <field name="event_date" readonly="1"/>
+                                    <field name="event_end_date" readonly="1"/>
+                                    <field name="venue_id" readonly="1"/>
+                                    <field name="venue_room_id" readonly="1"/>
                                 </group>
                             </group>
                         </page>
-                        <page string="Equipment">
+
+                        <!-- Tab 2 — Client -->
+                        <page string="Client" name="page_client">
                             <group>
-                                <field name="equipment_count" readonly="1"/>
+                                <group string="Contact">
+                                    <field name="partner_id" readonly="1"/>
+                                    <field name="partner_email" readonly="1"/>
+                                    <field name="partner_phone" readonly="1"/>
+                                </group>
                             </group>
-                            <field name="equipment_summary"
-                                   placeholder="Main items, sub-hire details, transport notes…"/>
-                        </page>
-                        <page string="Notes">
-                            <group>
-                                <field name="lead_tech_notes"
-                                       placeholder="Preparation notes, gear staging, briefing points…"/>
-                                <field name="crew_observations"
-                                       placeholder="On-site observations from the crew…"/>
-                                <field name="client_feedback"
-                                       placeholder="What the client said on the day, post-event feedback…"/>
-                                <field name="incidents_log"
-                                       placeholder="Free-form incident log (Phase 4 introduces a structured incident model)…"/>
+                            <group string="Client Notes">
+                                <field name="client_notes" nolabel="1"
+                                       placeholder="VIP notes, preferences, sensitivities, brand standards…"/>
                             </group>
                         </page>
-                        <page string="Closeout">
+
+                        <!-- Tab 3 — Venue -->
+                        <page string="Venue" name="page_venue">
+                            <group>
+                                <group string="Location">
+                                    <field name="venue_id" readonly="1"/>
+                                    <field name="venue_room_id" readonly="1"/>
+                                    <field name="on_site_contact_id"
+                                           options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                            <group string="Access Notes">
+                                <field name="venue_access_notes" nolabel="1"
+                                       placeholder="Loading dock location, lift dimensions, security desk, time restrictions…"/>
+                            </group>
+                            <group string="Parking">
+                                <field name="parking_arrangements" nolabel="1"
+                                       placeholder="Crew parking, gear-truck parking, permits required…"/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 4 — Schedule -->
+                        <page string="Schedule" name="page_schedule">
+                            <group>
+                                <group string="Event Window">
+                                    <field name="event_date" readonly="1"/>
+                                    <field name="event_end_date" readonly="1"/>
+                                </group>
+                                <group string="Operational Timing">
+                                    <field name="prep_start_datetime"/>
+                                    <field name="dispatch_datetime"/>
+                                    <field name="strike_start_datetime"/>
+                                    <field name="return_eta_datetime"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 5 — Scope -->
+                        <page string="Scope" name="page_scope">
+                            <group>
+                                <group string="Footprint">
+                                    <field name="expected_attendee_count"/>
+                                    <field name="scope_complexity"/>
+                                </group>
+                            </group>
+                            <group string="Equipment Summary">
+                                <field name="equipment_summary" nolabel="1"
+                                       placeholder="High-level kit list, sub-hire notes, special requirements…"/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 6 — Finance (manager / sales only) -->
+                        <page string="Finance" name="page_finance"
+                              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager">
+                            <group>
+                                <group string="Quotation">
+                                    <field name="currency_id" invisible="1"/>
+                                    <field name="quoted_value" widget="monetary"/>
+                                    <field name="deposit_received" widget="monetary"/>
+                                </group>
+                                <group string="Status">
+                                    <field name="finance_status" widget="badge"/>
+                                </group>
+                            </group>
+                            <div class="text-muted" role="alert">
+                                Read-only mirror of the Commercial Job's
+                                finance fields. Edit on the source job;
+                                changes propagate here.
+                            </div>
+                        </page>
+
+                        <!-- Tab 7 — People -->
+                        <page string="People" name="page_people">
+                            <group>
+                                <group string="Operational Owners">
+                                    <field name="lead_tech_id"
+                                           options="{'no_create': True}"/>
+                                    <field name="crew_chief_id" readonly="1"/>
+                                </group>
+                                <group string="Crew Coverage">
+                                    <field name="crew_total_count" readonly="1"/>
+                                    <field name="crew_confirmed_count" readonly="1"/>
+                                </group>
+                            </group>
+                            <div class="text-muted" role="alert">
+                                Crew assignments are managed on the
+                                Commercial Job's Crew tab. The Crew
+                                Chief is the assignment flagged
+                                "Crew Chief" there.
+                            </div>
+                        </page>
+
+                        <!-- Tab 8 — Equipment -->
+                        <page string="Equipment" name="page_equipment">
                             <group>
                                 <group>
+                                    <field name="equipment_count" readonly="1"/>
+                                    <field name="sub_hire_required" readonly="1"/>
+                                    <field name="logistics_flag" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Equipment Summary">
+                                <field name="equipment_summary" nolabel="1"
+                                       placeholder="Main items: line array PA, monitor mix, moving heads, dimmer packs, sub-hire…"/>
+                            </group>
+                            <div class="text-muted" role="alert">
+                                Phase 5 replaces this free-form summary
+                                with per-item equipment movement
+                                records linked to event_job.
+                            </div>
+                        </page>
+
+                        <!-- Tab 9 — Quality (Readiness) -->
+                        <page string="Quality" name="page_quality">
+                            <group>
+                                <group string="Aggregate">
+                                    <field name="readiness_score" readonly="1"/>
+                                </group>
+                                <group string="Dimensions">
+                                    <field name="readiness_dimension_finance" readonly="1"/>
+                                    <field name="readiness_dimension_equipment" readonly="1"/>
+                                    <field name="readiness_dimension_crew" readonly="1"/>
+                                    <field name="readiness_dimension_schedule_venue" readonly="1"/>
+                                    <field name="readiness_dimension_checklist" readonly="1"/>
+                                    <field name="readiness_dimension_risk" readonly="1"/>
+                                </group>
+                            </group>
+                            <div class="text-muted" role="alert">
+                                Readiness Score and its six dimensions
+                                are placeholders. P3.M4 wires the
+                                compute against checklist completeness,
+                                crew coverage, gear staging, etc.
+                            </div>
+                        </page>
+
+                        <!-- Tab 10 — Closeout -->
+                        <page string="Closeout" name="page_closeout">
+                            <group>
+                                <group string="Checkpoints">
                                     <field name="gear_reconciled"/>
                                     <field name="finance_handoff_complete"/>
                                 </group>
-                                <group>
+                                <group string="Closed At">
                                     <field name="closeout_completed_at" readonly="1"/>
                                 </group>
+                            </group>
+                            <group string="Lead Tech Notes">
+                                <field name="lead_tech_notes" nolabel="1"
+                                       placeholder="Prep notes, briefing points, on-the-day decisions…"/>
+                            </group>
+                            <group string="Crew Observations">
+                                <field name="crew_observations" nolabel="1"
+                                       placeholder="What the crew saw on site — what worked, what didn't…"/>
+                            </group>
+                            <group string="Client Feedback">
+                                <field name="client_feedback" nolabel="1"
+                                       placeholder="What the client said on the day, post-event feedback…"/>
+                            </group>
+                            <group string="Incidents Log">
+                                <field name="incidents_log" nolabel="1"
+                                       placeholder="Free-form incident notes. Phase 4 introduces a structured incident model."/>
                             </group>
                         </page>
                     </notebook>

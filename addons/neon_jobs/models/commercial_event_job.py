@@ -150,6 +150,121 @@ class CommercialEventJob(models.Model):
         readonly=True,
     )
 
+    # === P3.M2 — field groups per v4.1 §6 ===
+    # Client tab
+    partner_email = fields.Char(
+        related="partner_id.email",
+        string="Client Email",
+        readonly=True,
+    )
+    partner_phone = fields.Char(
+        related="partner_id.phone",
+        string="Client Phone",
+        readonly=True,
+    )
+    client_notes = fields.Text(
+        string="Client Notes",
+        help="Lead Tech captures client-specific instructions, "
+        "preferences, sensitivities, VIP notes here.",
+    )
+
+    # Venue tab
+    venue_access_notes = fields.Text(
+        string="Venue Access Notes",
+        help="Loading dock, lift dimensions, security desk, time "
+        "restrictions on access.",
+    )
+    parking_arrangements = fields.Text(
+        string="Parking Arrangements",
+    )
+    on_site_contact_id = fields.Many2one(
+        "res.partner",
+        string="On-site Contact",
+        help="Venue or client contact present on the day. Phone "
+        "number lives on the partner record.",
+    )
+
+    # Schedule tab
+    prep_start_datetime = fields.Datetime(
+        string="Prep Start",
+        help="When the team starts staging gear at the workshop.",
+    )
+    dispatch_datetime = fields.Datetime(
+        string="Dispatch Time",
+        help="When the convoy leaves the workshop for the venue.",
+    )
+    strike_start_datetime = fields.Datetime(
+        string="Strike Start",
+        help="When the team starts breaking down at the venue.",
+    )
+    return_eta_datetime = fields.Datetime(
+        string="Return ETA",
+        help="Expected arrival back at the workshop.",
+    )
+
+    # Scope tab
+    expected_attendee_count = fields.Integer(
+        string="Expected Attendees",
+        default=0,
+        help="Headcount used for risk scoring (P3.M4) and crew size "
+        "guidance.",
+    )
+    scope_complexity = fields.Selection(
+        [
+            ("simple", "Simple"),
+            ("standard", "Standard"),
+            ("complex", "Complex"),
+        ],
+        string="Scope Complexity",
+        default="standard",
+        help="Operational complexity classification. Drives risk and "
+        "checklist gating (P3.M4 / P3.M5).",
+    )
+
+    # Finance tab (read-only mirrors of commercial.job money fields)
+    quoted_value = fields.Monetary(
+        related="commercial_job_id.quoted_value",
+        string="Quoted Value",
+        readonly=True,
+        currency_field="currency_id",
+    )
+    deposit_received = fields.Monetary(
+        related="commercial_job_id.deposit_received",
+        string="Deposit Received",
+        readonly=True,
+        currency_field="currency_id",
+    )
+    finance_status = fields.Selection(
+        related="commercial_job_id.finance_status",
+        string="Finance Status",
+        readonly=True,
+    )
+    currency_id = fields.Many2one(
+        related="commercial_job_id.currency_id",
+        readonly=True,
+    )
+
+    # People tab
+    crew_total_count = fields.Integer(
+        string="Crew Total",
+        compute="_compute_crew_counts_for_event",
+        help="Total crew on the linked commercial.job (incl. pending).",
+    )
+    crew_confirmed_count = fields.Integer(
+        string="Crew Confirmed",
+        compute="_compute_crew_counts_for_event",
+    )
+
+    @api.depends("commercial_job_id.crew_assignment_ids",
+                 "commercial_job_id.crew_assignment_ids.state")
+    def _compute_crew_counts_for_event(self):
+        for rec in self:
+            assignments = rec.commercial_job_id.crew_assignment_ids
+            rec.crew_total_count = len(assignments)
+            rec.crew_confirmed_count = len(
+                assignments.filtered(lambda c: c.state == "confirmed")
+            )
+
     # === Operational notes ===
     lead_tech_notes = fields.Text(string="Lead Tech Notes")
     crew_observations = fields.Text(string="Crew Observations")
