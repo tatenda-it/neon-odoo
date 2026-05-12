@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P2.M7.8 — crew-specific commercial.job views.
+
+        Crew users who drill in from My Schedule's "Upcoming Events"
+        land on these views instead of the default tree+form. Goal:
+        show EVENT INFORMATION (when / where / who / what kit),
+        suppress JOB MANAGEMENT (lifecycle, soft hold, finance, gate,
+        master contract, status tracks, action buttons).
+
+        Wiring lives in commercial.job.crew.schedule.action_open_my_upcoming
+        which detects _is_crew_only() and routes the user here. Sales /
+        Manager / Crew Leader keep the default views.
+    -->
+
+    <record id="commercial_job_view_tree_for_crew" model="ir.ui.view">
+        <field name="name">commercial.job.tree.for.crew</field>
+        <field name="model">commercial.job</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <tree string="My Upcoming Events"
+                  create="0" edit="0" delete="0"
+                  default_order="event_date asc">
+                <field name="name"/>
+                <field name="event_date"/>
+                <field name="event_end_date" optional="show"/>
+                <field name="partner_id" string="Client"/>
+                <field name="venue_id"/>
+                <field name="venue_room_id" optional="show"/>
+                <field name="sub_hire_required" widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="logistics_flag" widget="boolean_toggle" readonly="1" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_job_view_form_for_crew" model="ir.ui.view">
+        <field name="name">commercial.job.form.for.crew</field>
+        <field name="model">commercial.job</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <form string="My Event"
+                  create="0" edit="0" delete="0">
+                <!--
+                    Header intentionally empty of action buttons (D-T43).
+                    Confirm / Decline live inside the My Assignment group
+                    so they only surface when the calling user actually
+                    has an assignment on this job.
+                -->
+                <header/>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <group string="My Assignment"
+                           invisible="not my_assignment_id">
+                        <field name="my_assignment_id" invisible="1"/>
+                        <group>
+                            <field name="my_assignment_role" readonly="1"/>
+                            <field name="my_assignment_state" widget="badge" readonly="1"
+                                   decoration-warning="my_assignment_state == 'pending'"
+                                   decoration-success="my_assignment_state == 'confirmed'"
+                                   decoration-danger="my_assignment_state == 'declined'"/>
+                        </group>
+                        <group>
+                            <button name="action_confirm_my_assignment" type="object"
+                                    string="Confirm My Assignment"
+                                    class="btn-success"
+                                    invisible="my_assignment_state != 'pending'"/>
+                            <button name="action_decline_my_assignment" type="object"
+                                    string="Decline My Assignment"
+                                    class="btn-danger"
+                                    invisible="my_assignment_state != 'pending'"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Event Details">
+                            <field name="event_date" readonly="1"/>
+                            <field name="event_end_date" readonly="1"/>
+                            <field name="partner_id" string="Client" readonly="1"/>
+                            <field name="venue_id" readonly="1"/>
+                            <field name="venue_room_id" readonly="1"/>
+                        </group>
+                        <group string="Equipment &amp; Logistics">
+                            <field name="equipment_count" readonly="1"/>
+                            <field name="sub_hire_required" readonly="1"/>
+                            <field name="logistics_flag" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Equipment Summary"
+                           invisible="not equipment_summary">
+                        <field name="equipment_summary" nolabel="1" readonly="1"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Crew">
+                            <field name="crew_assignment_ids" readonly="1" nolabel="1">
+                                <tree create="0" edit="0" delete="0"
+                                      decoration-warning="state == 'pending'"
+                                      decoration-success="state == 'confirmed'"
+                                      decoration-danger="state == 'declined'">
+                                    <field name="user_id"/>
+                                    <field name="role"/>
+                                    <field name="state" widget="badge"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <!-- No chatter — D principle: crew sees event info, not
+                     job-management threads. Followers / activities are
+                     manager surface. -->
+            </form>
+        </field>
+    </record>
+
+</odoo>

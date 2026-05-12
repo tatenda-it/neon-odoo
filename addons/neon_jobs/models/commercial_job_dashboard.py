@@ -367,13 +367,29 @@ class CommercialJobCrewSchedule(models.TransientModel):
 
     def action_open_my_upcoming(self):
         confirmed_jobs = self._scoped_confirmed_job_ids()
-        return {
+        action = {
             "type": "ir.actions.act_window",
             "name": _("My Upcoming Events"),
             "res_model": "commercial.job",
             "view_mode": "tree,form",
             "domain": self._upcoming_job_domain(confirmed_jobs),
         }
+        # P2.M7.8 — crew-only users land on the event-info views, not
+        # the job-management defaults. Sales / manager / leader fall
+        # through to the standard tree+form.
+        if self._is_crew_only():
+            tree = self.env.ref(
+                "neon_jobs.commercial_job_view_tree_for_crew",
+                raise_if_not_found=False,
+            )
+            form = self.env.ref(
+                "neon_jobs.commercial_job_view_form_for_crew",
+                raise_if_not_found=False,
+            )
+            if tree and form:
+                action["views"] = [(tree.id, "tree"), (form.id, "form")]
+                action["context"] = {"force_crew_view": 1}
+        return action
 
     def action_open_my_pending_confirms(self):
         domain = [("state", "=", "pending")] + self._scoped_user_filter()

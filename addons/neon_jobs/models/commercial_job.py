@@ -333,6 +333,31 @@ class CommercialJob(models.Model):
         "on this job. Drives the My Calendar action's domain.",
     )
 
+    # P2.M7.8 — the calling crew member's own assignment row on this job.
+    # Powers the "My Assignment" section + confirm/decline buttons on the
+    # crew-specific form view. Non-stored, recomputed per request.
+    my_assignment_id = fields.Many2one(
+        "commercial.job.crew",
+        string="My Assignment",
+        compute="_compute_my_assignment",
+        store=False,
+    )
+    # role / state are computed directly off crew_assignment_ids rather
+    # than related= through my_assignment_id. A related= would force Odoo
+    # to reverse-search my_assignment_id (non-stored, depends_context)
+    # whenever a crew row's state changes, which triggers a "field should
+    # be searchable" warning on every crew write/unlink.
+    my_assignment_role = fields.Selection(
+        selection=lambda self: self.env["commercial.job.crew"]._fields["role"].selection,
+        string="My Role",
+        compute="_compute_my_assignment_facets",
+    )
+    my_assignment_state = fields.Selection(
+        selection=lambda self: self.env["commercial.job.crew"]._fields["state"].selection,
+        string="My Confirmation",
+        compute="_compute_my_assignment_facets",
+    )
+
     # === Capacity Acceptance Gate result ===
     gate_result = fields.Selection(
         [
@@ -444,6 +469,29 @@ class CommercialJob(models.Model):
                 c.user_id.id == uid and c.state == "confirmed"
                 for c in rec.crew_assignment_ids
             )
+
+    @api.depends("crew_assignment_ids", "crew_assignment_ids.user_id",
+                 "crew_assignment_ids.state")
+    @api.depends_context("uid")
+    def _compute_my_assignment(self):
+        uid = self.env.uid
+        for rec in self:
+            match = rec.crew_assignment_ids.filtered(
+                lambda c: c.user_id.id == uid
+            )[:1]
+            rec.my_assignment_id = match
+
+    @api.depends("crew_assignment_ids", "crew_assignment_ids.user_id",
+                 "crew_assignment_ids.role", "crew_assignment_ids.state")
+    @api.depends_context("uid")
+    def _compute_my_assignment_facets(self):
+        uid = self.env.uid
+        for rec in self:
+            match = rec.crew_assignment_ids.filtered(
+                lambda c: c.user_id.id == uid
+            )[:1]
+            rec.my_assignment_role = match.role if match else False
+            rec.my_assignment_state = match.state if match else False
 
     @api.model
     def _search_is_my_crew_event(self, operator, value):
@@ -668,6 +716,24 @@ class CommercialJob(models.Model):
             "neon_jobs cron: notified %d soft-hold expiries.", len(jobs)
         )
         return True
+
+    # ============================================================
+    # === Crew-form thin wrappers (P2.M7.8)
+    # Crew users land on commercial.job records via the crew-specific
+    # form view. The Confirm / Decline buttons there can't call methods
+    # on commercial.job.crew directly, so delegate via my_assignment_id.
+    # ============================================================
+    def action_confirm_my_assignment(self):
+        self.ensure_one()
+        if not self.my_assignment_id:
+            raise UserError(_("You have no crew assignment on this job."))
+        return self.my_assignment_id.action_confirm()
+
+    def action_decline_my_assignment(self):
+        self.ensure_one()
+        if not self.my_assignment_id:
+            raise UserError(_("You have no crew assignment on this job."))
+        return self.my_assignment_id.action_open_decline_wizard()
 
     def action_open_soft_hold_extend_wizard(self):
         self.ensure_one()
