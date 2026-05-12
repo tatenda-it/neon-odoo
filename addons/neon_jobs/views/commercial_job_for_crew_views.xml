@@ -13,23 +13,44 @@
         Wiring lives in commercial.job.crew.schedule.action_open_my_upcoming
         which detects _is_crew_only() and routes the user here. Sales /
         Manager / Crew Leader keep the default views.
-    -->
 
-    <!--
-        P2.M7.8.1 — groups_id + priority make this view "win" for crew
-        users by every navigation path: stat-button action, m2o
-        hyperlink, deep link, breadcrumb. Without these, only the
-        action_open_my_upcoming injection routed crew here, so a click
-        on a job_id link in any other tree fell through to the default
-        view. priority=1 keeps us ahead of any future view that lands
-        at the default 16; groups_id makes the view invisible to
-        non-crew so the default still wins for them.
+        === ROUTING INVARIANT (P2.M7.8.2 correction) ===
+
+        Crew views are reached ONLY via explicit views=[...] injection
+        from action_open_my_upcoming. They are NOT default views for
+        any role — including crew themselves. Priority 99 ensures they
+        LOSE the default-selection race; the standard view at priority
+        16 wins for all roles via Odoo's "lowest priority NULLS LAST"
+        view picker.
+
+        Why not gate this with groups_id="group_neon_jobs_crew"?
+        Because groups_id on a PRIMARY ir.ui.view does NOT participate
+        in default view selection in Odoo 17. BaseModel._get_view_id
+        executes raw SQL ordering by (priority NULLS LAST, id LIMIT 1)
+        on the ir_ui_view table; groups_id is consulted only when an
+        INHERITING view's xpath arch is applied. The earlier M7.8.1
+        attempt to use groups_id+priority=1 caused EVERY user to
+        resolve to the crew views as defaults — confirmed by direct
+        get_view() probe across robin / sales / manager / leader / crew.
+
+        Trade-off accepted in M7.8.2: a crew user who reaches a
+        commercial.job via m2o hyperlink, deep link, or breadcrumb
+        will see the STANDARD form (chatter, lifecycle, statusbar
+        visible). The security boundary still holds via:
+          - commercial_job_rule_crew_own (ir.rule) — crew reads
+            limited to records they're crewed on
+          - per-field group attributes on the standard view — finance
+            fields invisible to crew
+          - commercial_job_action.groups_id — deep-link entry to the
+            standard "Commercial Jobs" navigation is closed to crew
+
+        Regression guard: p2m7_8_smoke.T62 asserts the default view
+        picker returns the STANDARD form id for every role.
     -->
     <record id="commercial_job_view_tree_for_crew" model="ir.ui.view">
         <field name="name">commercial.job.tree.for.crew</field>
         <field name="model">commercial.job</field>
-        <field name="priority">1</field>
-        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
             <tree string="My Upcoming Events"
                   create="0" edit="0" delete="0"
@@ -49,8 +70,7 @@
     <record id="commercial_job_view_form_for_crew" model="ir.ui.view">
         <field name="name">commercial.job.form.for.crew</field>
         <field name="model">commercial.job</field>
-        <field name="priority">1</field>
-        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
             <form string="My Event"
                   create="0" edit="0" delete="0">
