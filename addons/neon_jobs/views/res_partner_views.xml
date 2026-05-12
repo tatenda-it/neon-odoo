@@ -9,6 +9,15 @@
 
             <xpath expr="//field[@name='category_id']" position="after">
                 <field name="is_venue"/>
+                <!-- P2.M8 Rapid Ops eligibility. Manual flag is
+                     manager-only; the computed badge is read-only and
+                     visible to everyone so Sales can see why the fast
+                     path is (or isn't) available. -->
+                <field name="is_rapid_ops_eligible_manual"
+                       groups="neon_jobs.group_neon_jobs_manager"/>
+                <field name="has_active_master_contract" invisible="1"/>
+                <field name="is_rapid_ops_eligible" widget="boolean_toggle"
+                       readonly="1"/>
             </xpath>
 
             <xpath expr="//notebook" position="inside">

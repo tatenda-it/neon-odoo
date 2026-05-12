@@ -90,6 +90,16 @@
                     <button name="action_activate" type="object" string="Activate"
                             class="oe_highlight" invisible="state != 'pending'"
                             groups="neon_jobs.group_neon_jobs_user"/>
+                    <!-- P2.M8: Rapid Activate fast path. Visibility is
+                         computed (can_rapid_activate) so the button only
+                         appears when the calling user has authority on
+                         this partner — eligible partners for Sales+,
+                         any partner for Manager. -->
+                    <button name="action_rapid_activate" type="object"
+                            string="⚡ Rapid Activate"
+                            class="btn-warning"
+                            invisible="not can_rapid_activate"
+                            groups="neon_jobs.group_neon_jobs_user"/>
                     <button name="action_complete" type="object" string="Complete"
                             class="oe_highlight" invisible="state != 'active'"
                             groups="neon_jobs.group_neon_jobs_user"/>
@@ -111,6 +121,17 @@
                     <field name="state" widget="statusbar" statusbar_visible="pending,active,completed"/>
                 </header>
                 <sheet>
+                    <!-- P2.M8: Trusted-client banner. Surfaces the fast
+                         path so sales sees it before scrolling to the
+                         header buttons. -->
+                    <div class="alert alert-info" role="alert"
+                         invisible="not (state == 'pending' and partner_id and can_rapid_activate)">
+                        <strong>⚡ Rapid Activate available</strong> —
+                        this client is on the trusted fast path. Hard
+                        safety checks still run; only soft warnings are
+                        auto-passed.
+                    </div>
+                    <field name="can_rapid_activate" invisible="1"/>
                     <div class="alert alert-warning" role="alert"
                          invisible="not needs_attention">
                         <strong>Needs attention:</strong>

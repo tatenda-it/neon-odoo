@@ -32,6 +32,13 @@ _GATE_RETRIGGER_FIELDS = frozenset({
 
 _RESULT_RANK = {"pass": 0, "warning": 1, "reject": 2}
 
+# P2.M8 — Checks that may never be bypassed by Rapid Ops. Date/venue/room
+# overlap and crew double-booking are operational hard limits: bypassing
+# them risks an actual collision on the day. Soft checks (cash-flow,
+# sub-hire, logistics, strategic, master contract obligation, equipment
+# placeholder) can be bypassed for trusted clients.
+_HARD_GATE_CHECKS = frozenset({"date_venue", "crew"})
+
 
 class CommercialJob(models.Model):
     _inherit = "commercial.job"
@@ -41,6 +48,27 @@ class CommercialJob(models.Model):
         compute="_compute_gate_check_log_summary",
         store=False,
     )
+
+    # P2.M8 — drives Rapid Activate button visibility on the form.
+    can_rapid_activate = fields.Boolean(
+        string="Can Rapid Activate",
+        compute="_compute_can_rapid_activate",
+        store=False,
+        help="True when the calling user can fast-path this job: state is "
+        "pending AND (partner is Rapid Ops eligible OR user is a Manager).",
+    )
+
+    @api.depends("state", "partner_id", "partner_id.is_rapid_ops_eligible")
+    @api.depends_context("uid")
+    def _compute_can_rapid_activate(self):
+        is_mgr = self.env.user.has_group("neon_jobs.group_neon_jobs_manager")
+        for rec in self:
+            if rec.state != "pending":
+                rec.can_rapid_activate = False
+            elif rec.partner_id.is_rapid_ops_eligible:
+                rec.can_rapid_activate = True
+            else:
+                rec.can_rapid_activate = is_mgr
 
     # ============================================================
     # === Public entry points
@@ -70,6 +98,55 @@ class CommercialJob(models.Model):
             rec._persist_gate_result(result, post_change_chatter=True)
         return True
 
+    def action_rapid_activate(self):
+        """P2.M8 — Rapid Ops fast path for trusted clients.
+
+        Authority gate: partner must be is_rapid_ops_eligible, OR the
+        calling user must be a Neon Jobs Manager (the manager-override
+        case for one-off non-eligible partners).
+
+        Gate behaviour: soft checks (3-8) auto-pass with a
+        RAPID_OPS_BYPASS marker in their message + 'bypassed': True in
+        the log. Hard checks (date/venue/room + crew double-booking) run
+        normally — a reject from either still blocks activation, even
+        for trusted clients.
+        """
+        self.ensure_one()
+        is_mgr = self.env.user.has_group("neon_jobs.group_neon_jobs_manager")
+        manager_override = False
+        if not self.partner_id.is_rapid_ops_eligible:
+            if not is_mgr:
+                raise UserError(_(
+                    "Partner is not Rapid Ops eligible. Manager "
+                    "authorization required."
+                ))
+            manager_override = True
+        if self.state != "pending":
+            raise UserError(_(
+                "Only pending Commercial Jobs can be rapid-activated."
+            ))
+        result = self._evaluate_capacity_gate(bypass_soft_checks=True)
+        if result["aggregate"] == "reject":
+            # Hard check failed — persist the log for audit, then block.
+            self._persist_gate_result(result, post_change_chatter=False)
+            raise UserError(self._format_reject_error(result))
+        self._persist_gate_result(result, post_change_chatter=False)
+        self._do_activate_state()
+        bypassed = [c["name"] for c in result["checks"] if c.get("bypassed")]
+        bypass_list = ", ".join(bypassed) if bypassed else _("none")
+        if manager_override:
+            body = _(
+                "Rapid Ops Activation by %(user)s — non-eligible partner, "
+                "manager authorization. Soft checks bypassed: %(checks)s."
+            ) % {"user": self.env.user.name, "checks": bypass_list}
+        else:
+            body = _(
+                "Rapid Ops Activation by %(user)s. Soft checks "
+                "bypassed: %(checks)s."
+            ) % {"user": self.env.user.name, "checks": bypass_list}
+        self.message_post(body=body)
+        return True
+
     def _do_activate_state(self):
         """Perform only the state transition. Called by action_activate after
         a passing gate, and by the override wizard after manager confirm."""
@@ -79,7 +156,15 @@ class CommercialJob(models.Model):
     # ============================================================
     # === Evaluator
     # ============================================================
-    def _evaluate_capacity_gate(self):
+    def _evaluate_capacity_gate(self, bypass_soft_checks=False):
+        """Run the 8 capacity gate checks and aggregate.
+
+        bypass_soft_checks (P2.M8 Rapid Ops): when True, any non-hard
+        check that returned warning/reject is rewritten to pass with a
+        RAPID_OPS_BYPASS message prefix and a 'bypassed': True marker
+        in the log. Hard checks (date_venue, crew) pass through
+        unchanged — a hard reject still blocks aggregation.
+        """
         self.ensure_one()
         checks = [
             self._gate_check_date_venue(),
@@ -91,6 +176,16 @@ class CommercialJob(models.Model):
             self._gate_check_strategic(),
             self._gate_check_master(),
         ]
+        if bypass_soft_checks:
+            for c in checks:
+                if c["name"] in _HARD_GATE_CHECKS:
+                    continue
+                if c["result"] == "pass":
+                    continue
+                c["bypassed"] = True
+                c["original_result"] = c["result"]
+                c["message"] = "RAPID_OPS_BYPASS: " + c["message"]
+                c["result"] = "pass"
         worst = max((_RESULT_RANK[c["result"]] for c in checks), default=0)
         aggregate = {0: "pass", 1: "warning", 2: "reject"}[worst]
         return {
