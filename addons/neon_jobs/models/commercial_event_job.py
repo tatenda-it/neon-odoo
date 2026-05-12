@@ -12,6 +12,7 @@ execution. State machine (P3.M3) and Readiness Score compute
 the schema, security, and basic UI only.
 """
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 _EVENT_JOB_STATES = [
@@ -28,6 +29,32 @@ _EVENT_JOB_STATES = [
     ("cancelled", "Cancelled"),
     ("released", "Released"),
 ]
+
+_TERMINAL_STATES = ("cancelled", "released")
+
+# P3.M3 — transition spec table. Each forward transition lists:
+#   from:             tuple of source states (only one in practice today)
+#   groups:           which Neon Operations group keys may trigger it
+#   crew_chief_path:  whether the user can alternatively trigger this
+#                     transition by being the crew_chief on the linked job
+# Gates (readiness/closeout/lead_tech/crew_chief presence) are evaluated
+# per-action since they need access to record fields.
+_GROUP_XMLIDS = {
+    "user": "neon_jobs.group_neon_jobs_user",
+    "crew_leader": "neon_jobs.group_neon_jobs_crew_leader",
+    "manager": "neon_jobs.group_neon_jobs_manager",
+}
+_TRANSITIONS = {
+    "planning":           {"from": ("draft",),              "groups": ("user", "crew_leader", "manager"), "crew_chief_path": False},
+    "prep":               {"from": ("planning",),           "groups": ("crew_leader", "manager"),         "crew_chief_path": False},
+    "ready_for_dispatch": {"from": ("prep",),               "groups": ("crew_leader", "manager"),         "crew_chief_path": False},
+    "dispatched":         {"from": ("ready_for_dispatch",), "groups": ("crew_leader", "manager"),         "crew_chief_path": False},
+    "in_progress":        {"from": ("dispatched",),         "groups": ("crew_leader", "manager"),         "crew_chief_path": True},
+    "strike":             {"from": ("in_progress",),        "groups": ("crew_leader", "manager"),         "crew_chief_path": True},
+    "returned":           {"from": ("strike",),             "groups": ("crew_leader", "manager"),         "crew_chief_path": True},
+    "completed":          {"from": ("returned",),           "groups": ("crew_leader", "manager"),         "crew_chief_path": False},
+    "closed":             {"from": ("completed",),          "groups": ("manager",),                       "crew_chief_path": False},
+}
 
 
 class CommercialEventJob(models.Model):
@@ -283,6 +310,22 @@ class CommercialEventJob(models.Model):
         readonly=True,
     )
 
+    # === P3.M3 — state-machine UI gates ===
+    # One Boolean per forward transition + cancel + release. Drives the
+    # header buttons' invisible=... attributes. Non-stored; recomputed
+    # per request from state + role + gating fields.
+    can_move_to_planning = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_prep = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_ready_for_dispatch = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_dispatched = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_in_progress = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_strike = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_returned = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_completed = fields.Boolean(compute="_compute_state_buttons")
+    can_move_to_closed = fields.Boolean(compute="_compute_state_buttons")
+    can_cancel = fields.Boolean(compute="_compute_state_buttons")
+    can_release = fields.Boolean(compute="_compute_state_buttons")
+
     @api.depends("commercial_job_id.crew_assignment_ids.is_crew_chief",
                  "commercial_job_id.crew_assignment_ids.user_id")
     def _compute_crew_chief(self):
@@ -318,3 +361,253 @@ class CommercialEventJob(models.Model):
             "res_id": self.commercial_job_id.id,
             "target": "current",
         }
+
+    # ============================================================
+    # === P3.M3 — State machine
+    #
+    # Direct state writes via .write({"state": ...}) are blocked unless
+    # the caller passes context={"_allow_state_write": True}. All
+    # transitions must flow through action_move_to_<state> /
+    # action_cancel_event_job / action_release_event_job so the chatter
+    # audit and gates run consistently.
+    # ============================================================
+    def _user_in_any_group(self, group_keys):
+        return any(
+            self.env.user.has_group(_GROUP_XMLIDS[k]) for k in group_keys
+        )
+
+    def _is_crew_chief_of_job(self, commercial_job):
+        if not commercial_job:
+            return False
+        return bool(self.env["commercial.job.crew"].sudo().search([
+            ("job_id", "=", commercial_job.id),
+            ("user_id", "=", self.env.uid),
+            ("is_crew_chief", "=", True),
+        ], limit=1))
+
+    def _check_authority(self, target_state, raise_on_fail=True):
+        """Authority check for a forward transition. Returns True if
+        the calling user may move this record into target_state.
+        Raises UserError when raise_on_fail=True and the check fails."""
+        self.ensure_one()
+        spec = _TRANSITIONS.get(target_state)
+        if spec is None:
+            if raise_on_fail:
+                raise UserError(_(
+                    "Unknown transition target: %s."
+                ) % target_state)
+            return False
+        if self.state not in spec["from"]:
+            if raise_on_fail:
+                raise UserError(_(
+                    "Cannot move from %(from)s to %(to)s. Allowed "
+                    "source state(s) for %(to)s: %(allowed)s."
+                ) % {
+                    "from": self.state,
+                    "to": target_state,
+                    "allowed": ", ".join(spec["from"]),
+                })
+            return False
+        in_group = self._user_in_any_group(spec["groups"])
+        is_crew_chief = (
+            spec.get("crew_chief_path")
+            and self._is_crew_chief_of_job(self.commercial_job_id)
+        )
+        if not (in_group or is_crew_chief):
+            if raise_on_fail:
+                allowed = ", ".join(spec["groups"])
+                if spec.get("crew_chief_path"):
+                    allowed += ", or Crew Chief on this event"
+                raise UserError(_(
+                    "Only %(allowed)s can move an Event Job to "
+                    "%(target)s."
+                ) % {"allowed": allowed, "target": target_state})
+            return False
+        return True
+
+    def _do_transition(self, target):
+        """Apply the transition: bypass write-block via context flag,
+        set closeout_completed_at if moving to 'closed', post chatter.
+
+        The actual write is elevated via sudo() because crew tier can
+        legitimately trigger some transitions (via crew_chief_path) but
+        only has read ACL on commercial.event.job. Authority was just
+        verified in the calling action method, so the elevation is
+        safe. Chatter attribution stays with the real user via
+        author_id.
+        """
+        self.ensure_one()
+        old = self.state
+        user_partner_id = self.env.user.partner_id.id
+        user_name = self.env.user.name
+        vals = {"state": target}
+        if target == "closed":
+            vals["closeout_completed_at"] = fields.Datetime.now()
+        self.sudo().with_context(_allow_state_write=True).write(vals)
+        self.sudo().message_post(
+            body=_(
+                "State: %(old)s → %(new)s by %(user)s"
+            ) % {"old": old, "new": target, "user": user_name},
+            author_id=user_partner_id,
+        )
+
+    @api.depends("state", "lead_tech_id", "crew_chief_id",
+                 "gear_reconciled", "finance_handoff_complete",
+                 "readiness_score", "commercial_job_id")
+    @api.depends_context("uid")
+    def _compute_state_buttons(self):
+        for rec in self:
+            # Reset all to False
+            rec.can_move_to_planning = False
+            rec.can_move_to_prep = False
+            rec.can_move_to_ready_for_dispatch = False
+            rec.can_move_to_dispatched = False
+            rec.can_move_to_in_progress = False
+            rec.can_move_to_strike = False
+            rec.can_move_to_returned = False
+            rec.can_move_to_completed = False
+            rec.can_move_to_closed = False
+            rec.can_cancel = False
+            rec.can_release = False
+
+            # Forward transitions
+            for target, spec in _TRANSITIONS.items():
+                if rec.state not in spec["from"]:
+                    continue
+                if not rec._check_authority(target, raise_on_fail=False):
+                    continue
+                # Per-target gate checks
+                if target == "planning" and not rec.lead_tech_id:
+                    continue
+                if target == "dispatched" and not (rec.crew_chief_id and rec.lead_tech_id):
+                    continue
+                if target == "closed" and not (rec.gear_reconciled and rec.finance_handoff_complete):
+                    continue
+                # readiness gate (P3.M4 placeholder — see action method)
+                setattr(rec, "can_move_to_" + target, True)
+
+            # Terminal transitions (manager only, from any non-terminal)
+            is_mgr = rec.env.user.has_group(_GROUP_XMLIDS["manager"])
+            if is_mgr and rec.state not in _TERMINAL_STATES:
+                rec.can_cancel = True
+                rec.can_release = True
+
+    # ============================================================
+    # === Action methods — one per forward transition
+    # ============================================================
+    def action_move_to_planning(self):
+        for rec in self:
+            rec._check_authority("planning")
+            if not rec.lead_tech_id:
+                raise UserError(_(
+                    "Lead Tech must be assigned before moving to Planning. "
+                    "Set the Lead Tech on the People tab first."
+                ))
+            rec._do_transition("planning")
+
+    def action_move_to_prep(self):
+        for rec in self:
+            rec._check_authority("prep")
+            rec._do_transition("prep")
+
+    def action_move_to_ready_for_dispatch(self):
+        for rec in self:
+            rec._check_authority("ready_for_dispatch")
+            # P3.M4 will enforce readiness_score >= 70 as a hard block.
+            # Until then, log a warning when the score is below the
+            # eventual threshold so the audit trail captures it.
+            if rec.readiness_score < 70:
+                rec.message_post(body=_(
+                    "Note: Readiness Score gate at 70 not yet enforced "
+                    "(P3.M4 placeholder). Proceeded with "
+                    "readiness_score=%s."
+                ) % rec.readiness_score)
+            rec._do_transition("ready_for_dispatch")
+
+    def action_move_to_dispatched(self):
+        for rec in self:
+            rec._check_authority("dispatched")
+            missing = []
+            if not rec.crew_chief_id:
+                missing.append(_("Crew Chief must be assigned (mark "
+                                 "one crew member as Crew Chief on the "
+                                 "Commercial Job's Crew tab)"))
+            if not rec.lead_tech_id:
+                missing.append(_("Lead Tech must be assigned"))
+            if missing:
+                raise UserError("\n".join(missing))
+            rec._do_transition("dispatched")
+
+    def action_move_to_in_progress(self):
+        for rec in self:
+            rec._check_authority("in_progress")
+            rec._do_transition("in_progress")
+
+    def action_move_to_strike(self):
+        for rec in self:
+            rec._check_authority("strike")
+            rec._do_transition("strike")
+
+    def action_move_to_returned(self):
+        for rec in self:
+            rec._check_authority("returned")
+            rec._do_transition("returned")
+
+    def action_move_to_completed(self):
+        for rec in self:
+            rec._check_authority("completed")
+            rec._do_transition("completed")
+
+    def action_move_to_closed(self):
+        for rec in self:
+            rec._check_authority("closed")
+            missing = []
+            if not rec.gear_reconciled:
+                missing.append(_("Gear Reconciled"))
+            if not rec.finance_handoff_complete:
+                missing.append(_("Finance Handoff Complete"))
+            if missing:
+                raise UserError(_(
+                    "Cannot close Event Job — missing closeout "
+                    "requirements: %s. (P3.M7 will expand the closeout "
+                    "checklist.)"
+                ) % ", ".join(missing))
+            rec._do_transition("closed")
+
+    def action_cancel_event_job(self):
+        for rec in self:
+            if rec.state in _TERMINAL_STATES:
+                raise UserError(_(
+                    "Event Job is already in a terminal state (%s)."
+                ) % rec.state)
+            if not self.env.user.has_group(_GROUP_XMLIDS["manager"]):
+                raise UserError(_("Only Managers can cancel an Event Job."))
+            rec._do_transition("cancelled")
+
+    def action_release_event_job(self):
+        for rec in self:
+            if rec.state in _TERMINAL_STATES:
+                raise UserError(_(
+                    "Event Job is already in a terminal state (%s)."
+                ) % rec.state)
+            if not self.env.user.has_group(_GROUP_XMLIDS["manager"]):
+                raise UserError(_("Only Managers can release an Event Job."))
+            rec._do_transition("released")
+
+    # ============================================================
+    # === Write block — protect the audit trail
+    # ============================================================
+    def write(self, vals):
+        if "state" in vals and not self.env.context.get("_allow_state_write"):
+            # Allow no-op writes (state already equals target) for ORM
+            # cache flushing edge cases. Block anything that would
+            # actually change state without going through the action
+            # methods.
+            if any(rec.state != vals["state"] for rec in self):
+                raise UserError(_(
+                    "State must be changed via Event Job transition "
+                    "action methods (Start Planning, Move to Prep, "
+                    "etc.). Direct state writes are blocked to "
+                    "preserve the audit trail."
+                ))
+        return super().write(vals)

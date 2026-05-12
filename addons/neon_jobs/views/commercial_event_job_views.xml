@@ -90,6 +90,69 @@
         <field name="arch" type="xml">
             <form string="Event Job">
                 <header>
+                    <!-- P3.M3 — state-machine transition buttons. Each
+                         is gated by the matching can_move_to_* /
+                         can_cancel / can_release computed Boolean, so
+                         only the legal "next moves" for the current
+                         state + role + gating fields surface. -->
+                    <button name="action_move_to_planning" type="object"
+                            string="Start Planning"
+                            class="oe_highlight"
+                            invisible="not can_move_to_planning"/>
+                    <button name="action_move_to_prep" type="object"
+                            string="Move to Prep"
+                            class="oe_highlight"
+                            invisible="not can_move_to_prep"/>
+                    <button name="action_move_to_ready_for_dispatch" type="object"
+                            string="Mark Ready for Dispatch"
+                            class="oe_highlight"
+                            invisible="not can_move_to_ready_for_dispatch"/>
+                    <button name="action_move_to_dispatched" type="object"
+                            string="Dispatch"
+                            class="oe_highlight"
+                            invisible="not can_move_to_dispatched"/>
+                    <button name="action_move_to_in_progress" type="object"
+                            string="Event Started"
+                            class="oe_highlight"
+                            invisible="not can_move_to_in_progress"/>
+                    <button name="action_move_to_strike" type="object"
+                            string="Begin Strike"
+                            class="oe_highlight"
+                            invisible="not can_move_to_strike"/>
+                    <button name="action_move_to_returned" type="object"
+                            string="Gear Returned"
+                            class="oe_highlight"
+                            invisible="not can_move_to_returned"/>
+                    <button name="action_move_to_completed" type="object"
+                            string="Mark Completed"
+                            class="oe_highlight"
+                            invisible="not can_move_to_completed"/>
+                    <button name="action_move_to_closed" type="object"
+                            string="Close Event"
+                            class="oe_highlight"
+                            invisible="not can_move_to_closed"
+                            confirm="Close this Event Job? Closeout finalises the operational record."/>
+                    <button name="action_cancel_event_job" type="object"
+                            string="Cancel"
+                            class="btn-danger"
+                            invisible="not can_cancel"
+                            confirm="Cancel this Event Job? This is a manager-only terminal action."/>
+                    <button name="action_release_event_job" type="object"
+                            string="Release"
+                            class="btn-secondary"
+                            invisible="not can_release"
+                            confirm="Release this Event Job from active operations?"/>
+                    <field name="can_move_to_planning" invisible="1"/>
+                    <field name="can_move_to_prep" invisible="1"/>
+                    <field name="can_move_to_ready_for_dispatch" invisible="1"/>
+                    <field name="can_move_to_dispatched" invisible="1"/>
+                    <field name="can_move_to_in_progress" invisible="1"/>
+                    <field name="can_move_to_strike" invisible="1"/>
+                    <field name="can_move_to_returned" invisible="1"/>
+                    <field name="can_move_to_completed" invisible="1"/>
+                    <field name="can_move_to_closed" invisible="1"/>
+                    <field name="can_cancel" invisible="1"/>
+                    <field name="can_release" invisible="1"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,planning,prep,ready_for_dispatch,dispatched,in_progress,strike,returned,completed,closed"/>
                 </header>
