@@ -134,10 +134,37 @@ class CommercialEventJob(models.Model):
     lead_tech_id = fields.Many2one(
         "res.users",
         string="Lead Tech",
+        default=lambda self: self._default_lead_tech_id(),
         tracking=True,
         help="Designated Lead Tech. Required once state has moved past "
-        "draft (enforced in P3.M3).",
+        "draft (enforced in P3.M3). Auto-defaults to the first active "
+        "user in neon_jobs.group_neon_jobs_crew_leader at create time, "
+        "so personnel changes don't need code edits.",
     )
+
+    @api.model
+    def _default_lead_tech_id(self):
+        """Pick the current Lead Tech / Crew Leader at create time.
+
+        Dynamic group lookup rather than a hardcoded user id, so when
+        the role moves between people (Ranganai today, somebody else
+        tomorrow) the model picks up the new person automatically.
+        Returns False gracefully if no crew_leader user exists yet —
+        the field remains required at the state machine level
+        (draft → planning), not at create.
+        """
+        group = self.env.ref(
+            "neon_jobs.group_neon_jobs_crew_leader",
+            raise_if_not_found=False,
+        )
+        if not group:
+            return False
+        user = self.env["res.users"].search(
+            [("groups_id", "in", group.id), ("active", "=", True)],
+            limit=1,
+            order="id asc",
+        )
+        return user.id if user else False
     crew_chief_id = fields.Many2one(
         "res.users",
         string="Crew Chief",
