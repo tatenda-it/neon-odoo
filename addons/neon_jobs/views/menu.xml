@@ -87,4 +87,11 @@
               action="venue_room_action"
               sequence="20"/>
 
+    <menuitem id="menu_checklist_templates"
+              name="Checklist Templates"
+              parent="menu_operations_config"
+              action="commercial_checklist_template_action"
+              groups="neon_jobs.group_neon_jobs_manager"
+              sequence="30"/>
+
 </odoo>

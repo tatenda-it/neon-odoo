@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.2.2.2",
+    "version": "17.0.2.3.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -50,11 +50,14 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         # the time we get here, so the patch updates groups_id cleanly
         # on both -i and -u.
         "data/cross_module_menu_security.xml",
+        "data/checklist_templates_data.xml",
         "views/venue_room_views.xml",
         "views/res_partner_views.xml",
         "views/commercial_job_views.xml",
         "views/commercial_job_for_crew_views.xml",
         "views/commercial_event_job_views.xml",
+        "views/commercial_checklist_template_views.xml",
+        "views/commercial_event_job_checklist_views.xml",
         "views/commercial_job_master_views.xml",
         "views/commercial_job_crew_views.xml",
         "views/commercial_job_calendar_view.xml",

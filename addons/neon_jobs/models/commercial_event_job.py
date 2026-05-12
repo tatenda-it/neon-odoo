@@ -413,6 +413,13 @@ class CommercialEventJob(models.Model):
         "structured incident model.",
     )
 
+    # === P3.M5 — Checklists (9 instances per event_job) ===
+    checklist_ids = fields.One2many(
+        "commercial.event.job.checklist",
+        "event_job_id",
+        string="Checklists",
+    )
+
     # === Closeout checkpoints (P3.M7 will expand) ===
     gear_reconciled = fields.Boolean(default=False, tracking=True)
     finance_handoff_complete = fields.Boolean(default=False, tracking=True)
@@ -458,7 +465,51 @@ class CommercialEventJob(models.Model):
                     self.env["ir.sequence"].next_by_code("commercial.event.job")
                     or _("New")
                 )
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        # P3.M5 — eagerly create one checklist instance per type
+        # (snapshotting from each template's items) so the event_job
+        # opens with its 9 checklists already populated.
+        for rec in records:
+            rec._create_event_job_checklists()
+        return records
+
+    def _create_event_job_checklists(self):
+        """Idempotent: if instances already exist for this event_job,
+        skip. Otherwise loop the 9 templates by type, copy items
+        into instance items (snapshotting name/sequence/photo_required).
+        Runs sudo because crew-tier auto-creation paths may not have
+        write access on the new template models."""
+        from .commercial_checklist_template import (
+            CHECKLIST_TYPE_ORDER, CHECKLIST_TYPE_TO_ROLE,
+        )
+        ChecklistModel = self.env["commercial.event.job.checklist"].sudo()
+        ItemModel = self.env["commercial.event.job.checklist.item"].sudo()
+        TemplateModel = self.env["commercial.checklist.template"].sudo()
+        for rec in self:
+            if rec.checklist_ids:
+                continue
+            templates = {
+                t.type: t
+                for t in TemplateModel.search([("active", "=", True)])
+            }
+            for idx, ctype in enumerate(CHECKLIST_TYPE_ORDER):
+                template = templates.get(ctype)
+                instance = ChecklistModel.create({
+                    "event_job_id": rec.id,
+                    "type": ctype,
+                    "template_id": template.id if template else False,
+                    "ownership_role": CHECKLIST_TYPE_TO_ROLE.get(ctype, "lead_tech"),
+                    "sequence": (idx + 1) * 10,
+                })
+                if template:
+                    for ti in template.item_ids.filtered("active"):
+                        ItemModel.create({
+                            "checklist_id": instance.id,
+                            "template_item_id": ti.id,
+                            "sequence": ti.sequence,
+                            "name": ti.name,
+                            "photo_required": ti.photo_required,
+                        })
 
     # ============================================================
     # === Smart-button navigation back to source
@@ -943,15 +994,36 @@ class CommercialEventJob(models.Model):
         }
 
     def _compute_dim_checklist(self):
-        """Checklist dimension. P3.M5 will wire the actual checklist
-        completion check. Until then this dimension is N/A and its
-        weight redistributes."""
+        """Checklist dimension (P3.M5). Average completion_ratio
+        across the event_job's non-N/A checklists, scaled to 100.
+        N/A checklists are excluded from the average so a 'this
+        client_handover doesn't apply' decision steps out cleanly
+        rather than boosting the score."""
         self.ensure_one()
+        all_lists = self.checklist_ids
+        if not all_lists:
+            return {
+                "score": None,
+                "breakdown": _("No checklists on this event yet — N/A."),
+            }
+        active = all_lists.filtered(lambda c: c.state != "na")
+        if not active:
+            return {
+                "score": None,
+                "breakdown": _(
+                    "All %d checklists marked N/A — dimension excluded."
+                ) % len(all_lists),
+            }
+        avg_ratio = sum(c.completion_ratio for c in active) / len(active)
+        score = avg_ratio * 100.0
+        na_count = len(all_lists) - len(active)
+        na_note = (" (%d N/A excluded)" % na_count) if na_count else ""
         return {
-            "score": None,
+            "score": score,
             "breakdown": _(
-                "Checklist dimension activates in P3.M5 — N/A for now."
-            ),
+                "Avg completion %(pct).0f%% across %(n)d active "
+                "checklist(s)%(na)s"
+            ) % {"pct": score, "n": len(active), "na": na_note},
         }
 
     # ----- Risk dimension — 6 components -----------------------------
@@ -1098,6 +1170,8 @@ class CommercialEventJob(models.Model):
         "venue_room_id",
         "equipment_summary",
         "partner_id",
+        "checklist_ids.state",
+        "checklist_ids.completion_ratio",
     )
     def _compute_readiness_score(self):
         for rec in self:

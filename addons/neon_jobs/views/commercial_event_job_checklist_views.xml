@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P3.M5 — Embedded views for the 9 checklist instances per
+        event_job. Used inside the event_job form's Tab 11 sub-
+        notebook, one sub-page per checklist type.
+    -->
+    <record id="commercial_event_job_checklist_view_form" model="ir.ui.view">
+        <field name="name">commercial.event.job.checklist.form</field>
+        <field name="model">commercial.event.job.checklist</field>
+        <field name="arch" type="xml">
+            <form string="Checklist">
+                <header>
+                    <button name="action_mark_na" type="object"
+                            string="Mark Not Applicable"
+                            class="btn-secondary"
+                            confirm="Mark this whole checklist as Not Applicable for this event?"
+                            invisible="state == 'na'"/>
+                    <button name="action_unmark_na" type="object"
+                            string="Clear N/A"
+                            class="btn-secondary"
+                            invisible="state != 'na'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="not_started,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="type" readonly="1"/>
+                            <field name="ownership_role" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="completion_pct" widget="progressbar"
+                                   readonly="1"/>
+                            <field name="total_count" readonly="1"/>
+                            <field name="completed_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="item_ids" readonly="state == 'na'">
+                        <tree editable="bottom" default_order="sequence, id">
+                            <field name="sequence" widget="handle"/>
+                            <field name="is_checked" widget="boolean_toggle"/>
+                            <field name="name" readonly="1"/>
+                            <field name="is_na" widget="boolean_toggle"/>
+                            <field name="na_reason"/>
+                            <field name="photo_required" optional="show"/>
+                            <field name="photo_attachment_ids" widget="many2many_binary"
+                                   optional="show"/>
+                            <field name="checked_by" optional="hide"/>
+                            <field name="checked_at" optional="hide"/>
+                            <field name="notes" optional="hide"/>
+                        </tree>
+                    </field>
+                    <separator string="N/A Reason"/>
+                    <group col="1" invisible="state != 'na'">
+                        <field name="na_reason" nolabel="1" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="completed_at" readonly="1"/>
+                        <field name="completed_by" readonly="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_checklist_view_tree_embedded" model="ir.ui.view">
+        <field name="name">commercial.event.job.checklist.tree.embedded</field>
+        <field name="model">commercial.event.job.checklist</field>
+        <field name="arch" type="xml">
+            <tree default_order="sequence, id"
+                  decoration-muted="state == 'na'"
+                  decoration-success="state == 'completed'"
+                  decoration-info="state == 'in_progress'">
+                <field name="sequence" widget="handle"/>
+                <field name="type"/>
+                <field name="ownership_role"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'completed'"
+                       decoration-info="state == 'in_progress'"
+                       decoration-muted="state == 'na'"/>
+                <field name="completion_pct" widget="progressbar"/>
+                <field name="total_count"/>
+                <field name="completed_count"/>
+            </tree>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        P3.M5 — Seed the 9 v4.1 §20 checklist templates with starter
+        items. noupdate="1" so manager edits via Configuration UI
+        are NOT clobbered on -u upgrades.
+
+        Item names are industry-standard event-production starters;
+        managers refine them per Neon's actual workflow via the
+        Configuration menu.
+    -->
+
+    <!-- 1 — Capacity Acceptance (pre-event, Lead Tech) -->
+    <record id="checklist_template_capacity_acceptance" model="commercial.checklist.template">
+        <field name="type">capacity_acceptance</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="checklist_item_capacity_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_capacity_acceptance"/>
+        <field name="sequence">10</field>
+        <field name="name">Calendar conflict check completed</field>
+    </record>
+    <record id="checklist_item_capacity_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_capacity_acceptance"/>
+        <field name="sequence">20</field>
+        <field name="name">Crew availability confirmed for event window</field>
+    </record>
+    <record id="checklist_item_capacity_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_capacity_acceptance"/>
+        <field name="sequence">30</field>
+        <field name="name">Equipment availability checked (no conflicting bookings)</field>
+    </record>
+    <record id="checklist_item_capacity_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_capacity_acceptance"/>
+        <field name="sequence">40</field>
+        <field name="name">Venue access window confirmed with client</field>
+    </record>
+    <record id="checklist_item_capacity_5" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_capacity_acceptance"/>
+        <field name="sequence">50</field>
+        <field name="name">Sub-hire requirements identified and flagged</field>
+    </record>
+
+    <!-- 2 — Job Readiness (pre-event, Lead Tech) -->
+    <record id="checklist_template_job_readiness" model="commercial.checklist.template">
+        <field name="type">job_readiness</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="checklist_item_jr_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_job_readiness"/>
+        <field name="sequence">10</field>
+        <field name="name">Deposit received and reconciled</field>
+    </record>
+    <record id="checklist_item_jr_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_job_readiness"/>
+        <field name="sequence">20</field>
+        <field name="name">Signed event brief on file</field>
+    </record>
+    <record id="checklist_item_jr_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_job_readiness"/>
+        <field name="sequence">30</field>
+        <field name="name">Crew Chief assigned</field>
+    </record>
+    <record id="checklist_item_jr_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_job_readiness"/>
+        <field name="sequence">40</field>
+        <field name="name">Run-of-show document drafted</field>
+    </record>
+    <record id="checklist_item_jr_5" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_job_readiness"/>
+        <field name="sequence">50</field>
+        <field name="name">Sub-hire suppliers confirmed (if applicable)</field>
+    </record>
+
+    <!-- 3 — Gear Preparation (pre-event, Lead Tech) -->
+    <record id="checklist_template_gear_prep" model="commercial.checklist.template">
+        <field name="type">gear_prep</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="checklist_item_gp_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_gear_prep"/>
+        <field name="sequence">10</field>
+        <field name="name">PA system tested and verified</field>
+    </record>
+    <record id="checklist_item_gp_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_gear_prep"/>
+        <field name="sequence">20</field>
+        <field name="name">Lighting rig functional, all fixtures working</field>
+    </record>
+    <record id="checklist_item_gp_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_gear_prep"/>
+        <field name="sequence">30</field>
+        <field name="name">Cables labelled and bundled</field>
+    </record>
+    <record id="checklist_item_gp_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_gear_prep"/>
+        <field name="sequence">40</field>
+        <field name="name">Spare bulbs and fuses packed</field>
+    </record>
+    <record id="checklist_item_gp_5" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_gear_prep"/>
+        <field name="sequence">50</field>
+        <field name="name">Power distribution checked</field>
+    </record>
+
+    <!-- 4 — Dispatch (pre-event, Lead Tech) -->
+    <record id="checklist_template_dispatch" model="commercial.checklist.template">
+        <field name="type">dispatch</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="checklist_item_dp_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_dispatch"/>
+        <field name="sequence">10</field>
+        <field name="name">Gear inventory checked against event manifest</field>
+    </record>
+    <record id="checklist_item_dp_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_dispatch"/>
+        <field name="sequence">20</field>
+        <field name="name">Truck / van loaded per loading sequence</field>
+    </record>
+    <record id="checklist_item_dp_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_dispatch"/>
+        <field name="sequence">30</field>
+        <field name="name">Drivers briefed on route and arrival time</field>
+    </record>
+    <record id="checklist_item_dp_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_dispatch"/>
+        <field name="sequence">40</field>
+        <field name="name">Crew briefed on event scope and special instructions</field>
+    </record>
+    <record id="checklist_item_dp_5" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_dispatch"/>
+        <field name="sequence">50</field>
+        <field name="name">Client on-site contact details confirmed</field>
+    </record>
+
+    <!-- 5 — Site Setup (live, Crew Chief) -->
+    <record id="checklist_template_site_setup" model="commercial.checklist.template">
+        <field name="type">site_setup</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="checklist_item_ss_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_site_setup"/>
+        <field name="sequence">10</field>
+        <field name="name">Venue access confirmed at arrival</field>
+    </record>
+    <record id="checklist_item_ss_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_site_setup"/>
+        <field name="sequence">20</field>
+        <field name="name">Gear unloaded and staged</field>
+    </record>
+    <record id="checklist_item_ss_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_site_setup"/>
+        <field name="sequence">30</field>
+        <field name="name">PA + monitors built, soundcheck completed</field>
+    </record>
+    <record id="checklist_item_ss_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_site_setup"/>
+        <field name="sequence">40</field>
+        <field name="name">Lighting positioned and focused</field>
+    </record>
+    <record id="checklist_item_ss_5" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_site_setup"/>
+        <field name="sequence">50</field>
+        <field name="name">Power, safety, and cable runs checked</field>
+    </record>
+
+    <!-- 6 — Client Handover (live, Crew Chief) -->
+    <record id="checklist_template_client_handover" model="commercial.checklist.template">
+        <field name="type">client_handover</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="checklist_item_ch_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_client_handover"/>
+        <field name="sequence">10</field>
+        <field name="name">Client walkthrough completed</field>
+    </record>
+    <record id="checklist_item_ch_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_client_handover"/>
+        <field name="sequence">20</field>
+        <field name="name">Run-of-show reviewed with client</field>
+    </record>
+    <record id="checklist_item_ch_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_client_handover"/>
+        <field name="sequence">30</field>
+        <field name="name">Mic / lectern / AV cue points confirmed with MC</field>
+    </record>
+    <record id="checklist_item_ch_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_client_handover"/>
+        <field name="sequence">40</field>
+        <field name="name">Emergency contacts (medical / security) noted</field>
+    </record>
+
+    <!-- 7 — Strike Down (live, Crew Chief) -->
+    <record id="checklist_template_strike" model="commercial.checklist.template">
+        <field name="type">strike</field>
+        <field name="sequence">70</field>
+    </record>
+    <record id="checklist_item_st_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_strike"/>
+        <field name="sequence">10</field>
+        <field name="name">Power down sequence followed</field>
+    </record>
+    <record id="checklist_item_st_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_strike"/>
+        <field name="sequence">20</field>
+        <field name="name">Lighting rig de-rigged, fixtures packed</field>
+    </record>
+    <record id="checklist_item_st_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_strike"/>
+        <field name="sequence">30</field>
+        <field name="name">PA de-rigged, cables coiled</field>
+    </record>
+    <record id="checklist_item_st_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_strike"/>
+        <field name="sequence">40</field>
+        <field name="name">Venue swept, no Neon gear left behind</field>
+    </record>
+    <record id="checklist_item_st_5" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_strike"/>
+        <field name="sequence">50</field>
+        <field name="name">Truck reloaded for return trip</field>
+    </record>
+
+    <!-- 8 — Equipment Return (post-event, Lead Tech + Finance) -->
+    <record id="checklist_template_returned" model="commercial.checklist.template">
+        <field name="type">returned</field>
+        <field name="sequence">80</field>
+    </record>
+    <record id="checklist_item_rt_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_returned"/>
+        <field name="sequence">10</field>
+        <field name="name">All items returned to workshop and signed in</field>
+    </record>
+    <record id="checklist_item_rt_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_returned"/>
+        <field name="sequence">20</field>
+        <field name="name">Inventory reconciled against event manifest</field>
+    </record>
+    <record id="checklist_item_rt_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_returned"/>
+        <field name="sequence">30</field>
+        <field name="name">Damaged / missing items logged for repair / replacement</field>
+    </record>
+    <record id="checklist_item_rt_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_returned"/>
+        <field name="sequence">40</field>
+        <field name="name">Sub-hire items returned to supplier</field>
+    </record>
+
+    <!-- 9 — Event Closeout (post-event, Lead Tech + Finance) -->
+    <record id="checklist_template_closeout" model="commercial.checklist.template">
+        <field name="type">closeout</field>
+        <field name="sequence">90</field>
+    </record>
+    <record id="checklist_item_co_1" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_closeout"/>
+        <field name="sequence">10</field>
+        <field name="name">Final invoice issued and dispatched to client</field>
+    </record>
+    <record id="checklist_item_co_2" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_closeout"/>
+        <field name="sequence">20</field>
+        <field name="name">Outstanding balance status confirmed with Finance</field>
+    </record>
+    <record id="checklist_item_co_3" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_closeout"/>
+        <field name="sequence">30</field>
+        <field name="name">Post-event debrief completed with crew</field>
+    </record>
+    <record id="checklist_item_co_4" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_closeout"/>
+        <field name="sequence">40</field>
+        <field name="name">Client feedback captured</field>
+    </record>
+    <record id="checklist_item_co_5" model="commercial.checklist.template.item">
+        <field name="template_id" ref="checklist_template_closeout"/>
+        <field name="sequence">50</field>
+        <field name="name">Incidents log reviewed; follow-ups assigned</field>
+    </record>
+
+</odoo>
