@@ -1,0 +1,79 @@
+# Recreate the 4 test users + assignment for browser deep-link spot-check.
+
+# FK guard: drop any crew assignments + activities first.
+existing = env['res.users'].search([('login', 'in', [
+    'p2m75_sales', 'p2m75_mgr', 'p2m75_lead', 'p2m75_crew'
+])])
+if existing:
+    crew_rows = env['commercial.job.crew'].sudo().search([
+        ('user_id', 'in', existing.ids)])
+    if crew_rows:
+        print(f"  removing {len(crew_rows)} dependent crew assignments")
+        crew_rows.unlink()
+    acts = env['mail.activity'].sudo().search([
+        ('user_id', 'in', existing.ids)])
+    if acts:
+        print(f"  removing {len(acts)} dependent activities")
+        acts.unlink()
+    print(f"Removing {len(existing)} existing user(s)")
+    existing.unlink()
+
+g_user = env.ref('neon_jobs.group_neon_jobs_user')
+g_manager = env.ref('neon_jobs.group_neon_jobs_manager')
+g_crew_leader = env.ref('neon_jobs.group_neon_jobs_crew_leader')
+g_crew = env.ref('neon_jobs.group_neon_jobs_crew')
+g_internal = env.ref('base.group_user')
+
+users_spec = [
+    ('p2m75_sales', 'P2M75 Sales', g_user),
+    ('p2m75_mgr', 'P2M75 Manager', g_manager),
+    ('p2m75_lead', 'P2M75 Crew Leader', g_crew_leader),
+    ('p2m75_crew', 'P2M75 Crew', g_crew),
+]
+
+created = {}
+for login, name, neon_group in users_spec:
+    user = env['res.users'].create({
+        'name': name,
+        'login': login,
+        'password': 'test123',
+        'email': f'{login}@test.local',
+        'groups_id': [(6, 0, [g_internal.id, neon_group.id])],
+    })
+    if neon_group in (g_crew_leader, g_crew) and g_user in user.groups_id:
+        user.write({'groups_id': [(3, g_user.id)]})
+    print(f"Created {login} (id={user.id})")
+    created[login] = user
+
+env.cr.commit()
+
+# Ensure p2m75_crew has a confirmed assignment on an active/pending job
+print()
+print("=== Confirmed-assignment check ===")
+crew_user = created['p2m75_crew']
+existing_assigns = env['commercial.job.crew'].search([
+    ('user_id', '=', crew_user.id),
+    ('state', '=', 'confirmed'),
+])
+if existing_assigns:
+    print(f"p2m75_crew already has {len(existing_assigns)} confirmed assignment(s) — no action needed.")
+    for a in existing_assigns:
+        print(f"  -> {a.job_id.name} ({a.job_id.state})")
+else:
+    job = env['commercial.job'].search([
+        ('state', 'in', ['active', 'pending']),
+    ], limit=1)
+    if job:
+        # Use sudo because the model's create() override calls
+        # _retrigger_parent_gate which writes to commercial.job — fine
+        # since we're env.user (admin).
+        assignment = env['commercial.job.crew'].create({
+            'job_id': job.id,
+            'user_id': crew_user.id,
+            'role': 'tech',
+            'state': 'confirmed',
+        })
+        env.cr.commit()
+        print(f"Manufactured assignment {assignment.id} for p2m75_crew on {job.name} (state={job.state}).")
+    else:
+        print("WARNING: no active/pending job found — cannot manufacture assignment.")
