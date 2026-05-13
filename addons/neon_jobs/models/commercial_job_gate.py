@@ -417,6 +417,20 @@ class CommercialJob(models.Model):
             "gate_run_at": result["evaluated_at"],
             "gate_check_log": json.dumps(log_payload, default=str),
         })
+        # P4.M6 — fire the capacity_gate Action Centre trigger when
+        # the persisted gate result needs manager attention. 'warning'
+        # = consider override; 'reject' = must decide. 'overridden'
+        # is a manager-driven post-decision state and does not
+        # re-fire. Defensive wrap: an Action Centre failure must
+        # never break the gate evaluation path.
+        if persisted in ("warning", "reject"):
+            try:
+                self._action_centre_create_item("capacity_gate")
+            except Exception as e:
+                _logger.warning(
+                    "Action Centre capacity_gate trigger failed "
+                    "for %s: %s", self.name, e,
+                )
         if post_change_chatter and old_aggregate != persisted:
             failing = [c for c in result["checks"]
                        if c["result"] in ("warning", "reject")]

@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+# Action Centre abstract mixin must load before the source models
+# that inherit it (commercial.job, commercial.event.job). The other
+# Action Centre models (tag, trigger_config, item, history) carry
+# no inheritance edges into the Phase 2/3 source models, so they
+# can stay grouped at the bottom for readability.
+from . import action_centre_mixin
 from . import venue_room
 from . import res_partner
 from . import commercial_job_master
@@ -16,6 +22,5 @@ from . import crm_lead
 from . import sale_order
 from . import action_centre_item_tag
 from . import action_centre_trigger_config
-from . import action_centre_mixin
 from . import action_centre_item
 from . import action_centre_item_history

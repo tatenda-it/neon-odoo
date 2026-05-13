@@ -11,10 +11,14 @@ execution. State machine (P3.M3) and Readiness Score compute
 (P3.M4) land in subsequent milestones; this milestone establishes
 the schema, security, and basic UI only.
 """
+import logging
 from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+
+_logger = logging.getLogger(__name__)
 
 
 _EVENT_JOB_STATES = [
@@ -84,7 +88,7 @@ _READINESS_OVERRIDE_GROUPS = ("crew_leader", "manager")
 class CommercialEventJob(models.Model):
     _name = "commercial.event.job"
     _description = "Event Job — operational execution layer (Phase 3)"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "action.centre.mixin"]
     _order = "event_date desc, name desc"
 
     # === Identity ===
@@ -820,6 +824,19 @@ class CommercialEventJob(models.Model):
         # opens with its 9 checklists already populated.
         for rec in records:
             rec._create_event_job_checklists()
+        # P4.M5 — fire the event_created Action Centre trigger on
+        # each new event_job. Wrapped defensively: an Action Centre
+        # failure must never block event_job creation. Idempotency
+        # in the mixin handles double-fires (e.g. if Odoo replays
+        # the create() inside a savepoint).
+        for rec in records:
+            try:
+                rec._action_centre_create_item("event_created")
+            except Exception as e:
+                _logger.warning(
+                    "Action Centre event_created trigger failed "
+                    "for %s: %s", rec.name, e,
+                )
         return records
 
     def _create_event_job_checklists(self):
@@ -1903,6 +1920,83 @@ class CommercialEventJob(models.Model):
             ", ".join(available_labels) if available_labels else ""
         )
         self.readiness_breakdown = "\n".join(breakdown_lines)
+        # P4.M5 — evaluate readiness-driven Action Centre triggers
+        # off the back of the readiness write. Fires on every compute
+        # pass; idempotency (_find_existing_open_item) handles
+        # duplicates. Defensive wrap: trigger failures never break
+        # the readiness compute. Known optimisation point: if page-
+        # load regressions appear, route trigger eval through the
+        # explicit Recompute button + write paths only.
+        try:
+            self._evaluate_readiness_triggers()
+        except Exception as e:
+            _logger.warning(
+                "Action Centre readiness trigger evaluation failed "
+                "for %s: %s", self.name, e,
+            )
+
+    def _evaluate_readiness_triggers(self):
+        """P4.M5 — fire / auto-close the readiness alerts based on
+        the freshly computed readiness_score and proximity to event.
+
+        readiness_50 is an alert with auto_close_when_condition_clears
+        — fires below 50, auto-closes once back above. readiness_70
+        is a task — fires when score < 70 within 3 days of event,
+        and explicitly does NOT auto-close (manual closure per Q3).
+        """
+        self.ensure_one()
+        if self.state in ("completed", "closed", "cancelled", "released"):
+            return
+        score = self.readiness_score or 0.0
+
+        # readiness_50: alert when score below threshold; auto-close
+        # via _action_centre_close_items when it recovers.
+        if score < 50:
+            self._action_centre_create_item("readiness_50")
+        else:
+            self._action_centre_close_items("readiness_50")
+
+        # readiness_70: task only fires within 3 days of event start
+        # (per design D4b — the gate is "approaching dispatch with
+        # weak score"). Task does NOT auto-close.
+        if self.event_date:
+            days_to_event = (self.event_date - fields.Date.today()).days
+            if 0 <= days_to_event < 3 and score < 70:
+                self._action_centre_create_item("readiness_70")
+
+    @api.model
+    def _evaluate_closeout_overdue_trigger(self):
+        """P4.M5 — called from the daily Action Centre cron via the
+        split pattern: cron lives on action.centre.item, per-trigger
+        logic lives here on the source. Fires closeout_overdue items
+        for event_jobs that have been in 'completed' for ≥ 7 days
+        (event_date ≤ today - 7) and haven't yet been closed.
+
+        Idempotency from _action_centre_create_item — repeated cron
+        runs don't spawn duplicates.
+        """
+        cutoff = fields.Date.today() - timedelta(days=7)
+        overdue = self.sudo().search([
+            ("state", "=", "completed"),
+            ("event_date", "<=", cutoff),
+        ])
+        created = 0
+        for event in overdue:
+            try:
+                item = event._action_centre_create_item("closeout_overdue")
+                if item:
+                    created += 1
+            except Exception as e:
+                _logger.warning(
+                    "closeout_overdue trigger failed for %s: %s",
+                    event.name, e,
+                )
+        _logger.info(
+            "Action Centre closeout_overdue: %d candidates, "
+            "%d items created/refreshed.",
+            len(overdue), created,
+        )
+        return True
 
     # ============================================================
     # === Write block — protect the audit trail

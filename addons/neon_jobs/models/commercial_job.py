@@ -48,7 +48,7 @@ _OPERATIONAL_STATUS_TRANSITIONS = {
 class CommercialJob(models.Model):
     _name = "commercial.job"
     _description = "Commercial Job — central event record (Phase 2)"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "action.centre.mixin"]
     _order = "event_date desc, name desc"
 
     # === Identity ===
@@ -654,6 +654,16 @@ class CommercialJob(models.Model):
                     "then click Archive Lost again."
                 ))
             rec.write({"state": "archived"})
+            # P4.M6 — fire the lost Action Centre trigger so sales
+            # picks up a follow-up task. Defensive wrap: an Action
+            # Centre failure must never block the loss capture flow.
+            try:
+                rec._action_centre_create_item("lost")
+            except Exception as e:
+                _logger.warning(
+                    "Action Centre lost trigger failed for %s: %s",
+                    rec.name, e,
+                )
 
     # ============================================================
     # === Onchange — UX helpers

@@ -41,25 +41,25 @@ _logger = logging.getLogger(__name__)
 # with the source recordset bound to {source}.
 TRIGGER_REGISTRY = {
     "capacity_gate": {
-        "default_title": "Review capacity gate on {source.display_name}",
+        "default_title": "Review capacity gate for {source.name} ({source.partner_id.name})",
     },
     "lost": {
-        "default_title": "Follow up on lost job {source.display_name}",
+        "default_title": "Review loss of {source.name} — consider follow-up",
     },
     "event_created": {
-        "default_title": "New event job — acknowledge and move to planning: {source.display_name}",
+        "default_title": "Set Lead Tech for {source.name}",
     },
     "readiness_50": {
-        "default_title": "Readiness at risk on {source.display_name} (score below 50)",
+        "default_title": "Readiness at risk: {source.name} ({source.readiness_score}%)",
     },
     "readiness_70": {
-        "default_title": "Readiness below dispatch threshold on {source.display_name}",
+        "default_title": "Address readiness gaps for {source.name} (score {source.readiness_score}%, event {source.event_date})",
     },
     "scope_change": {
         "default_title": "Scope change to review: {source.display_name}",
     },
     "closeout_overdue": {
-        "default_title": "Closeout overdue on {source.display_name}",
+        "default_title": "Complete closeout for {source.name} (event date {source.event_date})",
     },
     "sla_passed": {
         "default_title": "Closeout SLA passed on {source.display_name}",

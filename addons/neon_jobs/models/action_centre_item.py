@@ -708,30 +708,27 @@ class ActionCentreItem(models.Model):
 
     @api.model
     def _cron_evaluate_time_based_triggers(self):
-        """Daily cron — scaffolding for time-based trigger
-        evaluation. P4.M4 ships the iteration shell only; the
-        actual trigger evaluators (sla_passed, closeout_overdue,
-        feedback_followup) land in P4.M5+ as the mixin gets
-        integrated with real source models.
+        """Daily cron — dispatch to per-trigger evaluators living on
+        the source models. The cron lives here so the schedule is
+        centralised; per-trigger logic lives on the source so each
+        evaluator owns its data shape (P4.M5+ split pattern).
 
-        Per D3, this exists so the cron schedule is in place from
-        the milestone where escalation lands, ready to be filled
-        in without a schema change. Today it just iterates the
-        enabled time-based configs and logs the count.
+        Currently dispatched:
+          * closeout_overdue (P4.M5) → commercial.event.job
+
+        P4.M7 adds: sla_passed, feedback_followup.
         """
+        EventJob = self.env["commercial.event.job"].sudo()
         Config = self.env["action.centre.trigger.config"].sudo()
-        time_based_types = (
-            "sla_passed", "closeout_overdue", "feedback_followup",
-            "readiness_50", "readiness_70",
-        )
-        enabled = Config.search([
-            ("trigger_type", "in", time_based_types),
-            ("is_enabled", "=", True),
-        ])
-        _logger.info(
-            "Action Centre time-based trigger cron: %d enabled "
-            "trigger types ready for evaluation (P4.M5+ wires the "
-            "actual evaluators).",
-            len(enabled),
-        )
+
+        # closeout_overdue — only run if the config is enabled
+        cfg_closeout = Config.search(
+            [("trigger_type", "=", "closeout_overdue")], limit=1)
+        if cfg_closeout and cfg_closeout.is_enabled:
+            try:
+                EventJob._evaluate_closeout_overdue_trigger()
+            except Exception:
+                _logger.exception(
+                    "Action Centre closeout_overdue evaluator raised")
+
         return True
