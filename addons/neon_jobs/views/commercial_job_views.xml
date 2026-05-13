@@ -267,7 +267,14 @@
                             <group>
                                 <field name="equipment_count"/>
                             </group>
-                            <field name="equipment_summary"
+                            <!-- P3.M8.5.1 — bare Text field directly
+                                 under <page> with nolabel + colspan=2,
+                                 matching the Tab 2 (Client Notes) idiom
+                                 on commercial.event.job. Was rendering
+                                 as a narrow label-field row without
+                                 these attributes. -->
+                            <separator string="Equipment Summary"/>
+                            <field name="equipment_summary" nolabel="1" colspan="2"
                                    placeholder="Main items: e.g. 2x line array PA, 1x DJ booth, 16-channel monitor mix, 8x moving heads, 3x dimmer packs…"/>
                         </page>
                         <page string="Capacity Gate">
@@ -282,10 +289,24 @@
                                 </group>
                                 <group>
                                     <field name="gate_override_by" readonly="1"/>
-                                    <field name="gate_override_reason" readonly="1"/>
                                 </group>
                             </group>
-                            <group string="Latest evaluation">
+                            <!-- P3.M8.5.1 — gate_override_reason broken
+                                 out of the structured group so the Text
+                                 stretches full-width; the Char neighbor
+                                 (gate_override_by) keeps its label-field
+                                 row above. -->
+                            <separator string="Override Reason"
+                                       invisible="not gate_override_by"/>
+                            <field name="gate_override_reason" nolabel="1"
+                                   colspan="2" readonly="1"
+                                   invisible="not gate_override_by"/>
+                            <!-- P3.M8.5.1 — col=1 on the wrapping group,
+                                 matching the Raw JSON log neighbor that
+                                 already rendered full-width. Was 75px
+                                 cramped in default col=2 (4-column grid,
+                                 single nolabel field in cell 2 of 4). -->
+                            <group string="Latest evaluation" col="1">
                                 <field name="gate_check_log_summary" nolabel="1" readonly="1"
                                        placeholder="No evaluation yet — the gate fires automatically when the job is activated."/>
                             </group>
@@ -295,12 +316,16 @@
                             </group>
                         </page>
                         <page string="Loss Capture" invisible="state not in ('pending','archived')">
+                            <!-- P3.M8.5.1 — loss_reason broken out of
+                                 the structured group (Tab 2 idiom);
+                                 lost_to_competitor Char stays in a
+                                 label-field group for the structured
+                                 label. -->
+                            <separator string="Loss Reason"/>
+                            <field name="loss_reason" nolabel="1" colspan="2"
+                                   placeholder="Required before archiving — fill in why the job was lost (competitor, budget, timing, etc.)."/>
                             <group>
-                                <group>
-                                    <field name="loss_reason"
-                                           placeholder="Required before archiving — fill in why the job was lost (competitor, budget, timing, etc.)."/>
-                                    <field name="lost_to_competitor"/>
-                                </group>
+                                <field name="lost_to_competitor"/>
                             </group>
                         </page>
                     </notebook>
