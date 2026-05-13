@@ -132,5 +132,27 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P4.M1 — Action Centre visibility for crew tier. Crew sees
+            only items where they are the primary assignee, the
+            escalated_to user, or the creator. Cross-event filtering
+            (via source_record → event_job → crew assignment) lands
+            in P4.M5+ when the mixin is integrated with event_job;
+            for P4.M1 the assignment-based scoping is sufficient.
+
+            Managers / Sales / Crew Leaders bypass via their CSV
+            grants (ir.rules OR-combine per group).
+        -->
+        <record id="action_centre_item_rule_crew_own" model="ir.rule">
+            <field name="name">Action Centre: crew sees own items only</field>
+            <field name="model_id" ref="model_action_centre_item"/>
+            <field name="domain_force">['|', '|', ('primary_assignee_id', '=', user.id), ('escalated_to_id', '=', user.id), ('created_by_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

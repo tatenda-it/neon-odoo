@@ -68,5 +68,16 @@
             ])]"/>
         </record>
 
+        <!-- P4.M1 — Action Centre menu group overlay. Same defensive
+             pattern as the rest: (6, 0, [...]) replaces the set so
+             future -u operations don't accumulate stale group links. -->
+        <record id="menu_action_centre" model="ir.ui.menu">
+            <field name="groups_id" eval="[(6, 0, [
+                ref('neon_jobs.group_neon_jobs_user'),
+                ref('neon_jobs.group_neon_jobs_manager'),
+                ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ])]"/>
+        </record>
+
     </data>
 </odoo>

@@ -93,6 +93,17 @@
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="37"/>
 
+    <!-- P4.M1 — Action Centre (proactive task + alert engine).
+         Gated to user/manager/crew_leader; crew tier is filtered by
+         ir.rule (own assignments) on the model when reached via
+         deep-link. -->
+    <menuitem id="menu_action_centre"
+              name="Action Centre"
+              parent="menu_operations_root"
+              action="action_centre_item_action"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="38"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"
@@ -117,5 +128,12 @@
               action="commercial_checklist_template_action"
               groups="neon_jobs.group_neon_jobs_manager"
               sequence="30"/>
+
+    <menuitem id="menu_action_centre_tags"
+              name="Action Centre Tags"
+              parent="menu_operations_config"
+              action="action_centre_item_tag_action"
+              groups="neon_jobs.group_neon_jobs_manager"
+              sequence="40"/>
 
 </odoo>

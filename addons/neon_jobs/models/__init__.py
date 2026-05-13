@@ -14,3 +14,5 @@ from . import commercial_job_dashboard
 from . import crm_stage
 from . import crm_lead
 from . import sale_order
+from . import action_centre_item_tag
+from . import action_centre_item

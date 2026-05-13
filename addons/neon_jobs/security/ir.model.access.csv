@@ -61,3 +61,11 @@ access_commercial_event_feedback_crew,commercial.event.feedback crew (read-only 
 access_commercial_event_job_gear_reconciled_override_wizard_crew_leader,gear override wizard crew_leader,model_commercial_event_job_gear_reconciled_override_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
 access_commercial_event_job_gear_reconciled_override_wizard_manager,gear override wizard manager,model_commercial_event_job_gear_reconciled_override_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_commercial_event_job_finance_handoff_override_wizard_manager,finance handoff override wizard manager,model_commercial_event_job_finance_handoff_override_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_action_centre_item_user,action.centre.item user,model_action_centre_item,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_action_centre_item_crew_leader,action.centre.item crew_leader,model_action_centre_item,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_action_centre_item_manager,action.centre.item manager,model_action_centre_item,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_action_centre_item_crew,action.centre.item crew (read-only own via ir.rule),model_action_centre_item,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_action_centre_item_tag_user,action.centre.item.tag user (read),model_action_centre_item_tag,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_action_centre_item_tag_crew_leader,action.centre.item.tag crew_leader (read),model_action_centre_item_tag,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_action_centre_item_tag_crew,action.centre.item.tag crew (read),model_action_centre_item_tag,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_action_centre_item_tag_manager,action.centre.item.tag manager (full),model_action_centre_item_tag,neon_jobs.group_neon_jobs_manager,1,1,1,1

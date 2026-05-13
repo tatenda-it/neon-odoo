@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ====================================================== -->
+    <!-- Tag form/tree (manager-only maintenance)               -->
+    <!-- ====================================================== -->
+    <record id="action_centre_item_tag_view_tree" model="ir.ui.view">
+        <field name="name">action.centre.item.tag.tree</field>
+        <field name="model">action.centre.item.tag</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="name"/>
+                <field name="color" widget="color_picker"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_centre_item_tag_action" model="ir.actions.act_window">
+        <field name="name">Action Centre Tags</field>
+        <field name="res_model">action.centre.item.tag</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Action Centre Item — tree                              -->
+    <!-- ====================================================== -->
+    <record id="action_centre_item_view_tree" model="ir.ui.view">
+        <field name="name">action.centre.item.tree</field>
+        <field name="model">action.centre.item</field>
+        <field name="arch" type="xml">
+            <tree string="Action Centre"
+                  decoration-danger="is_overdue == True"
+                  decoration-warning="priority == 'urgent' and not is_overdue"
+                  decoration-muted="state in ('done', 'cancelled')">
+                <field name="name"/>
+                <field name="item_type" widget="badge"
+                       decoration-info="item_type == 'task'"
+                       decoration-warning="item_type == 'alert'"/>
+                <field name="title"/>
+                <field name="priority" widget="badge"
+                       decoration-success="priority == 'low'"
+                       decoration-info="priority == 'medium'"
+                       decoration-warning="priority == 'high'"
+                       decoration-danger="priority == 'urgent'"/>
+                <field name="due_date"/>
+                <field name="is_overdue" widget="boolean_toggle" optional="show"/>
+                <field name="primary_role" optional="show"/>
+                <field name="primary_assignee_id"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'open'"
+                       decoration-warning="state == 'in_progress'"
+                       decoration-success="state == 'done'"
+                       decoration-muted="state == 'cancelled'"/>
+                <field name="created_by_id" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Action Centre Item — kanban                            -->
+    <!-- ====================================================== -->
+    <record id="action_centre_item_view_kanban" model="ir.ui.view">
+        <field name="name">action.centre.item.kanban</field>
+        <field name="model">action.centre.item</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="priority"/>
+                <field name="due_date"/>
+                <field name="is_overdue"/>
+                <field name="primary_assignee_id"/>
+                <field name="item_type"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click
+                                          #{record.is_overdue.raw_value ? 'oe_kanban_color_2' : ''}">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title">
+                                        <field name="title"/>
+                                    </strong>
+                                    <div class="text-muted small">
+                                        <field name="name"/>
+                                    </div>
+                                </div>
+                                <field name="priority" widget="priority"/>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div t-if="record.due_date.raw_value"
+                                     t-attf-class="#{record.is_overdue.raw_value ? 'text-danger' : 'text-muted'}">
+                                    Due: <field name="due_date"/>
+                                </div>
+                                <div t-if="record.item_type.raw_value == 'alert'"
+                                     class="badge text-bg-warning">Alert</div>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="oe_kanban_bottom_left"/>
+                                <div class="oe_kanban_bottom_right">
+                                    <field name="primary_assignee_id"
+                                           widget="many2one_avatar_user"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Action Centre Item — form                              -->
+    <!-- ====================================================== -->
+    <record id="action_centre_item_view_form" model="ir.ui.view">
+        <field name="name">action.centre.item.form</field>
+        <field name="model">action.centre.item</field>
+        <field name="arch" type="xml">
+            <form string="Action Centre Item">
+                <header>
+                    <button name="action_mark_in_progress"
+                            string="Mark In Progress"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'open'"/>
+                    <button name="action_mark_done"
+                            string="Mark Done"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state not in ('open', 'in_progress')"/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            invisible="state in ('done', 'cancelled')"
+                            confirm="Cancelling requires a closure reason. Continue?"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="open,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                        <h3>
+                            <field name="title" placeholder="Title..."/>
+                        </h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="item_type"/>
+                            <field name="priority"/>
+                            <field name="tag_ids" widget="many2many_tags"
+                                   options="{'color_field': 'color'}"/>
+                        </group>
+                        <group>
+                            <field name="due_date"/>
+                            <field name="is_overdue" readonly="1"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Detail" name="detail">
+                            <group>
+                                <field name="description"
+                                       placeholder="What needs to happen..."/>
+                            </group>
+                            <group string="Assignment">
+                                <field name="primary_role"/>
+                                <field name="primary_assignee_id"/>
+                                <field name="escalation_level" readonly="1"/>
+                                <field name="escalated_to_id" readonly="1"
+                                       invisible="escalation_level == 0"/>
+                                <field name="escalated_at" readonly="1"
+                                       invisible="escalation_level == 0"/>
+                            </group>
+                        </page>
+                        <page string="Source" name="source">
+                            <group>
+                                <field name="source_model_id"
+                                       options="{'no_create': True, 'no_open': True}"/>
+                                <field name="source_id"/>
+                                <field name="source_record" readonly="1"/>
+                                <field name="is_manual" readonly="1"/>
+                                <field name="trigger_type" readonly="1"/>
+                                <field name="parent_item_id"
+                                       options="{'no_create': True}"/>
+                            </group>
+                        </page>
+                        <page string="Closure" name="closure"
+                              invisible="state not in ('done', 'cancelled')">
+                            <group>
+                                <field name="closed_by_id" readonly="1"/>
+                                <field name="closed_at" readonly="1"/>
+                                <field name="closure_reason"/>
+                                <field name="notification_channels"/>
+                            </group>
+                        </page>
+                        <page string="Audit" name="audit">
+                            <div class="text-muted">
+                                <p>History will appear here in P4.M4.</p>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Action Centre Item — search                            -->
+    <!-- ====================================================== -->
+    <record id="action_centre_item_view_search" model="ir.ui.view">
+        <field name="name">action.centre.item.search</field>
+        <field name="model">action.centre.item</field>
+        <field name="arch" type="xml">
+            <search string="Action Centre">
+                <field name="title"/>
+                <field name="description"/>
+                <field name="primary_assignee_id"/>
+                <field name="source_model_id"/>
+                <field name="tag_ids"/>
+                <separator/>
+                <filter name="my_open_tasks" string="My Open Tasks"
+                        domain="[('state', '=', 'open'),
+                                 ('primary_assignee_id', '=', uid)]"/>
+                <!-- Inlined is_overdue: due_date set, in past, not closed.
+                     (is_overdue is non-stored so can't appear in a
+                     domain directly.) -->
+                <filter name="overdue" string="Overdue"
+                        domain="[('due_date', '!=', False),
+                                 ('due_date', '&lt;', context_today().strftime('%Y-%m-%d %H:%M:%S')),
+                                 ('state', 'not in', ('done', 'cancelled'))]"/>
+                <filter name="manual" string="Manual"
+                        domain="[('is_manual', '=', True)]"/>
+                <separator/>
+                <filter name="state_open" string="Open"
+                        domain="[('state', '=', 'open')]"/>
+                <filter name="state_in_progress" string="In Progress"
+                        domain="[('state', '=', 'in_progress')]"/>
+                <filter name="state_done" string="Done"
+                        domain="[('state', '=', 'done')]"/>
+                <separator/>
+                <filter name="type_task" string="Tasks"
+                        domain="[('item_type', '=', 'task')]"/>
+                <filter name="type_alert" string="Alerts"
+                        domain="[('item_type', '=', 'alert')]"/>
+                <separator/>
+                <filter name="archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_priority" string="Priority"
+                            context="{'group_by': 'priority'}"/>
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_item_type" string="Type"
+                            context="{'group_by': 'item_type'}"/>
+                    <filter name="group_primary_role" string="Primary Role"
+                            context="{'group_by': 'primary_role'}"/>
+                    <filter name="group_assignee" string="Assignee"
+                            context="{'group_by': 'primary_assignee_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Action window                                          -->
+    <!-- ====================================================== -->
+    <record id="action_centre_item_action" model="ir.actions.act_window">
+        <field name="name">Action Centre</field>
+        <field name="res_model">action.centre.item</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id" ref="action_centre_item_view_search"/>
+        <field name="context">{'search_default_my_open_tasks': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No action centre items yet
+            </p>
+            <p>
+                Action Centre items surface tasks and alerts that
+                need your attention. Items can be created manually
+                or generated automatically by event triggers (P4.M2+).
+            </p>
+        </field>
+    </record>
+
+</odoo>
