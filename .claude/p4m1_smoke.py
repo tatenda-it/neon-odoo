@@ -492,12 +492,101 @@ results["T167"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T168 - Overdue filter: domain returns correct items per role")
+print("=" * 72)
+# Use the EXACT domain the view filter evaluates to. The view uses
+# context_today().strftime('%Y-%m-%d'); we replicate via Date.today().
+today_str = fields.Date.today().strftime('%Y-%m-%d')
+overdue_domain = [
+    ("due_date", "!=", False),
+    ("due_date", "<", today_str),
+    ("state", "not in", ("done", "cancelled")),
+]
+# Build a clean three-record fixture assigned to crew_leader so all
+# roles can see them via their unrestricted CSV grants (or, for crew,
+# via the row-level rule on primary_assignee_id).
+past_dt = fields.Datetime.subtract(fields.Datetime.now(), days=2)
+future_dt = fields.Datetime.add(fields.Datetime.now(), days=2)
+i168_past_open = _new_item(
+    "T168_past_open", assignee=crew_leader, due=past_dt, user=manager)
+i168_future_open = _new_item(
+    "T168_future_open", assignee=crew_leader, due=future_dt, user=manager)
+i168_past_done = _new_item(
+    "T168_past_done", assignee=crew_leader, due=past_dt, user=manager)
+# Close the third one
+i168_past_done.with_user(crew_leader).action_mark_done()
+i168_past_done.invalidate_recordset()
+
+ok = True
+for u in (sales, crew_leader, manager):
+    try:
+        hits = env["action.centre.item"].with_user(u).search(overdue_domain)
+        titles = hits.mapped("title")
+        has_past_open = i168_past_open in hits
+        has_future_open = i168_future_open in hits
+        has_past_done = i168_past_done in hits
+        print(f"  {u.login}: hits={len(hits)}, "
+              f"past+open={has_past_open}, "
+              f"future+open={has_future_open}, "
+              f"past+done={has_past_done}")
+        if not has_past_open or has_future_open or has_past_done:
+            ok = False
+    except Exception as e:
+        print(f"  {u.login}: FAILED -> {type(e).__name__}: {str(e)[:120]}")
+        ok = False
+print("T168:", "PASS" if ok else "FAIL")
+results["T168"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T169 - Manual items can set source_model_id + source_id")
+print("=" * 72)
+src_model = env["ir.model"].sudo().search(
+    [("model", "=", "commercial.event.job")], limit=1)
+some_evt = env["commercial.event.job"].sudo().search([], limit=1)
+if not src_model or not some_evt:
+    print("  SKIP — no event_job in DB")
+    results["T169"] = None
+else:
+    i169 = _new_item("T169_manual_with_source",
+                     assignee=sales, user=sales)
+    # is_manual=True by default for manual creation
+    i169.invalidate_recordset()
+    is_manual_before = i169.is_manual
+    # Manager sets source on a manual item
+    i169.with_user(manager).write({
+        "source_model_id": src_model.id,
+        "source_id": some_evt.id,
+    })
+    i169.invalidate_recordset()
+    ok = (
+        is_manual_before is True
+        and i169.source_model_id == src_model
+        and i169.source_id == some_evt.id
+        and i169.source_record
+        and i169.source_record._name == "commercial.event.job"
+        and i169.source_record.id == some_evt.id
+    )
+    print("  is_manual at creation:", is_manual_before)
+    print("  source_model_id set:  ", i169.source_model_id.model)
+    print("  source_id set:        ", i169.source_id)
+    print("  source_record:        ", repr(i169.source_record))
+    print("T169:", "PASS" if ok else "FAIL")
+    results["T169"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
 order = [
     "T151", "T152", "T153", "T154", "T155", "T156", "T157", "T158",
     "T159", "T160", "T161", "T162", "T163",
     "T164", "T165", "T166", "T167",
+    "T168", "T169",
 ]
 for k in order:
     v_ = results.get(k)

@@ -176,12 +176,19 @@
                         </page>
                         <page string="Source" name="source">
                             <group>
-                                <!-- source_model_id / source_id are
-                                     populated by triggers (P4.M2+);
-                                     end-users don't edit them. -->
-                                <field name="source_model_id" readonly="1"
+                                <!-- Manual items can carry an optional
+                                     source link (e.g. "follow up on
+                                     this scope change"). Trigger-
+                                     spawned items keep these locked
+                                     so trigger metadata stays
+                                     authoritative. source_record is
+                                     always read-only — it's computed
+                                     from the model + id. -->
+                                <field name="source_model_id"
+                                       readonly="not is_manual"
                                        options="{'no_create': True, 'no_open': True}"/>
-                                <field name="source_id" readonly="1"/>
+                                <field name="source_id"
+                                       readonly="not is_manual"/>
                                 <field name="source_record" readonly="1"/>
                                 <field name="is_manual" readonly="1"/>
                                 <field name="trigger_type" readonly="1"/>
@@ -230,13 +237,19 @@
                 <filter name="my_open_tasks" string="My Open Tasks"
                         domain="[('state', '=', 'open'),
                                  ('primary_assignee_id', '=', uid)]"/>
-                <!-- Inlined is_overdue (non-stored so can't appear in a
-                     domain directly). context_today() returns a Date;
-                     comparing to a Datetime field works via implicit
-                     coercion (anything due before midnight today). -->
+                <!-- Inlined is_overdue (non-stored so can't appear in
+                     a domain directly). context_today() returns a
+                     Date; the search-view evaluator can't coerce a
+                     raw Date to the Datetime due_date column (fails
+                     with "%H" error from an internal strftime), so
+                     stringify via the codebase-standard '%Y-%m-%d'
+                     format — same pattern as Live Pipeline /
+                     Calendar All-Events filters. Items due before
+                     midnight-today and not yet closed are overdue. -->
                 <filter name="overdue" string="Overdue"
-                        domain="[('due_date', '&lt;', context_today()),
-                                 ('state', 'in', ('open', 'in_progress'))]"/>
+                        domain="[('due_date', '!=', False),
+                                 ('due_date', '&lt;', context_today().strftime('%Y-%m-%d')),
+                                 ('state', 'not in', ('done', 'cancelled'))]"/>
                 <filter name="manual" string="Manual"
                         domain="[('is_manual', '=', True)]"/>
                 <separator/>
