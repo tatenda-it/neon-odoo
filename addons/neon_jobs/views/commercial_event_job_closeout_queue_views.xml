@@ -133,7 +133,7 @@
         <field name="model">commercial.event.job</field>
         <field name="arch" type="xml">
             <kanban default_group_by="state"
-                    default_order="days_since_completed desc, id desc"
+                    default_order="event_date asc, id desc"
                     class="o_kanban_small_column">
                 <field name="name"/>
                 <field name="partner_id"/>
@@ -229,7 +229,7 @@
         <field name="model">commercial.event.job</field>
         <field name="arch" type="xml">
             <tree string="Closeout Queue"
-                  default_order="days_since_completed desc, id desc"
+                  default_order="event_date asc, id desc"
                   decoration-success="days_since_completed &lt;= 7"
                   decoration-warning="days_since_completed &gt; 7 and days_since_completed &lt;= 14"
                   decoration-danger="days_since_completed &gt; 14"
@@ -267,9 +267,16 @@
         <field name="model">commercial.event.job</field>
         <field name="arch" type="xml">
             <pivot string="Closeout Queue Analytics">
+                <!-- 17.0.2.7.2 — no explicit measure: days_since_completed
+                     is a non-stored compute and can't be aggregated by
+                     read_group. Pivots default to record-count which
+                     answers the intended use case ("which Lead Tech
+                     has the most stuck events") without needing a
+                     stored measure. If sum/avg of days-since is needed
+                     in Phase 8 analytics, add a stored mirror field
+                     refreshed by daily cron. -->
                 <field name="lead_tech_id" type="row"/>
                 <field name="state" type="col"/>
-                <field name="days_since_completed" type="measure"/>
             </pivot>
         </field>
     </record>

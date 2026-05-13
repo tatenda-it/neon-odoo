@@ -406,7 +406,14 @@ class CommercialEventJob(models.Model):
     # === Operational notes ===
     lead_tech_notes = fields.Text(string="Lead Tech Notes")
     crew_observations = fields.Text(string="Crew Observations")
-    client_feedback = fields.Text(string="Client Feedback")
+    client_feedback = fields.Text(
+        string="Client Feedback (legacy)",
+        help="DEPRECATED in 17.0.2.5.0 — replaced by the multi-channel "
+        "feedback_ids o2m. Field retained for migration safety; "
+        "scheduled for removal in 17.0.3.x. Renamed to avoid the "
+        "default-label collision with feedback_ids that surfaced "
+        "as an upgrade-log warning during P3.M9 production deploy.",
+    )
     incidents_log = fields.Text(
         string="Incidents Log",
         help="Free-form incident notes. Phase 4 replaces this with a "
