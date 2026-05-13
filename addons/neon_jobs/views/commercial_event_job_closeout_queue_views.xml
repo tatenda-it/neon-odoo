@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P3.M8 — Closeout Queue dashboard. Surfaces event_jobs that
+        are operationally complete but stuck (hard reqs missing, soft
+        reqs outstanding, SLA breach). Built on top of P3.M7's
+        existing computed fields (has_soft_requirements_outstanding,
+        days_since_completed, closeout_missing_summary).
+
+        Single action with kanban / tree / pivot / form view modes.
+        Role-aware default filter is set by the Python model method
+        action_open_closeout_queue (see commercial_event_job.py).
+    -->
+
+    <record id="commercial_event_job_closeout_queue_view_search" model="ir.ui.view">
+        <field name="name">commercial.event.job.closeout.queue.search</field>
+        <field name="model">commercial.event.job</field>
+        <field name="arch" type="xml">
+            <search string="Closeout Queue">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="lead_tech_id"/>
+                <field name="crew_chief_id"/>
+                <field name="closeout_missing_summary"/>
+
+                <!-- ===== State filters ===== -->
+                <separator/>
+                <filter string="All Stuck"
+                        name="filter_all_stuck"
+                        domain="['|',
+                                 ('state', '=', 'completed'),
+                                 '&amp;',
+                                 ('state', '=', 'closed'),
+                                 ('has_soft_requirements_outstanding', '=', True)]"/>
+                <filter string="In Completed"
+                        name="filter_state_completed"
+                        domain="[('state', '=', 'completed')]"/>
+                <filter string="Closed with Soft Outstanding"
+                        name="filter_state_closed_outstanding"
+                        domain="[('state', '=', 'closed'),
+                                 ('has_soft_requirements_outstanding', '=', True)]"/>
+                <filter string="Over SLA (>14 days)"
+                        name="filter_over_sla"
+                        domain="[('days_since_completed', '&gt;', 14),
+                                 ('state', 'in', ('completed', 'closed'))]"/>
+                <filter string="Closed within SLA"
+                        name="filter_within_sla"
+                        domain="[('state', '=', 'closed'),
+                                 ('days_since_completed', '&lt;=', 14)]"/>
+
+                <!-- ===== Ownership filters ===== -->
+                <separator/>
+                <filter string="My Lead Tech"
+                        name="filter_my_lead_tech"
+                        domain="[('lead_tech_id', '=', uid)]"/>
+                <filter string="My Crew Chief"
+                        name="filter_my_crew_chief"
+                        domain="[('crew_chief_id', '=', uid)]"/>
+                <filter string="My Client (partner sales rep)"
+                        name="filter_my_client"
+                        domain="[('partner_id.user_id', '=', uid)]"/>
+
+                <!-- ===== Missing data filters ===== -->
+                <separator/>
+                <filter string="Feedback Missing"
+                        name="filter_feedback_missing"
+                        domain="[('feedback_ids', '=', False)]"/>
+                <filter string="Lead Tech Notes Missing"
+                        name="filter_lead_tech_notes_missing"
+                        domain="['|',
+                                 ('lead_tech_notes', '=', False),
+                                 ('lead_tech_notes', '=', '')]"/>
+                <filter string="Crew Observations Missing"
+                        name="filter_crew_observations_missing"
+                        domain="['|',
+                                 ('crew_observations', '=', False),
+                                 ('crew_observations', '=', '')]"/>
+                <filter string="Gear Reconciled Missing"
+                        name="filter_gear_missing"
+                        domain="[('gear_reconciled', '=', False),
+                                 ('state', 'in', ('completed', 'closed'))]"/>
+                <filter string="Finance Handoff Missing"
+                        name="filter_finance_missing"
+                        domain="[('finance_handoff_complete', '=', False),
+                                 ('state', 'in', ('completed', 'closed'))]"/>
+
+                <!-- ===== Time filters ===== -->
+                <separator/>
+                <filter string="This week (≤7 days)"
+                        name="filter_this_week"
+                        domain="[('days_since_completed', '&lt;=', 7),
+                                 ('state', 'in', ('completed', 'closed'))]"/>
+                <filter string="Last 14 days"
+                        name="filter_last_14"
+                        domain="[('days_since_completed', '&lt;=', 14),
+                                 ('state', 'in', ('completed', 'closed'))]"/>
+                <filter string="Over 30 days"
+                        name="filter_over_30"
+                        domain="[('days_since_completed', '&gt;', 30),
+                                 ('state', 'in', ('completed', 'closed'))]"/>
+
+                <!-- ===== Acknowledgment ===== -->
+                <separator/>
+                <filter string="Hide Acknowledged"
+                        name="filter_hide_acknowledged"
+                        domain="[('is_acknowledged_in_queue', '=', False)]"/>
+                <filter string="Only Acknowledged"
+                        name="filter_only_acknowledged"
+                        domain="[('is_acknowledged_in_queue', '=', True)]"/>
+
+                <!-- ===== Group By ===== -->
+                <group expand="0" string="Group By">
+                    <filter string="State"
+                            name="group_state"
+                            context="{'group_by': 'state'}"/>
+                    <filter string="Lead Tech"
+                            name="group_lead_tech"
+                            context="{'group_by': 'lead_tech_id'}"/>
+                    <filter string="Client"
+                            name="group_partner"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter string="Crew Chief"
+                            name="group_crew_chief"
+                            context="{'group_by': 'crew_chief_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_closeout_queue_view_kanban" model="ir.ui.view">
+        <field name="name">commercial.event.job.closeout.queue.kanban</field>
+        <field name="model">commercial.event.job</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    default_order="days_since_completed desc, id desc"
+                    class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="event_date"/>
+                <field name="state"/>
+                <field name="days_since_completed"/>
+                <field name="has_soft_requirements_outstanding"/>
+                <field name="closeout_missing_summary"/>
+                <field name="gear_reconciled"/>
+                <field name="finance_handoff_complete"/>
+                <field name="feedback_ids"/>
+                <field name="lead_tech_notes"/>
+                <field name="lead_tech_id"/>
+                <field name="is_acknowledged_in_queue"/>
+                <field name="acknowledged_by"/>
+                <field name="acknowledged_at"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click
+                                           #{record.is_acknowledged_in_queue.raw_value
+                                             ? 'opacity-75' : ''}">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong><field name="name"/></strong>
+                                    <span t-if="record.is_acknowledged_in_queue.raw_value"
+                                          class="badge text-bg-info ms-1"
+                                          title="Acknowledged by Manager">ack</span>
+                                    <br/>
+                                    <small><field name="partner_id"/></small>
+                                </div>
+                                <div class="o_kanban_record_top_right">
+                                    <span t-attf-class="badge
+                                            #{record.days_since_completed.raw_value &gt; 14
+                                              ? 'text-bg-danger'
+                                              : (record.days_since_completed.raw_value &gt; 7
+                                                 ? 'text-bg-warning'
+                                                 : 'text-bg-success')}"
+                                          t-attf-title="Days since completed">
+                                        <field name="days_since_completed"/>d
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div class="text-muted">
+                                    Event: <field name="event_date"/>
+                                </div>
+                                <div t-if="record.closeout_missing_summary.raw_value"
+                                     class="text-muted">
+                                    <i class="fa fa-exclamation-triangle me-1"
+                                       title="Missing"/>
+                                    <field name="closeout_missing_summary"/>
+                                </div>
+                                <div class="mt-1">
+                                    <i t-if="!record.gear_reconciled.raw_value"
+                                       class="fa fa-wrench me-2 text-danger"
+                                       title="Gear not reconciled"/>
+                                    <i t-if="!record.finance_handoff_complete.raw_value"
+                                       class="fa fa-money me-2 text-danger"
+                                       title="Finance handoff not complete"/>
+                                    <i t-if="!record.feedback_ids.raw_value.length"
+                                       class="fa fa-comment-o me-2 text-warning"
+                                       title="No client feedback logged"/>
+                                    <i t-if="!record.lead_tech_notes.raw_value"
+                                       class="fa fa-clipboard me-2 text-warning"
+                                       title="Lead Tech notes missing"/>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="oe_kanban_bottom_left">
+                                    <field name="lead_tech_id"
+                                           widget="many2one_avatar_user"/>
+                                </div>
+                                <div class="oe_kanban_bottom_right">
+                                    <button name="action_acknowledge_in_queue"
+                                            type="object"
+                                            class="btn btn-sm btn-outline-info"
+                                            t-if="!record.is_acknowledged_in_queue.raw_value"
+                                            groups="neon_jobs.group_neon_jobs_manager"
+                                            title="Mark as reviewed (manager only)">
+                                        <i class="fa fa-check"/> Review
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_closeout_queue_view_tree" model="ir.ui.view">
+        <field name="name">commercial.event.job.closeout.queue.tree</field>
+        <field name="model">commercial.event.job</field>
+        <field name="arch" type="xml">
+            <tree string="Closeout Queue"
+                  default_order="days_since_completed desc, id desc"
+                  decoration-success="days_since_completed &lt;= 7"
+                  decoration-warning="days_since_completed &gt; 7 and days_since_completed &lt;= 14"
+                  decoration-danger="days_since_completed &gt; 14"
+                  decoration-muted="state == 'closed' and not has_soft_requirements_outstanding">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="event_date"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'completed'"
+                       decoration-success="state == 'closed'"/>
+                <field name="days_since_completed" widget="integer"/>
+                <field name="lead_tech_id" optional="show"/>
+                <field name="crew_chief_id" optional="hide"/>
+                <field name="closeout_missing_summary"/>
+                <field name="gear_reconciled" optional="hide"/>
+                <field name="finance_handoff_complete" optional="hide"/>
+                <field name="feedback_count" optional="show"/>
+                <field name="has_soft_requirements_outstanding" optional="show"/>
+                <field name="is_acknowledged_in_queue" widget="boolean_toggle"
+                       optional="show"/>
+                <field name="acknowledged_by" optional="hide"/>
+                <button name="action_acknowledge_in_queue"
+                        type="object"
+                        string="Mark Reviewed"
+                        class="btn-link"
+                        icon="fa-check"
+                        invisible="is_acknowledged_in_queue"
+                        groups="neon_jobs.group_neon_jobs_manager"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_closeout_queue_view_pivot" model="ir.ui.view">
+        <field name="name">commercial.event.job.closeout.queue.pivot</field>
+        <field name="model">commercial.event.job</field>
+        <field name="arch" type="xml">
+            <pivot string="Closeout Queue Analytics">
+                <field name="lead_tech_id" type="row"/>
+                <field name="state" type="col"/>
+                <field name="days_since_completed" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_action_closeout_queue" model="ir.actions.act_window">
+        <field name="name">Closeout Queue</field>
+        <field name="res_model">commercial.event.job</field>
+        <field name="view_mode">kanban,tree,pivot,form</field>
+        <field name="search_view_id" ref="commercial_event_job_closeout_queue_view_search"/>
+        <field name="domain">[('state', 'in', ('completed', 'closed'))]</field>
+        <field name="context">{'search_default_filter_all_stuck': 1}</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_jobs.group_neon_jobs_user'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                <b>Nothing in the Closeout Queue.</b>
+            </p>
+            <p>
+                Events surface here when they are operationally
+                complete but the soft requirements (client feedback,
+                Lead Tech notes) or the hard close gate (gear
+                reconciled, finance handoff) haven't been wrapped
+                up. The 14-day SLA banner highlights anything older
+                than two weeks.
+            </p>
+        </field>
+    </record>
+
+    <!--
+        Action-window view binding for the pivot — pivot mode is
+        useful for analytics-lite ("which Lead Tech has the most
+        stuck events?") and lives in the same action.
+    -->
+    <record id="commercial_event_job_action_closeout_queue_view_pivot"
+            model="ir.actions.act_window.view">
+        <field name="sequence">3</field>
+        <field name="view_mode">pivot</field>
+        <field name="view_id" ref="commercial_event_job_closeout_queue_view_pivot"/>
+        <field name="act_window_id" ref="commercial_event_job_action_closeout_queue"/>
+    </record>
+
+    <!--
+        Server action wraps the role-aware Python method so the
+        menu can dispatch to a context that differs per logged-in
+        user. The menu's `action` field accepts any ir.actions.*
+        xmlid; the server action's `code` body returns the
+        act_window dict from action_open_closeout_queue, which the
+        web client opens just like a static action.
+    -->
+    <record id="commercial_event_job_closeout_queue_server_action" model="ir.actions.server">
+        <field name="name">Open Closeout Queue (role-aware)</field>
+        <field name="model_id" ref="model_commercial_event_job"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_closeout_queue()</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_jobs.group_neon_jobs_user'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
+    </record>
+
+</odoo>

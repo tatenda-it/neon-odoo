@@ -519,11 +519,43 @@ class CommercialEventJob(models.Model):
         """True when at least one soft requirement is missing —
         feeds P3.M8 'Completed-but-not-Closed' queue. Stays True
         even after the event is Closed (the queue surfaces both
-        completed-but-not-closed AND closed-with-outstanding)."""
+        completed-but-not-closed AND closed-with-outstanding).
+
+        P3.M8 side effect: when soft requirements flip to satisfied,
+        clear is_acknowledged_in_queue automatically — the manager's
+        acknowledgment was for a queue entry that no longer needs
+        attention.
+        """
         for rec in self:
             no_feedback = not rec.feedback_ids
             no_notes = not (rec.lead_tech_notes and rec.lead_tech_notes.strip())
             rec.has_soft_requirements_outstanding = no_feedback or no_notes
+            if (
+                not rec.has_soft_requirements_outstanding
+                and rec.is_acknowledged_in_queue
+            ):
+                rec.is_acknowledged_in_queue = False
+
+    @api.depends("gear_reconciled", "finance_handoff_complete",
+                 "feedback_ids", "lead_tech_notes", "crew_observations")
+    def _compute_closeout_missing_summary(self):
+        """Comma-separated human-readable list of missing closeout
+        components for tree/kanban display. Empty string when fully
+        closed out. Non-stored — recomputes on view.
+        """
+        for rec in self:
+            missing = []
+            if not rec.gear_reconciled:
+                missing.append("gear")
+            if not rec.finance_handoff_complete:
+                missing.append("finance")
+            if not rec.feedback_ids:
+                missing.append("feedback")
+            if not (rec.lead_tech_notes and rec.lead_tech_notes.strip()):
+                missing.append("notes")
+            if not (rec.crew_observations and rec.crew_observations.strip()):
+                missing.append("observations")
+            rec.closeout_missing_summary = ", ".join(missing)
 
     @api.depends("state", "event_date")
     def _compute_days_since_completed(self):
@@ -540,6 +572,31 @@ class CommercialEventJob(models.Model):
                 continue
             delta = (today - rec.event_date).days
             rec.days_since_completed = max(0, delta)
+
+    @api.model
+    def _search_days_since_completed(self, operator, value):
+        """Translate a days_since_completed filter to a stored-field
+        domain on event_date. days_since = today - event_date, so a
+        greater-than days search inverts to a less-than date search.
+        Scoped to state in ('completed', 'closed') because the
+        compute returns 0 outside those states — including non-
+        completed records in the result set would surface every
+        draft event in the queue."""
+        from datetime import timedelta
+        today = fields.Date.context_today(self)
+        inverted = {">": "<", ">=": "<=", "<": ">", "<=": ">=",
+                    "=": "=", "!=": "!="}
+        if operator not in inverted:
+            return [("id", "=", 0)]
+        try:
+            n = int(value)
+        except (TypeError, ValueError):
+            return [("id", "=", 0)]
+        threshold = today - timedelta(days=n)
+        return [
+            ("state", "in", ("completed", "closed")),
+            ("event_date", inverted[operator], threshold),
+        ]
 
     @api.depends_context("uid")
     def _compute_closeout_gates(self):
@@ -653,9 +710,42 @@ class CommercialEventJob(models.Model):
     days_since_completed = fields.Integer(
         string="Days Since Completed",
         compute="_compute_days_since_completed",
+        search="_search_days_since_completed",
         help="Days elapsed since the event_job moved into completed "
         "state. Used for the 14-day SLA badge on the form and the "
-        "P3.M8 queue ordering.",
+        "P3.M8 queue ordering. Not stored (depends on today's date) "
+        "— P3.M8 queue filters translate days-since searches to "
+        "event_date domains via _search_days_since_completed.",
+    )
+    closeout_missing_summary = fields.Char(
+        string="Missing Closeout Items",
+        compute="_compute_closeout_missing_summary",
+        store=True,
+        help="Comma-separated list of missing closeout components "
+        "(gear, finance, feedback, notes, observations). Empty when "
+        "everything's in place. Stored so the P3.M8 queue search "
+        "panel can filter on it.",
+    )
+    is_acknowledged_in_queue = fields.Boolean(
+        string="Acknowledged in Queue",
+        default=False,
+        tracking=True,
+        copy=False,
+        help="Set by Manager via the Closeout Queue 'Mark Reviewed' "
+        "action — signals 'I've seen this is stuck, follow-up "
+        "underway'. Auto-clears when state transitions or when the "
+        "soft requirements flip to satisfied.",
+    )
+    acknowledged_at = fields.Datetime(
+        string="Acknowledged At",
+        readonly=True,
+        copy=False,
+    )
+    acknowledged_by = fields.Many2one(
+        "res.users",
+        string="Acknowledged By",
+        readonly=True,
+        copy=False,
     )
 
     # === P3.M7 — multi-channel feedback (D4) ===
@@ -959,6 +1049,92 @@ class CommercialEventJob(models.Model):
             "context": {"default_event_job_id": self.id},
         }
 
+    # ============================================================
+    # === P3.M8 — Closeout Queue (dashboard for stuck events)
+    # ============================================================
+    def action_acknowledge_in_queue(self):
+        """Manager marks 'I've seen this is stuck, follow-up
+        underway'. Doesn't change state — purely a visual signal
+        for the queue. Auto-clears on state transition or when
+        soft requirements flip to satisfied.
+        """
+        for rec in self:
+            if not rec._user_in_any_group(("manager",)):
+                raise UserError(_(
+                    "Only Managers can acknowledge a stuck event in "
+                    "the Closeout Queue."
+                ))
+            if rec.is_acknowledged_in_queue:
+                raise UserError(_(
+                    "Already acknowledged by %(user)s on %(when)s."
+                ) % {
+                    "user": rec.acknowledged_by.name,
+                    "when": rec.acknowledged_at,
+                })
+            rec.sudo().write({
+                "is_acknowledged_in_queue": True,
+                "acknowledged_at": fields.Datetime.now(),
+                "acknowledged_by": self.env.user.id,
+            })
+            rec.sudo().message_post(
+                body=_("Closeout queue reviewed by %s") % self.env.user.name,
+                author_id=self.env.user.partner_id.id,
+            )
+        return True
+
+    @api.model
+    def action_open_closeout_queue(self):
+        """Role-aware Closeout Queue entry. Default filter depends
+        on the logged-in user's group:
+
+        - Manager: All Stuck (everything overdue, sorted by SLA)
+        - Crew Leader / Lead Tech: My Lead Tech + All Stuck
+          (events they're Lead Tech on, still in queue)
+        - Sales User: My Client + Feedback Missing
+          (events where they own the partner and feedback is missing)
+
+        All filters are available in the search panel regardless of
+        role — defaults just save clicks for the common case.
+        """
+        user = self.env.user
+        is_manager = user.has_group("neon_jobs.group_neon_jobs_manager")
+        is_lead = user.has_group("neon_jobs.group_neon_jobs_crew_leader")
+
+        context = {}
+        if is_manager:
+            context["search_default_filter_all_stuck"] = 1
+        elif is_lead:
+            context["search_default_filter_my_lead_tech"] = 1
+            context["search_default_filter_all_stuck"] = 1
+        else:
+            # Default for neon_jobs_user (sales rep)
+            context["search_default_filter_my_client"] = 1
+            context["search_default_filter_feedback_missing"] = 1
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Closeout Queue"),
+            "res_model": "commercial.event.job",
+            "view_mode": "kanban,tree,pivot,form",
+            "search_view_id": [
+                self.env.ref(
+                    "neon_jobs.commercial_event_job_closeout_queue_view_search"
+                ).id,
+                "search view",
+            ],
+            "context": context,
+            "help": (
+                "<p class='o_view_nocontent_smiling_face'>"
+                "<b>Nothing in the Closeout Queue.</b><br/>"
+                "Events appear here when they are operationally "
+                "complete but the soft requirements (feedback, "
+                "notes) or the hard close gate haven't been "
+                "wrapped up. The 14-day SLA flag highlights "
+                "anything older than two weeks."
+                "</p>"
+            ),
+        }
+
     def action_log_scope_change(self):
         """P3.M6 17.0.2.4.1 — open a new scope_change form pre-filled
         with this event_job's context. Surfaces a clean entry point
@@ -1067,6 +1243,16 @@ class CommercialEventJob(models.Model):
         vals = {"state": target}
         if target == "closed":
             vals["closeout_completed_at"] = fields.Datetime.now()
+        # P3.M8 — every state transition clears any in-queue
+        # acknowledgment. The manager's "I've seen this" signal was
+        # for the previous queue position; the new state is a fresh
+        # context.
+        if self.is_acknowledged_in_queue:
+            vals.update({
+                "is_acknowledged_in_queue": False,
+                "acknowledged_at": False,
+                "acknowledged_by": False,
+            })
         self.sudo().with_context(_allow_state_write=True).write(vals)
         self.sudo().message_post(
             body=_(

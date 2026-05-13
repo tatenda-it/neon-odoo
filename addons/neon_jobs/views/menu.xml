@@ -80,6 +80,19 @@
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="35"/>
 
+    <!-- P3.M8 — Closeout Queue (dashboard for stuck events).
+         Menu binds to a server action that calls the role-aware
+         Python method action_open_closeout_queue, dispatching to
+         the default filter that matches the logged-in user's
+         group (manager / lead / sales). Gated to user/lead/mgr;
+         crew tier does not see this entry. -->
+    <menuitem id="menu_closeout_queue"
+              name="Closeout Queue"
+              parent="menu_operations_root"
+              action="commercial_event_job_closeout_queue_server_action"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="37"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"
