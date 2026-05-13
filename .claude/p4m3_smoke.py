@@ -322,12 +322,111 @@ results["T187"] = ok
 
 
 # ============================================================
+# T188-T191 — menu→server_action dispatch regression guard.
+#
+# T179-T181 verified action_open_action_centre in isolation. These
+# four tests follow the *menu's* action_id reference to the server
+# action and execute the server action's code, mirroring what the
+# web client does on menu click. Catches future regressions where
+# the menu's action= ref drifts away from the role-aware server
+# action (e.g. someone re-points it back at the static act_window).
+# ============================================================
+print()
+print("=" * 72)
+print("T188-T191 — Menu→server action dispatch per role")
+print("=" * 72)
+
+menu = env.ref("neon_jobs.menu_action_centre", raise_if_not_found=False)
+# T188-T190: roles in the server action's groups_id allowlist
+# (user / crew_leader / manager) — each should resolve the menu's
+# action_id → run the server action → get the role-correct
+# search_default_* key on the returned act_window context.
+expected_pass = {
+    "p2m75_mgr": ("T188", "search_default_all_open"),
+    "p2m75_lead": ("T189", "search_default_my_lead_tech_open"),
+    "p2m75_sales": ("T190", "search_default_my_sales_open"),
+}
+# T191: crew tier is gated OUT of the menu (and by extension out of
+# the server action via its groups_id). The Python method has a
+# crew fallback branch (search_default_my_items) for non-menu deep-
+# links, but invoking the *server action* as crew should hit the
+# access-rights gate. We assert that gate fires — that's what keeps
+# crew out of the manager surface.
+T191_login = "p2m75_crew"
+
+if not menu:
+    print("  SKIP — menu_action_centre not found")
+    for tid, _ in expected_pass.values():
+        results[tid] = None
+    results["T191"] = None
+elif not menu.action:
+    print("  FAIL — menu.action is empty (binding lost)")
+    for tid, _ in expected_pass.values():
+        results[tid] = False
+    results["T191"] = False
+else:
+    action = menu.action
+    if not hasattr(action, "_name") or action._name != "ir.actions.server":
+        print(f"  FAIL — menu.action resolves to {type(action).__name__} "
+              f"(want ir.actions.server)")
+        for tid, _ in expected_pass.values():
+            results[tid] = False
+        results["T191"] = False
+    else:
+        print(f"  menu.action → {action._name},{action.id} "
+              f"({action.name})")
+        # T188-T190 — allow-listed roles
+        for login, (tid, want_key) in expected_pass.items():
+            u = env["res.users"].search([("login", "=", login)], limit=1)
+            if not u:
+                print(f"  {tid} {login}: SKIP (user missing)")
+                results[tid] = None
+                continue
+            try:
+                returned = action.with_user(u).run()
+            except Exception as e:
+                print(f"  {tid} {login}: server action raised "
+                      f"{type(e).__name__}: {str(e)[:120]}")
+                results[tid] = False
+                continue
+            ctx = returned.get("context", {}) if isinstance(returned, dict) else {}
+            present = ctx.get(want_key) == 1
+            unexpected = [
+                k for k in ctx
+                if k.startswith("search_default_")
+                and k != want_key
+            ]
+            print(f"  {tid} {login}: want '{want_key}' → present={present}"
+                  f"{(', unexpected=' + str(unexpected)) if unexpected else ''}")
+            results[tid] = bool(present) and not unexpected
+        # T191 — crew tier gated OUT
+        crew_user = env["res.users"].search(
+            [("login", "=", T191_login)], limit=1)
+        if not crew_user:
+            print(f"  T191 {T191_login}: SKIP (user missing)")
+            results["T191"] = None
+        else:
+            raised = False
+            try:
+                action.with_user(crew_user).run()
+            except AccessError:
+                raised = True
+            except Exception as e:
+                print(f"  T191 {T191_login}: unexpected exception "
+                      f"{type(e).__name__}: {str(e)[:120]}")
+            print(f"  T191 {T191_login}: AccessError raised? {raised} "
+                  f"(want True — crew is gated out of the manager menu)")
+            results["T191"] = raised
+
+
+# ============================================================
 print()
 print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
 order = ["T179", "T180", "T181", "T182", "T183", "T184", "T185",
-         "T186", "T187"]
+         "T186", "T187",
+         "T188", "T189", "T190", "T191"]
 for k in order:
     v_ = results.get(k)
     mark = "PASS" if v_ is True else ("SKIP" if v_ is None else "FAIL")
