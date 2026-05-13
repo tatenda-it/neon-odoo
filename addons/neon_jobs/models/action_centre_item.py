@@ -23,6 +23,8 @@ notification channels (P4.5).
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+from .action_centre_trigger_config import TRIGGER_TYPE_SELECTION
+
 
 _GROUP_XMLIDS = {
     "user": "neon_jobs.group_neon_jobs_user",
@@ -77,16 +79,18 @@ class ActionCentreItem(models.Model):
         compute="_compute_is_overdue", store=False,
     )
 
-    # ----- Trigger origin (P4.M2 will extend) ------------------------
+    # ----- Trigger origin --------------------------------------------
     trigger_type = fields.Selection(
-        [("manual", "Manual")],
-        default="manual", required=True,
+        TRIGGER_TYPE_SELECTION, default="manual", required=True,
     )
-    # trigger_config_id placeholder — the model lands in P4.M2.
-    # Storing as a plain Integer means we don't need to declare a
-    # comodel that doesn't exist yet; P4.M2 swaps it for a real M2o.
-    trigger_config_id = fields.Integer(
-        string="Trigger Config (P4.M2)", readonly=True,
+    trigger_config_id = fields.Many2one(
+        "action.centre.trigger.config",
+        string="Trigger Config",
+        ondelete="set null",
+        readonly=True,
+        help="Set automatically when an item is spawned by the "
+        "Action Centre mixin from a source model. Manual items "
+        "leave this blank.",
     )
     is_manual = fields.Boolean(default=True, readonly=True)
 
@@ -132,8 +136,11 @@ class ActionCentreItem(models.Model):
     # ----- Channels (Q19 slot for P4.5) -----------------------------
     notification_channels = fields.Char(default="in_app")
 
-    # ----- Auto-close (P4.M2 will compute) --------------------------
-    is_auto_close_eligible = fields.Boolean(default=False)
+    # ----- Auto-close eligibility (computed from trigger config) ----
+    is_auto_close_eligible = fields.Boolean(
+        compute="_compute_is_auto_close_eligible",
+        store=True,
+    )
 
     # ----- Grouping --------------------------------------------------
     parent_item_id = fields.Many2one(
@@ -173,6 +180,34 @@ class ActionCentreItem(models.Model):
                 and rec.state not in _TERMINAL_STATES
                 and rec.due_date < now
             )
+
+    @api.depends("item_type", "trigger_config_id",
+                 "trigger_config_id.auto_close_when_condition_clears")
+    def _compute_is_auto_close_eligible(self):
+        for rec in self:
+            cfg = rec.trigger_config_id
+            rec.is_auto_close_eligible = bool(
+                cfg
+                and rec.item_type == "alert"
+                and cfg.auto_close_when_condition_clears
+            )
+
+    @api.model
+    def _find_existing_open_item(self, trigger_type, source_model,
+                                  source_id):
+        """Return the open (or in_progress) item matching the
+        trigger + source, if any. Used by the mixin to keep
+        repeated trigger fires from spawning duplicate work."""
+        SourceModel = self.env["ir.model"].sudo()
+        sm = SourceModel._get(source_model)
+        if not sm:
+            return self.browse()
+        return self.sudo().search([
+            ("trigger_type", "=", trigger_type),
+            ("source_model_id", "=", sm.id),
+            ("source_id", "=", source_id),
+            ("state", "in", ("open", "in_progress")),
+        ], limit=1)
 
     @api.depends("source_model_id", "source_id")
     def _compute_source_record(self):

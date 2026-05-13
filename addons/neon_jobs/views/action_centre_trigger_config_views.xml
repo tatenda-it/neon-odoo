@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="action_centre_trigger_config_view_tree" model="ir.ui.view">
+        <field name="name">action.centre.trigger.config.tree</field>
+        <field name="model">action.centre.trigger.config</field>
+        <field name="arch" type="xml">
+            <tree string="Action Centre Triggers"
+                  decoration-muted="not is_enabled">
+                <field name="trigger_type"/>
+                <field name="name"/>
+                <field name="is_enabled" widget="boolean_toggle"/>
+                <field name="item_type"/>
+                <field name="primary_role"/>
+                <field name="priority" widget="badge"
+                       decoration-success="priority == 'low'"
+                       decoration-info="priority == 'medium'"
+                       decoration-warning="priority == 'high'"
+                       decoration-danger="priority == 'urgent'"/>
+                <field name="escalation_minutes"/>
+                <field name="escalated_to_role" optional="show"/>
+                <field name="auto_close_when_condition_clears"
+                       optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_centre_trigger_config_view_form" model="ir.ui.view">
+        <field name="name">action.centre.trigger.config.form</field>
+        <field name="model">action.centre.trigger.config</field>
+        <field name="arch" type="xml">
+            <form string="Action Centre Trigger">
+                <sheet>
+                    <widget name="web_ribbon" title="Disabled"
+                            bg_color="text-bg-danger"
+                            invisible="is_enabled"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="trigger_type" readonly="id"/>
+                            <field name="is_enabled" widget="boolean_toggle"/>
+                            <field name="item_type"/>
+                        </group>
+                        <group>
+                            <field name="primary_role"/>
+                            <field name="priority"/>
+                        </group>
+                    </group>
+                    <group string="Escalation">
+                        <group>
+                            <field name="escalation_minutes"/>
+                            <field name="escalated_to_role"
+                                   invisible="escalation_minutes == 0"/>
+                        </group>
+                        <group>
+                            <field name="auto_close_when_condition_clears"/>
+                        </group>
+                    </group>
+                    <group string="Threshold (where applicable)">
+                        <group>
+                            <field name="threshold_value"/>
+                            <field name="threshold_field" readonly="1"/>
+                        </group>
+                    </group>
+                    <separator string="Description"/>
+                    <field name="description" nolabel="1" readonly="1"/>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_centre_trigger_config_view_search" model="ir.ui.view">
+        <field name="name">action.centre.trigger.config.search</field>
+        <field name="model">action.centre.trigger.config</field>
+        <field name="arch" type="xml">
+            <search string="Action Centre Triggers">
+                <field name="trigger_type"/>
+                <field name="name"/>
+                <separator/>
+                <filter name="enabled" string="Enabled"
+                        domain="[('is_enabled', '=', True)]"/>
+                <filter name="disabled" string="Disabled"
+                        domain="[('is_enabled', '=', False)]"/>
+                <separator/>
+                <filter name="type_task" string="Tasks"
+                        domain="[('item_type', '=', 'task')]"/>
+                <filter name="type_alert" string="Alerts"
+                        domain="[('item_type', '=', 'alert')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_item_type" string="Type"
+                            context="{'group_by': 'item_type'}"/>
+                    <filter name="group_primary_role" string="Primary Role"
+                            context="{'group_by': 'primary_role'}"/>
+                    <filter name="group_priority" string="Priority"
+                            context="{'group_by': 'priority'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_centre_trigger_config_action" model="ir.actions.act_window">
+        <field name="name">Action Centre Triggers</field>
+        <field name="res_model">action.centre.trigger.config</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="action_centre_trigger_config_view_search"/>
+        <field name="context">{'search_default_enabled': 1}</field>
+    </record>
+
+</odoo>

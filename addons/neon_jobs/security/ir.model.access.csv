@@ -73,3 +73,7 @@ access_ir_model_neon_user,ir.model read for neon user (Source dropdown + Referen
 access_ir_model_neon_crew_leader,ir.model read for neon crew_leader,base.model_ir_model,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
 access_ir_model_neon_crew,ir.model read for neon crew,base.model_ir_model,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_action_centre_item_cancel_wizard_manager,action.centre.item.cancel.wizard manager,model_action_centre_item_cancel_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_action_centre_trigger_config_user,action.centre.trigger.config user (read),model_action_centre_trigger_config,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_action_centre_trigger_config_crew_leader,action.centre.trigger.config crew_leader (read),model_action_centre_trigger_config,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_action_centre_trigger_config_crew,action.centre.trigger.config crew (read),model_action_centre_trigger_config,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_action_centre_trigger_config_manager,action.centre.trigger.config manager (full),model_action_centre_trigger_config,neon_jobs.group_neon_jobs_manager,1,1,1,1

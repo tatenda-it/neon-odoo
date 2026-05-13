@@ -136,4 +136,11 @@
               groups="neon_jobs.group_neon_jobs_manager"
               sequence="40"/>
 
+    <menuitem id="menu_action_centre_triggers"
+              name="Action Centre Triggers"
+              parent="menu_operations_config"
+              action="action_centre_trigger_config_action"
+              groups="neon_jobs.group_neon_jobs_manager"
+              sequence="50"/>
+
 </odoo>

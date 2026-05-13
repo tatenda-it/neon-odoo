@@ -192,6 +192,13 @@
                                 <field name="source_record" readonly="1"/>
                                 <field name="is_manual" readonly="1"/>
                                 <field name="trigger_type" readonly="1"/>
+                                <field name="trigger_config_id"
+                                       readonly="1"
+                                       invisible="is_manual"
+                                       options="{'no_create': True}"/>
+                                <field name="is_auto_close_eligible"
+                                       readonly="1"
+                                       invisible="is_manual"/>
                                 <field name="parent_item_id"
                                        options="{'no_create': True}"/>
                             </group>

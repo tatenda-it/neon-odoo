@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P4.M2 — Trigger configuration seed data.
+
+        noupdate="1" so director edits via the Configuration UI
+        survive module upgrades. Same pattern as P3.M5 checklist
+        templates: the schema lands once on -i; subsequent -u runs
+        leave the knobs alone.
+
+        Ten records — one per trigger_type Selection value. The
+        'manual' record exists so the FK on
+        action.centre.item.trigger_config_id resolves for any
+        consumer that wants to point manual items at a config row;
+        manual creation in P4.M1's create() override leaves the FK
+        null by default (only mixin-spawned items set it).
+
+        Defaults reflect the Schema Sketch §3.2 ramp targets;
+        directors tweak these in the Configuration menu.
+    -->
+    <data noupdate="1">
+
+        <record id="trigger_config_capacity_gate" model="action.centre.trigger.config">
+            <field name="trigger_type">capacity_gate</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">manager</field>
+            <field name="priority">high</field>
+            <field name="escalation_minutes">240</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Fires when a Commercial Job hits a capacity gate that needs Manager override (P2.M7). Resolved by override decision.</field>
+        </record>
+
+        <record id="trigger_config_lost" model="action.centre.trigger.config">
+            <field name="trigger_type">lost</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">sales</field>
+            <field name="priority">medium</field>
+            <field name="escalation_minutes">1440</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Fires when a Commercial Job is archived as lost. Sales follows up to capture loss reason details and feed the win/loss analytics loop.</field>
+        </record>
+
+        <record id="trigger_config_event_created" model="action.centre.trigger.config">
+            <field name="trigger_type">event_created</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">lead_tech</field>
+            <field name="priority">medium</field>
+            <field name="escalation_minutes">1440</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Fires when an Event Job is auto-created from a confirmed Commercial Job. Lead Tech acknowledges and moves to planning.</field>
+        </record>
+
+        <record id="trigger_config_readiness_50" model="action.centre.trigger.config">
+            <field name="trigger_type">readiness_50</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">alert</field>
+            <field name="primary_role">lead_tech</field>
+            <field name="priority">urgent</field>
+            <field name="escalation_minutes">240</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="threshold_value">50.0</field>
+            <field name="threshold_field">readiness_score &lt; threshold_value</field>
+            <field name="auto_close_when_condition_clears" eval="True"/>
+            <field name="description">Alert: Event Job readiness has dropped below 50. Auto-closes when readiness recovers.</field>
+        </record>
+
+        <record id="trigger_config_readiness_70" model="action.centre.trigger.config">
+            <field name="trigger_type">readiness_70</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">lead_tech</field>
+            <field name="priority">high</field>
+            <field name="escalation_minutes">240</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="threshold_value">70.0</field>
+            <field name="threshold_field">readiness_score &lt; threshold_value</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Task: Event Job readiness is below the dispatch threshold. Lead Tech drives the score back above 70 or invokes the override path.</field>
+        </record>
+
+        <record id="trigger_config_scope_change" model="action.centre.trigger.config">
+            <field name="trigger_type">scope_change</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">sales</field>
+            <field name="priority">medium</field>
+            <field name="escalation_minutes">1440</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Fires when a Scope Change is logged on an Event Job. Sales reviews commercial impact and updates the customer.</field>
+        </record>
+
+        <record id="trigger_config_closeout_overdue" model="action.centre.trigger.config">
+            <field name="trigger_type">closeout_overdue</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">lead_tech</field>
+            <field name="priority">high</field>
+            <field name="escalation_minutes">1440</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Fires when an Event Job is stuck in the closeout queue beyond its expected handoff window (P3.M8).</field>
+        </record>
+
+        <record id="trigger_config_sla_passed" model="action.centre.trigger.config">
+            <field name="trigger_type">sla_passed</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">alert</field>
+            <field name="primary_role">manager</field>
+            <field name="priority">urgent</field>
+            <field name="escalation_minutes">0</field>
+            <field name="threshold_value">14.0</field>
+            <field name="threshold_field">days_since_completed &gt; threshold_value</field>
+            <field name="auto_close_when_condition_clears" eval="True"/>
+            <field name="description">Alert: Event Job closeout has exceeded the 14-day SLA. Auto-closes once closeout completes.</field>
+        </record>
+
+        <record id="trigger_config_feedback_followup" model="action.centre.trigger.config">
+            <field name="trigger_type">feedback_followup</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">manager</field>
+            <field name="priority">medium</field>
+            <field name="escalation_minutes">4320</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Fires when client feedback is missing or low-score on a completed event (P3.M7). Manager drives the follow-up loop.</field>
+        </record>
+
+        <record id="trigger_config_manual" model="action.centre.trigger.config">
+            <field name="trigger_type">manual</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="priority">medium</field>
+            <field name="escalation_minutes">0</field>
+            <field name="auto_close_when_condition_clears" eval="False"/>
+            <field name="description">Placeholder config for ad-hoc / manually-created Action Centre items. The 'manual' trigger has no automated condition; this record exists so the FK on action.centre.item.trigger_config_id resolves consistently.</field>
+        </record>
+
+    </data>
+</odoo>
