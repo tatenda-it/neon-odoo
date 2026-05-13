@@ -129,11 +129,10 @@
                             type="object"
                             class="oe_highlight"
                             invisible="state not in ('open', 'in_progress')"/>
-                    <button name="action_cancel"
+                    <button name="action_open_cancel_wizard"
                             string="Cancel"
                             type="object"
-                            invisible="state in ('done', 'cancelled')"
-                            confirm="Cancelling requires a closure reason. Continue?"/>
+                            invisible="state in ('done', 'cancelled')"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="open,in_progress,done"/>
                 </header>
@@ -177,9 +176,12 @@
                         </page>
                         <page string="Source" name="source">
                             <group>
-                                <field name="source_model_id"
+                                <!-- source_model_id / source_id are
+                                     populated by triggers (P4.M2+);
+                                     end-users don't edit them. -->
+                                <field name="source_model_id" readonly="1"
                                        options="{'no_create': True, 'no_open': True}"/>
-                                <field name="source_id"/>
+                                <field name="source_id" readonly="1"/>
                                 <field name="source_record" readonly="1"/>
                                 <field name="is_manual" readonly="1"/>
                                 <field name="trigger_type" readonly="1"/>
@@ -223,19 +225,18 @@
                 <field name="title"/>
                 <field name="description"/>
                 <field name="primary_assignee_id"/>
-                <field name="source_model_id"/>
                 <field name="tag_ids"/>
                 <separator/>
                 <filter name="my_open_tasks" string="My Open Tasks"
                         domain="[('state', '=', 'open'),
                                  ('primary_assignee_id', '=', uid)]"/>
-                <!-- Inlined is_overdue: due_date set, in past, not closed.
-                     (is_overdue is non-stored so can't appear in a
-                     domain directly.) -->
+                <!-- Inlined is_overdue (non-stored so can't appear in a
+                     domain directly). context_today() returns a Date;
+                     comparing to a Datetime field works via implicit
+                     coercion (anything due before midnight today). -->
                 <filter name="overdue" string="Overdue"
-                        domain="[('due_date', '!=', False),
-                                 ('due_date', '&lt;', context_today().strftime('%Y-%m-%d %H:%M:%S')),
-                                 ('state', 'not in', ('done', 'cancelled'))]"/>
+                        domain="[('due_date', '&lt;', context_today()),
+                                 ('state', 'in', ('open', 'in_progress'))]"/>
                 <filter name="manual" string="Manual"
                         domain="[('is_manual', '=', True)]"/>
                 <separator/>

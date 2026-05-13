@@ -176,14 +176,30 @@ class ActionCentreItem(models.Model):
 
     @api.depends("source_model_id", "source_id")
     def _compute_source_record(self):
-        # ir.model is admin-only. Sudo the model-name read so the
-        # Reference field can render for non-admin users (sales / lead).
+        # ir.model is admin-only on this deployment (ir_model_all has
+        # perm_read=False; only Administrator inherits read). Sudo the
+        # whole M2o read so the truthy check itself doesn't trip ACL
+        # and silently drop into the else branch for sales / lead.
         for rec in self:
-            if rec.source_model_id and rec.source_id:
-                model_name = rec.source_model_id.sudo().model
-                rec.source_record = "%s,%s" % (model_name, rec.source_id)
+            sm = rec.sudo().source_model_id
+            sid = rec.source_id
+            if sm and sid:
+                rec.source_record = f"{sm.model},{sid}"
             else:
                 rec.source_record = False
+
+    @api.model
+    def _role_matches_user(self, role, user):
+        """True if the user belongs to the group corresponding to
+        the role. crew_chief has no group (per-job assignment), so
+        always False for that role."""
+        role_to_group = {
+            "lead_tech": "neon_jobs.group_neon_jobs_crew_leader",
+            "manager": "neon_jobs.group_neon_jobs_manager",
+            "sales": "neon_jobs.group_neon_jobs_user",
+        }
+        grp = role_to_group.get(role)
+        return bool(grp and user.has_group(grp))
 
     # ================================================================
     # === Authority helpers — P3.M3 pattern
@@ -222,6 +238,20 @@ class ActionCentreItem(models.Model):
                 vals["sequence_number"] = self.env["ir.sequence"].next_by_code(
                     "action.centre.item"
                 ) or _("New")
+            # Option A — on manual creation, when the item targets the
+            # creator's own role, default the assignee to the creator
+            # so they can immediately drive the item without a manager
+            # hand-off. Trigger-spawned items (is_manual=False) skip
+            # this and stay unassigned for role resolution in P4.M4.
+            is_manual = vals.get("is_manual", True)
+            role = vals.get("primary_role")
+            if (
+                is_manual
+                and not vals.get("primary_assignee_id")
+                and role
+                and self._role_matches_user(role, self.env.user)
+            ):
+                vals["primary_assignee_id"] = self.env.uid
         return super().create(vals_list)
 
     # ================================================================
@@ -274,6 +304,27 @@ class ActionCentreItem(models.Model):
                 "closed_by_id": self.env.uid,
                 "closed_at": fields.Datetime.now(),
             })
+
+    def action_open_cancel_wizard(self):
+        """Form-button entry point. Opens the cancel wizard so the
+        user can enter a closure_reason before action_cancel runs."""
+        self.ensure_one()
+        if self.state in _TERMINAL_STATES:
+            raise UserError(_(
+                "This item is already %(state)s."
+            ) % {"state": self.state})
+        if not self._user_can_cancel():
+            raise UserError(_(
+                "Only Manager can cancel an Action Centre item."
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Cancel Action Centre Item"),
+            "res_model": "action.centre.item.cancel.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_item_id": self.id},
+        }
 
     def action_cancel(self, reason=None):
         reason = reason or self.env.context.get("closure_reason")
