@@ -93,5 +93,26 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P3.M6 — Scope Change visibility for crew tier. Crew sees /
+            writes scope changes only on event_jobs they're crewed on
+            (same scoping pattern as P3.M5's checklist item rule).
+            Authority to actually LOG (create) is gated at the model
+            create() override — crew_chief on the event is allowed,
+            regular crew is blocked with a clear UserError. This rule
+            scopes the read/write surface; the model gate is the
+            authority decider.
+        -->
+        <record id="commercial_scope_change_rule_crew_read_own" model="ir.rule">
+            <field name="name">Scope Change: crew reads / writes own events' scope changes</field>
+            <field name="model_id" ref="model_commercial_scope_change"/>
+            <field name="domain_force">[('event_job_id.commercial_job_id.crew_assignment_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

@@ -69,6 +69,17 @@
               action="commercial_job_crew_action"
               sequence="30"/>
 
+    <!-- P3.M6 — Scope Changes (Sales Review queue + analytics).
+         Gated to user/manager/crew_leader; crew tier reaches scope
+         changes via the event_job Scope Changes tab if they're on
+         the event, scoped by the ir.rule. -->
+    <menuitem id="menu_scope_changes"
+              name="Scope Changes"
+              parent="menu_operations_root"
+              action="commercial_scope_change_action"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="35"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"

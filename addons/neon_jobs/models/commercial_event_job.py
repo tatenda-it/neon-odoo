@@ -420,6 +420,21 @@ class CommercialEventJob(models.Model):
         string="Checklists",
     )
 
+    # === P3.M6 — Scope Changes ===
+    scope_change_ids = fields.One2many(
+        "commercial.scope.change",
+        "event_job_id",
+        string="Scope Changes",
+    )
+    scope_change_count = fields.Integer(
+        string="Scope Change Count",
+        compute="_compute_scope_change_count",
+    )
+
+    def _compute_scope_change_count(self):
+        for rec in self:
+            rec.scope_change_count = len(rec.scope_change_ids)
+
     # === Closeout checkpoints (P3.M7 will expand) ===
     gear_reconciled = fields.Boolean(default=False, tracking=True)
     finance_handoff_complete = fields.Boolean(default=False, tracking=True)
@@ -523,6 +538,22 @@ class CommercialEventJob(models.Model):
             "view_mode": "form",
             "res_id": self.commercial_job_id.id,
             "target": "current",
+        }
+
+    def action_open_scope_changes(self):
+        """P3.M6 — smart-button entry into this event_job's scope
+        changes, filtered to just this event_job's records."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Scope Changes"),
+            "res_model": "commercial.scope.change",
+            "view_mode": "tree,form,kanban",
+            "domain": [("event_job_id", "=", self.id)],
+            "context": {
+                "default_event_job_id": self.id,
+                "search_default_event_job_id": self.id,
+            },
         }
 
     # ============================================================

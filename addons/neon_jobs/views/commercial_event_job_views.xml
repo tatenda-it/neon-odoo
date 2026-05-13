@@ -169,6 +169,11 @@
                                 <span class="o_stat_text">Commercial Job</span>
                             </div>
                         </button>
+                        <button name="action_open_scope_changes" type="object"
+                                class="oe_stat_button" icon="fa-exchange">
+                            <field name="scope_change_count" widget="statinfo"
+                                   string="Scope Changes"/>
+                        </button>
                     </div>
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
@@ -397,6 +402,22 @@
                                 The aggregate completion drives the
                                 Readiness Score's Checklist dimension
                                 (Quality tab).
+                            </div>
+                        </page>
+
+                        <!-- Tab 12 — Scope Changes (P3.M6) -->
+                        <page string="Scope Changes" name="page_scope_changes">
+                            <field name="scope_change_ids" nolabel="1"
+                                   context="{'default_event_job_id': active_id,
+                                             'tree_view_ref': 'neon_jobs.commercial_scope_change_view_tree_embedded'}">
+                            </field>
+                            <div class="text-muted" role="alert">
+                                Lead Tech / Crew Chief logs scope changes
+                                here as they happen. Default billing
+                                action is 'Pending Decision' — Sales Rep
+                                reviews via Operations → Scope Changes
+                                and reclassifies. Phase 8+ will surface
+                                scope-creep analytics per client.
                             </div>
                         </page>
 

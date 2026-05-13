@@ -50,3 +50,7 @@ access_commercial_event_job_checklist_item_user,commercial.event.job.checklist.i
 access_commercial_event_job_checklist_item_crew_leader,commercial.event.job.checklist.item crew_leader,model_commercial_event_job_checklist_item,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
 access_commercial_event_job_checklist_item_manager,commercial.event.job.checklist.item manager,model_commercial_event_job_checklist_item,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_commercial_event_job_checklist_item_crew,commercial.event.job.checklist.item crew (write own via authority check),model_commercial_event_job_checklist_item,neon_jobs.group_neon_jobs_crew,1,1,0,0
+access_commercial_scope_change_user,commercial.scope.change user (sales — full CRUD),model_commercial_scope_change,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_commercial_scope_change_crew_leader,commercial.scope.change crew_leader (lead tech — full CRUD),model_commercial_scope_change,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_commercial_scope_change_manager,commercial.scope.change manager (oversight — full),model_commercial_scope_change,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_scope_change_crew,commercial.scope.change crew (read+write+create — crew_chief logs via model-level gate; ir.rule scopes to own events),model_commercial_scope_change,neon_jobs.group_neon_jobs_crew,1,1,1,0

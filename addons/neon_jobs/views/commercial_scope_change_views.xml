@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_scope_change_view_tree" model="ir.ui.view">
+        <field name="name">commercial.scope.change.tree</field>
+        <field name="model">commercial.scope.change</field>
+        <field name="arch" type="xml">
+            <tree string="Scope Changes"
+                  decoration-info="state == 'logged'"
+                  decoration-warning="state == 'reviewed'"
+                  decoration-success="state == 'finalised'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="partner_id" optional="show"/>
+                <field name="event_date" optional="show"/>
+                <field name="occurred_at"/>
+                <field name="description"/>
+                <field name="scope_change_type" optional="hide"/>
+                <field name="billing_action" widget="badge"
+                       decoration-info="billing_action == 'pending_decision'"
+                       decoration-success="billing_action in ('chargeable','to_be_invoiced','to_be_quoted')"
+                       decoration-warning="billing_action == 'goodwill'"
+                       decoration-danger="billing_action == 'write_off'"
+                       decoration-muted="billing_action == 'included'"/>
+                <field name="estimated_value" widget="monetary" optional="show"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="logged_by" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'logged'"
+                       decoration-warning="state == 'reviewed'"
+                       decoration-success="state == 'finalised'"
+                       decoration-muted="state == 'cancelled'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_scope_change_view_tree_embedded" model="ir.ui.view">
+        <field name="name">commercial.scope.change.tree.embedded</field>
+        <field name="model">commercial.scope.change</field>
+        <field name="arch" type="xml">
+            <tree default_order="occurred_at desc, id desc"
+                  decoration-info="state == 'logged'"
+                  decoration-warning="state == 'reviewed'"
+                  decoration-success="state == 'finalised'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="occurred_at"/>
+                <field name="description"/>
+                <field name="billing_action" widget="badge"/>
+                <field name="estimated_value" widget="monetary" optional="show"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_scope_change_view_search" model="ir.ui.view">
+        <field name="name">commercial.scope.change.search</field>
+        <field name="model">commercial.scope.change</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="partner_id"/>
+                <field name="description"/>
+                <field name="logged_by"/>
+                <separator/>
+                <filter string="Pending Sales Review"
+                        name="filter_pending_review"
+                        domain="[('state', '=', 'logged'), ('billing_action', '=', 'pending_decision')]"/>
+                <filter string="Reviewed (awaiting finalise)"
+                        name="filter_reviewed"
+                        domain="[('state', '=', 'reviewed')]"/>
+                <filter string="Finalised"
+                        name="filter_finalised"
+                        domain="[('state', '=', 'finalised')]"/>
+                <filter string="Cancelled"
+                        name="filter_cancelled"
+                        domain="[('state', '=', 'cancelled')]"/>
+                <separator/>
+                <filter string="My logged changes"
+                        name="filter_my_logged"
+                        domain="[('logged_by', '=', uid)]"/>
+                <filter string="Chargeable"
+                        name="filter_chargeable"
+                        domain="[('billing_action', '=', 'chargeable')]"/>
+                <filter string="Goodwill"
+                        name="filter_goodwill"
+                        domain="[('billing_action', '=', 'goodwill')]"/>
+                <filter string="Write-Off"
+                        name="filter_write_off"
+                        domain="[('billing_action', '=', 'write_off')]"/>
+                <separator/>
+                <filter string="Event date this month"
+                        name="filter_this_month"
+                        domain="[('event_date', '&gt;=', (context_today()).strftime('%Y-%m-01'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="State"
+                            name="group_state"
+                            context="{'group_by': 'state'}"/>
+                    <filter string="Billing Action"
+                            name="group_billing"
+                            context="{'group_by': 'billing_action'}"/>
+                    <filter string="Client"
+                            name="group_partner"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter string="Event Job"
+                            name="group_event_job"
+                            context="{'group_by': 'event_job_id'}"/>
+                    <filter string="Logged By"
+                            name="group_logged_by"
+                            context="{'group_by': 'logged_by'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="commercial_scope_change_view_form" model="ir.ui.view">
+        <field name="name">commercial.scope.change.form</field>
+        <field name="model">commercial.scope.change</field>
+        <field name="arch" type="xml">
+            <form string="Scope Change">
+                <header>
+                    <button name="action_mark_reviewed" type="object"
+                            string="Mark Reviewed"
+                            class="oe_highlight"
+                            invisible="not can_review"
+                            context="{'default_billing_action': billing_action, 'default_billing_notes': billing_notes}"
+                            confirm="Mark this scope change as Reviewed with the selected billing action?"/>
+                    <button name="action_finalise" type="object"
+                            string="Finalise"
+                            class="oe_highlight"
+                            invisible="not can_finalise"
+                            confirm="Finalise this scope change? Terminal state — no further edits."/>
+                    <button name="action_cancel" type="object"
+                            string="Cancel"
+                            class="btn-danger"
+                            invisible="not can_cancel"
+                            context="{'default_cancel_reason': 'Cancelled via form action'}"
+                            confirm="Cancel this scope change? Provide a reason (passed via context)."/>
+                    <field name="can_review" invisible="1"/>
+                    <field name="can_finalise" invisible="1"/>
+                    <field name="can_cancel" invisible="1"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="logged,reviewed,finalised"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="Event">
+                            <field name="event_job_id"
+                                   options="{'no_create': True}"
+                                   readonly="state != 'logged'"/>
+                            <field name="commercial_job_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="event_date" readonly="1"/>
+                            <field name="scope_change_type"/>
+                        </group>
+                        <group string="Timing &amp; Logger">
+                            <field name="occurred_at"/>
+                            <field name="logged_at" readonly="1"/>
+                            <field name="logged_by" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <separator string="What Changed"/>
+                    <group col="1">
+                        <field name="description" nolabel="1"
+                               placeholder="What was added, modified, removed, or replaced…"/>
+                    </group>
+                    <separator string="Reason"/>
+                    <group col="1">
+                        <field name="reason" nolabel="1"
+                               placeholder="Why was the change needed? Client request, venue constraint, weather, equipment failure…"/>
+                    </group>
+
+                    <separator string="Billing Classification"/>
+                    <group>
+                        <group>
+                            <field name="billing_action"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="estimated_value" widget="monetary"/>
+                        </group>
+                        <group string="Sales Review">
+                            <field name="reviewed_by" readonly="1"/>
+                            <field name="reviewed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <separator string="Billing Notes"/>
+                    <group col="1">
+                        <field name="billing_notes" nolabel="1"
+                               placeholder="Explanation of the billing decision (why chargeable, why goodwill, why written off…)"/>
+                    </group>
+
+                    <separator string="Finalisation"/>
+                    <group>
+                        <group>
+                            <field name="finalised_by" readonly="1"/>
+                            <field name="finalised_at" readonly="1"/>
+                        </group>
+                        <group string="Auto-generation Hooks (Phase 8+)">
+                            <field name="invoice_line_id" readonly="1"
+                                   options="{'no_create': True}"/>
+                            <field name="sale_order_line_id" readonly="1"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="commercial_scope_change_view_kanban" model="ir.ui.view">
+        <field name="name">commercial.scope.change.kanban</field>
+        <field name="model">commercial.scope.change</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="partner_id"/>
+                <field name="occurred_at"/>
+                <field name="billing_action"/>
+                <field name="estimated_value"/>
+                <field name="currency_id"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong><field name="name"/></strong>
+                                    <br/>
+                                    <small><field name="event_job_id"/></small>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div><field name="partner_id"/></div>
+                                <div class="text-muted"><field name="description"/></div>
+                                <div>
+                                    <field name="billing_action" widget="badge"/>
+                                </div>
+                                <div t-if="record.estimated_value.raw_value">
+                                    Est: <field name="estimated_value" widget="monetary"/>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <small><field name="occurred_at"/></small>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="commercial_scope_change_action" model="ir.actions.act_window">
+        <field name="name">Scope Changes</field>
+        <field name="res_model">commercial.scope.change</field>
+        <field name="view_mode">tree,kanban,form</field>
+        <field name="search_view_id" ref="commercial_scope_change_view_search"/>
+        <field name="context">{'search_default_filter_pending_review': 1}</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_jobs.group_neon_jobs_user'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
+    </record>
+
+</odoo>
