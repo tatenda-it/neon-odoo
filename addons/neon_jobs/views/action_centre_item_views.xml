@@ -30,8 +30,9 @@
         <field name="arch" type="xml">
             <tree string="Action Centre"
                   decoration-danger="is_overdue == True"
-                  decoration-warning="priority == 'urgent' and not is_overdue"
-                  decoration-muted="state in ('done', 'cancelled')">
+                  decoration-warning="priority in ('urgent', 'high') and not is_overdue and state in ('open', 'in_progress')"
+                  decoration-success="state == 'done'"
+                  decoration-muted="state == 'cancelled'">
                 <field name="name"/>
                 <field name="item_type" widget="badge"
                        decoration-info="item_type == 'task'"
@@ -43,7 +44,8 @@
                        decoration-warning="priority == 'high'"
                        decoration-danger="priority == 'urgent'"/>
                 <field name="due_date"/>
-                <field name="is_overdue" widget="boolean_toggle" optional="show"/>
+                <field name="is_overdue" widget="boolean_toggle"
+                       optional="show" readonly="1"/>
                 <field name="primary_role" optional="show"/>
                 <field name="primary_assignee_id"/>
                 <field name="state" widget="badge"
@@ -52,6 +54,10 @@
                        decoration-success="state == 'done'"
                        decoration-muted="state == 'cancelled'"/>
                 <field name="created_by_id" optional="hide"/>
+                <field name="trigger_type" optional="hide"/>
+                <field name="tag_ids" widget="many2many_tags"
+                       options="{'color_field': 'color'}"
+                       optional="hide"/>
             </tree>
         </field>
     </record>
@@ -73,6 +79,7 @@
                 <field name="primary_assignee_id"/>
                 <field name="item_type"/>
                 <field name="state"/>
+                <field name="can_close"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div t-attf-class="oe_kanban_card oe_kanban_global_click
@@ -96,8 +103,28 @@
                                 <div t-if="record.item_type.raw_value == 'alert'"
                                      class="badge text-bg-warning">Alert</div>
                             </div>
+                            <!-- P4.M3 inline actions: rendered only
+                                 for users who can_close the item
+                                 (assignee / escalated_to / manager).
+                                 Falls back to "click card to open
+                                 form" for everyone else. -->
                             <div class="o_kanban_record_bottom">
-                                <div class="oe_kanban_bottom_left"/>
+                                <div class="oe_kanban_bottom_left">
+                                    <t t-if="record.can_close.raw_value and record.state.raw_value == 'open'">
+                                        <button name="action_mark_in_progress"
+                                                type="object"
+                                                class="btn btn-sm btn-secondary me-1">
+                                            Start
+                                        </button>
+                                    </t>
+                                    <t t-if="record.can_close.raw_value and (record.state.raw_value == 'open' or record.state.raw_value == 'in_progress')">
+                                        <button name="action_mark_done"
+                                                type="object"
+                                                class="btn btn-sm btn-success">
+                                            Mark Done
+                                        </button>
+                                    </t>
+                                </div>
                                 <div class="oe_kanban_bottom_right">
                                     <field name="primary_assignee_id"
                                            widget="many2one_avatar_user"/>
@@ -240,49 +267,105 @@
                 <field name="description"/>
                 <field name="primary_assignee_id"/>
                 <field name="tag_ids"/>
+
+                <!-- =========================================
+                     State filters
+                     ========================================= -->
                 <separator/>
-                <filter name="my_open_tasks" string="My Open Tasks"
-                        domain="[('state', '=', 'open'),
-                                 ('primary_assignee_id', '=', uid)]"/>
-                <!-- Inlined is_overdue (non-stored so can't appear in
-                     a domain directly). context_today() returns a
-                     Date; the search-view evaluator can't coerce a
-                     raw Date to the Datetime due_date column (fails
-                     with "%H" error from an internal strftime), so
-                     stringify via the codebase-standard '%Y-%m-%d'
-                     format — same pattern as Live Pipeline /
-                     Calendar All-Events filters. Items due before
-                     midnight-today and not yet closed are overdue. -->
-                <filter name="overdue" string="Overdue"
-                        domain="[('due_date', '!=', False),
-                                 ('due_date', '&lt;', context_today().strftime('%Y-%m-%d')),
-                                 ('state', 'not in', ('done', 'cancelled'))]"/>
-                <filter name="manual" string="Manual"
-                        domain="[('is_manual', '=', True)]"/>
-                <separator/>
+                <filter name="all_open" string="All Open"
+                        domain="[('state', 'in', ('open', 'in_progress'))]"/>
                 <filter name="state_open" string="Open"
                         domain="[('state', '=', 'open')]"/>
                 <filter name="state_in_progress" string="In Progress"
                         domain="[('state', '=', 'in_progress')]"/>
                 <filter name="state_done" string="Done"
                         domain="[('state', '=', 'done')]"/>
+
+                <!-- =========================================
+                     Ownership filters (role-aware defaults bind
+                     here via action_open_action_centre)
+                     ========================================= -->
                 <separator/>
-                <filter name="type_task" string="Tasks"
+                <filter name="my_items" string="My Items"
+                        domain="[('primary_assignee_id', '=', uid)]"/>
+                <filter name="my_escalations" string="My Escalations"
+                        domain="[('escalated_to_id', '=', uid)]"/>
+                <filter name="my_open_tasks" string="My Open Tasks"
+                        domain="[('state', '=', 'open'),
+                                 ('primary_assignee_id', '=', uid)]"/>
+                <filter name="my_lead_tech_open"
+                        string="My Lead Tech + Role"
+                        domain="['&amp;',
+                                 ('state', 'in', ('open', 'in_progress')),
+                                 '|', '|',
+                                 ('primary_assignee_id', '=', uid),
+                                 ('escalated_to_id', '=', uid),
+                                 '&amp;',
+                                 ('primary_role', '=', 'lead_tech'),
+                                 ('primary_assignee_id', '=', False)]"/>
+                <filter name="my_sales_open"
+                        string="My Sales + Role"
+                        domain="['&amp;',
+                                 ('state', 'in', ('open', 'in_progress')),
+                                 '|', '|',
+                                 ('primary_assignee_id', '=', uid),
+                                 ('escalated_to_id', '=', uid),
+                                 '&amp;',
+                                 ('primary_role', '=', 'sales'),
+                                 ('primary_assignee_id', '=', False)]"/>
+                <filter name="created_by_me" string="Created by Me"
+                        domain="[('created_by_id', '=', uid)]"/>
+
+                <!-- =========================================
+                     Urgency filters
+                     ========================================= -->
+                <separator/>
+                <!-- Inlined is_overdue (non-stored so can't appear in
+                     a domain directly). Stringify context_today()
+                     via the codebase-standard '%Y-%m-%d' to dodge
+                     the search-view evaluator's Date→Datetime
+                     strftime path (was raising "%H" in P4.M1). -->
+                <filter name="overdue" string="Overdue"
+                        domain="[('due_date', '!=', False),
+                                 ('due_date', '&lt;', context_today().strftime('%Y-%m-%d')),
+                                 ('state', 'not in', ('done', 'cancelled'))]"/>
+                <filter name="due_today" string="Due Today"
+                        domain="[('due_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('due_date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter name="due_this_week" string="Due This Week"
+                        domain="[('due_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('due_date', '&lt;=', (context_today() + relativedelta(days=7)).strftime('%Y-%m-%d 23:59:59'))]"/>
+                <filter name="high_priority" string="High Priority"
+                        domain="[('priority', 'in', ('high', 'urgent'))]"/>
+
+                <!-- =========================================
+                     Type / Source
+                     ========================================= -->
+                <separator/>
+                <filter name="type_task" string="Tasks Only"
                         domain="[('item_type', '=', 'task')]"/>
-                <filter name="type_alert" string="Alerts"
+                <filter name="type_alert" string="Alerts Only"
                         domain="[('item_type', '=', 'alert')]"/>
+                <separator/>
+                <filter name="manual" string="Manual Only"
+                        domain="[('is_manual', '=', True)]"/>
+                <filter name="trigger_spawned" string="Trigger-Spawned Only"
+                        domain="[('is_manual', '=', False)]"/>
                 <separator/>
                 <filter name="archived" string="Archived"
                         domain="[('active', '=', False)]"/>
+
                 <group expand="0" string="Group By">
-                    <filter name="group_priority" string="Priority"
-                            context="{'group_by': 'priority'}"/>
                     <filter name="group_state" string="State"
                             context="{'group_by': 'state'}"/>
-                    <filter name="group_item_type" string="Type"
-                            context="{'group_by': 'item_type'}"/>
+                    <filter name="group_priority" string="Priority"
+                            context="{'group_by': 'priority'}"/>
                     <filter name="group_primary_role" string="Primary Role"
                             context="{'group_by': 'primary_role'}"/>
+                    <filter name="group_item_type" string="Type"
+                            context="{'group_by': 'item_type'}"/>
+                    <filter name="group_source_model" string="Source Model"
+                            context="{'group_by': 'source_model_id'}"/>
                     <filter name="group_assignee" string="Assignee"
                             context="{'group_by': 'primary_assignee_id'}"/>
                 </group>
@@ -309,6 +392,27 @@
                 or generated automatically by event triggers (P4.M2+).
             </p>
         </field>
+    </record>
+
+    <!--
+        P4.M3 — server action wrapping the role-aware Python method.
+        The menu binds to this so each role lands on the filter that
+        matches their default workflow (Manager → All Open, Lead
+        Tech → My Lead Tech + Role, Sales → My Sales + Role, Crew
+        → My Items). All filters remain available in the search
+        panel; the default just saves clicks. Same pattern as
+        P3.M8's closeout_queue_server_action.
+    -->
+    <record id="action_centre_item_server_action" model="ir.actions.server">
+        <field name="name">Open Action Centre (role-aware)</field>
+        <field name="model_id" ref="model_action_centre_item"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_action_centre()</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_jobs.group_neon_jobs_user'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
     </record>
 
 </odoo>

@@ -35,6 +35,14 @@ class CommercialJobDashboard(models.TransientModel):
     crew_gap_count = fields.Integer(compute="_compute_crew_gap_count")
     needs_attention_count = fields.Integer(compute="_compute_needs_attention_count")
     cash_flow_count = fields.Integer(compute="_compute_cash_flow_count")
+    # P4.M3 — My Action Items tile counters.
+    my_action_items_count = fields.Integer(
+        compute="_compute_my_action_items_count",
+        help="Open action items assigned to the current user.")
+    my_action_items_overdue_count = fields.Integer(
+        compute="_compute_my_action_items_count",
+        help="Open action items assigned to the current user whose "
+        "due_date is in the past — drives the dashboard's red flag.")
 
     # === Top-3 previews (populated at create() time) ===
     # Distinct relation= names avoid autogen collisions between five
@@ -68,6 +76,13 @@ class CommercialJobDashboard(models.TransientModel):
         relation="cjd_cash_flow_top3_rel",
         column1="dashboard_id", column2="job_id",
         string="Top Cash-flow Risks",
+    )
+    # P4.M3 — top 5 Action Centre items for the current user.
+    my_action_items_top5 = fields.Many2many(
+        "action.centre.item",
+        relation="cjd_my_action_items_top5_rel",
+        column1="dashboard_id", column2="item_id",
+        string="My Action Items (Top 5)",
     )
 
     # === Role-aware UI hiding (P2.M7.5) ===
@@ -158,6 +173,31 @@ class CommercialJobDashboard(models.TransientModel):
             rec.cash_flow_count = count
 
     @api.depends_context("uid")
+    def _compute_my_action_items_count(self):
+        Item = self.env["action.centre.item"]
+        uid = self.env.uid
+        base_domain = [
+            ("state", "in", ("open", "in_progress")),
+            "|",
+            ("primary_assignee_id", "=", uid),
+            ("escalated_to_id", "=", uid),
+        ]
+        total = Item.search_count(base_domain)
+        # Overdue is non-stored so we use the search-domain equivalent
+        # (codebase-standard date-string form — see P4.M1.2 hotfix
+        # for why context_today().strftime is necessary).
+        from datetime import date
+        today_str = date.today().strftime("%Y-%m-%d")
+        overdue_domain = base_domain + [
+            ("due_date", "!=", False),
+            ("due_date", "<", today_str),
+        ]
+        overdue = Item.search_count(overdue_domain)
+        for rec in self:
+            rec.my_action_items_count = total
+            rec.my_action_items_overdue_count = overdue
+
+    @api.depends_context("uid")
     def _compute_hide_cash_flow(self):
         user = self.env.user
         hide = (
@@ -179,6 +219,11 @@ class CommercialJobDashboard(models.TransientModel):
         crew_gap = self._crew_gap_jobs()[:3]
         attn = Job.search(self._needs_attention_domain(), order="create_date desc", limit=3)
         cash = Job.search(self._cash_flow_domain(), order="event_date asc", limit=3)
+        # P4.M3 — top 5 action items for the current user, sourced
+        # from the model helper so the dashboard and any future RPC
+        # consumer share the same ordering rule.
+        my_items = self.env["action.centre.item"].get_dashboard_tile_items(
+            limit=5)
         for rec in records:
             rec.write({
                 "gate_issues_top3": [(6, 0, gate.ids)],
@@ -186,6 +231,7 @@ class CommercialJobDashboard(models.TransientModel):
                 "crew_gap_top3": [(6, 0, crew_gap.ids)],
                 "needs_attention_top3": [(6, 0, attn.ids)],
                 "cash_flow_top3": [(6, 0, cash.ids)],
+                "my_action_items_top5": [(6, 0, my_items.ids)],
             })
         return records
 
@@ -247,6 +293,13 @@ class CommercialJobDashboard(models.TransientModel):
 
     def action_open_cash_flow(self):
         return self._drilldown(_("Cash-flow Watch"), self._cash_flow_domain())
+
+    def action_open_my_action_items(self):
+        """Drill-down from the My Action Items stat button. Defers
+        to the role-aware Python method on action.centre.item so
+        the user lands on the same default filter the menu would
+        give them."""
+        return self.env["action.centre.item"].action_open_action_centre()
 
 
 class CommercialJobCrewSchedule(models.TransientModel):

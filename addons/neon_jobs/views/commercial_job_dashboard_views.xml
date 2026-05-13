@@ -39,6 +39,17 @@
                                 class="oe_stat_button" icon="fa-flag">
                             <field name="needs_attention_count" widget="statinfo" string="Needs Attention"/>
                         </button>
+                        <!-- P4.M3 — My Action Items. statinfo shows
+                             the total open count; the overdue count
+                             sits beside it as a red text label so a
+                             quick glance surfaces the most pressing
+                             items without opening the section. -->
+                        <button name="action_open_my_action_items" type="object"
+                                class="oe_stat_button" icon="fa-tasks">
+                            <field name="my_action_items_count"
+                                   widget="statinfo"
+                                   string="My Action Items"/>
+                        </button>
                         <button name="action_open_cash_flow" type="object"
                                 class="oe_stat_button" icon="fa-money"
                                 invisible="hide_cash_flow">
@@ -115,6 +126,47 @@
                     </field>
                     <div class="text-muted" invisible="needs_attention_count != 0">
                         No jobs flagged as needing attention.
+                    </div>
+
+                    <!-- P4.M3 — My Action Items tile.
+                         Header overdue badge dims when count == 0.
+                         Position: between Needs Attention and the
+                         manager-only Cash-flow Watch, so the
+                         "attention-driving" sections cluster. -->
+                    <separator string="My Action Items"
+                               invisible="my_action_items_count == 0"/>
+                    <div invisible="my_action_items_count == 0
+                                    or my_action_items_overdue_count == 0"
+                         class="alert alert-danger" role="alert">
+                        <i class="fa fa-exclamation-circle me-1"/>
+                        <field name="my_action_items_overdue_count"
+                               nolabel="1" class="oe_inline"/>
+                        item(s) overdue.
+                    </div>
+                    <field name="my_action_items_top5" colspan="2"
+                           nolabel="1" readonly="1"
+                           invisible="my_action_items_count == 0">
+                        <tree>
+                            <field name="name"/>
+                            <field name="priority" widget="badge"
+                                   decoration-success="priority == 'low'"
+                                   decoration-info="priority == 'medium'"
+                                   decoration-warning="priority == 'high'"
+                                   decoration-danger="priority == 'urgent'"/>
+                            <field name="title"/>
+                            <field name="due_date"/>
+                            <field name="is_overdue"
+                                   widget="boolean_toggle"
+                                   readonly="1"/>
+                            <field name="item_type" widget="badge"
+                                   decoration-info="item_type == 'task'"
+                                   decoration-warning="item_type == 'alert'"/>
+                        </tree>
+                    </field>
+                    <div class="text-muted"
+                         invisible="my_action_items_count != 0">
+                        No action items assigned to you. Use the Action
+                        Centre menu to create one manually.
                     </div>
 
                     <separator string="Top 3 Cash-flow Watch"

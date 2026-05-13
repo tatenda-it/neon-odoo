@@ -96,11 +96,15 @@
     <!-- P4.M1 — Action Centre (proactive task + alert engine).
          Gated to user/manager/crew_leader; crew tier is filtered by
          ir.rule (own assignments) on the model when reached via
-         deep-link. -->
+         deep-link.
+
+         P4.M3: switched the action ref from the static act_window
+         to a server action so the menu opens with a role-aware
+         default filter (same pattern as P3.M8 Closeout Queue). -->
     <menuitem id="menu_action_centre"
               name="Action Centre"
               parent="menu_operations_root"
-              action="action_centre_item_action"
+              action="action_centre_item_server_action"
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="38"/>
 

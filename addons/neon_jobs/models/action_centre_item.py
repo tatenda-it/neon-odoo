@@ -78,6 +78,15 @@ class ActionCentreItem(models.Model):
     is_overdue = fields.Boolean(
         compute="_compute_is_overdue", store=False,
     )
+    # uid-aware authority signal for inline kanban buttons (P4.M3).
+    # Mirrors the is_overdue pattern: non-stored compute with
+    # depends_context='uid'. _user_can_close is the per-record
+    # authority decider; this field surfaces the same answer to the
+    # web client so the Start / Mark Done kanban buttons render
+    # only for users who can actually drive the transition.
+    can_close = fields.Boolean(
+        compute="_compute_can_close", store=False,
+    )
 
     # ----- Trigger origin --------------------------------------------
     trigger_type = fields.Selection(
@@ -179,6 +188,19 @@ class ActionCentreItem(models.Model):
                 rec.due_date
                 and rec.state not in _TERMINAL_STATES
                 and rec.due_date < now
+            )
+
+    @api.depends("primary_assignee_id", "escalated_to_id")
+    @api.depends_context("uid")
+    def _compute_can_close(self):
+        is_manager = self.env.user.has_group(
+            "neon_jobs.group_neon_jobs_manager")
+        uid = self.env.uid
+        for rec in self:
+            rec.can_close = bool(
+                is_manager
+                or (rec.primary_assignee_id and rec.primary_assignee_id.id == uid)
+                or (rec.escalated_to_id and rec.escalated_to_id.id == uid)
             )
 
     @api.depends("item_type", "trigger_config_id",
@@ -381,6 +403,70 @@ class ActionCentreItem(models.Model):
                 "closed_at": fields.Datetime.now(),
                 "closure_reason": reason,
             })
+
+    # ================================================================
+    # === P4.M3 — Role-aware menu entry + dashboard tile helper
+    # ================================================================
+    @api.model
+    def action_open_action_centre(self):
+        """Role-aware Action Centre entry. Mirrors P3.M8's
+        action_open_closeout_queue pattern: returns an act_window
+        with default search filters set per the calling user's role.
+
+        - Manager: All Open (every non-terminal item)
+        - Crew Leader / Lead Tech: My Lead Tech + Role
+        - Sales User: My Sales + Role
+
+        All filters are available in the search panel regardless of
+        role; the defaults just save clicks on the common case.
+        """
+        user = self.env.user
+        context = dict(self.env.context)
+
+        if user.has_group("neon_jobs.group_neon_jobs_manager"):
+            context["search_default_all_open"] = 1
+        elif user.has_group("neon_jobs.group_neon_jobs_crew_leader"):
+            context["search_default_my_lead_tech_open"] = 1
+        elif user.has_group("neon_jobs.group_neon_jobs_user"):
+            context["search_default_my_sales_open"] = 1
+        else:
+            # Crew-tier fallback: show only what their ir.rule allows
+            # (own assignments / creations) — no role default needed.
+            context["search_default_my_items"] = 1
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Action Centre"),
+            "res_model": "action.centre.item",
+            "view_mode": "kanban,tree,form",
+            "context": context,
+        }
+
+    @api.model
+    def get_dashboard_tile_items(self, limit=5):
+        """Return the top N open items for the current user, sorted
+        with overdue first, then by due_date ascending (oldest due
+        first), then by priority descending. Used by the Operations
+        Dashboard 'My Action Items' section.
+
+        Returns a recordset (not a list of dicts) — callers that
+        need serialised data can .read() the result.
+        """
+        uid = self.env.uid
+        # Use an SQL-friendly approximation of "overdue first" via
+        # due_date ascending — overdue items by definition have the
+        # oldest due_dates and bubble to the top. Items with no
+        # due_date sort to the end via the NULLS LAST default.
+        return self.search(
+            [
+                ("state", "in", ("open", "in_progress")),
+                "|",
+                ("primary_assignee_id", "=", uid),
+                ("escalated_to_id", "=", uid),
+            ],
+            order="priority desc, due_date asc, id desc",
+            limit=limit,
+        )
 
     # ================================================================
     # === Write block — protect audit + enforce reassign authority
