@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P4.M4 — append-only audit log tree.
+
+        Embedded inside action.centre.item's Audit tab (no standalone
+        action / menu — history is always viewed in the context of
+        its parent item). The view is intentionally non-editable;
+        the model's write/unlink overrides block mutation anyway,
+        but readonly=1 keeps the UI honest.
+    -->
+    <record id="action_centre_item_history_view_tree" model="ir.ui.view">
+        <field name="name">action.centre.item.history.tree</field>
+        <field name="model">action.centre.item.history</field>
+        <field name="arch" type="xml">
+            <tree string="History" create="false" edit="false" delete="false"
+                  default_order="event_at desc, id desc">
+                <field name="event_at"/>
+                <field name="event_type" widget="badge"
+                       decoration-info="event_type == 'created'"
+                       decoration-warning="event_type in ('reassigned', 'escalated')"
+                       decoration-success="event_type == 'state_change'"
+                       decoration-muted="event_type == 'auto_closed'"
+                       decoration-danger="event_type == 'escalation_failed'"/>
+                <field name="from_value"/>
+                <field name="to_value"/>
+                <field name="actor_id"/>
+                <field name="actor_is_system" widget="boolean_toggle"/>
+                <field name="notes" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+</odoo>

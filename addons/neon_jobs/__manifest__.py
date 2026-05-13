@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.3.2.0",
+    "version": "17.0.3.3.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -44,6 +44,7 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "data/res_partner_data.xml",
         "data/crm_stage_data.xml",
         "data/ir_cron_data.xml",
+        "data/action_centre_cron_data.xml",
         # cross_module_menu_security patches menus from EXTERNAL
         # modules (sale, crm, account, base, utm, spreadsheet_dashboard)
         # which have already loaded — those records exist in the DB by
@@ -75,6 +76,7 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "views/commercial_event_job_closeout_queue_views.xml",
         "views/commercial_job_dashboard_views.xml",
         "views/action_centre_trigger_config_views.xml",
+        "views/action_centre_item_history_views.xml",
         "views/action_centre_item_views.xml",
         "views/action_centre_item_cancel_wizard_views.xml",
         "views/crm_lead_views.xml",

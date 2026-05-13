@@ -18,3 +18,4 @@ from . import action_centre_item_tag
 from . import action_centre_trigger_config
 from . import action_centre_mixin
 from . import action_centre_item
+from . import action_centre_item_history

@@ -240,9 +240,9 @@
                             </group>
                         </page>
                         <page string="Audit" name="audit">
-                            <div class="text-muted">
-                                <p>History will appear here in P4.M4.</p>
-                            </div>
+                            <field name="history_ids" nolabel="1"
+                                   readonly="1"
+                                   context="{'tree_view_ref': 'neon_jobs.action_centre_item_history_view_tree'}"/>
                         </page>
                     </notebook>
                 </sheet>

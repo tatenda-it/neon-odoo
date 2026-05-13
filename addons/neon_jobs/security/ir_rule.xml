@@ -154,5 +154,23 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P4.M4 — history visibility for crew tier. Scopes
+            history reads to rows whose parent item is also
+            visible (per the rule above), so a crew user
+            deep-linked to a history row can only see entries for
+            items they're assigned to or created.
+        -->
+        <record id="action_centre_item_history_rule_crew_own" model="ir.rule">
+            <field name="name">Action Centre History: crew sees own items' history only</field>
+            <field name="model_id" ref="model_action_centre_item_history"/>
+            <field name="domain_force">['|', '|', ('item_id.primary_assignee_id', '=', user.id), ('item_id.escalated_to_id', '=', user.id), ('item_id.created_by_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

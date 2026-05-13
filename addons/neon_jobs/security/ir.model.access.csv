@@ -77,3 +77,7 @@ access_action_centre_trigger_config_user,action.centre.trigger.config user (read
 access_action_centre_trigger_config_crew_leader,action.centre.trigger.config crew_leader (read),model_action_centre_trigger_config,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
 access_action_centre_trigger_config_crew,action.centre.trigger.config crew (read),model_action_centre_trigger_config,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_action_centre_trigger_config_manager,action.centre.trigger.config manager (full),model_action_centre_trigger_config,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_action_centre_item_history_user,action.centre.item.history user (read; create via classmethod sudo),model_action_centre_item_history,neon_jobs.group_neon_jobs_user,1,0,1,0
+access_action_centre_item_history_crew_leader,action.centre.item.history crew_leader (read; create via classmethod sudo),model_action_centre_item_history,neon_jobs.group_neon_jobs_crew_leader,1,0,1,0
+access_action_centre_item_history_crew,action.centre.item.history crew (read; create via classmethod sudo),model_action_centre_item_history,neon_jobs.group_neon_jobs_crew,1,0,1,0
+access_action_centre_item_history_manager,action.centre.item.history manager (read; create via classmethod sudo; write/unlink blocked at model level),model_action_centre_item_history,neon_jobs.group_neon_jobs_manager,1,0,1,0

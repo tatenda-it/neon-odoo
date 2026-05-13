@@ -20,10 +20,30 @@ Out of scope here: trigger registry (P4.M2), the abstract mixin
 crons (P4.M4), audit history (P4.M4), dashboard tile (P4.M3),
 notification channels (P4.5).
 """
+import logging
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 from .action_centre_trigger_config import TRIGGER_TYPE_SELECTION
+
+
+_logger = logging.getLogger(__name__)
+
+# P4.M4 — cap on automatic escalation. After three escalation
+# cycles the cron stops trying; managers can still reassign
+# manually. Future enhancement: per-trigger.config override.
+_MAX_ESCALATION_LEVEL = 3
+
+# Mirrors the role → group resolution used by _role_matches_user
+# elsewhere in this file. Centralised so the escalation resolver
+# stays in sync. crew_chief deliberately omitted — it's a per-job
+# designation with no group.
+_ROLE_TO_GROUP = {
+    "lead_tech": "neon_jobs.group_neon_jobs_crew_leader",
+    "manager": "neon_jobs.group_neon_jobs_manager",
+    "sales": "neon_jobs.group_neon_jobs_user",
+}
 
 
 _GROUP_XMLIDS = {
@@ -162,6 +182,12 @@ class ActionCentreItem(models.Model):
     # ----- Categorization -------------------------------------------
     tag_ids = fields.Many2many("action.centre.item.tag")
 
+    # ----- History (P4.M4 — append-only audit trail) -----------------
+    history_ids = fields.One2many(
+        "action.centre.item.history", "item_id",
+        string="History", readonly=True,
+    )
+
     # ----- Archive ---------------------------------------------------
     active = fields.Boolean(default=True, tracking=True)
 
@@ -286,6 +312,22 @@ class ActionCentreItem(models.Model):
         return self._user_in_any_group(("manager",))
 
     # ================================================================
+    # === P4.M4 — history helper (delegates to history model's
+    #             classmethod, which is the only sanctioned write
+    #             path on the append-only audit log)
+    # ================================================================
+    def _log_history(self, event_type, to_value, from_value=None,
+                     actor_id=None, actor_is_system=False, notes=None):
+        self.ensure_one()
+        return self.env["action.centre.item.history"].log_event(
+            self.id, event_type, to_value,
+            from_value=from_value,
+            actor_id=actor_id,
+            actor_is_system=actor_is_system,
+            notes=notes,
+        )
+
+    # ================================================================
     # === Sequence + create
     # ================================================================
     @api.model_create_multi
@@ -309,7 +351,15 @@ class ActionCentreItem(models.Model):
                 and self._role_matches_user(role, self.env.user)
             ):
                 vals["primary_assignee_id"] = self.env.uid
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        # P4.M4 — log the inaugural history row. State at creation
+        # is always 'open' (the model's default), so to_value is
+        # the literal 'open'. Bypassed if the caller already wrote
+        # a non-default state, which shouldn't happen via the
+        # public API since direct state writes are blocked.
+        for rec in records:
+            rec._log_history("created", to_value=rec.state)
+        return records
 
     # ================================================================
     # === State transition methods
@@ -332,6 +382,10 @@ class ActionCentreItem(models.Model):
             ) % {"old": old, "new": target, "user": self.env.user.name},
             author_id=self.env.user.partner_id.id,
         )
+        # P4.M4 — append history row alongside chatter. Chatter is
+        # for humans skimming; history is for queries, reporting,
+        # and forensic accountability.
+        self._log_history("state_change", to_value=target, from_value=old)
 
     def action_mark_in_progress(self):
         for rec in self:
@@ -482,14 +536,202 @@ class ActionCentreItem(models.Model):
                     "Cancel). Direct state writes are blocked to "
                     "preserve the audit trail."
                 ))
+        # P4.M4 — capture OLD primary_assignee_id per record before
+        # super().write() lands, so we can log the reassignment with
+        # accurate from_value names. Also enforces the reassign
+        # authority gate (manager-only).
+        reassignment_log = []
         if "primary_assignee_id" in vals:
+            new_val = vals["primary_assignee_id"]
+            new_user = self.env["res.users"].sudo().browse(new_val) if new_val else None
             for rec in self:
-                # Compare new vs current; allow no-op writes
-                new_val = vals["primary_assignee_id"]
                 cur_val = rec.primary_assignee_id.id or False
-                if new_val != cur_val and not rec._user_can_reassign():
-                    raise UserError(_(
-                        "Only Manager can reassign an Action Centre "
-                        "item."
-                    ))
-        return super().write(vals)
+                if new_val != cur_val:
+                    if not rec._user_can_reassign():
+                        raise UserError(_(
+                            "Only Manager can reassign an Action "
+                            "Centre item."
+                        ))
+                    old_name = (
+                        rec.primary_assignee_id.name
+                        if rec.primary_assignee_id else _("(unassigned)")
+                    )
+                    new_name = new_user.name if new_user else _("(unassigned)")
+                    reassignment_log.append((rec.id, old_name, new_name))
+        result = super().write(vals)
+        # Now log the reassignments — context flag distinguishes
+        # cron-driven escalation from user-driven reassignment, so
+        # the history reads as 'escalated' vs 'reassigned' as
+        # appropriate.
+        is_escalation = self.env.context.get("_force_escalated_flag")
+        event_type = "escalated" if is_escalation else "reassigned"
+        actor_is_system = bool(is_escalation)
+        for item_id, old_name, new_name in reassignment_log:
+            self.browse(item_id)._log_history(
+                event_type, to_value=new_name, from_value=old_name,
+                actor_is_system=actor_is_system,
+            )
+        return result
+
+    # ================================================================
+    # === P4.M4 — Escalation resolution + cron jobs
+    # ================================================================
+    def _resolve_escalation_user(self, role):
+        """Find a user in the group corresponding to `role`.
+
+        First-found-by-id-asc for determinism. Future enhancement:
+        prefer the least-loaded user (fewest open action items) per
+        D4 spec. The simpler form is fine for the milestone — load
+        balancing is a P4.M6+ refinement once we have real cross-
+        event volume.
+
+        Returns a res.users record or empty recordset.
+        """
+        self.ensure_one()
+        group_xmlid = _ROLE_TO_GROUP.get(role)
+        if not group_xmlid:
+            return self.env["res.users"]
+        group = self.env.ref(group_xmlid, raise_if_not_found=False)
+        if not group:
+            return self.env["res.users"]
+        # Exclude the current assignee + the system user so escalation
+        # actually moves the work to a fresh face.
+        exclude_ids = []
+        if self.primary_assignee_id:
+            exclude_ids.append(self.primary_assignee_id.id)
+        candidates = self.env["res.users"].sudo().search(
+            [
+                ("groups_id", "in", group.id),
+                ("active", "=", True),
+                ("id", "not in", exclude_ids),
+                ("id", "!=", self.env.ref("base.user_root").id),
+            ],
+            order="id asc",
+            limit=1,
+        )
+        return candidates
+
+    def _resolve_escalation(self):
+        """Perform one escalation step on self. Called by the cron.
+
+        Algorithm per D4:
+          1. Resolve next user via trigger_config.escalated_to_role
+          2. If no candidate: write 'escalation_failed' history,
+             leave assignee untouched.
+          3. Otherwise: bump escalation_level, set escalated_at +
+             escalated_to_id, reassign primary_assignee_id to the
+             new user. The write() override picks up the assignee
+             change and logs 'escalated' (via the
+             _force_escalated_flag context).
+        """
+        self.ensure_one()
+        cfg = self.trigger_config_id
+        if not cfg or not cfg.escalated_to_role:
+            self._log_history(
+                "escalation_failed",
+                to_value=_("(no escalation role configured)"),
+                actor_is_system=True,
+            )
+            return False
+        new_user = self._resolve_escalation_user(cfg.escalated_to_role)
+        if not new_user:
+            self._log_history(
+                "escalation_failed",
+                to_value=_("(no user in role %s)") % cfg.escalated_to_role,
+                actor_is_system=True,
+                notes=_("Escalation skipped — no active user found "
+                        "in role %s.") % cfg.escalated_to_role,
+            )
+            return False
+        # Sudo: cron runs as base.user_root, and the write() override's
+        # _user_can_reassign gate would otherwise refuse. The
+        # _force_escalated_flag tells write() to log 'escalated'
+        # rather than 'reassigned'.
+        self.sudo().with_context(_force_escalated_flag=True).write({
+            "primary_assignee_id": new_user.id,
+            "escalated_to_id": new_user.id,
+            "escalated_at": fields.Datetime.now(),
+            "escalation_level": self.escalation_level + 1,
+        })
+        return True
+
+    @api.model
+    def _cron_check_escalations(self):
+        """Hourly cron — find items whose escalation window has
+        elapsed and escalate them.
+
+        Due check: MAX(create_date, escalated_at) + escalation_minutes
+        < now. This is the idempotency trick — once an item is
+        escalated, escalated_at = now, so the next cron run can't
+        re-escalate it until another escalation_minutes elapses.
+
+        Skip items already at _MAX_ESCALATION_LEVEL.
+        """
+        now = fields.Datetime.now()
+        # Pull all open/in-progress items with a trigger_config that
+        # has escalation_minutes > 0 and we're under the cap. The
+        # per-item due check happens in Python because Datetime
+        # arithmetic in domains is awkward and the candidate set
+        # should be small enough that this is fine.
+        candidates = self.sudo().search([
+            ("state", "in", ("open", "in_progress")),
+            ("trigger_config_id", "!=", False),
+            ("trigger_config_id.escalation_minutes", ">", 0),
+            ("escalation_level", "<", _MAX_ESCALATION_LEVEL),
+        ])
+        escalated_count = 0
+        skipped_count = 0
+        for item in candidates:
+            cfg = item.trigger_config_id
+            reference = item.escalated_at or item.create_date
+            if not reference:
+                skipped_count += 1
+                continue
+            elapsed_minutes = (now - reference).total_seconds() / 60.0
+            if elapsed_minutes < cfg.escalation_minutes:
+                skipped_count += 1
+                continue
+            try:
+                if item._resolve_escalation():
+                    escalated_count += 1
+            except Exception:
+                _logger.exception(
+                    "action.centre.item %s: escalation failed",
+                    item.name,
+                )
+        _logger.info(
+            "Action Centre escalation cron: %d candidates inspected, "
+            "%d escalated, %d skipped (window not elapsed).",
+            len(candidates), escalated_count, skipped_count,
+        )
+        return True
+
+    @api.model
+    def _cron_evaluate_time_based_triggers(self):
+        """Daily cron — scaffolding for time-based trigger
+        evaluation. P4.M4 ships the iteration shell only; the
+        actual trigger evaluators (sla_passed, closeout_overdue,
+        feedback_followup) land in P4.M5+ as the mixin gets
+        integrated with real source models.
+
+        Per D3, this exists so the cron schedule is in place from
+        the milestone where escalation lands, ready to be filled
+        in without a schema change. Today it just iterates the
+        enabled time-based configs and logs the count.
+        """
+        Config = self.env["action.centre.trigger.config"].sudo()
+        time_based_types = (
+            "sla_passed", "closeout_overdue", "feedback_followup",
+            "readiness_50", "readiness_70",
+        )
+        enabled = Config.search([
+            ("trigger_type", "in", time_based_types),
+            ("is_enabled", "=", True),
+        ])
+        _logger.info(
+            "Action Centre time-based trigger cron: %d enabled "
+            "trigger types ready for evaluation (P4.M5+ wires the "
+            "actual evaluators).",
+            len(enabled),
+        )
+        return True
