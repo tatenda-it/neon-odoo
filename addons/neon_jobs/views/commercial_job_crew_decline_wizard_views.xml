@@ -5,20 +5,19 @@
         <field name="name">commercial.job.crew.decline.wizard.form</field>
         <field name="model">commercial.job.crew.decline.wizard</field>
         <field name="arch" type="xml">
+            <!-- P3.M8.5 — No <sheet>, bare Text field as direct
+                 child of <form> for full-width rendering. -->
             <form string="Decline Crew Assignment">
-                <sheet>
-                    <div class="alert alert-warning" role="alert">
-                        Declining sends a notice to MD/OD so they can reassign.
-                        Please record why you can't take this job.
-                    </div>
-                    <group>
-                        <field name="crew_id" readonly="1"/>
-                    </group>
-                    <group>
-                        <field name="decline_reason" nolabel="1"
-                               placeholder="Why are you declining? (visible to MD/OD)"/>
-                    </group>
-                </sheet>
+                <div class="alert alert-warning" role="alert">
+                    Declining sends a notice to MD/OD so they can reassign.
+                    Please record why you can't take this job.
+                </div>
+                <group>
+                    <field name="crew_id" readonly="1"/>
+                </group>
+                <separator string="Decline Reason"/>
+                <field name="decline_reason" nolabel="1"
+                       placeholder="Why are you declining? (visible to MD/OD)"/>
                 <footer>
                     <button name="action_confirm" type="object" string="Decline Assignment"
                             class="btn-danger"/>

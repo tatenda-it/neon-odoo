@@ -5,22 +5,27 @@
         <field name="name">commercial.job.loss.wizard.form</field>
         <field name="model">commercial.job.loss.wizard</field>
         <field name="arch" type="xml">
+            <!-- P3.M8.5 — No <sheet>. Bare Text field (loss_reason) is
+                 a direct child of <form> so it stretches full-width.
+                 Char field (lost_to_competitor) stays in a <group>
+                 for label rendering. -->
             <form string="Capture Loss Details">
-                <sheet>
-                    <div class="alert alert-warning" role="alert">
-                        Record why this lead was lost. Linked pending Commercial
-                        Jobs will be archived with this loss reason for future
-                        sales-process learning.
-                    </div>
-                    <group>
-                        <field name="lead_id" readonly="1"/>
-                        <field name="job_ids" widget="many2many_tags" readonly="1"/>
-                    </group>
-                    <group>
-                        <field name="loss_reason" placeholder="Why was the lead lost? (competitor, budget, timing, scope, etc.)"/>
-                        <field name="lost_to_competitor" placeholder="Optional — competitor name if known"/>
-                    </group>
-                </sheet>
+                <div class="alert alert-warning" role="alert">
+                    Record why this lead was lost. Linked pending Commercial
+                    Jobs will be archived with this loss reason for future
+                    sales-process learning.
+                </div>
+                <group>
+                    <field name="lead_id" readonly="1"/>
+                    <field name="job_ids" widget="many2many_tags" readonly="1"/>
+                </group>
+                <separator string="Loss Reason"/>
+                <field name="loss_reason" nolabel="1"
+                       placeholder="Why was the lead lost? (competitor, budget, timing, scope, etc.)"/>
+                <group>
+                    <field name="lost_to_competitor"
+                           placeholder="Optional — competitor name if known"/>
+                </group>
                 <footer>
                     <button name="action_confirm" type="object" string="Archive Lost"
                             class="btn-primary"/>

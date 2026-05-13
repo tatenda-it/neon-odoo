@@ -5,27 +5,24 @@
         <field name="name">commercial.event.job.gear.reconciled.override.wizard.form</field>
         <field name="model">commercial.event.job.gear.reconciled.override.wizard</field>
         <field name="arch" type="xml">
+            <!-- P3.M8.5 — No <sheet>, bare Text field for full-width. -->
             <form string="Override Gear Reconciled">
-                <sheet>
-                    <div class="alert alert-warning" role="alert">
-                        <strong>Gear Reconciled auto check failed.</strong>
-                        The Returned and/or Closeout checklists are not
-                        both 100% complete. Apply a manual override only
-                        when the missing items are tracked elsewhere
-                        (sub-hire, partial-return, etc.). The acting
-                        user and written reason are logged to the
-                        Event Job's audit trail.
-                    </div>
-                    <group>
-                        <field name="event_job_id" readonly="1"/>
-                        <field name="gear_reconciled_auto" readonly="1"/>
-                    </group>
-                    <separator string="Override Reason"/>
-                    <group col="1">
-                        <field name="override_reason" nolabel="1"
-                               placeholder="e.g. 'Sub-hired moving heads returned direct to supplier — verified by Lead Tech on site.'"/>
-                    </group>
-                </sheet>
+                <div class="alert alert-warning" role="alert">
+                    <strong>Gear Reconciled auto check failed.</strong>
+                    The Returned and/or Closeout checklists are not
+                    both 100% complete. Apply a manual override only
+                    when the missing items are tracked elsewhere
+                    (sub-hire, partial-return, etc.). The acting
+                    user and written reason are logged to the
+                    Event Job's audit trail.
+                </div>
+                <group>
+                    <field name="event_job_id" readonly="1"/>
+                    <field name="gear_reconciled_auto" readonly="1"/>
+                </group>
+                <separator string="Override Reason"/>
+                <field name="override_reason" nolabel="1"
+                       placeholder="e.g. 'Sub-hired moving heads returned direct to supplier — verified by Lead Tech on site.'"/>
                 <footer>
                     <button name="action_confirm" type="object"
                             string="Confirm Override"

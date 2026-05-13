@@ -5,30 +5,32 @@
         <field name="name">commercial.event.job.readiness.override.wizard.form</field>
         <field name="model">commercial.event.job.readiness.override.wizard</field>
         <field name="arch" type="xml">
+            <!--
+                P3.M8.5 — No <sheet> wrapper. Bare <field> elements are
+                direct children of <form>, matching the Odoo core
+                wizard idiom (account.move.reversal, base.module.uninstall,
+                account.automatic.entry.wizard). The modal dialog
+                provides the visual chrome; <sheet> only added a
+                CSS grid constraint that boxed Text fields into the
+                ~290px column the chore was filed for.
+            -->
             <form string="Override Readiness Gate">
-                <sheet>
-                    <div class="alert alert-warning" role="alert">
-                        <strong>Readiness Score below threshold.</strong>
-                        Moving to Ready for Dispatch requires a written
-                        justification. The acting user and reason will be
-                        logged to the Event Job's audit trail.
-                    </div>
-                    <group>
-                        <field name="event_job_id" readonly="1"/>
-                        <field name="readiness_score" readonly="1"
-                               widget="progressbar"/>
-                    </group>
-                    <separator string="Current Breakdown"/>
-                    <group col="1">
-                        <field name="readiness_breakdown" nolabel="1"
-                               readonly="1"/>
-                    </group>
-                    <separator string="Override Reason"/>
-                    <group col="1">
-                        <field name="override_reason" nolabel="1"
-                               placeholder="Why is the override justified? (recorded to the Event Job's chatter)"/>
-                    </group>
-                </sheet>
+                <div class="alert alert-warning" role="alert">
+                    <strong>Readiness Score below threshold.</strong>
+                    Moving to Ready for Dispatch requires a written
+                    justification. The acting user and reason will be
+                    logged to the Event Job's audit trail.
+                </div>
+                <group>
+                    <field name="event_job_id" readonly="1"/>
+                    <field name="readiness_score" readonly="1"
+                           widget="progressbar"/>
+                </group>
+                <separator string="Current Breakdown"/>
+                <field name="readiness_breakdown" nolabel="1" readonly="1"/>
+                <separator string="Override Reason"/>
+                <field name="override_reason" nolabel="1"
+                       placeholder="Why is the override justified? (recorded to the Event Job's chatter)"/>
                 <footer>
                     <button name="action_confirm" type="object"
                             string="Override and Move to Ready"

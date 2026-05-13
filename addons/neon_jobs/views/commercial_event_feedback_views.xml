@@ -86,11 +86,14 @@
                             <field name="rating"/>
                         </group>
                     </group>
+                    <!-- P3.M8.5 — Text fields are bare children of
+                         <sheet> (not wrapped in <group col="1">) so
+                         they stretch to full sheet width. Matches the
+                         pattern proven in commercial.scope.change and
+                         in Tab 2 of commercial.event.job. -->
                     <separator string="Feedback"/>
-                    <group col="1">
-                        <field name="feedback_text" nolabel="1"
-                               placeholder="The client's actual words or paraphrased account…"/>
-                    </group>
+                    <field name="feedback_text" nolabel="1"
+                           placeholder="The client's actual words or paraphrased account…"/>
                     <separator string="Follow-up"/>
                     <group>
                         <group>
@@ -109,10 +112,9 @@
                                    invisible="not follow_up_completed"/>
                         </group>
                     </group>
-                    <group col="1" invisible="not is_follow_up_required">
-                        <field name="follow_up_notes" nolabel="1"
-                               placeholder="What did Sales / Manager promise the client? Date by which the follow-up should land?"/>
-                    </group>
+                    <field name="follow_up_notes" nolabel="1"
+                           invisible="not is_follow_up_required"
+                           placeholder="What did Sales / Manager promise the client? Date by which the follow-up should land?"/>
                 </sheet>
                 <div class="oe_chatter">
                     <field name="message_follower_ids"/>

@@ -168,16 +168,19 @@
                         </group>
                     </group>
 
+                    <!-- P3.M8.5 — Text fields are bare <field> direct
+                         children of <sheet>, NOT wrapped in <group>.
+                         A <group> imposes a 2-column CSS grid that
+                         boxes the field into ~290px; a bare field is
+                         a block-level child of the sheet and stretches
+                         to full width. Same idiom as Tab 2 (Client
+                         Notes) on the commercial.event.job form.  -->
                     <separator string="What Changed"/>
-                    <group col="1">
-                        <field name="description" nolabel="1"
-                               placeholder="What was added, modified, removed, or replaced…"/>
-                    </group>
+                    <field name="description" nolabel="1"
+                           placeholder="What was added, modified, removed, or replaced…"/>
                     <separator string="Reason"/>
-                    <group col="1">
-                        <field name="reason" nolabel="1"
-                               placeholder="Why was the change needed? Client request, venue constraint, weather, equipment failure…"/>
-                    </group>
+                    <field name="reason" nolabel="1"
+                           placeholder="Why was the change needed? Client request, venue constraint, weather, equipment failure…"/>
 
                     <separator string="Billing Classification"/>
                     <group>
@@ -192,10 +195,8 @@
                         </group>
                     </group>
                     <separator string="Billing Notes"/>
-                    <group col="1">
-                        <field name="billing_notes" nolabel="1"
-                               placeholder="Explanation of the billing decision (why chargeable, why goodwill, why written off…)"/>
-                    </group>
+                    <field name="billing_notes" nolabel="1"
+                           placeholder="Explanation of the billing decision (why chargeable, why goodwill, why written off…)"/>
 
                     <separator string="Finalisation"/>
                     <group>
