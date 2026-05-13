@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_event_feedback_view_tree" model="ir.ui.view">
+        <field name="name">commercial.event.feedback.tree</field>
+        <field name="model">commercial.event.feedback</field>
+        <field name="arch" type="xml">
+            <tree string="Client Feedback"
+                  decoration-success="sentiment == 'positive'"
+                  decoration-info="sentiment == 'neutral'"
+                  decoration-warning="sentiment == 'mixed'"
+                  decoration-danger="sentiment == 'negative'">
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="partner_id" optional="show"/>
+                <field name="event_date" optional="show"/>
+                <field name="channel" widget="badge"/>
+                <field name="captured_at"/>
+                <field name="captured_by" optional="show"/>
+                <field name="feedback_text"/>
+                <field name="sentiment" widget="badge"
+                       decoration-success="sentiment == 'positive'"
+                       decoration-info="sentiment == 'neutral'"
+                       decoration-warning="sentiment == 'mixed'"
+                       decoration-danger="sentiment == 'negative'"/>
+                <field name="rating" optional="show"/>
+                <field name="is_follow_up_required" widget="boolean_toggle"/>
+                <field name="follow_up_completed" widget="boolean_toggle" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_event_feedback_view_tree_embedded" model="ir.ui.view">
+        <field name="name">commercial.event.feedback.tree.embedded</field>
+        <field name="model">commercial.event.feedback</field>
+        <field name="arch" type="xml">
+            <tree default_order="captured_at desc, id desc"
+                  decoration-success="sentiment == 'positive'"
+                  decoration-info="sentiment == 'neutral'"
+                  decoration-warning="sentiment == 'mixed'"
+                  decoration-danger="sentiment == 'negative'">
+                <field name="name"/>
+                <field name="channel" widget="badge"/>
+                <field name="captured_at"/>
+                <field name="captured_by"/>
+                <field name="feedback_text"/>
+                <field name="sentiment" widget="badge"/>
+                <field name="rating" optional="show"/>
+                <field name="is_follow_up_required" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="commercial_event_feedback_view_form" model="ir.ui.view">
+        <field name="name">commercial.event.feedback.form</field>
+        <field name="model">commercial.event.feedback</field>
+        <field name="arch" type="xml">
+            <form string="Client Feedback">
+                <header>
+                    <button name="action_complete_follow_up" type="object"
+                            string="Mark Follow-up Complete"
+                            class="oe_highlight"
+                            invisible="not can_complete_follow_up"
+                            context="{'default_follow_up_notes': follow_up_notes}"
+                            confirm="Mark this follow-up as complete? Records who and when."/>
+                    <field name="can_complete_follow_up" invisible="1"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Event">
+                            <field name="event_job_id"
+                                   options="{'no_create': True}"/>
+                            <field name="commercial_job_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="event_date" readonly="1"/>
+                        </group>
+                        <group string="Capture">
+                            <field name="channel"/>
+                            <field name="captured_at" readonly="1"/>
+                            <field name="captured_by" readonly="1"/>
+                            <field name="sentiment"/>
+                            <field name="rating"/>
+                        </group>
+                    </group>
+                    <separator string="Feedback"/>
+                    <group col="1">
+                        <field name="feedback_text" nolabel="1"
+                               placeholder="The client's actual words or paraphrased account…"/>
+                    </group>
+                    <separator string="Follow-up"/>
+                    <group>
+                        <group>
+                            <field name="is_follow_up_required"/>
+                            <field name="follow_up_owner"
+                                   options="{'no_create': True}"
+                                   required="is_follow_up_required"
+                                   invisible="not is_follow_up_required"/>
+                            <field name="follow_up_completed" readonly="1"
+                                   invisible="not is_follow_up_required"/>
+                        </group>
+                        <group>
+                            <field name="follow_up_completed_at" readonly="1"
+                                   invisible="not follow_up_completed"/>
+                            <field name="follow_up_completed_by" readonly="1"
+                                   invisible="not follow_up_completed"/>
+                        </group>
+                    </group>
+                    <group col="1" invisible="not is_follow_up_required">
+                        <field name="follow_up_notes" nolabel="1"
+                               placeholder="What did Sales / Manager promise the client? Date by which the follow-up should land?"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="commercial_event_feedback_view_search" model="ir.ui.view">
+        <field name="name">commercial.event.feedback.search</field>
+        <field name="model">commercial.event.feedback</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="partner_id"/>
+                <field name="feedback_text"/>
+                <field name="captured_by"/>
+                <field name="follow_up_owner"/>
+                <separator/>
+                <filter string="Follow-up Required (open)"
+                        name="filter_follow_up_open"
+                        domain="[('is_follow_up_required', '=', True),
+                                 ('follow_up_completed', '=', False)]"/>
+                <filter string="Follow-up Completed"
+                        name="filter_follow_up_done"
+                        domain="[('is_follow_up_required', '=', True),
+                                 ('follow_up_completed', '=', True)]"/>
+                <separator/>
+                <filter string="Negative sentiment"
+                        name="filter_negative"
+                        domain="[('sentiment', '=', 'negative')]"/>
+                <filter string="Positive sentiment"
+                        name="filter_positive"
+                        domain="[('sentiment', '=', 'positive')]"/>
+                <filter string="Mixed sentiment"
+                        name="filter_mixed"
+                        domain="[('sentiment', '=', 'mixed')]"/>
+                <separator/>
+                <filter string="My follow-ups"
+                        name="filter_my_follow_ups"
+                        domain="[('follow_up_owner', '=', uid),
+                                 ('follow_up_completed', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Channel"
+                            name="group_channel"
+                            context="{'group_by': 'channel'}"/>
+                    <filter string="Sentiment"
+                            name="group_sentiment"
+                            context="{'group_by': 'sentiment'}"/>
+                    <filter string="Client"
+                            name="group_partner"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter string="Event Job"
+                            name="group_event_job"
+                            context="{'group_by': 'event_job_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="commercial_event_feedback_action" model="ir.actions.act_window">
+        <field name="name">Client Feedback</field>
+        <field name="res_model">commercial.event.feedback</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="commercial_event_feedback_view_search"/>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_jobs.group_neon_jobs_user'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
+    </record>
+
+</odoo>

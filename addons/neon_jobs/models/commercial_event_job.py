@@ -450,12 +450,234 @@ class CommercialEventJob(models.Model):
         for rec in self:
             rec.can_log_scope_change = ScopeChange._user_can_log_for_event(rec)
 
-    # === Closeout checkpoints (P3.M7 will expand) ===
-    gear_reconciled = fields.Boolean(default=False, tracking=True)
-    finance_handoff_complete = fields.Boolean(default=False, tracking=True)
+    @api.depends("feedback_ids")
+    def _compute_feedback_count(self):
+        for rec in self:
+            rec.feedback_count = len(rec.feedback_ids)
+
+    # ============================================================
+    # === P3.M7 — Closeout auto-compute + effective values
+    # ============================================================
+    @api.depends("checklist_ids.type", "checklist_ids.state")
+    def _compute_gear_reconciled_auto(self):
+        """Auto-completes when the Returned AND Closeout checklists
+        are both at state='completed'. Other checklists (gear_prep,
+        site_setup, etc.) don't gate gear reconciliation — only the
+        two end-of-event ones do."""
+        for rec in self:
+            returned_done = any(
+                c.state == "completed" for c in rec.checklist_ids
+                if c.type == "returned"
+            )
+            closeout_done = any(
+                c.state == "completed" for c in rec.checklist_ids
+                if c.type == "closeout"
+            )
+            rec.gear_reconciled_auto = returned_done and closeout_done
+
+    @api.depends("gear_reconciled_auto", "gear_reconciled_override_at")
+    def _compute_gear_reconciled_effective(self):
+        for rec in self:
+            rec.gear_reconciled = (
+                rec.gear_reconciled_auto
+                or bool(rec.gear_reconciled_override_at)
+            )
+
+    @api.depends("scope_change_ids.state",
+                 "commercial_job_id.sale_order_id.invoice_ids",
+                 "commercial_job_id.sale_order_id.invoice_ids.state")
+    def _compute_finance_handoff_auto(self):
+        """Auto-completes when every scope_change is in a terminal
+        billing state (finalised or cancelled) AND no draft invoices
+        remain on the parent commercial.job. A draft invoice means
+        Finance still has work to do — handoff is not complete."""
+        for rec in self:
+            pending_scope = any(
+                sc.state not in ("finalised", "cancelled")
+                for sc in rec.scope_change_ids
+            )
+            draft_invoices = False
+            if rec.commercial_job_id:
+                draft_invoices = any(
+                    inv.state == "draft"
+                    for inv in rec.commercial_job_id.invoice_ids
+                )
+            rec.finance_handoff_auto = (
+                not pending_scope and not draft_invoices
+            )
+
+    @api.depends("finance_handoff_auto", "finance_handoff_override_at")
+    def _compute_finance_handoff_effective(self):
+        for rec in self:
+            rec.finance_handoff_complete = (
+                rec.finance_handoff_auto
+                or bool(rec.finance_handoff_override_at)
+            )
+
+    @api.depends("feedback_ids", "lead_tech_notes")
+    def _compute_has_soft_requirements_outstanding(self):
+        """True when at least one soft requirement is missing —
+        feeds P3.M8 'Completed-but-not-Closed' queue. Stays True
+        even after the event is Closed (the queue surfaces both
+        completed-but-not-closed AND closed-with-outstanding)."""
+        for rec in self:
+            no_feedback = not rec.feedback_ids
+            no_notes = not (rec.lead_tech_notes and rec.lead_tech_notes.strip())
+            rec.has_soft_requirements_outstanding = no_feedback or no_notes
+
+    @api.depends("state", "event_date")
+    def _compute_days_since_completed(self):
+        """Days since the event moved into completed state. Approx
+        from event_date because we don't store a completed_at field
+        separately — closeout_completed_at fires on 'closed', not
+        'completed'. Returns 0 when the event is not in or past the
+        completed state."""
+        today = fields.Date.context_today(self)
+        post_completed_states = ("completed", "closed")
+        for rec in self:
+            if rec.state not in post_completed_states or not rec.event_date:
+                rec.days_since_completed = 0
+                continue
+            delta = (today - rec.event_date).days
+            rec.days_since_completed = max(0, delta)
+
+    @api.depends_context("uid")
+    def _compute_closeout_gates(self):
+        for rec in self:
+            can_lead_or_mgr = rec._user_in_any_group(("crew_leader", "manager"))
+            rec.can_override_gear_reconciled = (
+                can_lead_or_mgr and not rec.gear_reconciled_auto
+                and not rec.gear_reconciled_override_at
+            )
+            rec.can_override_finance_handoff = (
+                rec._user_in_any_group(("manager",))
+                and not rec.finance_handoff_auto
+                and not rec.finance_handoff_override_at
+            )
+            rec.can_log_feedback = rec._user_in_any_group(
+                ("user", "crew_leader", "manager")
+            )
+
+    # === P3.M7 — Closeout (hybrid auto-compute + manual override) ===
+    # gear_reconciled and finance_handoff_complete are EFFECTIVE values
+    # = auto OR override. Both stored so the state machine's depends
+    # graph can pick up changes. Direct writes are blocked (compute=
+    # readonly); use the action_override_* methods to flip them when
+    # the auto path can't get there.
+    gear_reconciled_auto = fields.Boolean(
+        string="Gear Reconciled (auto)",
+        compute="_compute_gear_reconciled_auto",
+        store=True,
+        readonly=True,
+        help="Auto-completes when the Returned and Closeout checklists "
+        "are both at 100% completion (state='completed').",
+    )
+    gear_reconciled_override_reason = fields.Text(
+        string="Gear Override Reason",
+        readonly=True,
+        copy=False,
+    )
+    gear_reconciled_override_by = fields.Many2one(
+        "res.users",
+        string="Gear Override By",
+        readonly=True,
+        copy=False,
+    )
+    gear_reconciled_override_at = fields.Datetime(
+        string="Gear Override At",
+        readonly=True,
+        copy=False,
+    )
+    gear_reconciled = fields.Boolean(
+        string="Gear Reconciled",
+        compute="_compute_gear_reconciled_effective",
+        store=True,
+        readonly=True,
+        tracking=True,
+        help="Effective Gear Reconciled flag. True when the auto "
+        "compute succeeds (both checklists complete) OR when Lead "
+        "Tech / Manager has applied a manual override.",
+    )
+
+    finance_handoff_auto = fields.Boolean(
+        string="Finance Handoff (auto)",
+        compute="_compute_finance_handoff_auto",
+        store=True,
+        readonly=True,
+        help="Auto-completes when (a) all scope changes are finalised "
+        "or cancelled (no pending billing decisions) AND (b) no "
+        "draft invoices remain on the parent Commercial Job.",
+    )
+    finance_handoff_override_reason = fields.Text(
+        string="Finance Override Reason",
+        readonly=True,
+        copy=False,
+    )
+    finance_handoff_override_by = fields.Many2one(
+        "res.users",
+        string="Finance Override By",
+        readonly=True,
+        copy=False,
+    )
+    finance_handoff_override_at = fields.Datetime(
+        string="Finance Override At",
+        readonly=True,
+        copy=False,
+    )
+    finance_handoff_complete = fields.Boolean(
+        string="Finance Handoff Complete",
+        compute="_compute_finance_handoff_effective",
+        store=True,
+        readonly=True,
+        tracking=True,
+        help="Effective Finance Handoff Complete flag. True when the "
+        "auto compute succeeds OR when Manager has applied a manual "
+        "override.",
+    )
+
     closeout_completed_at = fields.Datetime(
         string="Closeout Completed At",
         readonly=True,
+    )
+
+    # === Soft requirements tracking (D3 — flag for P3.M8 queue) ===
+    has_soft_requirements_outstanding = fields.Boolean(
+        string="Soft Requirements Outstanding",
+        compute="_compute_has_soft_requirements_outstanding",
+        store=True,
+        help="True when at least one soft closeout requirement is "
+        "still missing (no client feedback record OR empty Lead "
+        "Tech Notes). Feeds the P3.M8 'Completed-but-not-Closed' "
+        "follow-up queue. Never blocks the close transition.",
+    )
+    days_since_completed = fields.Integer(
+        string="Days Since Completed",
+        compute="_compute_days_since_completed",
+        help="Days elapsed since the event_job moved into completed "
+        "state. Used for the 14-day SLA badge on the form and the "
+        "P3.M8 queue ordering.",
+    )
+
+    # === P3.M7 — multi-channel feedback (D4) ===
+    feedback_ids = fields.One2many(
+        "commercial.event.feedback",
+        "event_job_id",
+        string="Client Feedback",
+    )
+    feedback_count = fields.Integer(
+        string="Feedback Count",
+        compute="_compute_feedback_count",
+    )
+
+    # === Closeout UI gates ===
+    can_override_gear_reconciled = fields.Boolean(
+        compute="_compute_closeout_gates"
+    )
+    can_override_finance_handoff = fields.Boolean(
+        compute="_compute_closeout_gates"
+    )
+    can_log_feedback = fields.Boolean(
+        compute="_compute_closeout_gates"
     )
 
     # === P3.M3 — state-machine UI gates ===
@@ -569,6 +791,172 @@ class CommercialEventJob(models.Model):
                 "default_event_job_id": self.id,
                 "search_default_event_job_id": self.id,
             },
+        }
+
+    # ============================================================
+    # === P3.M7 — Closeout override actions
+    # ============================================================
+    def action_override_gear_reconciled(self, reason=None):
+        """Lead Tech / Manager flips gear_reconciled to True when the
+        auto path can't get there (e.g. a sub-hired piece that doesn't
+        come back through our Returned checklist). Reason is captured
+        in the audit fields and chatter."""
+        if reason is None:
+            reason = self.env.context.get("default_gear_override_reason")
+        if not reason or not str(reason).strip():
+            raise UserError(_(
+                "Gear override requires a written reason — the audit "
+                "trail keeps a record of why the auto check was bypassed."
+            ))
+        reason = str(reason).strip()
+        for rec in self:
+            if not rec._user_in_any_group(("crew_leader", "manager")):
+                raise UserError(_(
+                    "Only Lead Tech or Manager can override Gear "
+                    "Reconciled."
+                ))
+            if rec.gear_reconciled_auto:
+                raise UserError(_(
+                    "Gear Reconciled already True via auto compute — "
+                    "no override needed."
+                ))
+            if rec.gear_reconciled_override_at:
+                raise UserError(_(
+                    "Gear Reconciled has already been overridden by "
+                    "%(user)s on %(when)s. Reason: %(reason)s"
+                ) % {
+                    "user": rec.gear_reconciled_override_by.name,
+                    "when": rec.gear_reconciled_override_at,
+                    "reason": rec.gear_reconciled_override_reason,
+                })
+            rec.sudo().write({
+                "gear_reconciled_override_reason": reason,
+                "gear_reconciled_override_by": self.env.user.id,
+                "gear_reconciled_override_at": fields.Datetime.now(),
+            })
+            rec.sudo().message_post(
+                body=_(
+                    "Gear reconciled override by %(user)s. Reason: %(reason)s"
+                ) % {"user": self.env.user.name, "reason": reason},
+                author_id=self.env.user.partner_id.id,
+            )
+        return True
+
+    def action_open_gear_override_wizard(self):
+        """UI entry: opens the gear override wizard so the user can
+        capture their reason and confirm."""
+        self.ensure_one()
+        if not self._user_in_any_group(("crew_leader", "manager")):
+            raise UserError(_(
+                "Only Lead Tech or Manager can override Gear Reconciled."
+            ))
+        if self.gear_reconciled_auto:
+            raise UserError(_(
+                "Gear Reconciled already True via auto compute — "
+                "no override needed."
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Override Gear Reconciled"),
+            "res_model": "commercial.event.job.gear.reconciled.override.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_event_job_id": self.id},
+        }
+
+    def action_override_finance_handoff(self, reason=None):
+        """Manager flips finance_handoff_complete to True when the
+        auto path can't get there. Manager-only — Finance role
+        doesn't exist as a separate group; Manager stands in."""
+        if reason is None:
+            reason = self.env.context.get("default_finance_override_reason")
+        if not reason or not str(reason).strip():
+            raise UserError(_(
+                "Finance override requires a written reason — the audit "
+                "trail keeps a record of why the auto check was bypassed."
+            ))
+        reason = str(reason).strip()
+        for rec in self:
+            if not rec._user_in_any_group(("manager",)):
+                raise UserError(_(
+                    "Only Manager can override Finance Handoff Complete."
+                ))
+            if rec.finance_handoff_auto:
+                raise UserError(_(
+                    "Finance Handoff already True via auto compute — "
+                    "no override needed."
+                ))
+            if rec.finance_handoff_override_at:
+                raise UserError(_(
+                    "Finance Handoff has already been overridden by "
+                    "%(user)s on %(when)s. Reason: %(reason)s"
+                ) % {
+                    "user": rec.finance_handoff_override_by.name,
+                    "when": rec.finance_handoff_override_at,
+                    "reason": rec.finance_handoff_override_reason,
+                })
+            rec.sudo().write({
+                "finance_handoff_override_reason": reason,
+                "finance_handoff_override_by": self.env.user.id,
+                "finance_handoff_override_at": fields.Datetime.now(),
+            })
+            rec.sudo().message_post(
+                body=_(
+                    "Finance handoff override by %(user)s. Reason: %(reason)s"
+                ) % {"user": self.env.user.name, "reason": reason},
+                author_id=self.env.user.partner_id.id,
+            )
+        return True
+
+    def action_open_finance_override_wizard(self):
+        self.ensure_one()
+        if not self._user_in_any_group(("manager",)):
+            raise UserError(_(
+                "Only Manager can override Finance Handoff Complete."
+            ))
+        if self.finance_handoff_auto:
+            raise UserError(_(
+                "Finance Handoff already True via auto compute — "
+                "no override needed."
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Override Finance Handoff"),
+            "res_model": "commercial.event.job.finance.handoff.override.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_event_job_id": self.id},
+        }
+
+    def action_log_feedback(self):
+        """Open a new feedback form pre-filled with this event_job's
+        context. Same UX shape as action_log_scope_change."""
+        self.ensure_one()
+        if not self.can_log_feedback:
+            raise UserError(_(
+                "You are not authorised to log client feedback on "
+                "this event."
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Log Client Feedback"),
+            "res_model": "commercial.event.feedback",
+            "view_mode": "form",
+            "target": "current",
+            "context": {"default_event_job_id": self.id},
+        }
+
+    def action_open_feedback(self):
+        """Smart-button equivalent — opens the list of feedback
+        records filtered to this event_job."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Client Feedback"),
+            "res_model": "commercial.event.feedback",
+            "view_mode": "tree,form",
+            "domain": [("event_job_id", "=", self.id)],
+            "context": {"default_event_job_id": self.id},
         }
 
     def action_log_scope_change(self):
@@ -886,19 +1274,34 @@ class CommercialEventJob(models.Model):
             rec._do_transition("completed")
 
     def action_move_to_closed(self):
+        """P3.M7 — hard close gate.
+
+        Requires gear_reconciled AND finance_handoff_complete (both
+        effective values: auto OR override). Soft requirements
+        (lead_tech_notes, feedback, crew_observations) DO NOT block
+        the close — they surface in the P3.M8 follow-up queue via
+        has_soft_requirements_outstanding.
+        """
         for rec in self:
             rec._check_authority("closed")
             missing = []
             if not rec.gear_reconciled:
-                missing.append(_("Gear Reconciled"))
+                missing.append(_(
+                    "Gear Reconciled (complete the Returned + Closeout "
+                    "checklists, or apply a manual override from the "
+                    "Closeout tab)"
+                ))
             if not rec.finance_handoff_complete:
-                missing.append(_("Finance Handoff Complete"))
+                missing.append(_(
+                    "Finance Handoff Complete (finalise all pending "
+                    "scope changes and clear draft invoices, or apply "
+                    "a manual Manager override)"
+                ))
             if missing:
                 raise UserError(_(
-                    "Cannot close Event Job — missing closeout "
-                    "requirements: %s. (P3.M7 will expand the closeout "
-                    "checklist.)"
-                ) % ", ".join(missing))
+                    "Cannot close Event Job — missing hard closeout "
+                    "requirements:\n- %s"
+                ) % "\n- ".join(missing))
             rec._do_transition("closed")
 
     def action_cancel_event_job(self):

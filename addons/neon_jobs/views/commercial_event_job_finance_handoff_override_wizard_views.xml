@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_event_job_finance_handoff_override_wizard_view_form" model="ir.ui.view">
+        <field name="name">commercial.event.job.finance.handoff.override.wizard.form</field>
+        <field name="model">commercial.event.job.finance.handoff.override.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Override Finance Handoff">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Finance Handoff auto check failed.</strong>
+                        Either pending scope changes remain (not finalised
+                        / cancelled) OR draft invoices exist on the
+                        Commercial Job. Manager-only override — record
+                        why finance is satisfied despite the auto check.
+                        Acting user and reason logged to the audit
+                        trail.
+                    </div>
+                    <group>
+                        <field name="event_job_id" readonly="1"/>
+                        <field name="finance_handoff_auto" readonly="1"/>
+                    </group>
+                    <separator string="Override Reason"/>
+                    <group col="1">
+                        <field name="override_reason" nolabel="1"
+                               placeholder="e.g. 'Final invoice issued offline pending ZIMRA system fix — receipt attached to Commercial Job.'"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Confirm Override"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

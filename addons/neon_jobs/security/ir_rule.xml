@@ -114,5 +114,23 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P3.M7 — Feedback visibility for crew tier. Crew sees
+            feedback records on event_jobs they're assigned to
+            (same scoping pattern as scope_change). Crew cannot
+            create or write feedback — only Sales / Crew Leader /
+            Manager can (D6 authority matrix).
+        -->
+        <record id="commercial_event_feedback_rule_crew_read_own" model="ir.rule">
+            <field name="name">Event Feedback: crew reads own events' feedback only</field>
+            <field name="model_id" ref="model_commercial_event_feedback"/>
+            <field name="domain_force">[('event_job_id.commercial_job_id.crew_assignment_ids.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

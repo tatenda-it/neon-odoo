@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_event_job_gear_reconciled_override_wizard_view_form" model="ir.ui.view">
+        <field name="name">commercial.event.job.gear.reconciled.override.wizard.form</field>
+        <field name="model">commercial.event.job.gear.reconciled.override.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Override Gear Reconciled">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Gear Reconciled auto check failed.</strong>
+                        The Returned and/or Closeout checklists are not
+                        both 100% complete. Apply a manual override only
+                        when the missing items are tracked elsewhere
+                        (sub-hire, partial-return, etc.). The acting
+                        user and written reason are logged to the
+                        Event Job's audit trail.
+                    </div>
+                    <group>
+                        <field name="event_job_id" readonly="1"/>
+                        <field name="gear_reconciled_auto" readonly="1"/>
+                    </group>
+                    <separator string="Override Reason"/>
+                    <group col="1">
+                        <field name="override_reason" nolabel="1"
+                               placeholder="e.g. 'Sub-hired moving heads returned direct to supplier — verified by Lead Tech on site.'"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Confirm Override"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

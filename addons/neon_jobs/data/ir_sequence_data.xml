@@ -42,5 +42,15 @@
             <field name="implementation">standard</field>
         </record>
 
+        <record id="seq_commercial_event_feedback" model="ir.sequence">
+            <field name="name">Event Client Feedback</field>
+            <field name="code">commercial.event.feedback</field>
+            <field name="prefix">FB-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
     </data>
 </odoo>

@@ -54,3 +54,10 @@ access_commercial_scope_change_user,commercial.scope.change user (sales — full
 access_commercial_scope_change_crew_leader,commercial.scope.change crew_leader (lead tech — full CRUD),model_commercial_scope_change,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
 access_commercial_scope_change_manager,commercial.scope.change manager (oversight — full),model_commercial_scope_change,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_commercial_scope_change_crew,commercial.scope.change crew (read+write+create — crew_chief logs via model-level gate; ir.rule scopes to own events),model_commercial_scope_change,neon_jobs.group_neon_jobs_crew,1,1,1,0
+access_commercial_event_feedback_user,commercial.event.feedback user (sales — full CRUD),model_commercial_event_feedback,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_commercial_event_feedback_crew_leader,commercial.event.feedback crew_leader,model_commercial_event_feedback,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_commercial_event_feedback_manager,commercial.event.feedback manager,model_commercial_event_feedback,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_event_feedback_crew,commercial.event.feedback crew (read-only via ir.rule on own events),model_commercial_event_feedback,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_commercial_event_job_gear_reconciled_override_wizard_crew_leader,gear override wizard crew_leader,model_commercial_event_job_gear_reconciled_override_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_commercial_event_job_gear_reconciled_override_wizard_manager,gear override wizard manager,model_commercial_event_job_gear_reconciled_override_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_event_job_finance_handoff_override_wizard_manager,finance handoff override wizard manager,model_commercial_event_job_finance_handoff_override_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1

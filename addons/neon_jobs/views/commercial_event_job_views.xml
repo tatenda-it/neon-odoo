@@ -174,6 +174,11 @@
                             <field name="scope_change_count" widget="statinfo"
                                    string="Scope Changes"/>
                         </button>
+                        <button name="action_open_feedback" type="object"
+                                class="oe_stat_button" icon="fa-comment">
+                            <field name="feedback_count" widget="statinfo"
+                                   string="Feedback"/>
+                        </button>
                     </div>
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
@@ -434,15 +439,77 @@
                             </div>
                         </page>
 
-                        <!-- Tab 10 — Closeout -->
+                        <!-- Tab 10 — Closeout (P3.M7 rebuild) -->
                         <page string="Closeout" name="page_closeout">
+                            <field name="can_override_gear_reconciled" invisible="1"/>
+                            <field name="can_override_finance_handoff" invisible="1"/>
+                            <field name="can_log_feedback" invisible="1"/>
+
+                            <!-- 14-day SLA banner (visible only when overdue) -->
+                            <div class="alert alert-danger mb-2" role="alert"
+                                 invisible="state != 'completed' or days_since_completed &lt;= 14">
+                                <strong>SLA breach.</strong>
+                                This event has been in Completed state for
+                                <field name="days_since_completed" readonly="1" nolabel="1"
+                                       class="oe_inline"/>
+                                days (target: close within 14). Resolve the
+                                outstanding hard requirements below or
+                                escalate to Manager.
+                            </div>
+
+                            <!-- Section A — Hard Requirements -->
+                            <separator string="Hard Requirements (gate close)"/>
                             <group>
-                                <group string="Checkpoints">
-                                    <field name="gear_reconciled"/>
-                                    <field name="finance_handoff_complete"/>
+                                <group string="Gear Reconciliation">
+                                    <field name="gear_reconciled_auto" readonly="1"/>
+                                    <field name="gear_reconciled" readonly="1"
+                                           help="Effective value: auto OR override."/>
+                                    <field name="gear_reconciled_override_by" readonly="1"
+                                           invisible="not gear_reconciled_override_at"/>
+                                    <field name="gear_reconciled_override_at" readonly="1"
+                                           invisible="not gear_reconciled_override_at"/>
+                                    <field name="gear_reconciled_override_reason" readonly="1"
+                                           invisible="not gear_reconciled_override_at"/>
+                                    <button name="action_open_gear_override_wizard"
+                                            type="object"
+                                            string="Override Gear Reconciled"
+                                            class="btn-warning"
+                                            invisible="not can_override_gear_reconciled"
+                                            help="Manually mark gear reconciled (e.g. sub-hire returned direct to supplier). Lead Tech / Manager only; reason logged."/>
                                 </group>
-                                <group string="Closed At">
-                                    <field name="closeout_completed_at" readonly="1"/>
+                                <group string="Finance Handoff">
+                                    <field name="finance_handoff_auto" readonly="1"/>
+                                    <field name="finance_handoff_complete" readonly="1"
+                                           help="Effective value: auto OR override."/>
+                                    <field name="finance_handoff_override_by" readonly="1"
+                                           invisible="not finance_handoff_override_at"/>
+                                    <field name="finance_handoff_override_at" readonly="1"
+                                           invisible="not finance_handoff_override_at"/>
+                                    <field name="finance_handoff_override_reason" readonly="1"
+                                           invisible="not finance_handoff_override_at"/>
+                                    <button name="action_open_finance_override_wizard"
+                                            type="object"
+                                            string="Override Finance Handoff"
+                                            class="btn-warning"
+                                            invisible="not can_override_finance_handoff"
+                                            help="Manually mark finance handoff complete despite pending scope changes or draft invoices. Manager only; reason logged."/>
+                                </group>
+                            </group>
+                            <div class="text-muted" role="alert">
+                                Both Gear Reconciled and Finance Handoff
+                                Complete must be True before Close Event
+                                fires. Auto compute drives both — manual
+                                overrides exist for the edge cases
+                                (sub-hire returns, offline invoices).
+                            </div>
+
+                            <!-- Section B — Soft Requirements -->
+                            <separator string="Soft Requirements (don't block close — flag follow-up queue)"/>
+                            <group>
+                                <group string="Status">
+                                    <field name="has_soft_requirements_outstanding" readonly="1"
+                                           help="True when at least one soft requirement is missing — feeds P3.M8 follow-up queue."/>
+                                    <field name="feedback_count" readonly="1"/>
                                 </group>
                             </group>
                             <separator string="Lead Tech Notes"/>
@@ -451,12 +518,43 @@
                             <separator string="Crew Observations"/>
                             <field name="crew_observations" nolabel="1" colspan="2"
                                    placeholder="What the crew saw on site — what worked, what didn't…"/>
-                            <separator string="Client Feedback"/>
-                            <field name="client_feedback" nolabel="1" colspan="2"
-                                   placeholder="What the client said on the day, post-event feedback…"/>
                             <separator string="Incidents Log"/>
                             <field name="incidents_log" nolabel="1" colspan="2"
                                    placeholder="Free-form incident notes. Phase 4 introduces a structured incident model."/>
+
+                            <!-- Section C — Client Feedback (new model) -->
+                            <separator string="Client Feedback (multi-channel)"/>
+                            <div class="mb-2">
+                                <button name="action_log_feedback"
+                                        type="object"
+                                        string="Log Feedback"
+                                        class="btn-primary"
+                                        icon="fa-comment"
+                                        invisible="not can_log_feedback"
+                                        help="Open a new feedback form pre-filled with this event's context."/>
+                            </div>
+                            <field name="feedback_ids" nolabel="1"
+                                   context="{'default_event_job_id': active_id,
+                                             'tree_view_ref': 'neon_jobs.commercial_event_feedback_view_tree_embedded'}">
+                            </field>
+
+                            <!-- Section D — Closure -->
+                            <separator string="Closure"/>
+                            <group>
+                                <group>
+                                    <field name="closeout_completed_at" readonly="1"/>
+                                    <field name="days_since_completed" readonly="1"
+                                           invisible="state not in ('completed','closed')"/>
+                                </group>
+                            </group>
+
+                            <!-- DEPRECATED — preserved for migration backwards-compat -->
+                            <separator string="Client Feedback (legacy free-form, deprecated)"
+                                       invisible="not client_feedback"/>
+                            <field name="client_feedback" nolabel="1" colspan="2"
+                                   invisible="not client_feedback"
+                                   readonly="1"
+                                   help="DEPRECATED in 17.0.2.5.0 — replaced by the multi-channel Client Feedback list above. Migration converted any existing text into a 'written' channel record. Remove in 17.0.3.x."/>
                         </page>
                     </notebook>
                 </sheet>
