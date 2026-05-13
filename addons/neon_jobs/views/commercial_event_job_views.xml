@@ -407,13 +407,26 @@
 
                         <!-- Tab 12 — Scope Changes (P3.M6) -->
                         <page string="Scope Changes" name="page_scope_changes">
+                            <div class="mb-2">
+                                <button name="action_log_scope_change"
+                                        type="object"
+                                        string="Log Scope Change"
+                                        class="btn-primary"
+                                        icon="fa-plus-circle"
+                                        invisible="not can_log_scope_change"
+                                        help="Open a new scope change form pre-filled with this event's context."/>
+                            </div>
+                            <field name="can_log_scope_change" invisible="1"/>
                             <field name="scope_change_ids" nolabel="1"
                                    context="{'default_event_job_id': active_id,
                                              'tree_view_ref': 'neon_jobs.commercial_scope_change_view_tree_embedded'}">
                             </field>
                             <div class="text-muted" role="alert">
                                 Lead Tech / Crew Chief logs scope changes
-                                here as they happen. Default billing
+                                here as they happen — use the
+                                <strong>Log Scope Change</strong> button
+                                above for a fresh form, or inline-edit
+                                the list to add a row. Default billing
                                 action is 'Pending Decision' — Sales Rep
                                 reviews via Operations → Scope Changes
                                 and reclassifies. Phase 8+ will surface

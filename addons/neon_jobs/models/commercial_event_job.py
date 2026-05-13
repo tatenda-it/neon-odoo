@@ -430,10 +430,25 @@ class CommercialEventJob(models.Model):
         string="Scope Change Count",
         compute="_compute_scope_change_count",
     )
+    can_log_scope_change = fields.Boolean(
+        compute="_compute_can_log_scope_change",
+        help="Visibility gate for the Log Scope Change button on "
+        "Tab 12. Mirrors commercial.scope.change._user_can_log_for_event "
+        "so the button surfaces only for users authorised to log: "
+        "Sales, Crew Leader, Manager, or the Crew Chief on this event.",
+    )
 
     def _compute_scope_change_count(self):
         for rec in self:
             rec.scope_change_count = len(rec.scope_change_ids)
+
+    @api.depends("commercial_job_id.crew_assignment_ids.is_crew_chief",
+                 "commercial_job_id.crew_assignment_ids.user_id")
+    @api.depends_context("uid")
+    def _compute_can_log_scope_change(self):
+        ScopeChange = self.env["commercial.scope.change"]
+        for rec in self:
+            rec.can_log_scope_change = ScopeChange._user_can_log_for_event(rec)
 
     # === Closeout checkpoints (P3.M7 will expand) ===
     gear_reconciled = fields.Boolean(default=False, tracking=True)
@@ -553,6 +568,33 @@ class CommercialEventJob(models.Model):
             "context": {
                 "default_event_job_id": self.id,
                 "search_default_event_job_id": self.id,
+            },
+        }
+
+    def action_log_scope_change(self):
+        """P3.M6 17.0.2.4.1 — open a new scope_change form pre-filled
+        with this event_job's context. Surfaces a clean entry point
+        for Crew Chief on-site (whose event_job form is otherwise
+        readonly) alongside the inline 'Add a line' path that
+        Sales / Lead Tech / Manager use.
+
+        Authority is enforced twice: button visibility via
+        can_log_scope_change, and at create time via the model
+        gate. The check here is a defensive belt-and-braces."""
+        self.ensure_one()
+        if not self.can_log_scope_change:
+            raise UserError(_(
+                "You are not authorised to log scope changes on this "
+                "event — escalate to the Crew Chief or Lead Tech."
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Log Scope Change"),
+            "res_model": "commercial.scope.change",
+            "view_mode": "form",
+            "target": "current",
+            "context": {
+                "default_event_job_id": self.id,
             },
         }
 
