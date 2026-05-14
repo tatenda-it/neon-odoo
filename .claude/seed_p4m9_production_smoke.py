@@ -308,18 +308,21 @@ def _lost_items(j):
 pre = _lost_items(ngo)
 print("  lost items pre-archive:", len(pre))
 if ngo.state != "archived":
-    # action_archive_lost takes no kwargs; it reads loss_reason
-    # off the record itself, raising UserError if it's empty and
-    # the actor isn't a manager. Write the reason first, then
-    # archive. Seed runs as admin (a manager-equivalent), so even
-    # an empty loss_reason would pass the gate — but we set it
-    # anyway so the audit trail and the job form look realistic.
+    # commercial.job's lifecycle gate blocks active → archived
+    # except when the actor has the manager group (per the
+    # _check_transition manager-override branch). sudo() alone
+    # is NOT enough — the gate checks env.user's groups, and
+    # __system__ doesn't carry neon_jobs_manager. Use the seeded
+    # p2m75_mgr user so the transition passes cleanly.
+    #
+    # action_archive_lost reads loss_reason off the record, so
+    # write the reason first.
     ngo.sudo().write({
         "loss_reason": "Test seed — lost to a competitor "
                        "(P4.M9 dummy data).",
         "lost_to_competitor": "TEST COMPETITOR " + MARKER,
     })
-    ngo.sudo().action_archive_lost()
+    ngo.with_user(mgr).action_archive_lost()
 post = _lost_items(ngo)
 print("  lost items post-archive:", len(post),
       "(delta", len(post) - len(pre), ")")
