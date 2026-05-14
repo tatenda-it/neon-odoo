@@ -136,3 +136,68 @@ hidden Mark Done for non-authorised users).
 None. The tighter sequencing (stop → upgrade → start, replacing the
 original overlap pattern) per Tatenda's refinement was the only
 modification, and it worked cleanly.
+
+## Addendum — production smoke seed (2026-05-14)
+
+After the code deploy and verification, a dummy-data seed was applied
+to populate Action Centre with diverse records spanning all 9 trigger
+paths and the M8 visual states. The seed is fully scripted and Phase 9
+removal is a single command.
+
+### Files
+
+- `.claude/seed_p4m9_production_smoke.py` — the seed
+- `.claude/teardown_p4m9_dummy_data.py` — the Phase 9 cleanup
+
+Both scripts live under `.claude/` and are never loaded from the addon
+manifest — they run only manually via `docker compose exec -T odoo
+odoo shell -d neon_crm`.
+
+### What the seed creates
+
+| Kind | Count | Marker |
+|---|---|---|
+| `res.partner` | 2 | name contains `[TEST-DELETE]` |
+| `res.users` (`p2m75_*`) | 6 | `partner_id.comment` warning |
+| `commercial.job` | 10 | `equipment_summary` contains `[TEST-DELETE]` |
+| `commercial.event.job` | 10 (auto-spawned) | cascade-removed |
+| `commercial.scope.change` | 3 | description contains `[TEST-DELETE]` |
+| `commercial.event.feedback` | 5 | feedback_text contains `[TEST-DELETE]` |
+| `action.centre.item` | ~25-30 | bound to seed records via polymorphic source |
+
+### Trigger coverage exercised
+
+Every entry in the registry fires at least once. The two cron-driven
+triggers (`closeout_overdue`, `sla_passed`) fire because the seed
+script invokes `_cron_evaluate_time_based_triggers()` in-process at
+the end — no need to wait for the 02:30 nightly cron.
+
+If you want to re-trigger the cron later via the UI: navigate to
+**Settings → Technical → Scheduled Actions →** the Action Centre
+time-based-triggers cron **→ Run Manually**.
+
+### Phase 9 cleanup
+
+Single command removes everything the seed created:
+
+```bash
+ssh root@188.245.154.84
+cd /opt/neon-odoo
+docker compose exec -T odoo odoo shell -d neon_crm \
+    < .claude/teardown_p4m9_dummy_data.py
+```
+
+The teardown is idempotent — running twice is a no-op the second time.
+It reports counts of what it removed so cutover verification can
+confirm clean state.
+
+### TODO surfaced by seeding
+
+`readiness_score` is a computed field that aggregates many sub-fields;
+deterministically seeding a particular score (e.g. exactly 65 to
+exercise `readiness_70`) requires populating all sub-inputs. For P4.M9
+we accept the natural fall-through — fresh event_jobs land near zero,
+which fires `readiness_50` (and `readiness_70` when event_date is
+within 3 days). Phase 5+ may want to make readiness inputs
+deterministically seedable for test scenarios; flagged as enhancement,
+not a blocker.
