@@ -2,11 +2,30 @@
 """
 P5.M1 — Equipment Unit (per-physical-item identity).
 
-One row per physical asset. The 8-state lifecycle (Schema Sketch
-§3.2) drives reservation eligibility, repair workflow, and the
-P5.M9 incident model. For P5.M1, the state field is a Selection
-without enforcement — any transition is allowed. P5.M2 introduces
-state-machine guards (action_* methods + _do_transition).
+One row per physical asset. The lifecycle drives reservation
+eligibility, repair workflow, and the P5.M9 incident model. For
+P5.M1, the state field is a Selection without enforcement — any
+transition is allowed. P5.M2 introduces state-machine guards
+(action_* methods + _do_transition) bound to ALLOWED_TRANSITIONS.
+
+LOCKED 9-state contract (2026-05-14, supersedes the early Schema
+Sketch draft which had 8 with some different codes):
+
+  1. draft          — new, not yet in service
+  2. active         — in service, available for reservation
+  3. reserved       — held for an upcoming job
+  4. checked_out    — with crew on a job, not yet returned
+  5. transferred    — in transit between jobs (Q9 cross-job flow)
+  6. returned       — back from a job, pending check-in
+  7. maintenance    — in maintenance / repair
+  8. damaged        — incident-flagged, not yet in maintenance
+  9. decommissioned — retired
+
+The early draft used 'enrolled'/'in_repair'/'retired' and omitted
+'damaged'; the model's operational codes (draft / maintenance /
+decommissioned + damaged) are clearer on the workshop floor and
+have been locked as the canonical spec. 'transferred' was added
+2026-05-14 to support the Q9 cross-job transfer workflow.
 
 Inherits action.centre.mixin so future workshop triggers
 (repair_required, asset_overdue_return, maintenance_due) have a
@@ -24,6 +43,7 @@ _UNIT_STATES = [
     ("active",         "Active (in service, available)"),
     ("reserved",       "Reserved (held for upcoming job)"),
     ("checked_out",    "Checked Out (with crew on job)"),
+    ("transferred",    "Transferred (in transit between jobs)"),
     ("returned",       "Returned (back, pending check-in)"),
     ("maintenance",    "In Maintenance / Repair"),
     ("damaged",        "Damaged (incident-flagged)"),

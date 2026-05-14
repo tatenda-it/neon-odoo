@@ -37,22 +37,32 @@ Cabling and Accessories was the largest category there too.
 
 ### State distribution (across all 330 units)
 
-| State | Target | Actual |
+The locked 9-state contract on `neon.equipment.unit` (2026-05-14)
+is exercised by spreading units across every state so the kanban,
+tree, and form decorations all render at least once during local
+browser smoke.
+
+| State | Target | Approx units |
 |---|---|---|
-| active | 70% | 231 |
-| draft | 15% | 50 |
-| reserved | 5% | 16 |
-| checked_out | 5% | 17 |
-| maintenance | 3% | 10 |
-| decommissioned | 2% | 6 |
+| active | 65% | ~215 |
+| draft | 12% | ~40 |
+| reserved | 6% | ~20 |
+| checked_out | 6% | ~20 |
+| returned | 3% | ~10 |
+| maintenance | 3% | ~10 |
+| transferred | 2% | ~7 |
+| damaged | 2% | ~7 |
+| decommissioned | 1% | ~3 |
 
 State assignment is deterministic — index-based, not random — so
 re-running on a fresh DB always produces the same distribution.
 
-Note: the M1 spec D5 used some pre-model state names (`enrolled`,
-`in_repair`, `retired`). These map to the canonical model states
-(`draft`, `maintenance`, `decommissioned`) and the script applies
-the canonical names.
+The model's canonical state codes (locked in
+`neon_equipment_unit.py`) supersede the early Schema Sketch draft
+which used `enrolled` / `in_repair` / `retired` and omitted
+`damaged`. The model's choices are clearer on the workshop floor,
+and `transferred` was added 2026-05-14 to cover the Q9 cross-job
+transfer workflow.
 
 ## Naming convention
 

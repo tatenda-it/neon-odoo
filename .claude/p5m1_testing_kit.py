@@ -5,8 +5,11 @@ CREATES on the local neon_crm database:
     with realistic Neon-style names and ALL-CAPS workshop_name
     (the PHP workshop convention).
   * ~330 neon.equipment.unit records, distributed across the
-    8-state lifecycle: 70% active, 15% draft, 5% reserved, 5%
-    checked_out, 3% maintenance, 2% decommissioned.
+    locked 9-state lifecycle (2026-05-14): 65% active, 12% draft,
+    6% reserved, 6% checked_out, 3% returned, 3% maintenance,
+    2% transferred, 2% damaged, 1% decommissioned. Every state
+    gets at least a handful of representatives so the kanban /
+    tree / form decorations are visible.
 
 Every record carries the "[TEST-DELETE]" marker in name +
 workshop_name so the symmetric teardown script can find and
@@ -105,17 +108,21 @@ ITEM_SPECS = [
 
 # ---------------------------------------------------------------
 # STATE DISTRIBUTION — applied deterministically across the global
-# unit index so the same input produces the same output. The
-# spec's "enrolled / in_repair / retired" map to the model's
-# canonical names (draft / maintenance / decommissioned).
+# unit index so the same input produces the same output. Locked
+# 2026-05-14 to exercise all 9 states (the earlier 6-state
+# distribution skipped 'returned', 'transferred', 'damaged' — the
+# kanban couldn't show their decorations during browser smoke).
 # ---------------------------------------------------------------
 STATE_DISTRIBUTION = [
-    ("active",         0.70),
-    ("draft",          0.15),  # spec: "enrolled"
-    ("reserved",       0.05),
-    ("checked_out",    0.05),
-    ("maintenance",    0.03),  # spec: "in_repair"
-    ("decommissioned", 0.02),  # spec: "retired"
+    ("active",         0.65),  # ~215 units — primary "available" pool
+    ("draft",          0.12),  # ~40  units — newly enrolled
+    ("reserved",       0.06),  # ~20  units — held for upcoming jobs
+    ("checked_out",    0.06),  # ~20  units — currently on jobs
+    ("returned",       0.03),  # ~10  units — back, pending check-in
+    ("maintenance",    0.03),  # ~10  units — in repair
+    ("transferred",    0.02),  # ~7   units — in transit between jobs
+    ("damaged",        0.02),  # ~7   units — incident-flagged
+    ("decommissioned", 0.01),  # ~3   units — retired
 ]
 
 

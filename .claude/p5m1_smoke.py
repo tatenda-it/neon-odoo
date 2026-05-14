@@ -2,7 +2,9 @@
 
 T250 9 equipment categories seeded with correct codes + tracking
 T251 product.template extension fields present and queryable
-T252 neon.equipment.unit model exists with 8-state machine + mixin
+T252 neon.equipment.unit model exists with 9-state machine + mixin
+     (Updated 2026-05-14: state list locked at 9 codes — added
+     'transferred' for the Q9 cross-job transfer workflow.)
 T253 product.template tracking_mode inherits from category default
 T254 neon.equipment.unit name compute (workshop_name + serial)
 T255 UNIQUE constraints on unit (serial-per-product + asset_tag)
@@ -78,19 +80,23 @@ results["T251"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T252 - neon.equipment.unit model exists + 8 states + mixin")
+print("T252 - neon.equipment.unit model exists + 9 states + mixin")
 print("=" * 72)
 state_field = Unit._fields["state"]
 states = [s[0] for s in state_field.selection]
 print("  states:", states)
+# Locked 9-state contract (2026-05-14). 'transferred' added for
+# the Q9 cross-job transfer workflow; the early Schema Sketch
+# draft had only 8.
 expected_states = {
-    "draft", "active", "reserved", "checked_out",
+    "draft", "active", "reserved", "checked_out", "transferred",
     "returned", "maintenance", "damaged", "decommissioned",
 }
 inherits = set(Unit._inherit) if isinstance(Unit._inherit, list) else {Unit._inherit}
 print("  inheritance:", inherits)
 ok = (
     set(states) == expected_states
+    and len(states) == 9
     and "action.centre.mixin" in inherits
     and "mail.thread" in inherits
 )
