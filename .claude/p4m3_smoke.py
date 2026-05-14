@@ -1,8 +1,12 @@
 """P4.M3 smoke — Dashboard tile + role-aware filters.
 
 T179 Manager opens Action Centre → search_default_all_open = 1.
-T180 Crew Leader → search_default_my_lead_tech_open = 1.
-T181 Sales → search_default_my_sales_open = 1.
+T180 Crew Leader → search_default_my_items_open = 1
+     (Updated 2026-05-14 per P4.M8.1 hotfix design decision M4 —
+     see commit 4489d35: the role-specific my_lead_tech_open /
+     my_sales_open defaults were collapsed into a single generic
+     my_items_open filter to avoid showing wrong-role pill labels.)
+T181 Sales → search_default_my_items_open = 1 (same M8.1 reason).
 T182 get_dashboard_tile_items honors limit=5 and ordering.
 T183 Dashboard tile excludes done/cancelled items.
 T184 Urgency filter domains evaluate without error per role.
@@ -76,15 +80,20 @@ results["T179"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T180 - Crew Leader → search_default_my_lead_tech_open")
+print("T180 - Crew Leader → search_default_my_items_open")
 print("=" * 72)
+# Updated 2026-05-14 per P4.M8.1 hotfix design decision M4
+# (commit 4489d35): the role-specific my_lead_tech_open default
+# was collapsed into a single generic my_items_open filter, so
+# the pill label always matches the actual user. All non-manager
+# roles now land on the same default.
 act = env["action.centre.item"].with_user(
     crew_leader).action_open_action_centre()
 ctx = act.get("context", {})
 print("  context keys:", sorted(ctx.keys()))
-# crew_leader does NOT have manager group, so should hit the lead path
-ok = ctx.get("search_default_my_lead_tech_open") == 1 \
-    and not ctx.get("search_default_all_open")
+ok = ctx.get("search_default_my_items_open") == 1 \
+    and not ctx.get("search_default_all_open") \
+    and not ctx.get("search_default_my_lead_tech_open")
 print("T180:", "PASS" if ok else "FAIL")
 results["T180"] = ok
 
@@ -92,13 +101,16 @@ results["T180"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T181 - Sales → search_default_my_sales_open")
+print("T181 - Sales → search_default_my_items_open")
 print("=" * 72)
+# Updated 2026-05-14 per P4.M8.1 hotfix design decision M4
+# (commit 4489d35): same generic my_items_open default as T180.
 act = env["action.centre.item"].with_user(
     sales).action_open_action_centre()
 ctx = act.get("context", {})
 print("  context keys:", sorted(ctx.keys()))
-ok = ctx.get("search_default_my_sales_open") == 1 \
+ok = ctx.get("search_default_my_items_open") == 1 \
+    and not ctx.get("search_default_my_sales_open") \
     and not ctx.get("search_default_my_lead_tech_open") \
     and not ctx.get("search_default_all_open")
 print("T181:", "PASS" if ok else "FAIL")
@@ -341,10 +353,13 @@ menu = env.ref("neon_jobs.menu_action_centre", raise_if_not_found=False)
 # (user / crew_leader / manager) — each should resolve the menu's
 # action_id → run the server action → get the role-correct
 # search_default_* key on the returned act_window context.
+# Updated 2026-05-14 per P4.M8.1 hotfix design decision M4
+# (commit 4489d35): T189/T190 expect the generic my_items_open
+# filter — same reason as T180/T181 above.
 expected_pass = {
     "p2m75_mgr": ("T188", "search_default_all_open"),
-    "p2m75_lead": ("T189", "search_default_my_lead_tech_open"),
-    "p2m75_sales": ("T190", "search_default_my_sales_open"),
+    "p2m75_lead": ("T189", "search_default_my_items_open"),
+    "p2m75_sales": ("T190", "search_default_my_items_open"),
 }
 # T191: crew tier is gated OUT of the menu (and by extension out of
 # the server action via its groups_id). The Python method has a
