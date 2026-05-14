@@ -1958,11 +1958,29 @@ class CommercialEventJob(models.Model):
 
         # readiness_70: task only fires within 3 days of event start
         # (per design D4b — the gate is "approaching dispatch with
-        # weak score"). Task does NOT auto-close.
+        # weak score"). Task does NOT auto-close (Q3 — tasks need
+        # manual close). P4.M7 D5: when the condition clears, post
+        # a chatter note on the open task so the assignee learns
+        # the source recovered and they can mark it done manually.
         if self.event_date:
             days_to_event = (self.event_date - fields.Date.today()).days
             if 0 <= days_to_event < 3 and score < 70:
                 self._action_centre_create_item("readiness_70")
+            elif score >= 70 or days_to_event >= 3:
+                try:
+                    self._action_centre_chatter_note(
+                        "readiness_70",
+                        _(
+                            "Condition cleared — readiness recovered "
+                            "to %(s)d%% or event date now >3 days away. "
+                            "Task can be manually closed."
+                        ) % {"s": int(score)},
+                    )
+                except Exception as e:
+                    _logger.warning(
+                        "readiness_70 chatter note failed for %s: %s",
+                        self.name, e,
+                    )
 
     @api.model
     def _evaluate_closeout_overdue_trigger(self):
@@ -1993,6 +2011,40 @@ class CommercialEventJob(models.Model):
                 )
         _logger.info(
             "Action Centre closeout_overdue: %d candidates, "
+            "%d items created/refreshed.",
+            len(overdue), created,
+        )
+        return True
+
+    @api.model
+    def _evaluate_sla_passed_trigger(self):
+        """P4.M7 — escalation tier above closeout_overdue. Fires when
+        an event_job has been in 'completed' state for ≥ 14 days
+        (event_date ≤ today - 14). The closeout_overdue task at 7
+        days targets the Lead Tech; this alert at 14 days targets
+        the Manager. Both can be open simultaneously — different
+        concerns, no auto-close cascade between them.
+
+        Idempotency via _find_existing_open_item.
+        """
+        cutoff = fields.Date.today() - timedelta(days=14)
+        overdue = self.sudo().search([
+            ("state", "=", "completed"),
+            ("event_date", "<=", cutoff),
+        ])
+        created = 0
+        for event in overdue:
+            try:
+                item = event._action_centre_create_item("sla_passed")
+                if item:
+                    created += 1
+            except Exception as e:
+                _logger.warning(
+                    "sla_passed trigger failed for %s: %s",
+                    event.name, e,
+                )
+        _logger.info(
+            "Action Centre sla_passed: %d candidates, "
             "%d items created/refreshed.",
             len(overdue), created,
         )

@@ -88,12 +88,12 @@
             <field name="trigger_type">scope_change</field>
             <field name="is_enabled" eval="True"/>
             <field name="item_type">task</field>
-            <field name="primary_role">sales</field>
+            <field name="primary_role">lead_tech</field>
             <field name="priority">medium</field>
             <field name="escalation_minutes">1440</field>
             <field name="escalated_to_role">manager</field>
             <field name="auto_close_when_condition_clears" eval="False"/>
-            <field name="description">Fires when a Scope Change is logged on an Event Job. Sales reviews commercial impact and updates the customer.</field>
+            <field name="description">Fires when a Scope Change is logged on an Event Job. The Lead Tech reviews the on-site change and confirms next steps; Sales picks it up later from the review queue.</field>
         </record>
 
         <record id="trigger_config_closeout_overdue" model="action.centre.trigger.config">

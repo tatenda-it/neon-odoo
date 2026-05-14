@@ -15,10 +15,16 @@ Authority to log: Sales / Crew Leader / Manager (D6). Regular
 crew tier sees feedback on their own events via row-level rule
 but cannot create.
 """
+import logging
+from datetime import timedelta
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 from .commercial_event_job import _GROUP_XMLIDS
+
+
+_logger = logging.getLogger(__name__)
 
 
 FEEDBACK_CHANNELS = [
@@ -38,7 +44,7 @@ FEEDBACK_SENTIMENTS = [
 class CommercialEventFeedback(models.Model):
     _name = "commercial.event.feedback"
     _description = "Event Client Feedback Record"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "action.centre.mixin"]
     _order = "captured_at desc, id desc"
 
     # === Identity ===
@@ -203,7 +209,108 @@ class CommercialEventFeedback(models.Model):
                     self.env["ir.sequence"].next_by_code("commercial.event.feedback")
                     or _("New")
                 )
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        # P4.M7 — fire feedback_followup when the feedback record is
+        # captured with is_follow_up_required=True. Per D2, prefer
+        # the per-record follow_up_owner over role resolution.
+        for rec in records:
+            if rec.is_follow_up_required:
+                kwargs = {}
+                if rec.follow_up_owner and rec.follow_up_owner.exists():
+                    kwargs["primary_assignee_id"] = rec.follow_up_owner.id
+                try:
+                    rec._action_centre_create_item(
+                        "feedback_followup", **kwargs)
+                except Exception as e:
+                    _logger.warning(
+                        "Action Centre feedback_followup trigger "
+                        "failed for %s: %s", rec.name, e,
+                    )
+        return records
+
+    def write(self, vals):
+        # P4.M7 — flip / completion hooks. We need to compare against
+        # the pre-write state for each record, so snapshot before
+        # super().write(). The mixin's idempotency keeps repeated
+        # writes (e.g. setting follow_up_completed=True alongside
+        # other field changes) safe.
+        flips_to_required = self.env["commercial.event.feedback"]
+        if vals.get("is_follow_up_required") is True:
+            flips_to_required = self.filtered(
+                lambda r: not r.is_follow_up_required
+            )
+        # Auto-close cases: follow_up_completed flipping to True, OR
+        # is_follow_up_required being explicitly cleared.
+        closes_followup = self.env["commercial.event.feedback"]
+        if (
+            vals.get("follow_up_completed") is True
+            or vals.get("is_follow_up_required") is False
+        ):
+            closes_followup = self
+        result = super().write(vals)
+        for rec in flips_to_required:
+            kwargs = {}
+            if rec.follow_up_owner and rec.follow_up_owner.exists():
+                kwargs["primary_assignee_id"] = rec.follow_up_owner.id
+            try:
+                rec._action_centre_create_item(
+                    "feedback_followup", **kwargs)
+            except Exception as e:
+                _logger.warning(
+                    "Action Centre feedback_followup trigger (write) "
+                    "failed for %s: %s", rec.name, e,
+                )
+        for rec in closes_followup:
+            try:
+                # force=True: feedback_followup is a task so the
+                # mixin's default eligibility filter would skip it,
+                # but follow_up_completed=True is the source's
+                # explicit "this is done" signal.
+                rec._action_centre_close_items(
+                    "feedback_followup", force=True)
+            except Exception as e:
+                _logger.warning(
+                    "Action Centre feedback_followup auto-close "
+                    "failed for %s: %s", rec.name, e,
+                )
+        return result
+
+    @api.model
+    def _evaluate_feedback_followup_backfill(self):
+        """P4.M7 — catch records whose feedback_followup trigger was
+        missed by the real-time create()/write() hooks (e.g. records
+        loaded by a data migration, or created before the addon was
+        upgraded). Search the last 30 days for is_follow_up_required
+        records with no open item, fire the trigger. Mixin idempotency
+        skips any record that already has an open item.
+        """
+        cutoff = fields.Date.today() - timedelta(days=30)
+        pending = self.sudo().search([
+            ("is_follow_up_required", "=", True),
+            ("follow_up_completed", "=", False),
+            ("create_date", ">=", cutoff),
+        ])
+        created = 0
+        for fb in pending:
+            kwargs = {}
+            if fb.follow_up_owner and fb.follow_up_owner.exists():
+                kwargs["primary_assignee_id"] = fb.follow_up_owner.id
+            try:
+                item = fb._action_centre_create_item(
+                    "feedback_followup", **kwargs)
+                if item:
+                    created += 1
+            except Exception as e:
+                _logger.warning(
+                    "feedback_followup backfill failed for %s: %s",
+                    fb.name, e,
+                )
+        _logger.info(
+            "Action Centre feedback_followup backfill: %d candidates, "
+            "%d items created/refreshed.",
+            len(pending), created,
+        )
+        return True
 
     def action_complete_follow_up(self, notes=None):
         """Manager marks the follow-up workflow done. Captures who +

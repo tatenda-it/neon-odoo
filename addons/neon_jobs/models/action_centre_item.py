@@ -715,10 +715,11 @@ class ActionCentreItem(models.Model):
 
         Currently dispatched:
           * closeout_overdue (P4.M5) → commercial.event.job
-
-        P4.M7 adds: sla_passed, feedback_followup.
+          * sla_passed (P4.M7) → commercial.event.job
+          * feedback_followup backfill (P4.M7) → commercial.event.feedback
         """
         EventJob = self.env["commercial.event.job"].sudo()
+        Feedback = self.env["commercial.event.feedback"].sudo()
         Config = self.env["action.centre.trigger.config"].sudo()
 
         # closeout_overdue — only run if the config is enabled
@@ -730,5 +731,26 @@ class ActionCentreItem(models.Model):
             except Exception:
                 _logger.exception(
                     "Action Centre closeout_overdue evaluator raised")
+
+        # sla_passed — 14-day escalation tier above closeout_overdue
+        cfg_sla = Config.search(
+            [("trigger_type", "=", "sla_passed")], limit=1)
+        if cfg_sla and cfg_sla.is_enabled:
+            try:
+                EventJob._evaluate_sla_passed_trigger()
+            except Exception:
+                _logger.exception(
+                    "Action Centre sla_passed evaluator raised")
+
+        # feedback_followup backfill — catch records the real-time
+        # create()/write() hooks missed (data migrations, etc.)
+        cfg_feedback = Config.search(
+            [("trigger_type", "=", "feedback_followup")], limit=1)
+        if cfg_feedback and cfg_feedback.is_enabled:
+            try:
+                Feedback._evaluate_feedback_followup_backfill()
+            except Exception:
+                _logger.exception(
+                    "Action Centre feedback_followup backfill raised")
 
         return True

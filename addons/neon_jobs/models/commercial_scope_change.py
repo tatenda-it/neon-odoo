@@ -23,10 +23,15 @@ P3.M6 ships pure log only (D6) — invoice_line_id / sale_order_line_id
 are placeholders for Phase 8+ auto-generation. No logic touches
 them in this milestone.
 """
+import logging
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 from .commercial_event_job import _GROUP_XMLIDS
+
+
+_logger = logging.getLogger(__name__)
 
 
 SCOPE_CHANGE_STATES = [
@@ -59,7 +64,7 @@ SCOPE_CHANGE_TYPES = [
 class CommercialScopeChange(models.Model):
     _name = "commercial.scope.change"
     _description = "Event Job Scope Change Log Entry"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "action.centre.mixin"]
     _order = "occurred_at desc, id desc"
 
     # === Identity ===
@@ -277,7 +282,25 @@ class CommercialScopeChange(models.Model):
                     self.env["ir.sequence"].next_by_code("commercial.scope.change")
                     or _("New")
                 )
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        # P4.M7 — fire the scope_change Action Centre trigger. The
+        # mixin's PREFERRED_ASSIGNEE_FIELDS lookup can't reach
+        # event_job_id.lead_tech_id from a scope_change record (no
+        # direct lead_tech_id field on this model), so we pass the
+        # resolved user explicitly when available.
+        for rec in records:
+            kwargs = {}
+            ej_lead = rec.event_job_id.lead_tech_id
+            if ej_lead and ej_lead.exists():
+                kwargs["primary_assignee_id"] = ej_lead.id
+            try:
+                rec._action_centre_create_item("scope_change", **kwargs)
+            except Exception as e:
+                _logger.warning(
+                    "Action Centre scope_change trigger failed for "
+                    "%s: %s", rec.name, e,
+                )
+        return records
 
     # ============================================================
     # === Computed action gates for the header buttons
