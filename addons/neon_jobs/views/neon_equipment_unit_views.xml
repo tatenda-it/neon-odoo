@@ -29,6 +29,88 @@
         <field name="model">neon.equipment.unit</field>
         <field name="arch" type="xml">
             <form string="Equipment Unit">
+                <!-- P5.M2 — state-machine header. All transitions
+                     route through action_* methods which delegate to
+                     _do_transition; the can_<verb> compute fields
+                     drive button visibility per source state.
+                     Recommission is manager-only and only visible
+                     when the unit is decommissioned. -->
+                <header>
+                    <!-- Capability flags driving button visibility.
+                         Declared invisible here so Odoo 17's view
+                         validator sees them when checking the
+                         invisible="not can_*" modifiers below. -->
+                    <field name="can_enroll" invisible="1"/>
+                    <field name="can_reserve" invisible="1"/>
+                    <field name="can_check_out" invisible="1"/>
+                    <field name="can_transfer" invisible="1"/>
+                    <field name="can_receive_transfer" invisible="1"/>
+                    <field name="can_return" invisible="1"/>
+                    <field name="can_complete_check_in" invisible="1"/>
+                    <field name="can_send_to_maintenance" invisible="1"/>
+                    <field name="can_complete_maintenance" invisible="1"/>
+                    <field name="can_flag_damaged" invisible="1"/>
+                    <field name="can_decommission" invisible="1"/>
+                    <button name="action_enroll"
+                            string="Activate"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_enroll"/>
+                    <button name="action_reserve"
+                            string="Reserve"
+                            type="object"
+                            invisible="not can_reserve"/>
+                    <button name="action_check_out"
+                            string="Check Out"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_check_out"/>
+                    <button name="action_transfer"
+                            string="Transfer"
+                            type="object"
+                            invisible="not can_transfer"/>
+                    <button name="action_receive_transfer"
+                            string="Receive Transfer"
+                            type="object"
+                            invisible="not can_receive_transfer"/>
+                    <button name="action_return"
+                            string="Return"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_return"/>
+                    <button name="action_complete_check_in"
+                            string="Complete Check-In"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_complete_check_in"/>
+                    <button name="action_send_to_maintenance"
+                            string="Send to Maintenance"
+                            type="object"
+                            invisible="not can_send_to_maintenance"/>
+                    <button name="action_complete_maintenance"
+                            string="Complete Maintenance"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_complete_maintenance"/>
+                    <button name="action_flag_damaged"
+                            string="Flag Damaged"
+                            type="object"
+                            class="btn-danger"
+                            invisible="not can_flag_damaged"/>
+                    <button name="action_decommission"
+                            string="Decommission"
+                            type="object"
+                            invisible="not can_decommission"
+                            confirm="Decommission this unit? It will be retired from service. Manager override can reverse it later if needed."/>
+                    <button name="action_open_recommission_wizard"
+                            string="Recommission..."
+                            type="object"
+                            class="oe_highlight"
+                            groups="neon_jobs.group_neon_jobs_manager"
+                            invisible="state != 'decommissioned'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,active,reserved,checked_out,returned,maintenance,decommissioned"/>
+                </header>
                 <sheet>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
@@ -41,8 +123,7 @@
                             <field name="asset_tag"/>
                             <field name="workshop_location"/>
                         </group>
-                        <group string="State">
-                            <field name="state" widget="statusbar"/>
+                        <group string="Classification">
                             <field name="equipment_category_id"
                                    readonly="1"/>
                             <field name="tracking_mode" readonly="1"/>

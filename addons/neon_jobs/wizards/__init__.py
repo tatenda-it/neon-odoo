@@ -7,3 +7,4 @@ from . import commercial_event_job_readiness_override_wizard
 from . import commercial_event_job_gear_reconciled_override_wizard
 from . import commercial_event_job_finance_handoff_override_wizard
 from . import action_centre_item_cancel_wizard
+from . import neon_equipment_recommission_wizard

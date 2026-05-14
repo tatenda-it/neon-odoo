@@ -89,3 +89,4 @@ access_neon_equipment_unit_user,neon.equipment.unit user (read-only),model_neon_
 access_neon_equipment_unit_crew_leader,neon.equipment.unit crew_leader (read+update — workshop ops),model_neon_equipment_unit,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
 access_neon_equipment_unit_crew,neon.equipment.unit crew (read-only),model_neon_equipment_unit,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_neon_equipment_unit_manager,neon.equipment.unit manager (full),model_neon_equipment_unit,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_recommission_wizard_manager,neon.equipment.recommission.wizard manager,model_neon_equipment_recommission_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
