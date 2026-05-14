@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_unit_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.unit.tree</field>
+        <field name="model">neon.equipment.unit</field>
+        <field name="arch" type="xml">
+            <tree string="Equipment Units"
+                  decoration-muted="state == 'decommissioned'"
+                  decoration-warning="state in ('maintenance', 'damaged')"
+                  decoration-info="state == 'reserved'"
+                  decoration-success="state == 'active'">
+                <field name="name"/>
+                <field name="product_template_id"/>
+                <field name="equipment_category_id"/>
+                <field name="serial_number"/>
+                <field name="asset_tag"/>
+                <field name="workshop_location" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="tracking_mode" optional="hide"/>
+                <field name="purchase_date" optional="hide"/>
+                <field name="purchase_price" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_unit_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.unit.form</field>
+        <field name="model">neon.equipment.unit</field>
+        <field name="arch" type="xml">
+            <form string="Equipment Unit">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="product_template_id"
+                                   options="{'no_create': True}"/>
+                            <field name="serial_number"/>
+                            <field name="asset_tag"/>
+                            <field name="workshop_location"/>
+                        </group>
+                        <group string="State">
+                            <field name="state" widget="statusbar"/>
+                            <field name="equipment_category_id"
+                                   readonly="1"/>
+                            <field name="tracking_mode" readonly="1"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Acquisition" name="acquisition">
+                            <group>
+                                <field name="purchase_date"/>
+                                <field name="purchase_price"/>
+                                <field name="currency_id" invisible="1"/>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"
+                                   placeholder="Anything worth knowing about this unit..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_unit_view_kanban" model="ir.ui.view">
+        <field name="name">neon.equipment.unit.kanban</field>
+        <field name="model">neon.equipment.unit</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="state"/>
+                <field name="serial_number"/>
+                <field name="asset_tag"/>
+                <field name="product_template_id"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top">
+                                <strong class="o_kanban_record_title">
+                                    <field name="name"/>
+                                </strong>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div t-if="record.serial_number.raw_value"
+                                     class="text-muted small">
+                                    SN: <field name="serial_number"/>
+                                </div>
+                                <div t-if="record.asset_tag.raw_value"
+                                     class="text-muted small">
+                                    Tag: <field name="asset_tag"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="neon_equipment_unit_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.unit.search</field>
+        <field name="model">neon.equipment.unit</field>
+        <field name="arch" type="xml">
+            <search string="Equipment Units">
+                <field name="name"/>
+                <field name="serial_number"/>
+                <field name="asset_tag"/>
+                <field name="product_template_id"/>
+                <separator/>
+                <filter name="state_active" string="Active"
+                        domain="[('state', '=', 'active')]"/>
+                <filter name="state_in_use" string="In Use"
+                        domain="[('state', 'in', ('reserved', 'checked_out'))]"/>
+                <filter name="state_maintenance" string="Maintenance"
+                        domain="[('state', '=', 'maintenance')]"/>
+                <filter name="state_damaged" string="Damaged"
+                        domain="[('state', '=', 'damaged')]"/>
+                <separator/>
+                <filter name="archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_category" string="Category"
+                            context="{'group_by': 'equipment_category_id'}"/>
+                    <filter name="group_product" string="Product"
+                            context="{'group_by': 'product_template_id'}"/>
+                    <filter name="group_location" string="Location"
+                            context="{'group_by': 'workshop_location'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_equipment_unit_action" model="ir.actions.act_window">
+        <field name="name">Equipment Units</field>
+        <field name="res_model">neon.equipment.unit</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id" ref="neon_equipment_unit_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No equipment units recorded yet
+            </p>
+            <p>
+                Each unit represents one physical piece of workshop
+                inventory. Create one product.template per type, then
+                spawn units for the serial-tracked items.
+            </p>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P5.M1 — Seed the 9 workshop equipment categories per the
+        Phase 5 Open Questions D3 mapping. noupdate="1" so director
+        edits via the Configuration UI survive module upgrades.
+        Order matches the PHP workshop nav (Sound first, Trussing
+        last) so the existing operational rhythm carries over.
+    -->
+    <data noupdate="1">
+
+        <record id="equipment_category_sound" model="neon.equipment.category">
+            <field name="name">Sound</field>
+            <field name="code">sound</field>
+            <field name="sequence">10</field>
+            <field name="default_tracking">serial</field>
+            <field name="icon">fa-volume-up</field>
+        </record>
+
+        <record id="equipment_category_visual" model="neon.equipment.category">
+            <field name="name">Visual</field>
+            <field name="code">visual</field>
+            <field name="sequence">20</field>
+            <field name="default_tracking">serial</field>
+            <field name="icon">fa-tv</field>
+        </record>
+
+        <record id="equipment_category_lighting" model="neon.equipment.category">
+            <field name="name">Lighting</field>
+            <field name="code">lighting</field>
+            <field name="sequence">30</field>
+            <field name="default_tracking">serial</field>
+            <field name="icon">fa-lightbulb</field>
+        </record>
+
+        <record id="equipment_category_cabling" model="neon.equipment.category">
+            <field name="name">Cabling and Accessories</field>
+            <field name="code">cabling</field>
+            <field name="sequence">40</field>
+            <field name="default_tracking">quantity</field>
+            <field name="icon">fa-plug</field>
+        </record>
+
+        <record id="equipment_category_laptops" model="neon.equipment.category">
+            <field name="name">Laptops</field>
+            <field name="code">laptops</field>
+            <field name="sequence">50</field>
+            <field name="default_tracking">serial</field>
+            <field name="icon">fa-laptop</field>
+        </record>
+
+        <record id="equipment_category_staging" model="neon.equipment.category">
+            <field name="name">Staging</field>
+            <field name="code">staging</field>
+            <field name="sequence">60</field>
+            <field name="default_tracking">quantity</field>
+            <field name="icon">fa-cube</field>
+        </record>
+
+        <record id="equipment_category_dance_floor" model="neon.equipment.category">
+            <field name="name">Dance Floor</field>
+            <field name="code">dance_floor</field>
+            <field name="sequence">70</field>
+            <field name="default_tracking">quantity</field>
+            <field name="icon">fa-th</field>
+        </record>
+
+        <record id="equipment_category_effects" model="neon.equipment.category">
+            <field name="name">Effects</field>
+            <field name="code">effects</field>
+            <field name="sequence">80</field>
+            <field name="default_tracking">serial</field>
+            <field name="icon">fa-magic</field>
+        </record>
+
+        <record id="equipment_category_trussing" model="neon.equipment.category">
+            <field name="name">Trussing</field>
+            <field name="code">trussing</field>
+            <field name="sequence">90</field>
+            <field name="default_tracking">quantity</field>
+            <field name="icon">fa-grip-lines</field>
+        </record>
+
+    </data>
+</odoo>

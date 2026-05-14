@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_category_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.category.tree</field>
+        <field name="model">neon.equipment.category</field>
+        <field name="arch" type="xml">
+            <tree string="Equipment Categories" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="default_tracking" widget="badge"/>
+                <field name="icon"/>
+                <field name="product_count"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_category_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.category.form</field>
+        <field name="model">neon.equipment.category</field>
+        <field name="arch" type="xml">
+            <form string="Equipment Category">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(neon_equipment_unit_action)d"
+                                type="action"
+                                class="oe_stat_button"
+                                icon="fa-cubes"
+                                context="{'search_default_equipment_category_id': active_id}">
+                            <field name="product_count" widget="statinfo" string="Products"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Category name..."/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                            <field name="default_tracking"/>
+                        </group>
+                        <group>
+                            <field name="icon"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_category_action" model="ir.actions.act_window">
+        <field name="name">Equipment Categories</field>
+        <field name="res_model">neon.equipment.category</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define a workshop category
+            </p>
+            <p>
+                Categories group equipment by physical kind — Sound,
+                Visual, Lighting, etc. The 9 default categories were
+                seeded automatically; add more if Neon's workshop
+                grows beyond them.
+            </p>
+        </field>
+    </record>
+
+</odoo>

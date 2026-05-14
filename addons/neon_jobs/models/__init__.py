@@ -24,3 +24,7 @@ from . import action_centre_item_tag
 from . import action_centre_trigger_config
 from . import action_centre_item
 from . import action_centre_item_history
+# P5.M1 — Workshop equipment register foundation
+from . import neon_equipment_category
+from . import product_template_extension
+from . import neon_equipment_unit

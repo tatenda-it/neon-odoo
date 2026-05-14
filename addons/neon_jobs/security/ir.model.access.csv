@@ -81,3 +81,11 @@ access_action_centre_item_history_user,action.centre.item.history user (read; cr
 access_action_centre_item_history_crew_leader,action.centre.item.history crew_leader (read; create via classmethod sudo),model_action_centre_item_history,neon_jobs.group_neon_jobs_crew_leader,1,0,1,0
 access_action_centre_item_history_crew,action.centre.item.history crew (read; create via classmethod sudo),model_action_centre_item_history,neon_jobs.group_neon_jobs_crew,1,0,1,0
 access_action_centre_item_history_manager,action.centre.item.history manager (read; create via classmethod sudo; write/unlink blocked at model level),model_action_centre_item_history,neon_jobs.group_neon_jobs_manager,1,0,1,0
+access_neon_equipment_category_user,neon.equipment.category user (read-only),model_neon_equipment_category,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_category_crew_leader,neon.equipment.category crew_leader (read-only),model_neon_equipment_category,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_equipment_category_crew,neon.equipment.category crew (read-only),model_neon_equipment_category,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_neon_equipment_category_manager,neon.equipment.category manager (full),model_neon_equipment_category,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_unit_user,neon.equipment.unit user (read-only),model_neon_equipment_unit,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_unit_crew_leader,neon.equipment.unit crew_leader (read+update — workshop ops),model_neon_equipment_unit,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_equipment_unit_crew,neon.equipment.unit crew (read-only),model_neon_equipment_unit,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_neon_equipment_unit_manager,neon.equipment.unit manager (full),model_neon_equipment_unit,neon_jobs.group_neon_jobs_manager,1,1,1,1

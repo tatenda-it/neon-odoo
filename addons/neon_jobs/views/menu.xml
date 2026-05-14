@@ -108,6 +108,31 @@
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="38"/>
 
+    <!-- P5.M1 — Workshop top-level navigation. Gated to manager
+         tier; Phase 5 later milestones layer in dedicated workshop
+         roles (lead tech, stores keeper) on top of this. -->
+    <menuitem id="menu_workshop_root"
+              name="Workshop"
+              sequence="45"
+              groups="neon_jobs.group_neon_jobs_manager"/>
+
+    <menuitem id="menu_workshop_equipment"
+              name="Equipment"
+              parent="menu_workshop_root"
+              sequence="10"/>
+
+    <menuitem id="menu_workshop_equipment_units"
+              name="Equipment Units"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_unit_action"
+              sequence="10"/>
+
+    <menuitem id="menu_workshop_equipment_categories"
+              name="Categories"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_category_action"
+              sequence="20"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"
