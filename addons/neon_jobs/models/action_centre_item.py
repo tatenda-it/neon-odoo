@@ -535,25 +535,25 @@ class ActionCentreItem(models.Model):
         with default search filters set per the calling user's role.
 
         - Manager: All Open (every non-terminal item)
-        - Crew Leader / Lead Tech: My Lead Tech + Role
-        - Sales User: My Sales + Role
+        - Everyone else: My Items (assigned to me OR escalated to me,
+          state in open/in_progress). P4.M8.1 collapsed the
+          role-specific defaults (My Lead Tech / My Sales) into a
+          single generic filter so the pill label always matches the
+          actual user — the role-specific labels were misleading
+          when a user landed on a pill whose name didn't match
+          their group membership.
 
-        All filters are available in the search panel regardless of
-        role; the defaults just save clicks on the common case.
+        All role-specific filters remain available in the search
+        panel as advanced selectors — only the default landing
+        changed.
         """
         user = self.env.user
         context = dict(self.env.context)
 
         if user.has_group("neon_jobs.group_neon_jobs_manager"):
             context["search_default_all_open"] = 1
-        elif user.has_group("neon_jobs.group_neon_jobs_crew_leader"):
-            context["search_default_my_lead_tech_open"] = 1
-        elif user.has_group("neon_jobs.group_neon_jobs_user"):
-            context["search_default_my_sales_open"] = 1
         else:
-            # Crew-tier fallback: show only what their ir.rule allows
-            # (own assignments / creations) — no role default needed.
-            context["search_default_my_items"] = 1
+            context["search_default_my_items_open"] = 1
 
         return {
             "type": "ir.actions.act_window",

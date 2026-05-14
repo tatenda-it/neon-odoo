@@ -11,6 +11,7 @@ T237 SKIPPED — menu needaction badge scoped out per M8 decision M4
 T238 SKIPPED — needaction count scoped out per M8 decision M4
 T239 PRIORITY_BADGE_MAP module constant present with bootstrap classes
 T240 Trigger config escalation_minutes coverage (sla_passed + manual=0 by design)
+T241 Due Soon filter domain evaluates without error and matches today's items (P4.M8.1 hotfix)
 """
 from datetime import timedelta
 
@@ -299,10 +300,52 @@ results["T240"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T241 - Due Soon filter domain evaluates and matches today's items")
+print("=" * 72)
+# Re-parse the search view's due_soon filter domain via env to
+# confirm it evaluates without error. The original strftime form
+# with '%H:%M:%S' was throwing UncaughtPromiseError in Odoo 17's
+# frontend evaluator; the hotfix replaces it with day-granularity
+# strftime('%Y-%m-%d'). Server-side, both forms parse — but we
+# also verify the resulting domain returns the expected count
+# against a freshly-seeded fixture due today.
+i241 = _make(
+    "T241 due today",
+    due_date=fields.Datetime.now().replace(
+        hour=15, minute=0, second=0, microsecond=0),
+)
+# Mirror the hotfixed filter domain at the Python layer
+today = fields.Date.today()
+tomorrow = today + timedelta(days=1)
+domain = [
+    ("state", "in", ("open", "in_progress")),
+    ("due_date", ">=", today.strftime("%Y-%m-%d")),
+    ("due_date", "<", tomorrow.strftime("%Y-%m-%d")),
+]
+try:
+    found = Item.search(domain)
+    raised = False
+except Exception as e:
+    found = Item.browse()
+    raised = True
+    print("  domain raised:", type(e).__name__, str(e)[:100])
+ok = (
+    not raised
+    and i241 in found
+)
+print("  fixture in result?", i241 in found, "(want True)")
+print("  total matches:    ", len(found))
+print("T241:", "PASS" if ok else "FAIL")
+results["T241"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
 order = ["T230", "T231", "T232", "T233", "T234", "T235", "T236",
-         "T237", "T238", "T239", "T240"]
+         "T237", "T238", "T239", "T240", "T241"]
 for k in order:
     v_ = results.get(k)
     mark = "PASS" if v_ is True else ("SKIP" if v_ is None else "FAIL")

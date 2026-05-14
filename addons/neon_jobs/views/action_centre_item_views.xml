@@ -126,20 +126,29 @@
                                  form" for everyone else. -->
                             <div class="o_kanban_record_bottom">
                                 <div class="oe_kanban_bottom_left">
-                                    <t t-if="record.can_close.raw_value and record.state.raw_value == 'open'">
-                                        <button name="action_mark_in_progress"
-                                                type="object"
-                                                class="btn btn-sm btn-secondary me-1">
-                                            Start
-                                        </button>
-                                    </t>
-                                    <t t-if="record.can_close.raw_value and (record.state.raw_value == 'open' or record.state.raw_value == 'in_progress')">
-                                        <button name="action_mark_done"
-                                                type="object"
-                                                class="btn btn-sm btn-success">
-                                            Mark Done
-                                        </button>
-                                    </t>
+                                    <!-- P4.M8.1 — switched from t-if
+                                         wrappers to button-level
+                                         `invisible` attributes. The
+                                         t-if pattern was unreliable
+                                         in browser smoke (the button
+                                         rendered even when
+                                         can_close=False under some
+                                         cache states), and the
+                                         attribute form is the Odoo
+                                         17 idiom for conditional
+                                         kanban buttons anyway. -->
+                                    <button name="action_mark_in_progress"
+                                            type="object"
+                                            class="btn btn-sm btn-secondary me-1"
+                                            invisible="not can_close or state != 'open'">
+                                        Start
+                                    </button>
+                                    <button name="action_mark_done"
+                                            type="object"
+                                            class="btn btn-sm btn-success"
+                                            invisible="not can_close or state not in ('open', 'in_progress')">
+                                        Mark Done
+                                    </button>
                                 </div>
                                 <div class="oe_kanban_bottom_right">
                                     <field name="primary_assignee_id"
@@ -314,8 +323,23 @@
                      here via action_open_action_centre)
                      ========================================= -->
                 <separator/>
-                <filter name="my_items" string="My Items"
+                <filter name="my_items" string="My Items (any state)"
                         domain="[('primary_assignee_id', '=', uid)]"/>
+                <!-- P4.M8.1 — generic role-agnostic "My Items" default
+                     for non-manager users (Sales / Lead Tech / Crew).
+                     Replaces the role-specific my_lead_tech_open and
+                     my_sales_open as the default landing — those
+                     remain in the search panel as advanced filters
+                     that also surface unassigned-by-role work. The
+                     generic label avoids showing the wrong role-name
+                     pill to a user whose group membership doesn't
+                     match the filter name (browser smoke regression). -->
+                <filter name="my_items_open" string="My Items"
+                        domain="['&amp;',
+                                 ('state', 'in', ('open', 'in_progress')),
+                                 '|',
+                                 ('primary_assignee_id', '=', uid),
+                                 ('escalated_to_id', '=', uid)]"/>
                 <filter name="my_escalations" string="My Escalations"
                         domain="[('escalated_to_id', '=', uid)]"/>
                 <filter name="my_open_tasks" string="My Open Tasks"
@@ -360,15 +384,19 @@
                 <!-- P4.M8 D4 — "Due Soon": items inside one escalation
                      window of becoming overdue. is_due_soon is a
                      non-stored compute and can't appear in a domain
-                     directly, so we approximate with "due_date in
-                     the next 24 hours" (the default escalation
-                     window). The kanban / tree decorations still
-                     use the per-item compute for the colour
-                     rendering — this filter is for the search list. -->
+                     directly. P4.M8.1: the Odoo 17 search-view
+                     domain evaluator does NOT support time format
+                     specifiers in strftime (was throwing
+                     UncaughtPromiseError on the original
+                     '%Y-%m-%d %H:%M:%S' form), so we approximate at
+                     day granularity — "due today" — which matches
+                     the typical 24h escalation window well enough.
+                     The kanban / tree decorations still use the
+                     precise per-item compute for colour rendering. -->
                 <filter name="due_soon" string="Due Soon"
-                        domain="[('due_date', '&gt;=', context_today().strftime('%Y-%m-%d %H:%M:%S')),
-                                 ('due_date', '&lt;=', (context_today() + relativedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')),
-                                 ('state', 'not in', ('done', 'cancelled'))]"/>
+                        domain="[('state', 'in', ('open', 'in_progress')),
+                                 ('due_date', '&gt;=', context_today().strftime('%Y-%m-%d')),
+                                 ('due_date', '&lt;', (context_today() + relativedelta(days=1)).strftime('%Y-%m-%d'))]"/>
                 <filter name="due_today" string="Due Today"
                         domain="[('due_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
                                  ('due_date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
