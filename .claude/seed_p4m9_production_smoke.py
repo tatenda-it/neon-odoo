@@ -352,7 +352,11 @@ for j, desc, sc_type in scope_specs:
     if existing:
         print("  reused", existing.name, "for", j.equipment_summary)
         continue
-    sc = ScopeChange.sudo().create({
+    # commercial.scope.change.create() gates by env.user groups,
+    # not by sudo() — __system__ doesn't carry neon_jobs_user/
+    # crew_leader/manager so the gate raises UserError. Run as
+    # the seeded manager.
+    sc = ScopeChange.with_user(mgr).create({
         "event_job_id": ej.id,
         "description": full_desc,
         "scope_change_type": sc_type,
@@ -396,7 +400,9 @@ for idx, channel, sentiment, follow_up, text in fb_specs:
     }
     if follow_up:
         vals["follow_up_owner"] = mgr.id
-    fb = Feedback.sudo().create(vals)
+    # Same authority gate as scope_change — feedback.create()
+    # checks env.user groups directly. Run as the seeded manager.
+    fb = Feedback.with_user(mgr).create(vals)
     results["feedbacks"] += 1
     print("  created", fb.name, "follow_up=", follow_up)
 env.cr.commit()
