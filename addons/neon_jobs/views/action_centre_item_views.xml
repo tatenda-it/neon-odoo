@@ -30,7 +30,7 @@
         <field name="arch" type="xml">
             <tree string="Action Centre"
                   decoration-danger="is_overdue == True"
-                  decoration-warning="priority in ('urgent', 'high') and not is_overdue and state in ('open', 'in_progress')"
+                  decoration-warning="is_due_soon == True and is_overdue == False"
                   decoration-success="state == 'done'"
                   decoration-muted="state == 'cancelled'">
                 <field name="name"/>
@@ -46,6 +46,8 @@
                 <field name="due_date"/>
                 <field name="is_overdue" widget="boolean_toggle"
                        optional="show" readonly="1"/>
+                <field name="is_due_soon" widget="boolean_toggle"
+                       optional="hide" readonly="1"/>
                 <field name="primary_role" optional="show"/>
                 <field name="primary_assignee_id"/>
                 <field name="state" widget="badge"
@@ -76,14 +78,19 @@
                 <field name="priority"/>
                 <field name="due_date"/>
                 <field name="is_overdue"/>
+                <field name="is_due_soon"/>
                 <field name="primary_assignee_id"/>
                 <field name="item_type"/>
                 <field name="state"/>
                 <field name="can_close"/>
                 <templates>
                     <t t-name="kanban-box">
-                        <div t-attf-class="oe_kanban_card oe_kanban_global_click
-                                          #{record.is_overdue.raw_value ? 'oe_kanban_color_2' : ''}">
+                        <!-- P4.M8 D2 — left border colour-codes urgency
+                             (replaces the M1-era oe_kanban_color_2
+                             background tint, which was too loud and
+                             clashed with kanban group colours). -->
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click border-start border-3
+                                          #{record.is_overdue.raw_value ? 'border-danger' : (record.is_due_soon.raw_value ? 'border-warning' : 'border-secondary')}">
                             <div class="o_kanban_record_top">
                                 <div class="o_kanban_record_headings">
                                     <strong class="o_kanban_record_title">
@@ -93,7 +100,16 @@
                                         <field name="name"/>
                                     </div>
                                 </div>
-                                <field name="priority" widget="priority"/>
+                                <!-- P4.M8 D1 — text chip instead of
+                                     widget="priority" star. Same
+                                     decoration palette the tree
+                                     view uses, so colour mapping
+                                     stays consistent. -->
+                                <field name="priority" widget="badge"
+                                       decoration-success="priority == 'low'"
+                                       decoration-info="priority == 'medium'"
+                                       decoration-warning="priority == 'high'"
+                                       decoration-danger="priority == 'urgent'"/>
                             </div>
                             <div class="o_kanban_record_body">
                                 <div t-if="record.due_date.raw_value"
@@ -164,6 +180,17 @@
                            statusbar_visible="open,in_progress,done"/>
                 </header>
                 <sheet>
+                    <!-- P4.M8 D5 — overdue banner. Surfaces the same
+                         is_overdue signal that drives kanban / tree
+                         colour decorations, so a user landing on
+                         the form from a deep link sees it
+                         immediately without needing to scan back
+                         to the kanban. -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not is_overdue or state in ('done', 'cancelled')">
+                        <strong>Overdue:</strong>
+                        this item is past its due date.
+                    </div>
                     <div class="oe_title">
                         <h1>
                             <field name="name" readonly="1"/>
@@ -182,6 +209,7 @@
                         <group>
                             <field name="due_date"/>
                             <field name="is_overdue" readonly="1"/>
+                            <field name="is_due_soon" readonly="1"/>
                             <field name="active" widget="boolean_toggle"/>
                         </group>
                     </group>
@@ -329,6 +357,18 @@
                         domain="[('due_date', '!=', False),
                                  ('due_date', '&lt;', context_today().strftime('%Y-%m-%d')),
                                  ('state', 'not in', ('done', 'cancelled'))]"/>
+                <!-- P4.M8 D4 — "Due Soon": items inside one escalation
+                     window of becoming overdue. is_due_soon is a
+                     non-stored compute and can't appear in a domain
+                     directly, so we approximate with "due_date in
+                     the next 24 hours" (the default escalation
+                     window). The kanban / tree decorations still
+                     use the per-item compute for the colour
+                     rendering — this filter is for the search list. -->
+                <filter name="due_soon" string="Due Soon"
+                        domain="[('due_date', '&gt;=', context_today().strftime('%Y-%m-%d %H:%M:%S')),
+                                 ('due_date', '&lt;=', (context_today() + relativedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')),
+                                 ('state', 'not in', ('done', 'cancelled'))]"/>
                 <filter name="due_today" string="Due Today"
                         domain="[('due_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
                                  ('due_date', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
@@ -368,6 +408,15 @@
                             context="{'group_by': 'source_model_id'}"/>
                     <filter name="group_assignee" string="Assignee"
                             context="{'group_by': 'primary_assignee_id'}"/>
+                    <!-- P4.M8 D4 — trigger type + due-date week
+                         buckets. Trigger type is the most-asked-for
+                         grouping in the M5+M6 browser smoke
+                         feedback; week buckets give the manager a
+                         calendar-style read of upcoming load. -->
+                    <filter name="group_trigger_type" string="Trigger Type"
+                            context="{'group_by': 'trigger_type'}"/>
+                    <filter name="group_due_date" string="Due Date (week)"
+                            context="{'group_by': 'due_date:week'}"/>
                 </group>
             </search>
         </field>

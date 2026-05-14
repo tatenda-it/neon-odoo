@@ -62,6 +62,24 @@ _STATES = [
 
 _TERMINAL_STATES = ("done", "cancelled")
 
+# P4.M8 — Bootstrap class per priority. Kanban + tree both render
+# priority with widget="badge" which reads the decoration-* attrs
+# from the view, but the dict is exposed so other callers (test
+# fixtures, future dashboard tiles) can resolve a colour without
+# duplicating the mapping.
+PRIORITY_BADGE_MAP = {
+    "low":    "bg-secondary",
+    "medium": "bg-info",
+    "high":   "bg-warning",
+    "urgent": "bg-danger",
+}
+
+# P4.M8 — fallback window for is_due_soon when the item has no
+# trigger.config (manual items) or the config's escalation_minutes
+# is 0 / NULL. 24h is the convention from D2's "default 24 if config
+# missing" guidance.
+_DUE_SOON_DEFAULT_MINUTES = 1440
+
 
 class ActionCentreItem(models.Model):
     _name = "action.centre.item"
@@ -97,6 +115,25 @@ class ActionCentreItem(models.Model):
     due_date = fields.Datetime(tracking=True)
     is_overdue = fields.Boolean(
         compute="_compute_is_overdue", store=False,
+    )
+    # P4.M8 — "due_soon" = within one escalation window of becoming
+    # overdue. Window is trigger_config_id.escalation_minutes / 60
+    # (hours), with a 1440-minute fallback for manual items or
+    # configs with no window set.
+    #
+    # P4.M8 scope decision: a per-user "count of overdue items" menu
+    # badge was considered (D5 in the M8 spec) but scoped out.
+    # Odoo 17 dropped the Odoo-14 _needaction_domain_get pattern,
+    # and the alternative (synthesising mail.activity records to
+    # piggyback the activity badge) couples this model to an
+    # unrelated subsystem for a visual feature. The role-aware
+    # default landing on the Action Centre menu already surfaces
+    # the user's overdue items first, and the form view shows a
+    # red alert banner when is_overdue=True. If the menu badge
+    # becomes important post-deploy, revisit as a Phase 4.5
+    # enhancement.
+    is_due_soon = fields.Boolean(
+        compute="_compute_is_due_soon", store=False,
     )
     # uid-aware authority signal for inline kanban buttons (P4.M3).
     # Mirrors the is_overdue pattern: non-stored compute with
@@ -214,6 +251,27 @@ class ActionCentreItem(models.Model):
                 rec.due_date
                 and rec.state not in _TERMINAL_STATES
                 and rec.due_date < now
+            )
+
+    @api.depends("due_date", "state",
+                 "trigger_config_id",
+                 "trigger_config_id.escalation_minutes")
+    @api.depends_context("uid")
+    def _compute_is_due_soon(self):
+        now = fields.Datetime.now()
+        for rec in self:
+            if rec.state in _TERMINAL_STATES or not rec.due_date:
+                rec.is_due_soon = False
+                continue
+            cfg = rec.trigger_config_id
+            minutes = cfg.escalation_minutes if cfg else 0
+            if not minutes or minutes <= 0:
+                minutes = _DUE_SOON_DEFAULT_MINUTES
+            seconds_until_due = (rec.due_date - now).total_seconds()
+            window_seconds = minutes * 60.0
+            rec.is_due_soon = (
+                seconds_until_due > 0
+                and seconds_until_due <= window_seconds
             )
 
     @api.depends("primary_assignee_id", "escalated_to_id")
@@ -411,10 +469,19 @@ class ActionCentreItem(models.Model):
                     "Only the assignee, the escalated user, or a "
                     "Manager can close this item."
                 ))
-            rec._do_transition("done", {
+            extra = {
                 "closed_by_id": self.env.uid,
                 "closed_at": fields.Datetime.now(),
-            })
+            }
+            # P4.M8 — record a default closure_reason on manual
+            # close. Cancel goes through the wizard which collects
+            # an explicit reason; "Mark Done" had no reason at all
+            # before this, leaving the audit blank.
+            if not rec.closure_reason:
+                extra["closure_reason"] = _(
+                    "Manually resolved by %s"
+                ) % self.env.user.name
+            rec._do_transition("done", extra)
 
     def action_open_cancel_wizard(self):
         """Form-button entry point. Opens the cancel wizard so the
