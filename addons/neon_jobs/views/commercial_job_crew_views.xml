@@ -9,8 +9,10 @@
                 <field name="job_id"/>
                 <field name="job_event_date"/>
                 <field name="job_partner_id"/>
-                <field name="user_id"/>
+                <field name="partner_id"/>
+                <field name="user_id" optional="hide"/>
                 <field name="role"/>
+                <field name="is_crew_chief" optional="show"/>
                 <field name="state" widget="badge"/>
                 <field name="assigned_on"/>
                 <field name="responded_on"/>
@@ -27,8 +29,11 @@
                     <group>
                         <group>
                             <field name="job_id"/>
-                            <field name="user_id"/>
+                            <field name="partner_id"/>
+                            <field name="user_id"
+                                   help="Optional. Leave blank for freelancers."/>
                             <field name="role"/>
+                            <field name="is_crew_chief"/>
                         </group>
                         <group>
                             <field name="state" widget="statusbar"/>

@@ -16,21 +16,29 @@ class CommercialJobCrew(models.Model):
         ondelete="cascade",
         tracking=True,
     )
-    # TODO (Phase 5 - Workshop): Crew identity should support
-    # non-Odoo-user freelancers. Currently user_id assumes the crew
-    # member has a res.users record, which only fits permanent crew
-    # with Odoo logins. Phase 5 should expand to either:
-    #   - Allow res.partner-based assignment (any partner record,
-    #     login optional)
-    #   - Or add separate partner_id field for freelancers, keep
-    #     user_id for logged-in crew
-    # See userMemory: crew = mix of permanent and freelance, most
-    # NOT Odoo users; notified via WhatsApp (neon_channels).
-    user_id = fields.Many2one(
-        "res.users",
-        string="Crew Member",
+    # P5.M1 (Q18) — crew identity supports both permanent users and
+    # freelance contacts. partner_id is the canonical identity field
+    # (always set). user_id is optional — set only for crew members
+    # who have an Odoo login (permanent crew). Freelancers carry a
+    # res.partner record only; WhatsApp dispatch (P5.M11+) reaches
+    # them via partner_id.phone / partner_id.mobile.
+    partner_id = fields.Many2one(
+        "res.partner",
+        string="Crew Contact",
         required=True,
         tracking=True,
+        domain="[('is_company', '=', False)]",
+        help="The crew member as a contact. Required. For permanent "
+        "crew, this auto-populates from their user_id when you pick "
+        "a user. For freelancers, leave user_id blank and pick the "
+        "contact directly.",
+    )
+    user_id = fields.Many2one(
+        "res.users",
+        string="Crew User Account",
+        tracking=True,
+        help="Optional — set only when the crew member has an Odoo "
+        "login. Freelancers leave this blank.",
     )
     role = fields.Selection(
         [
@@ -104,9 +112,9 @@ class CommercialJobCrew(models.Model):
 
     _sql_constraints = [
         (
-            "unique_user_per_job",
-            "UNIQUE (job_id, user_id)",
-            "This crew member is already assigned to this job.",
+            "unique_partner_per_job",
+            "UNIQUE (job_id, partner_id)",
+            "This crew contact is already assigned to this job.",
         ),
     ]
 
@@ -121,19 +129,70 @@ class CommercialJobCrew(models.Model):
                 ("id", "!=", rec.id),
             ], limit=1)
             if other:
+                existing_name = (
+                    other.partner_id.name
+                    or (other.user_id.name if other.user_id else _("(no name)"))
+                )
                 raise ValidationError(_(
                     "Only one Crew Chief is allowed per Commercial Job. "
                     "%(existing)s is already marked Crew Chief on "
                     "%(job)s."
                 ) % {
-                    "existing": other.user_id.name,
+                    "existing": existing_name,
                     "job": rec.job_id.name,
                 })
+
+    @api.constrains("is_crew_chief", "user_id")
+    def _check_crew_chief_has_user(self):
+        """P5.M1 — Crew Chief role drives commercial.event.job.crew_chief_id
+        which is a Many2one to res.users. A freelancer with no user_id
+        can't take that slot; raise rather than silently failing.
+        """
+        for rec in self:
+            if rec.is_crew_chief and not rec.user_id:
+                raise ValidationError(_(
+                    "Crew Chief must be a registered system user "
+                    "(res.users), not a freelancer-only contact. "
+                    "Reassign or create a user account first."
+                ))
+
+    @api.constrains("user_id", "partner_id")
+    def _check_user_partner_match(self):
+        """When both user_id and partner_id are set, they must agree —
+        a user_id implies its own partner_id, so allowing them to
+        diverge invites silent data drift.
+        """
+        for rec in self:
+            if rec.user_id and rec.partner_id:
+                if rec.user_id.partner_id != rec.partner_id:
+                    raise ValidationError(_(
+                        "Crew Contact and Crew User Account must "
+                        "refer to the same person. %(user)s is linked "
+                        "to contact %(user_partner)s, but the Crew "
+                        "Contact is set to %(partner)s."
+                    ) % {
+                        "user": rec.user_id.name,
+                        "user_partner": rec.user_id.partner_id.name,
+                        "partner": rec.partner_id.name,
+                    })
+
+    @api.onchange("user_id")
+    def _onchange_user_id(self):
+        """UX nicety — when the user picks a Crew User Account, snap
+        Crew Contact to that user's partner_id automatically. The
+        user can override afterwards but the default is right.
+        """
+        if self.user_id and self.user_id.partner_id:
+            self.partner_id = self.user_id.partner_id
 
     def name_get(self):
         result = []
         for rec in self:
-            display = f"{rec.user_id.name} ({dict(self._fields['role'].selection).get(rec.role, '')})"
+            # Prefer partner_id.name (always set post-P5.M1); fall
+            # back to user_id.name for any straggler rows in flight.
+            who = rec.partner_id.name or (
+                rec.user_id.name if rec.user_id else _("(unnamed)"))
+            display = f"{who} ({dict(self._fields['role'].selection).get(rec.role, '')})"
             if rec.job_id:
                 display = f"{rec.job_id.name} — {display}"
             result.append((rec.id, display))
@@ -183,6 +242,16 @@ class CommercialJobCrew(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        # P5.M1 — programmatic create() callers that only pass
+        # user_id (the pre-Q18 API) get partner_id auto-filled
+        # from user.partner_id. The @api.onchange covers the form
+        # UI; this covers programmatic paths and existing fixtures.
+        Users = self.env["res.users"]
+        for vals in vals_list:
+            if not vals.get("partner_id") and vals.get("user_id"):
+                user = Users.browse(vals["user_id"])
+                if user.partner_id:
+                    vals["partner_id"] = user.partner_id.id
         recs = super().create(vals_list)
         self._retrigger_parent_gate(recs.mapped("job_id"))
         return recs
