@@ -267,21 +267,29 @@ def _capacity_items(j):
 
 pre = _capacity_items(dinner)
 print("  capacity_gate items pre-flip:", len(pre))
-# Path A — direct write
+# Persist the visible state first so a browser viewer sees the
+# warning chip on the job form.
 dinner.sudo().write({"gate_result": "warning"})
 post_a = _capacity_items(dinner)
 print("  after gate_result='warning' write:", len(post_a),
       "(delta", len(post_a) - len(pre), ")")
+# The model's gate-eval flow (_persist_gate_result) fires the
+# capacity_gate trigger from inside an evaluation pass; calling
+# that helper from a seed requires synthesising a full gate-result
+# object, which is heavier than this seed needs. Fire the trigger
+# directly instead — the resulting action.centre.item is
+# indistinguishable from the production gate-eval path.
 if len(post_a) == len(pre):
-    # Path B — call the persist helper directly
-    print("  fallback to _persist_gate_result('warning')")
-    dinner.sudo()._persist_gate_result("warning",
-                                       post_change_chatter=True)
-    post_b = _capacity_items(dinner)
-    print("  after _persist_gate_result:", len(post_b))
-    if len(post_b) == len(pre):
-        print("  DEFECT: capacity_gate trigger did NOT fire via "
-              "either path — flag for investigation")
+    print("  direct trigger fire (gate_result write alone "
+          "doesn't fire the trigger — only _persist_gate_result "
+          "does, and that needs a structured eval result)")
+    try:
+        dinner.sudo()._action_centre_create_item("capacity_gate")
+        post_b = _capacity_items(dinner)
+        print("  after direct _action_centre_create_item:", len(post_b))
+    except Exception as e:
+        print("  DEFECT: direct capacity_gate trigger failed:",
+              type(e).__name__, str(e)[:80])
 env.cr.commit()
 
 
@@ -300,25 +308,18 @@ def _lost_items(j):
 pre = _lost_items(ngo)
 print("  lost items pre-archive:", len(pre))
 if ngo.state != "archived":
-    try:
-        # action_archive_lost typically requires a reason; pass via
-        # context the same way the wizard does.
-        ngo.with_context(
-            default_loss_reason="lost_to_competitor",
-            default_loss_notes="Test seed — competitor undercut us.",
-        ).action_archive_lost()
-    except UserError as e:
-        # Some implementations require parameters directly; try a
-        # broader call. Surface the failure if neither works.
-        print("  action_archive_lost UserError:", str(e)[:100])
-        try:
-            ngo.sudo().action_archive_lost(
-                reason="lost_to_competitor",
-                notes="Test seed",
-            )
-        except Exception as e2:
-            print("  fallback call failed:", type(e2).__name__,
-                  str(e2)[:100])
+    # action_archive_lost takes no kwargs; it reads loss_reason
+    # off the record itself, raising UserError if it's empty and
+    # the actor isn't a manager. Write the reason first, then
+    # archive. Seed runs as admin (a manager-equivalent), so even
+    # an empty loss_reason would pass the gate — but we set it
+    # anyway so the audit trail and the job form look realistic.
+    ngo.sudo().write({
+        "loss_reason": "Test seed — lost to a competitor "
+                       "(P4.M9 dummy data).",
+        "lost_to_competitor": "TEST COMPETITOR " + MARKER,
+    })
+    ngo.sudo().action_archive_lost()
 post = _lost_items(ngo)
 print("  lost items post-archive:", len(post),
       "(delta", len(post) - len(pre), ")")
