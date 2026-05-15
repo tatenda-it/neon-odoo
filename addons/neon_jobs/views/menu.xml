@@ -157,6 +157,13 @@
               action="neon_equipment_movement_pending_transfers_action"
               sequence="35"/>
 
+    <!-- P5.M8 — Stock Takes (weekly Tuesday 06:00 cron + ad-hoc). -->
+    <menuitem id="menu_workshop_equipment_stock_takes"
+              name="Stock Takes"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_stock_take_action"
+              sequence="50"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"

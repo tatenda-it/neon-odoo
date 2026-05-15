@@ -47,6 +47,15 @@ class NeonEquipmentCategory(models.Model):
         help="FontAwesome class for kanban tile rendering — e.g. "
         "'fa-volume-up'. Used by P5.M10 workshop dashboard.",
     )
+    is_high_impact = fields.Boolean(
+        string="High-Impact Category",
+        default=False,
+        help="P5.M8 — when True, stock-take discrepancies on units "
+        "in this category fire an immediate manager-tier alert via "
+        "the Action Centre (stock_take_high_impact trigger). "
+        "Seed values: Sound, Visual, Lighting, Laptops. Managers "
+        "can override per category.",
+    )
     description = fields.Text()
     active = fields.Boolean(default=True)
 

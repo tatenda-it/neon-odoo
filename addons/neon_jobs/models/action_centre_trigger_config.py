@@ -32,6 +32,7 @@ TRIGGER_TYPE_SELECTION = [
     ("feedback_followup", "Feedback Follow-up Required"),
     ("equipment_conflict", "Equipment Reservation Conflict"),
     ("transfer_pending", "Equipment Transfer Pending"),
+    ("stock_take_high_impact", "Stock Take High-Impact Discrepancy"),
     ("manual", "Manual"),
 ]
 

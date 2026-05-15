@@ -11,3 +11,4 @@ from . import neon_equipment_recommission_wizard
 from . import neon_equipment_allocate_wizard
 from . import neon_equipment_transfer_wizard
 from . import neon_equipment_checkin_wizard
+from . import neon_equipment_stock_take_wizard

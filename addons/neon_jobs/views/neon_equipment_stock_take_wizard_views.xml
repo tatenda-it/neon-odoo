@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_stock_take_wizard_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.stock.take.wizard.form</field>
+        <field name="model">neon.equipment.stock.take.wizard</field>
+        <field name="arch" type="xml">
+            <form string="New Stock Take">
+                <group>
+                    <group string="Session">
+                        <field name="scheduled_for"/>
+                        <field name="candidate_count" readonly="1"/>
+                    </group>
+                    <group string="Filters (optional)">
+                        <field name="category_ids" widget="many2many_tags"
+                               options="{'no_create': True}"/>
+                        <field name="location_text"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_confirm"
+                            string="Create Stock Take"
+                            type="object"
+                            class="oe_highlight"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

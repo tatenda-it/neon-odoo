@@ -33,3 +33,6 @@ from . import neon_equipment_reservation
 # P5.M5 — Equipment lines + movement audit log
 from . import commercial_event_job_equipment_line
 from . import neon_equipment_movement
+# P5.M8 — Weekly stock take + per-unit attestation
+from . import neon_equipment_stock_take
+from . import neon_equipment_stock_take_line

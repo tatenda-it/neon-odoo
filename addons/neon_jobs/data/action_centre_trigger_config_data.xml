@@ -157,6 +157,18 @@
             <field name="description">Fires when an equipment transfer has been pending for more than 24 hours without destination acceptance. Auto-closes on accept / decline.</field>
         </record>
 
+        <record id="trigger_config_stock_take_high_impact" model="action.centre.trigger.config">
+            <field name="trigger_type">stock_take_high_impact</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">alert</field>
+            <field name="primary_role">manager</field>
+            <field name="priority">urgent</field>
+            <field name="escalation_minutes">240</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="True"/>
+            <field name="description">Fires when a high-impact-category unit (Sound / Visual / Lighting / Laptops by seed) is attested during stock take with a state, location, or condition discrepancy. Auto-closes when the line's discrepancy is marked resolved or the data is reconciled.</field>
+        </record>
+
         <record id="trigger_config_manual" model="action.centre.trigger.config">
             <field name="trigger_type">manual</field>
             <field name="is_enabled" eval="True"/>

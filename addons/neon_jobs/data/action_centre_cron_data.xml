@@ -48,5 +48,26 @@
             <field name="doall" eval="False"/>
         </record>
 
+        <!--
+            P5.M8 — Weekly Tuesday 06:00 stock take session
+            auto-creation. Hardcoded nextcall to the next Tuesday
+            from the install date (2026-05-15 Fri → 2026-05-19 Tue);
+            the interval_type=weeks + interval_number=1 keeps it
+            firing weekly thereafter.
+        -->
+        <record id="ir_cron_equipment_stock_take_weekly" model="ir.cron">
+            <field name="name">Equipment: Weekly Stock Take (Tue 06:00)</field>
+            <field name="model_id" ref="model_neon_equipment_stock_take"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_create_weekly_session()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">weeks</field>
+            <field name="nextcall">2026-05-19 06:00:00</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+        </record>
+
     </data>
 </odoo>

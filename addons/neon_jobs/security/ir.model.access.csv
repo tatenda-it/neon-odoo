@@ -113,3 +113,13 @@ access_neon_equipment_checkin_wizard_crew,neon.equipment.checkin.wizard crew (ch
 access_neon_equipment_checkin_wizard_line_crew_leader,neon.equipment.checkin.wizard.line crew_leader,model_neon_equipment_checkin_wizard_line,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
 access_neon_equipment_checkin_wizard_line_manager,neon.equipment.checkin.wizard.line manager,model_neon_equipment_checkin_wizard_line,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_neon_equipment_checkin_wizard_line_crew,neon.equipment.checkin.wizard.line crew,model_neon_equipment_checkin_wizard_line,neon_jobs.group_neon_jobs_crew,1,1,1,1
+access_neon_equipment_stock_take_user,neon.equipment.stock.take user (read-only),model_neon_equipment_stock_take,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_stock_take_crew_leader,neon.equipment.stock.take crew_leader (R/U/C),model_neon_equipment_stock_take,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_equipment_stock_take_crew,neon.equipment.stock.take crew (read-only),model_neon_equipment_stock_take,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_neon_equipment_stock_take_manager,neon.equipment.stock.take manager (full),model_neon_equipment_stock_take,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_stock_take_line_user,neon.equipment.stock.take.line user (read-only),model_neon_equipment_stock_take_line,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_stock_take_line_crew_leader,neon.equipment.stock.take.line crew_leader (R/U),model_neon_equipment_stock_take_line,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_equipment_stock_take_line_crew,neon.equipment.stock.take.line crew (read-only),model_neon_equipment_stock_take_line,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_neon_equipment_stock_take_line_manager,neon.equipment.stock.take.line manager (full),model_neon_equipment_stock_take_line,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_stock_take_wizard_crew_leader,neon.equipment.stock.take.wizard crew_leader,model_neon_equipment_stock_take_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_neon_equipment_stock_take_wizard_manager,neon.equipment.stock.take.wizard manager,model_neon_equipment_stock_take_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1

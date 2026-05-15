@@ -11,6 +11,8 @@
                 <field name="code"/>
                 <field name="default_tracking" widget="badge"/>
                 <field name="icon"/>
+                <field name="is_high_impact" widget="boolean_toggle"
+                       optional="show"/>
                 <field name="product_count"/>
                 <field name="active" widget="boolean_toggle"/>
             </tree>
@@ -44,6 +46,9 @@
                         <group>
                             <field name="icon"/>
                             <field name="active" widget="boolean_toggle"/>
+                            <field name="is_high_impact"
+                                   widget="boolean_toggle"
+                                   help="Stock take discrepancies on units in this category fire an immediate manager alert."/>
                         </group>
                     </group>
                     <group string="Description">

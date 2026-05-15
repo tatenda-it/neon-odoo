@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_stock_take_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.stock.take.tree</field>
+        <field name="model">neon.equipment.stock.take</field>
+        <field name="arch" type="xml">
+            <tree string="Stock Takes"
+                  decoration-warning="discrepancy_count &gt; 0"
+                  decoration-danger="high_impact_discrepancy_count &gt; 0"
+                  decoration-success="state == 'completed'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="scheduled_for"/>
+                <field name="session_type"/>
+                <field name="state" widget="badge"/>
+                <field name="line_count"/>
+                <field name="attested_count"/>
+                <field name="discrepancy_count"/>
+                <field name="high_impact_discrepancy_count"
+                       optional="show"/>
+                <field name="started_by_id" optional="hide"/>
+                <field name="completed_at" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_stock_take_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.stock.take.form</field>
+        <field name="model">neon.equipment.stock.take</field>
+        <field name="arch" type="xml">
+            <form string="Stock Take">
+                <header>
+                    <button name="action_start"
+                            string="Start Audit"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'pending'"/>
+                    <button name="action_complete"
+                            string="Complete"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'in_progress'"/>
+                    <button name="action_attest_all_as_expected"
+                            string="Attest All As Expected"
+                            type="object"
+                            groups="neon_jobs.group_neon_jobs_manager"
+                            invisible="state not in ('pending', 'in_progress')"
+                            confirm="Mark every unattested line as matching its expected snapshot? Use only after a physical sweep confirms everything matches the system. Manager-only."/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            invisible="state in ('completed', 'cancelled')"
+                            confirm="Cancel this stock take session? Attestations already saved will be preserved but the session won't drive further checks."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Session">
+                            <field name="scheduled_for"/>
+                            <field name="session_type" readonly="1"/>
+                            <field name="started_by_id" readonly="1"/>
+                            <field name="started_at" readonly="1"/>
+                            <field name="completed_by_id" readonly="1"
+                                   invisible="state != 'completed'"/>
+                            <field name="completed_at" readonly="1"
+                                   invisible="state != 'completed'"/>
+                        </group>
+                        <group string="Progress">
+                            <field name="line_count" readonly="1"/>
+                            <field name="attested_count" readonly="1"/>
+                            <field name="discrepancy_count"
+                                   readonly="1"/>
+                            <field name="high_impact_discrepancy_count"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines" name="lines">
+                            <field name="line_ids">
+                                <tree editable="bottom"
+                                      decoration-warning="has_discrepancy"
+                                      decoration-danger="has_discrepancy and is_high_impact"
+                                      decoration-muted="resolved">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="unit_id" readonly="1"/>
+                                    <field name="category_id"
+                                           readonly="1" optional="show"/>
+                                    <field name="expected_state"
+                                           readonly="1"/>
+                                    <field name="expected_location"
+                                           readonly="1" optional="hide"/>
+                                    <field name="attested"
+                                           widget="boolean_toggle"/>
+                                    <field name="found_state"/>
+                                    <field name="found_location"
+                                           optional="hide"/>
+                                    <field name="physical_condition"/>
+                                    <field name="has_discrepancy"
+                                           widget="boolean_toggle"
+                                           readonly="1"/>
+                                    <field name="is_high_impact"
+                                           widget="boolean_toggle"
+                                           readonly="1" optional="show"/>
+                                    <field name="resolved"
+                                           widget="boolean_toggle"
+                                           optional="hide"/>
+                                    <field name="notes" optional="hide"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_stock_take_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.stock.take.search</field>
+        <field name="model">neon.equipment.stock.take</field>
+        <field name="arch" type="xml">
+            <search string="Stock Takes">
+                <field name="name"/>
+                <field name="scheduled_for"/>
+                <separator/>
+                <filter name="pending" string="Pending"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="in_progress" string="In Progress"
+                        domain="[('state', '=', 'in_progress')]"/>
+                <filter name="completed" string="Completed"
+                        domain="[('state', '=', 'completed')]"/>
+                <separator/>
+                <filter name="discrepancies" string="With Discrepancies"
+                        domain="[('discrepancy_count', '&gt;', 0)]"/>
+                <filter name="high_impact" string="High-Impact Discrepancies"
+                        domain="[('high_impact_discrepancy_count', '&gt;', 0)]"/>
+                <separator/>
+                <filter name="scheduled" string="Scheduled"
+                        domain="[('session_type', '=', 'scheduled')]"/>
+                <filter name="ad_hoc" string="Ad-Hoc"
+                        domain="[('session_type', '=', 'ad_hoc')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_session_type" string="Session Type"
+                            context="{'group_by': 'session_type'}"/>
+                    <filter name="group_scheduled" string="Scheduled For"
+                            context="{'group_by': 'scheduled_for'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_equipment_stock_take_action" model="ir.actions.act_window">
+        <field name="name">Stock Takes</field>
+        <field name="res_model">neon.equipment.stock.take</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_equipment_stock_take_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No stock takes recorded yet
+            </p>
+            <p>
+                Sessions auto-create every Tuesday morning at 06:00.
+                Click 'New' to launch an ad-hoc audit between
+                scheduled runs.
+            </p>
+        </field>
+    </record>
+
+    <record id="neon_equipment_stock_take_action_adhoc_wizard"
+            model="ir.actions.act_window">
+        <field name="name">New Ad-Hoc Stock Take</field>
+        <field name="res_model">neon.equipment.stock.take.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

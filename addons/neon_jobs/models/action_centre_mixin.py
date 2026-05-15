@@ -73,6 +73,9 @@ TRIGGER_REGISTRY = {
     "transfer_pending": {
         "default_title": "Pending transfer {source.name}: {source.unit_id.display_name} → {source.destination_event_job_id.name}",
     },
+    "stock_take_high_impact": {
+        "default_title": "Stock take discrepancy on {source.unit_id.display_name} ({source.category_id.name})",
+    },
     "manual": {
         "default_title": "Manual action item",
     },
