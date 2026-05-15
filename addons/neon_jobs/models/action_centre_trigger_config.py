@@ -33,6 +33,9 @@ TRIGGER_TYPE_SELECTION = [
     ("equipment_conflict", "Equipment Reservation Conflict"),
     ("transfer_pending", "Equipment Transfer Pending"),
     ("stock_take_high_impact", "Stock Take High-Impact Discrepancy"),
+    ("incident_open", "Equipment Incident Open"),
+    ("repair_stalled", "Repair Order Stalled"),
+    ("stock_take_unresolved", "Stock Take Discrepancy Unresolved"),
     ("manual", "Manual"),
 ]
 

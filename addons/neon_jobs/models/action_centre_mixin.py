@@ -76,6 +76,15 @@ TRIGGER_REGISTRY = {
     "stock_take_high_impact": {
         "default_title": "Stock take discrepancy on {source.unit_id.display_name} ({source.category_id.name})",
     },
+    "incident_open": {
+        "default_title": "Incident {source.name}: {source.unit_id.display_name} ({source.incident_type})",
+    },
+    "repair_stalled": {
+        "default_title": "Repair {source.name} stalled on {source.unit_id.display_name} (state {source.state})",
+    },
+    "stock_take_unresolved": {
+        "default_title": "Stock take discrepancy unresolved: {source.unit_id.display_name} ({source.stock_take_id.name})",
+    },
     "manual": {
         "default_title": "Manual action item",
     },

@@ -14,6 +14,8 @@ The model inherits action.centre.mixin so it can spawn / close the
 high-impact item directly. Mail.thread carries the attestation
 chatter.
 """
+from datetime import timedelta
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -107,6 +109,20 @@ class NeonEquipmentStockTakeLine(models.Model):
     resolved_at = fields.Datetime(tracking=True, readonly=True)
     resolved_by_id = fields.Many2one(
         "res.users", string="Resolved By", readonly=True)
+    resolution_method = fields.Selection(
+        [
+            ("reconciled",      "Reconciled (no real discrepancy)"),
+            ("repair_opened",   "Repair Order Opened"),
+            ("incident_opened", "Incident Opened"),
+            ("manual",          "Manually Resolved"),
+        ],
+        string="Resolution Method",
+        tracking=True,
+        help="How the discrepancy was reconciled. Set automatically "
+        "by action_open_repair_order / action_open_incident; "
+        "managers can pick 'reconciled' or 'manual' via the resolve "
+        "action when there's no follow-up workflow needed.",
+    )
     resolution_notes = fields.Text()
 
     # === Computed flags ===
@@ -196,7 +212,7 @@ class NeonEquipmentStockTakeLine(models.Model):
                 rec._action_centre_close_items(
                     "stock_take_high_impact", force=True)
 
-    def action_resolve(self, notes=None):
+    def action_resolve(self, notes=None, method="manual"):
         for rec in self:
             if not rec.has_discrepancy:
                 raise UserError(_(
@@ -207,9 +223,100 @@ class NeonEquipmentStockTakeLine(models.Model):
                 "resolved_at": fields.Datetime.now(),
                 "resolved_by_id": self.env.uid,
                 "resolution_notes": notes or rec.resolution_notes,
+                "resolution_method": method,
             })
             rec._sync_high_impact_action_item()
+            rec._sync_unresolved_action_item()
         return True
+
+    # ============================================================
+    # === P5.M9 — resolution helpers
+    # action_open_repair_order and action_open_incident spawn the
+    # follow-up record AND mark the line resolved with the
+    # corresponding method. The smoke and any future automation
+    # call these directly; the form view also exposes them as
+    # buttons (visible when has_discrepancy=True).
+    # ============================================================
+    def action_open_repair_order(self, fault_description=None):
+        self.ensure_one()
+        if not self.has_discrepancy:
+            raise UserError(_(
+                "Open a repair order only from a line with a "
+                "discrepancy."))
+        RepairOrder = self.env["neon.equipment.repair.order"]
+        repair = RepairOrder.sudo().create({
+            "unit_id": self.unit_id.id,
+            "source_stock_take_line_id": self.id,
+            "source_event_job_id": False,
+            "fault_description": fault_description or _(
+                "Opened from stock-take discrepancy on "
+                "%(line)s. Found state=%(found)s; expected "
+                "state=%(expected)s; condition=%(cond)s."
+            ) % {
+                "line": self.display_name,
+                "found": self.found_state or "(unset)",
+                "expected": self.expected_state or "(unset)",
+                "cond": self.physical_condition or "(unset)",
+            },
+        })
+        self.action_resolve(method="repair_opened",
+                            notes=_("Repair order opened: %(name)s") % {
+                                "name": repair.name})
+        return repair
+
+    def action_open_incident(self, description=None,
+                             incident_type="loss"):
+        self.ensure_one()
+        if not self.has_discrepancy:
+            raise UserError(_(
+                "Open an incident only from a line with a "
+                "discrepancy."))
+        Incident = self.env["neon.equipment.incident"]
+        incident = Incident.sudo().create({
+            "unit_id": self.unit_id.id,
+            "incident_type": incident_type,
+            "source_stock_take_line_id": self.id,
+            "description": description or _(
+                "Reported from stock-take discrepancy on "
+                "%(line)s. Found state=%(found)s; expected "
+                "state=%(expected)s."
+            ) % {
+                "line": self.display_name,
+                "found": self.found_state or "(unset)",
+                "expected": self.expected_state or "(unset)",
+            },
+        })
+        self.action_resolve(method="incident_opened",
+                            notes=_("Incident opened: %(name)s") % {
+                                "name": incident.name})
+        return incident
+
+    # ============================================================
+    # === Action Centre cron evaluator (stock_take_unresolved)
+    # Fires for lines that have carried a discrepancy for more than
+    # 7 days without being resolved. Auto-close on resolve flows
+    # through _sync_unresolved_action_item().
+    # ============================================================
+    @api.model
+    def _evaluate_stock_take_unresolved_trigger(self):
+        cutoff = fields.Datetime.now() - timedelta(days=7)
+        candidates = self.sudo().search([
+            ("has_discrepancy", "=", True),
+            ("resolved", "=", False),
+            ("create_date", "<", cutoff),
+        ])
+        for rec in candidates:
+            try:
+                rec._action_centre_create_item("stock_take_unresolved")
+            except Exception:  # noqa: BLE001
+                continue
+        return candidates
+
+    def _sync_unresolved_action_item(self):
+        for rec in self.sudo():
+            if rec.resolved or not rec.has_discrepancy:
+                rec._action_centre_close_items(
+                    "stock_take_unresolved", force=True)
 
     # ============================================================
     # === write() — re-run high-impact sync on attestation /

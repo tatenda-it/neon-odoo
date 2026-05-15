@@ -123,3 +123,11 @@ access_neon_equipment_stock_take_line_crew,neon.equipment.stock.take.line crew (
 access_neon_equipment_stock_take_line_manager,neon.equipment.stock.take.line manager (full),model_neon_equipment_stock_take_line,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_neon_equipment_stock_take_wizard_crew_leader,neon.equipment.stock.take.wizard crew_leader,model_neon_equipment_stock_take_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
 access_neon_equipment_stock_take_wizard_manager,neon.equipment.stock.take.wizard manager,model_neon_equipment_stock_take_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_repair_order_user,neon.equipment.repair.order user (read-only),model_neon_equipment_repair_order,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_repair_order_crew_leader,neon.equipment.repair.order crew_leader (R/U/C),model_neon_equipment_repair_order,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_equipment_repair_order_crew,neon.equipment.repair.order crew (read-only),model_neon_equipment_repair_order,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_neon_equipment_repair_order_manager,neon.equipment.repair.order manager (full),model_neon_equipment_repair_order,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_incident_user,neon.equipment.incident user (read-only),model_neon_equipment_incident,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_incident_crew_leader,neon.equipment.incident crew_leader (R/U/C),model_neon_equipment_incident,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_equipment_incident_crew,neon.equipment.incident crew (read-only),model_neon_equipment_incident,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_neon_equipment_incident_manager,neon.equipment.incident manager (full),model_neon_equipment_incident,neon_jobs.group_neon_jobs_manager,1,1,1,1

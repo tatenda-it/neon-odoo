@@ -135,17 +135,15 @@ class NeonEquipmentCheckinWizard(models.TransientModel):
 
         # Pre-validate every line before any writes — collect errors
         # so the user sees all problems at once instead of one at a
-        # time.
+        # time. P5.M9: incident_link is now a real workflow (no
+        # longer a stub), so no pre-validation error there.
         photo_missing = []
         resolution_missing = []
-        incident_stub_units = []
         for line in self.checkin_line_ids:
             if line.requires_photo and not line.photo:
                 photo_missing.append(line.unit_id.display_name)
             if line.requires_resolution and not line.resolution_path:
                 resolution_missing.append(line.unit_id.display_name)
-            if line.resolution_path == "incident_link":
-                incident_stub_units.append(line.unit_id.display_name)
         errors = []
         if photo_missing:
             errors.append(_(
@@ -156,13 +154,6 @@ class NeonEquipmentCheckinWizard(models.TransientModel):
             errors.append(_(
                 "Resolution required for missing items: %(units)s"
             ) % {"units": ", ".join(resolution_missing)})
-        if incident_stub_units:
-            errors.append(_(
-                "Incident linking will be available in P5.M9 "
-                "(Repair / Incident workflow). For now use 'Write "
-                "Off' if the item is genuinely lost, or 'Returned "
-                "Late' if you expect it back. Affected: %(units)s"
-            ) % {"units": ", ".join(incident_stub_units)})
         if errors:
             raise UserError("\n\n".join(errors))
 
@@ -304,7 +295,38 @@ class NeonEquipmentCheckinWizardLine(models.TransientModel):
                     "notes": self.resolution_notes or "",
                 })
                 return
-            # incident_link was pre-blocked in wizard.action_confirm.
+            elif self.resolution_path == "incident_link":
+                # P5.M9 — incident_link now creates a real
+                # neon.equipment.incident in 'open' state with
+                # type='loss'. The unit stays in checked_out (the
+                # investigation drives subsequent state changes
+                # via the incident's resolve_* actions). The
+                # source reservation gets late_return_pending=True
+                # so closeout can still proceed while the
+                # investigation runs.
+                Incident = self.env[
+                    "neon.equipment.incident"].sudo()
+                Incident.create({
+                    "unit_id": unit.id,
+                    "incident_type": "loss",
+                    "source_event_job_id": event_job.id,
+                    "description": self.resolution_notes or _(
+                        "Reported from check-in on %(event)s: "
+                        "unit missing at venue."
+                    ) % {"event": event_job.display_name},
+                })
+                if source_res:
+                    source_res.write({"late_return_pending": True})
+                event_job.message_post(body=_(
+                    "Incident opened on %(unit)s by %(actor)s "
+                    "(missing at check-in). Closeout permitted; "
+                    "investigation continues."
+                ) % {
+                    "unit": unit.display_name,
+                    "actor": self.env["res.users"].sudo().browse(
+                        actor_uid).name,
+                })
+                return
 
         # Non-missing path: transition unit + create check-in movement.
         if cond == "damaged":

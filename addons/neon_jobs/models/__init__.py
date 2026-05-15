@@ -36,3 +36,6 @@ from . import neon_equipment_movement
 # P5.M8 — Weekly stock take + per-unit attestation
 from . import neon_equipment_stock_take
 from . import neon_equipment_stock_take_line
+# P5.M9 — Repair + incident workflows
+from . import neon_equipment_repair_order
+from . import neon_equipment_incident

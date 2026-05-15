@@ -164,6 +164,19 @@
               action="neon_equipment_stock_take_action"
               sequence="50"/>
 
+    <!-- P5.M9 — Repair Orders + Incidents. -->
+    <menuitem id="menu_workshop_equipment_repair_orders"
+              name="Repair Orders"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_repair_order_action"
+              sequence="60"/>
+
+    <menuitem id="menu_workshop_equipment_incidents"
+              name="Incidents"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_incident_action"
+              sequence="70"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"

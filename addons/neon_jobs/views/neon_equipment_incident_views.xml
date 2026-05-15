@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_incident_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.incident.tree</field>
+        <field name="model">neon.equipment.incident</field>
+        <field name="arch" type="xml">
+            <tree string="Incidents"
+                  decoration-danger="state == 'open'"
+                  decoration-warning="state == 'under_investigation'"
+                  decoration-success="state in ('resolved_recovered', 'resolved_writeoff', 'resolved_claim')"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="unit_id"/>
+                <field name="incident_type" widget="badge"/>
+                <field name="state" widget="badge"/>
+                <field name="description" optional="show"/>
+                <field name="estimated_loss_value" optional="hide"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="source_event_job_id" optional="hide"/>
+                <field name="create_date"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_incident_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.incident.form</field>
+        <field name="model">neon.equipment.incident</field>
+        <field name="arch" type="xml">
+            <form string="Equipment Incident">
+                <header>
+                    <button name="action_investigate"
+                            string="Start Investigation"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'open'"/>
+                    <button name="action_resolve_recovered"
+                            string="Resolve — Recovered"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'under_investigation'"/>
+                    <button name="action_resolve_writeoff"
+                            string="Resolve — Write-off"
+                            type="object"
+                            class="btn-danger"
+                            groups="neon_jobs.group_neon_jobs_manager"
+                            invisible="state != 'under_investigation'"
+                            confirm="Write off this unit? The unit will be decommissioned."/>
+                    <button name="action_resolve_claim"
+                            string="Resolve — Insurance Claim"
+                            type="object"
+                            groups="neon_jobs.group_neon_jobs_manager"
+                            invisible="state != 'under_investigation'"/>
+                    <button name="action_cancel"
+                            string="Cancel — False Alarm"
+                            type="object"
+                            groups="neon_jobs.group_neon_jobs_manager"
+                            invisible="state != 'open'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="open,under_investigation,resolved_recovered"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Subject">
+                            <field name="unit_id"
+                                   options="{'no_create': True}"/>
+                            <field name="incident_type"/>
+                            <field name="estimated_loss_value"/>
+                            <field name="currency_id"/>
+                        </group>
+                        <group string="Source">
+                            <field name="source_event_job_id"
+                                   readonly="1"/>
+                            <field name="source_stock_take_line_id"
+                                   readonly="1"/>
+                            <field name="source_checkin_movement_id"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="External References">
+                            <field name="insurance_claim_ref"/>
+                            <field name="police_report_ref"
+                                   invisible="incident_type != 'theft'"/>
+                        </group>
+                        <group string="Resolution">
+                            <field name="resolved_at" readonly="1"/>
+                            <field name="resolved_by_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description" name="description">
+                            <field name="description" nolabel="1"/>
+                        </page>
+                        <page string="Investigation" name="investigation">
+                            <field name="investigation_notes" nolabel="1"
+                                   placeholder="Who's investigating, leads, timeline..."/>
+                        </page>
+                        <page string="Resolution Notes" name="resolution"
+                              invisible="state not in ('resolved_recovered', 'resolved_writeoff', 'resolved_claim', 'cancelled')">
+                            <field name="resolution_notes" nolabel="1"/>
+                        </page>
+                        <page string="Linked Repairs" name="repairs">
+                            <field name="repair_order_ids">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="fault_description"/>
+                                    <field name="actual_cost"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Photo" name="photo">
+                            <field name="photo" widget="image"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_incident_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.incident.search</field>
+        <field name="model">neon.equipment.incident</field>
+        <field name="arch" type="xml">
+            <search string="Equipment Incidents">
+                <field name="name"/>
+                <field name="unit_id"/>
+                <field name="source_event_job_id"/>
+                <separator/>
+                <filter name="open_states" string="Open / Investigating"
+                        domain="[('state', 'in', ('open', 'under_investigation'))]"/>
+                <filter name="resolved" string="Resolved"
+                        domain="[('state', 'in', ('resolved_recovered', 'resolved_writeoff', 'resolved_claim'))]"/>
+                <filter name="cancelled" string="Cancelled"
+                        domain="[('state', '=', 'cancelled')]"/>
+                <separator/>
+                <filter name="loss" string="Loss"
+                        domain="[('incident_type', '=', 'loss')]"/>
+                <filter name="theft" string="Theft"
+                        domain="[('incident_type', '=', 'theft')]"/>
+                <filter name="accident" string="Accident"
+                        domain="[('incident_type', '=', 'accident')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_type" string="Type"
+                            context="{'group_by': 'incident_type'}"/>
+                    <filter name="group_unit" string="Unit"
+                            context="{'group_by': 'unit_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_equipment_incident_action" model="ir.actions.act_window">
+        <field name="name">Incidents</field>
+        <field name="res_model">neon.equipment.incident</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_equipment_incident_view_search"/>
+    </record>
+
+</odoo>

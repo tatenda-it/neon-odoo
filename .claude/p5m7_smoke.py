@@ -343,7 +343,7 @@ results["T346"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T347 - condition='missing' + incident_link raises P5.M9 stub")
+print("T347 - condition='missing' + incident_link creates a real incident (P5.M9)")
 print("=" * 72)
 line347, units347 = _make_line_with_checked_out_units(qty=1)
 wiz347 = _open_wizard(line=line347)
@@ -351,15 +351,27 @@ wiz347.checkin_line_ids[0].write({
     "condition_at_event": "missing",
     "resolution_path": "incident_link",
     "photo": DUMMY_PHOTO,
+    "resolution_notes": "Crew can't locate after strike",
 })
-err, _v = _try(lambda: wiz347.action_confirm())
+wiz347.action_confirm()
+units347.invalidate_recordset()
+Incident = env["neon.equipment.incident"]
+incident347 = Incident.sudo().search([
+    ("unit_id", "=", units347[0].id),
+    ("incident_type", "=", "loss"),
+    ("state", "=", "open"),
+], limit=1, order="id desc")
+res347 = line347.reservation_ids[0]
+res347.invalidate_recordset()
 ok = (
-    isinstance(err, UserError)
-    and "P5.M9" in str(err)
+    bool(incident347)
+    and incident347.name.startswith("INC-")
     and units347[0].state == "checked_out"  # unchanged
+    and res347.late_return_pending is True
 )
-print("  raised:", type(err).__name__ if err else None)
-print("  msg excerpt:", (str(err) or "")[:140])
+print("  incident created:", incident347.name if incident347 else None)
+print("  unit state:", units347[0].state, "(want checked_out)")
+print("  res.late_return_pending:", res347.late_return_pending)
 print("T347:", "PASS" if ok else "FAIL")
 results["T347"] = ok
 

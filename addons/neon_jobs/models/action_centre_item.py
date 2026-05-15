@@ -833,4 +833,31 @@ class ActionCentreItem(models.Model):
                 _logger.exception(
                     "Action Centre transfer_pending evaluator raised")
 
+        # repair_stalled — escalates repair orders sitting in a
+        # non-terminal state for more than 7 days (P5.M9).
+        cfg_repair = Config.search(
+            [("trigger_type", "=", "repair_stalled")], limit=1)
+        if cfg_repair and cfg_repair.is_enabled:
+            try:
+                self.env[
+                    "neon.equipment.repair.order"
+                ].sudo()._evaluate_repair_stalled_trigger()
+            except Exception:
+                _logger.exception(
+                    "Action Centre repair_stalled evaluator raised")
+
+        # stock_take_unresolved — escalates stock-take discrepancies
+        # left unresolved for more than 7 days (P5.M9 — turns the
+        # P5.M8 deferred 7-day rule into a real cron).
+        cfg_stock = Config.search(
+            [("trigger_type", "=", "stock_take_unresolved")], limit=1)
+        if cfg_stock and cfg_stock.is_enabled:
+            try:
+                self.env[
+                    "neon.equipment.stock.take.line"
+                ].sudo()._evaluate_stock_take_unresolved_trigger()
+            except Exception:
+                _logger.exception(
+                    "Action Centre stock_take_unresolved evaluator raised")
+
         return True

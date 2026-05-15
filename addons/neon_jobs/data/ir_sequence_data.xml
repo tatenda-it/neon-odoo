@@ -82,5 +82,25 @@
             <field name="implementation">standard</field>
         </record>
 
+        <record id="seq_neon_equipment_repair_order" model="ir.sequence">
+            <field name="name">Equipment Repair Order</field>
+            <field name="code">neon.equipment.repair.order</field>
+            <field name="prefix">REP-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
+        <record id="seq_neon_equipment_incident" model="ir.sequence">
+            <field name="name">Equipment Incident</field>
+            <field name="code">neon.equipment.incident</field>
+            <field name="prefix">INC-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
     </data>
 </odoo>

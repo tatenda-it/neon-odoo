@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_repair_order_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.repair.order.tree</field>
+        <field name="model">neon.equipment.repair.order</field>
+        <field name="arch" type="xml">
+            <tree string="Repair Orders"
+                  decoration-info="state in ('open', 'diagnosed')"
+                  decoration-warning="state in ('quoted', 'approved', 'in_progress')"
+                  decoration-success="state == 'completed'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="unit_id"/>
+                <field name="state" widget="badge"/>
+                <field name="fault_description" optional="show"/>
+                <field name="estimated_cost" optional="hide"/>
+                <field name="actual_cost"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="repair_vendor_id" optional="hide"/>
+                <field name="is_internal" widget="boolean_toggle" optional="hide"/>
+                <field name="is_client_caused" widget="boolean_toggle" optional="hide"/>
+                <field name="create_date" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_repair_order_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.repair.order.form</field>
+        <field name="model">neon.equipment.repair.order</field>
+        <field name="arch" type="xml">
+            <form string="Repair Order">
+                <header>
+                    <button name="action_diagnose"
+                            string="Mark Diagnosed"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'open'"/>
+                    <button name="action_quote"
+                            string="Submit Quote"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'diagnosed'"/>
+                    <button name="action_approve"
+                            string="Approve"
+                            type="object"
+                            class="oe_highlight"
+                            groups="neon_jobs.group_neon_jobs_manager"
+                            invisible="state != 'quoted'"/>
+                    <button name="action_start_repair"
+                            string="Start Repair"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'approved'"/>
+                    <button name="action_complete_repair"
+                            string="Complete"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'in_progress'"/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            groups="neon_jobs.group_neon_jobs_manager"
+                            invisible="state in ('completed', 'cancelled')"
+                            confirm="Cancel this repair order? The unit will not auto-transition; handle the unit state manually if needed."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="open,diagnosed,quoted,approved,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Subject">
+                            <field name="unit_id"
+                                   options="{'no_create': True}"/>
+                            <field name="repair_vendor_id"
+                                   options="{'no_create': True}"/>
+                            <field name="is_internal"
+                                   widget="boolean_toggle"/>
+                        </group>
+                        <group string="Source">
+                            <field name="source_movement_id"
+                                   readonly="1"/>
+                            <field name="source_event_job_id"
+                                   readonly="1"/>
+                            <field name="source_stock_take_line_id"
+                                   readonly="1"/>
+                            <field name="incident_id"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Cost">
+                            <field name="estimated_cost"/>
+                            <field name="actual_cost"/>
+                            <field name="currency_id"/>
+                        </group>
+                        <group string="Cost Recovery (Q14)">
+                            <field name="is_client_caused"
+                                   widget="boolean_toggle"/>
+                            <field name="chargeback_to_event_id"
+                                   options="{'no_create': True}"
+                                   invisible="not is_client_caused"/>
+                            <field name="chargeback_notes"
+                                   invisible="not is_client_caused"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Fault" name="fault">
+                            <field name="fault_description"
+                                   nolabel="1" placeholder="What's broken?"/>
+                        </page>
+                        <page string="Diagnosis" name="diagnosis">
+                            <field name="diagnosis_notes" nolabel="1"
+                                   placeholder="Cause + recommended fix..."/>
+                        </page>
+                        <page string="Timeline" name="timeline">
+                            <group>
+                                <field name="quoted_at" readonly="1"/>
+                                <field name="approved_at" readonly="1"/>
+                                <field name="approved_by_id" readonly="1"/>
+                                <field name="started_at" readonly="1"/>
+                                <field name="completed_at" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Photo" name="photo">
+                            <field name="photo" widget="image"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_repair_order_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.repair.order.search</field>
+        <field name="model">neon.equipment.repair.order</field>
+        <field name="arch" type="xml">
+            <search string="Repair Orders">
+                <field name="name"/>
+                <field name="unit_id"/>
+                <field name="repair_vendor_id"/>
+                <separator/>
+                <filter name="open_states" string="In Progress"
+                        domain="[('state', 'in', ('open', 'diagnosed', 'quoted', 'approved', 'in_progress'))]"/>
+                <filter name="completed" string="Completed"
+                        domain="[('state', '=', 'completed')]"/>
+                <filter name="cancelled" string="Cancelled"
+                        domain="[('state', '=', 'cancelled')]"/>
+                <separator/>
+                <filter name="client_caused" string="Client-Caused"
+                        domain="[('is_client_caused', '=', True)]"/>
+                <filter name="external" string="External Vendor"
+                        domain="[('is_internal', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_unit" string="Unit"
+                            context="{'group_by': 'unit_id'}"/>
+                    <filter name="group_vendor" string="Vendor"
+                            context="{'group_by': 'repair_vendor_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_equipment_repair_order_action" model="ir.actions.act_window">
+        <field name="name">Repair Orders</field>
+        <field name="res_model">neon.equipment.repair.order</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_equipment_repair_order_view_search"/>
+    </record>
+
+</odoo>

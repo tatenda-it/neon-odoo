@@ -412,7 +412,7 @@ results["T227"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T228 - TRIGGER_REGISTRY has 13 entries with renderable templates")
+print("T228 - TRIGGER_REGISTRY has 16 entries with renderable templates")
 print("=" * 72)
 from odoo.addons.neon_jobs.models.action_centre_mixin import TRIGGER_REGISTRY
 keys = list(TRIGGER_REGISTRY.keys())
@@ -423,14 +423,17 @@ expected = {
     "equipment_conflict",      # P5.M4
     "transfer_pending",        # P5.M6
     "stock_take_high_impact",  # P5.M8
+    "incident_open",           # P5.M9
+    "repair_stalled",          # P5.M9
+    "stock_take_unresolved",   # P5.M9
     "manual",
 }
-ok = set(keys) == expected and len(keys) == 13
+ok = set(keys) == expected and len(keys) == 16
 print("  keys (", len(keys), "):", sorted(keys))
 print("  template count:",
       sum(1 for k, v in TRIGGER_REGISTRY.items()
           if v.get("default_title")),
-      "(want 13)")
+      "(want 16)")
 all_have_templates = all(
     bool(v.get("default_title")) for v in TRIGGER_REGISTRY.values()
 )
