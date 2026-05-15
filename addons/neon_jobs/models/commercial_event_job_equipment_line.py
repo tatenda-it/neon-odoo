@@ -385,6 +385,30 @@ class CommercialEventJobEquipmentLine(models.Model):
                 })
         return True
 
+    def action_checkin(self):
+        """Open the check-in wizard scoped to this line. Authority
+        for opening is the same gate as checkout (Q7). The wizard's
+        default_get auto-populates this line's checked_out /
+        transferred units."""
+        self.ensure_one()
+        if not self._user_can_checkout():
+            raise UserError(_(
+                "You are not authorised to check in equipment for "
+                "%(event)s. Manager, Lead Tech, or Crew Chief on "
+                "this event only."
+            ) % {"event": self.event_job_id.name})
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Check In Equipment"),
+            "res_model": "neon.equipment.checkin.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_event_job_id": self.event_job_id.id,
+                "default_line_id": self.id,
+            },
+        }
+
     def action_cancel(self):
         """Manually drop the line. Cancels every non-terminal
         reservation and sticks state at 'cancelled'."""

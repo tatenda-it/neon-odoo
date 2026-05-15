@@ -99,6 +99,16 @@ class NeonEquipmentReservation(models.Model):
         help="The planned-equipment line this reservation belongs to "
         "(P5.M5). NULL for manual / standalone reservations.",
     )
+    late_return_pending = fields.Boolean(
+        default=False,
+        tracking=True,
+        help="P5.M7 — set by the check-in wizard when a unit is "
+        "acknowledged as late-returning (condition='missing', "
+        "resolution='returned_late'). Excludes this reservation "
+        "from the event_job's has_unresolved_missing closeout "
+        "blocker so the event can close while the unit is physically "
+        "still out. Cleared when the unit is eventually checked in.",
+    )
     product_template_id = fields.Many2one(
         related="unit_id.product_template_id",
         store=True,

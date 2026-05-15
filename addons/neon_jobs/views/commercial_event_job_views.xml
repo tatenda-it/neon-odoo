@@ -337,6 +337,10 @@
                                             string="Initiate Transfer"
                                             type="object"
                                             help="Open the transfer wizard to send checked-out units from this event to another active event."/>
+                                    <button name="action_checkin_all_equipment"
+                                            string="Check In Equipment"
+                                            type="object"
+                                            help="Open the check-in wizard for every checked-out / transferred unit on this event."/>
                                 </group>
                             </group>
                             <separator string="Equipment Lines (P5.M5)"/>

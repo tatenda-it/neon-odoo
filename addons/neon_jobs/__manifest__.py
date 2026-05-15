@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.4.0.8",
+    "version": "17.0.4.0.9",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -90,6 +90,7 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "views/neon_equipment_movement_views.xml",
         "views/neon_equipment_allocate_wizard_views.xml",
         "views/neon_equipment_transfer_wizard_views.xml",
+        "views/neon_equipment_checkin_wizard_views.xml",
         "views/crm_lead_views.xml",
         "views/sale_order_views.xml",
         # menu.xml defines our own menus (with required `name` field).

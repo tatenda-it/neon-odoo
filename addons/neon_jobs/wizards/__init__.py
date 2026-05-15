@@ -10,3 +10,4 @@ from . import action_centre_item_cancel_wizard
 from . import neon_equipment_recommission_wizard
 from . import neon_equipment_allocate_wizard
 from . import neon_equipment_transfer_wizard
+from . import neon_equipment_checkin_wizard

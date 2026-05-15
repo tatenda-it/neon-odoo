@@ -17,6 +17,10 @@
                             type="object"
                             class="oe_highlight"
                             invisible="state == 'fulfilled' or state == 'cancelled'"/>
+                    <button name="action_checkin"
+                            string="Check In"
+                            type="object"
+                            invisible="state not in ('partial', 'fulfilled')"/>
                     <button name="action_cancel"
                             string="Cancel Line"
                             type="object"

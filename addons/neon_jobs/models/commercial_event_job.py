@@ -293,6 +293,22 @@ class CommercialEventJob(models.Model):
         "event_job_id",
         string="Equipment Lines",
     )
+    # P5.M7 — closeout blocker. has_unresolved_missing is stored so
+    # search/filter is cheap; unresolved_missing_unit_ids drives the
+    # UI listing on the closeout error.
+    has_unresolved_missing = fields.Boolean(
+        compute="_compute_has_unresolved_missing",
+        store=True,
+        help="True when at least one fulfilled reservation on this "
+        "event has a unit still in checked_out / transferred state "
+        "and the reservation is NOT flagged late_return_pending. "
+        "Blocks action_move_to_closed until resolved.",
+    )
+    unresolved_missing_unit_ids = fields.Many2many(
+        "neon.equipment.unit",
+        compute="_compute_has_unresolved_missing",
+        string="Unresolved Units",
+    )
     sub_hire_required = fields.Boolean(
         related="commercial_job_id.sub_hire_required",
         readonly=True,
@@ -908,6 +924,70 @@ class CommercialEventJob(models.Model):
             rt = fields.Datetime.to_datetime(
                 f"{self.event_date} 23:59:59")
         return rf, rt
+
+    # ============================================================
+    # === P5.M7 — Check-in flow: missing-items closeout blocker
+    # has_unresolved_missing is stored so action_move_to_closed and
+    # any future search filters get an indexed cheap lookup. The
+    # M2M companion field lists the offending units for UI display.
+    # ============================================================
+    @api.depends(
+        "equipment_line_ids",
+        "equipment_line_ids.reservation_ids",
+        "equipment_line_ids.reservation_ids.state",
+        "equipment_line_ids.reservation_ids.unit_id.state",
+        "equipment_line_ids.reservation_ids.late_return_pending",
+    )
+    def _compute_has_unresolved_missing(self):
+        for rec in self:
+            missing_unit_ids = []
+            for line in rec.equipment_line_ids:
+                for res in line.reservation_ids:
+                    if res.state != "fulfilled":
+                        continue
+                    if res.late_return_pending:
+                        continue
+                    unit = res.unit_id
+                    if unit and unit.state in (
+                            "checked_out", "transferred"):
+                        missing_unit_ids.append(unit.id)
+            rec.unresolved_missing_unit_ids = [
+                (6, 0, list(set(missing_unit_ids)))]
+            rec.has_unresolved_missing = bool(missing_unit_ids)
+
+    def _user_can_checkin(self):
+        """Authority gate for opening the check-in wizard. Same
+        shape as _user_can_checkout (Q7 — same authority for both
+        directions of the operational equipment flow)."""
+        self.ensure_one()
+        user = self.env.user
+        if user.has_group("neon_jobs.group_neon_jobs_manager"):
+            return True
+        if user.has_group("neon_jobs.group_neon_jobs_crew_leader"):
+            return True
+        if self._is_crew_chief_of_job(self.commercial_job_id):
+            return True
+        return False
+
+    def action_checkin_all_equipment(self):
+        """Open the check-in wizard scoped to this event_job. The
+        wizard's default_get auto-populates every checked_out /
+        transferred unit currently linked via fulfilled reservation."""
+        self.ensure_one()
+        if not self._user_can_checkin():
+            raise UserError(_(
+                "You are not authorised to check in equipment for "
+                "%(event)s. Manager, Lead Tech, or Crew Chief on "
+                "this event only."
+            ) % {"event": self.name})
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Check In Equipment"),
+            "res_model": "neon.equipment.checkin.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_event_job_id": self.id},
+        }
 
     # ============================================================
     # === P5.M6 — Transfer authority + initiation
@@ -1703,6 +1783,23 @@ class CommercialEventJob(models.Model):
                     "scope changes and clear draft invoices, or apply "
                     "a manual Manager override)"
                 ))
+            # P5.M7 — equipment must be checked back in (or flagged
+            # as 'returned late' / written off) before close.
+            if rec.has_unresolved_missing:
+                unresolved = rec.unresolved_missing_unit_ids
+                preview = ", ".join(
+                    unresolved[:5].mapped("display_name"))
+                ellipsis = "..." if len(unresolved) > 5 else ""
+                missing.append(_(
+                    "Equipment Check-In (%(n)d unit(s) still out: "
+                    "%(units)s%(ellipsis)s — check them back in, or "
+                    "mark them returned-late / write-off via the "
+                    "check-in wizard)"
+                ) % {
+                    "n": len(unresolved),
+                    "units": preview,
+                    "ellipsis": ellipsis,
+                })
             if missing:
                 raise UserError(_(
                     "Cannot close Event Job — missing hard closeout "
