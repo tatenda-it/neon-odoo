@@ -866,20 +866,27 @@ class CommercialEventJob(models.Model):
         reservations on this event_job. unit_id is left NULL — the
         allocation flow (P5.M5) fills it later. Idempotent: lines
         that already have reservations are skipped."""
-        Reservation = self.env["neon.equipment.reservation"].sudo()
-        reserve_from, reserve_to = self._reservation_window_for_autocreate()
         for line in lines:
             if line.reservation_ids:
                 continue
             for _i in range(line.quantity_planned):
-                Reservation.create({
-                    "event_job_id": self.id,
-                    "equipment_line_id": line.id,
-                    "unit_id": False,
-                    "reserve_from": reserve_from,
-                    "reserve_to": reserve_to,
-                    "state": "soft_hold",
-                })
+                self._spawn_one_reservation_for_line(line)
+
+    def _spawn_one_reservation_for_line(self, line):
+        """Spawn a single soft_hold reservation on this event_job
+        bound to the given equipment line. Returns the new record.
+        Used by both initial auto-creation and the line's quantity
+        reconciliation (upsize path)."""
+        self.ensure_one()
+        rf, rt = self._reservation_window_for_autocreate()
+        return self.env["neon.equipment.reservation"].sudo().create({
+            "event_job_id": self.id,
+            "equipment_line_id": line.id,
+            "unit_id": False,
+            "reserve_from": rf,
+            "reserve_to": rt,
+            "state": "soft_hold",
+        })
 
     def _reservation_window_for_autocreate(self):
         """Pick reserve_from / reserve_to for auto-spawned soft_holds.

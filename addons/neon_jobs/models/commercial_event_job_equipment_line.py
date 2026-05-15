@@ -21,8 +21,13 @@ Line state is computed off reservation states:
   fulfilled — fulfilled >= planned
   cancelled — set explicitly by action_cancel (manual line drop)
 """
+import logging
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+
+_logger = logging.getLogger(__name__)
 
 
 _LINE_STATES = [
@@ -105,6 +110,83 @@ class CommercialEventJobEquipmentLine(models.Model):
          "CHECK (quantity_planned > 0)",
          "Planned quantity must be a positive integer."),
     ]
+
+    # ============================================================
+    # === ORM lifecycle hooks
+    # On create: auto-spawn quantity_planned soft_hold reservations
+    # via the existing helper on commercial.event.job (idempotent,
+    # NULL unit_id, allocation fills it in later). This covers the
+    # common UI flow — adding a line to an existing event_job via
+    # the One2many editor. The event_job.create() override handles
+    # the pre-seeded path (lines passed inline at job creation).
+    #
+    # On write: when quantity_planned changes, reconcile the
+    # reservation count. Upsize spawns more soft_holds; downsize
+    # cancels open (unit-less) soft_holds. Underflow — shrinking
+    # below the count of already-allocated reservations — raises
+    # UserError before the write applies.
+    # ============================================================
+    @api.model_create_multi
+    def create(self, vals_list):
+        lines = super().create(vals_list)
+        for line in lines:
+            try:
+                line.event_job_id._autocreate_reservations_for_lines(line)
+            except Exception as e:  # noqa: BLE001
+                _logger.warning(
+                    "Auto-reservation failed for equipment line %s "
+                    "(event_job %s): %s",
+                    line.id, line.event_job_id.name, e,
+                )
+        return lines
+
+    def write(self, vals):
+        # Underflow guard: raise BEFORE the write applies so the line
+        # never lands in an inconsistent state. Iterate without sudo
+        # so the user sees the error from their context.
+        if "quantity_planned" in vals:
+            new_qty = vals["quantity_planned"]
+            for line in self:
+                allocated_count = len(line.reservation_ids.filtered(
+                    lambda r: r.state in ("confirmed", "fulfilled")))
+                if new_qty < allocated_count:
+                    raise UserError(_(
+                        "Cannot reduce planned quantity on "
+                        "%(name)s to %(new)d — %(alloc)d unit(s) "
+                        "are already allocated to this line. "
+                        "Cancel an allocated reservation first if "
+                        "you want to reduce the plan."
+                    ) % {
+                        "name": line.display_name,
+                        "new": new_qty,
+                        "alloc": allocated_count,
+                    })
+        res = super().write(vals)
+        if "quantity_planned" in vals:
+            for line in self:
+                line._reconcile_reservations_to_quantity()
+        return res
+
+    def _reconcile_reservations_to_quantity(self):
+        """Bring the soft_hold reservation count in line with
+        quantity_planned. Upsize → spawn more soft_holds via the
+        event_job helper. Downsize → cancel open (unit-less)
+        soft_holds preferentially. Allocated reservations
+        (confirmed / fulfilled / any with unit_id set) are never
+        touched here; the underflow check in write() blocks the
+        only case where they'd need to be."""
+        self.ensure_one()
+        active = self.reservation_ids.filtered(
+            lambda r: r.state in ("soft_hold", "confirmed", "fulfilled"))
+        diff = self.quantity_planned - len(active)
+        if diff > 0:
+            for _i in range(diff):
+                self.event_job_id._spawn_one_reservation_for_line(self)
+        elif diff < 0:
+            open_holds = self.reservation_ids.filtered(
+                lambda r: r.state == "soft_hold" and not r.unit_id)
+            for hold in open_holds[:abs(diff)]:
+                hold._do_transition("cancelled")
 
     # ============================================================
     # === Computes

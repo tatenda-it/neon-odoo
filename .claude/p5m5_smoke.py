@@ -109,9 +109,10 @@ def _find_product_pool(min_units, target_count):
                 break
     return found
 
-products_pool = _find_product_pool(min_units=3, target_count=10)
-assert len(products_pool) >= 8, (
-    "Need ≥8 distinct serial products with ≥3 active units; "
+products_pool = _find_product_pool(min_units=3, target_count=12)
+assert len(products_pool) >= 10, (
+    "Need ≥10 distinct serial products with ≥3 active units "
+    "(7 for T305-T312 + 1 primary + 2 for T317/T318); "
     "got %d. Re-run the testing kit." % len(products_pool))
 product = products_pool[0]  # used by T300 / T301 / T303
 _pool_iter = iter(products_pool[1:])
@@ -119,11 +120,19 @@ print("product pool:", [p.workshop_name or p.name
                         for p in products_pool])
 print("primary product:", product.workshop_name or product.name)
 
-# Clean any prior P5M5 lines on these event_jobs
+# Clean any prior P5M5 lines on these event_jobs. Also sweep any
+# orphan movements left from earlier smoke iterations that aborted
+# before reaching the trailing rollback — those rows pin the test
+# users via actor_id FK and break unrelated suites' user teardown.
 Line.sudo().search([
     ("event_job_id", "in", (ej.id,)),
     ("product_template_id", "=", product.id),
 ]).unlink()
+orphan_mvts = Movement.sudo().search(
+    [("actor_id", "in", (manager.id, lead.id, crew.id,
+                         other_crew.id, sales.id))])
+if orphan_mvts:
+    orphan_mvts.with_context(_allow_movement_write=True).unlink()
 env.cr.commit()
 
 
@@ -262,22 +271,14 @@ results["T304"] = ok
 def _make_allocated_line(qty=3, event_job=None):
     target_ej = event_job or ej
     p = next(_pool_iter)
+    # Post-hotfix (17.0.4.0.7): line.create() now auto-spawns
+    # quantity_planned soft_hold reservations. No manual seeding
+    # required — just create the line and allocate.
     line = Line.sudo().create({
         "event_job_id": target_ej.id,
         "product_template_id": p.id,
         "quantity_planned": qty,
     })
-    # Auto-reservation only fires on event_job create — manually
-    # spawn the soft_holds here.
-    rf, rt = target_ej._reservation_window_for_autocreate()
-    for _i in range(qty):
-        Reservation.sudo().create({
-            "event_job_id": target_ej.id,
-            "equipment_line_id": line.id,
-            "reserve_from": rf,
-            "reserve_to": rt,
-            "state": "soft_hold",
-        })
     line.action_allocate_units()
     return line
 
@@ -435,12 +436,178 @@ results["T312"] = ok
 
 
 # ============================================================
+# P5.M5 hotfix (17.0.4.0.7) — auto-reservation on line.create() +
+# write() reconciliation when quantity_planned changes.
+# ============================================================
+print()
+print("=" * 72)
+print("T313 - auto-reservation fires when a line is added to an existing event_job")
+print("=" * 72)
+ej_t313 = EventJob.sudo().create({
+    "commercial_job_id": parent_job.id,
+})
+line313 = Line.sudo().create({
+    "event_job_id": ej_t313.id,
+    "product_template_id": product.id,
+    "quantity_planned": 3,
+})
+line313.invalidate_recordset()
+ok = (
+    len(line313.reservation_ids) == 3
+    and all(r.state == "soft_hold" for r in line313.reservation_ids)
+    and all(not r.unit_id for r in line313.reservation_ids)
+    and all(r.equipment_line_id == line313 for r in line313.reservation_ids)
+)
+print("  reservations:", len(line313.reservation_ids), "(want 3)")
+print("  states:", [r.state for r in line313.reservation_ids])
+print("  unit_ids:", [bool(r.unit_id) for r in line313.reservation_ids])
+print("T313:", "PASS" if ok else "FAIL")
+results["T313"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T314 - autocreate is idempotent (calling twice doesn't double up)")
+print("=" * 72)
+ej_t313._autocreate_reservations_for_lines(line313)
+line313.invalidate_recordset()
+ok = len(line313.reservation_ids) == 3  # still 3, not 6
+print("  reservations after 2nd call:",
+      len(line313.reservation_ids), "(want 3)")
+print("T314:", "PASS" if ok else "FAIL")
+results["T314"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T315 - quantity UP spawns extra soft_holds (3 -> 5)")
+print("=" * 72)
+line315 = Line.sudo().create({
+    "event_job_id": ej_t313.id,
+    "product_template_id": product.id,
+    "quantity_planned": 3,
+})
+before = len(line315.reservation_ids)
+line315.write({"quantity_planned": 5})
+line315.invalidate_recordset()
+after = len(line315.reservation_ids)
+soft_holds = line315.reservation_ids.filtered(lambda r: r.state == "soft_hold")
+ok = before == 3 and after == 5 and len(soft_holds) == 5
+print("  reservations: ", before, "->", after, "(want 3->5)")
+print("  all soft_hold?", len(soft_holds) == 5)
+print("T315:", "PASS" if ok else "FAIL")
+results["T315"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T316 - quantity DOWN cancels open soft_holds (3 -> 1)")
+print("=" * 72)
+line316 = Line.sudo().create({
+    "event_job_id": ej_t313.id,
+    "product_template_id": product.id,
+    "quantity_planned": 3,
+})
+line316.write({"quantity_planned": 1})
+line316.invalidate_recordset()
+states = [r.state for r in line316.reservation_ids]
+soft = [s for s in states if s == "soft_hold"]
+cancelled = [s for s in states if s == "cancelled"]
+ok = len(soft) == 1 and len(cancelled) == 2
+print("  states:", sorted(states), "(want 1 soft_hold + 2 cancelled)")
+print("T316:", "PASS" if ok else "FAIL")
+results["T316"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T317 - quantity DOWN cancels OPEN soft_holds preferentially "
+      "(allocated preserved)")
+print("=" * 72)
+# Pick a product from the pool that still has ≥2 active units
+p_t317 = next(_pool_iter)
+line317 = Line.sudo().create({
+    "event_job_id": ej_t313.id,
+    "product_template_id": p_t317.id,
+    "quantity_planned": 3,
+})
+# Partially allocate: bind 2 units, leaving 1 open soft_hold
+two_units_t317 = Unit.sudo().search([
+    ("product_template_id", "=", p_t317.id),
+    ("state", "=", "active"),
+], limit=2)
+line317._bind_units_to_reservations(two_units_t317)
+line317.invalidate_recordset()
+# Pre-state: 2 confirmed (with units) + 1 open soft_hold
+pre_states = sorted([(r.state, bool(r.unit_id))
+                     for r in line317.reservation_ids])
+# Now shrink to 2 — should cancel the lone soft_hold, leave confirmed alone
+line317.write({"quantity_planned": 2})
+line317.invalidate_recordset()
+post = line317.reservation_ids
+post_confirmed = post.filtered(
+    lambda r: r.state == "confirmed" and r.unit_id)
+post_cancelled = post.filtered(lambda r: r.state == "cancelled")
+post_soft_hold = post.filtered(lambda r: r.state == "soft_hold")
+ok = (
+    len(post_confirmed) == 2
+    and len(post_cancelled) == 1
+    and len(post_soft_hold) == 0
+)
+print("  pre-state:", pre_states)
+print("  post-state: confirmed=%d cancelled=%d soft_hold=%d" % (
+    len(post_confirmed), len(post_cancelled), len(post_soft_hold)))
+print("T317:", "PASS" if ok else "FAIL")
+results["T317"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T318 - quantity DOWN below allocated raises UserError")
+print("=" * 72)
+p_t318 = next(_pool_iter)
+line318 = Line.sudo().create({
+    "event_job_id": ej_t313.id,
+    "product_template_id": p_t318.id,
+    "quantity_planned": 3,
+})
+two_units_t318 = Unit.sudo().search([
+    ("product_template_id", "=", p_t318.id),
+    ("state", "=", "active"),
+], limit=2)
+line318._bind_units_to_reservations(two_units_t318)
+line318.invalidate_recordset()
+# 2 confirmed (allocated) + 1 open soft_hold; try to shrink to 1
+err, _v = _try(lambda: line318.write({"quantity_planned": 1}))
+line318.invalidate_recordset()
+post_states = sorted(line318.reservation_ids.mapped("state"))
+ok = (
+    isinstance(err, UserError)
+    and "allocated" in str(err).lower()
+    and line318.quantity_planned == 3  # unchanged
+    and post_states == ["confirmed", "confirmed", "soft_hold"]
+)
+print("  raised:", type(err).__name__ if err else None)
+print("  msg excerpt:", (str(err) or "")[:140])
+print("  qty_planned after (want unchanged 3):", line318.quantity_planned)
+print("  reservation states (want unchanged):", post_states)
+print("T318:", "PASS" if ok else "FAIL")
+results["T318"] = ok
+
+
+# ============================================================
 print()
 print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
 order = ["T300", "T301", "T302", "T303", "T304", "T305", "T306",
-         "T307", "T308", "T309", "T310", "T311", "T312"]
+         "T307", "T308", "T309", "T310", "T311", "T312",
+         "T313", "T314", "T315", "T316", "T317", "T318"]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")
