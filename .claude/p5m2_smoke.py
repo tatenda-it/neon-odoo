@@ -53,12 +53,21 @@ env.cr.commit()
 
 def _new_unit(label, state="draft"):
     """Create a fresh unit in the given state via direct write
-    (fixtures don't go through _do_transition — see milestone note)."""
-    return Unit.sudo().create({
+    (fixtures don't go through _do_transition — see milestone note).
+
+    The precommit.run() at the end fires mail.thread's create-time
+    _track_finalize hook and clears the create-discard flag, so any
+    subsequent write() in this test will trigger tracking normally.
+    Without this, mail.thread suppresses tracking on writes that
+    happen in the same transaction as the create — which is fine in
+    production (separate HTTP requests) but breaks shell smokes."""
+    u = Unit.sudo().create({
         "product_template_id": test_product.id,
         "serial_number": "P5M2_%s" % label,
         "state": state,
     })
+    env.cr.precommit.run()
+    return u
 
 
 # ============================================================
@@ -93,16 +102,24 @@ print("=" * 72)
 u261 = _new_unit("T261", "draft")
 msg_count_pre = len(u261.message_ids)
 u261._do_transition("active")
+env.cr.precommit.run()  # flush mail.thread tracking message
 u261.invalidate_recordset()
-matching = u261.message_ids.filtered(
-    lambda m: "draft" in (m.body or "") and "active" in (m.body or ""))
+# Post-hotfix (17.0.4.0.3): _do_transition no longer manual-posts on
+# normal transitions — mail.thread's tracking=True on `state` already
+# logs the change. Assert against the tracking-value message instead
+# of a body string.
+tracking_msgs = u261.message_ids.filtered(
+    lambda m: m.tracking_value_ids and any(
+        t.field_id.name == "state" for t in m.tracking_value_ids))
+added = len(u261.message_ids) - msg_count_pre
 ok = (
     u261.state == "active"
-    and len(matching) >= 1
-    and len(u261.message_ids) > msg_count_pre
+    and len(tracking_msgs) >= 1
+    and added == 1  # exactly one chatter entry per normal transition
 )
 print("  state:", u261.state, "(want active)")
-print("  chatter rows added:", len(u261.message_ids) - msg_count_pre)
+print("  chatter rows added:", added, "(want 1)")
+print("  state-tracking message present?", bool(tracking_msgs))
 print("T261:", "PASS" if ok else "FAIL")
 results["T261"] = ok
 

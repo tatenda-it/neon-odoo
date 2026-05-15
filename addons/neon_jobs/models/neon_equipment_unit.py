@@ -293,15 +293,15 @@ class NeonEquipmentUnit(models.Model):
         self.write(write_vals)
 
         if manager_override:
+            # mail.thread's tracking=True on `state` already logs the
+            # field change. The override case posts an additional note
+            # because the reason text can't be captured by field
+            # tracking alone.
             self.message_post(body=_(
                 "Manager override transition: %(from)s → %(to)s. "
                 "Reason: %(reason)s"
             ) % {"from": old_state, "to": new_state,
                  "reason": override_reason})
-        else:
-            self.message_post(body=_(
-                "State change: %(from)s → %(to)s"
-            ) % {"from": old_state, "to": new_state})
 
         return True
 
