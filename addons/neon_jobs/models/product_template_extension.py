@@ -15,6 +15,7 @@ implement the hybrid granularity model from D2:
   - neon.equipment.unit = physical instance (serial, asset tag, state)
 """
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ProductTemplate(models.Model):
@@ -87,3 +88,42 @@ class ProductTemplate(models.Model):
             rec.total_units = len(rec.equipment_unit_ids)
             rec.available_units = len(rec.equipment_unit_ids.filtered(
                 lambda u: u.state == "active"))
+
+    # ============================================================
+    # === P5.M3 — tracking_mode change validation (D5)
+    # Tightening a tracking_mode (anything → serial or batch) must
+    # not strand units in an invalid identity state. Loosening
+    # (anything → quantity) is always allowed. Draft and
+    # decommissioned units bypass — they are not in active service.
+    # ============================================================
+    @api.constrains("tracking_mode")
+    def _check_tracking_mode_change_against_units(self):
+        for rec in self:
+            if rec.tracking_mode == "quantity":
+                continue
+            units = rec.equipment_unit_ids.filtered(
+                lambda u: u.state not in ("draft", "decommissioned"))
+            if not units:
+                continue
+            if rec.tracking_mode == "serial":
+                bad = units.filtered(
+                    lambda u: not (u.serial_number or "").strip())
+                if bad:
+                    raise ValidationError(_(
+                        "Cannot switch %(p)s to serial-tracked — "
+                        "%(n)d unit(s) have no serial number: "
+                        "%(names)s"
+                    ) % {"p": rec.display_name, "n": len(bad),
+                         "names": ", ".join(
+                             bad[:10].mapped("display_name"))})
+            elif rec.tracking_mode == "batch":
+                bad = units.filtered(
+                    lambda u: not (u.batch_code or "").strip())
+                if bad:
+                    raise ValidationError(_(
+                        "Cannot switch %(p)s to batch-tracked — "
+                        "%(n)d unit(s) have no batch code: "
+                        "%(names)s"
+                    ) % {"p": rec.display_name, "n": len(bad),
+                         "names": ", ".join(
+                             bad[:10].mapped("display_name"))})

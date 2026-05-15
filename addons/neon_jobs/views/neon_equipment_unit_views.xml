@@ -119,8 +119,14 @@
                         <group string="Identity">
                             <field name="product_template_id"
                                    options="{'no_create': True}"/>
-                            <field name="serial_number"/>
+                            <field name="requires_serial" invisible="1"/>
+                            <field name="requires_batch" invisible="1"/>
+                            <field name="serial_number"
+                                   required="requires_serial"/>
                             <field name="asset_tag"/>
+                            <field name="batch_code"
+                                   required="requires_batch"
+                                   invisible="not requires_batch"/>
                             <field name="workshop_location"/>
                         </group>
                         <group string="Classification">

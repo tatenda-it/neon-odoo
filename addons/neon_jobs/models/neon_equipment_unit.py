@@ -36,7 +36,7 @@ tracked products typically have a single "bulk" unit with serial
 left blank and asset_tag carrying the bulk identifier.
 """
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 _UNIT_STATES = [
@@ -130,6 +130,15 @@ class NeonEquipmentUnit(models.Model):
         help="Neon's internal asset identifier — e.g. 'NL2', 'AC-014'. "
         "Optional but recommended for floor traceability.",
     )
+    batch_code = fields.Char(
+        string="Batch Code",
+        index=True,
+        tracking=True,
+        help="Manufacturing batch / lot code. Required when the "
+        "product's tracking_mode is 'batch'. Multiple units can "
+        "share a batch — no uniqueness constraint, unlike "
+        "serial_number.",
+    )
     workshop_location = fields.Char(
         string="Location",
         tracking=True,
@@ -195,6 +204,23 @@ class NeonEquipmentUnit(models.Model):
     can_decommission = fields.Boolean(
         compute="_compute_state_capabilities")
 
+    # ============================================================
+    # === P5.M3 — tracking-mode capability flags
+    # Drive the required="..." modifier on the form fields. Stored
+    # so view evaluation is cheap and search/filter on the booleans
+    # is possible later if needed.
+    # ============================================================
+    requires_serial = fields.Boolean(
+        compute="_compute_tracking_requirements",
+        store=True,
+        help="True when the product's tracking_mode is 'serial' — "
+        "drives the required modifier on serial_number.",
+    )
+    requires_batch = fields.Boolean(
+        compute="_compute_tracking_requirements",
+        store=True,
+    )
+
     @api.depends("product_template_id.workshop_name",
                  "product_template_id.name",
                  "serial_number", "asset_tag")
@@ -226,6 +252,48 @@ class NeonEquipmentUnit(models.Model):
                 "active" in allowed and rec.state == "maintenance")
             rec.can_flag_damaged = "damaged" in allowed
             rec.can_decommission = "decommissioned" in allowed
+
+    @api.depends("tracking_mode")
+    def _compute_tracking_requirements(self):
+        for rec in self:
+            rec.requires_serial = (rec.tracking_mode == "serial")
+            rec.requires_batch = (rec.tracking_mode == "batch")
+
+    # ============================================================
+    # === P5.M3 — tracking-mode validators
+    # Draft and decommissioned bypass validation (D4 — allows
+    # preparation before service and post-retirement data loss).
+    # Serial uniqueness is already enforced by the SQL constraint
+    # unique_serial_per_product above; T281 will see an
+    # IntegrityError from the DB rather than a ValidationError here.
+    # ============================================================
+    _STATE_BYPASS_VALIDATION = ("draft", "decommissioned")
+
+    @api.constrains("tracking_mode", "serial_number", "state")
+    def _check_serial_required(self):
+        for rec in self:
+            if rec.state in self._STATE_BYPASS_VALIDATION:
+                continue
+            if rec.tracking_mode == "serial" and not (
+                    rec.serial_number or "").strip():
+                raise ValidationError(_(
+                    "Unit %(name)s is serial-tracked but has no "
+                    "serial number. Set a serial number before "
+                    "moving the unit out of draft."
+                ) % {"name": rec.display_name})
+
+    @api.constrains("tracking_mode", "batch_code", "state")
+    def _check_batch_required(self):
+        for rec in self:
+            if rec.state in self._STATE_BYPASS_VALIDATION:
+                continue
+            if rec.tracking_mode == "batch" and not (
+                    rec.batch_code or "").strip():
+                raise ValidationError(_(
+                    "Unit %(name)s is batch-tracked but has no "
+                    "batch code. Set a batch code before moving "
+                    "the unit out of draft."
+                ) % {"name": rec.display_name})
 
     # ============================================================
     # === P5.M2 — _do_transition (the sanctioned state-write path)

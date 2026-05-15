@@ -145,7 +145,10 @@ u1 = Unit.sudo().create({
 u2 = Unit.sudo().create({
     "product_template_id": p_serial.id,
     "asset_tag": "AC-014",
-    "state": "active",
+    # state='draft' bypasses the P5.M3 serial-required validator;
+    # this test exercises the name-compute asset_tag fallback, not
+    # serial enforcement.
+    "state": "draft",
 })
 print("  with serial:    name =", repr(u1.name))
 print("  with asset_tag: name =", repr(u2.name))

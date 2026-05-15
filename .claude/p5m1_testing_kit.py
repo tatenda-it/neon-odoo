@@ -96,6 +96,11 @@ ITEM_SPECS = [
     ("effects", "Antari B100 Bubble Machine",  3, "quantity"),
     ("effects", "CO2 Jet",                     3, "serial"),
     ("effects", "Confetti Cannon",             3, "quantity"),
+    # P5.M3 — Batch-tracked consumables (3 types, 6 units): lot/batch
+    # is the meaningful identity here, not per-unit serial.
+    ("effects", "Confetti Cannon Refill (Batch)", 2, "batch"),
+    ("effects", "Smoke Fluid 5L (Batch)",      2, "batch"),
+    ("cabling", "Velcro Roll (Batch)",         2, "batch"),
     # Trussing (6 types, 60 units): all quantity
     ("trussing", "Global Truss F34 2m",        10, None),
     ("trussing", "Global Truss F34 1m",        10, None),
@@ -209,11 +214,18 @@ for cat_code, name, unit_count, tracking_override in ITEM_SPECS:
             "workshop_location": "Workshop A — Shelf %s" % (
                 chr(ord("A") + (global_idx // 30) % 26)),
         }
-        # Serial-tracked items get a numbered serial; quantity
-        # items get an asset_tag instead. Always-unique to honour
-        # the model's UNIQUE constraints.
+        # Serial-tracked items get a numbered serial; batch-tracked
+        # items get a batch_code (P5.M3 validator requires it for
+        # non-draft units); quantity-tracked items get an asset_tag.
+        # All identifiers are unique enough to honour the SQL
+        # constraints.
         if tracking == "serial":
             vals["serial_number"] = "%s #%d" % (workshop_name, unit_idx + 1)
+        elif tracking == "batch":
+            vals["batch_code"] = "BATCH-%s-%d" % (
+                workshop_name.replace(" ", "_"), unit_idx + 1)
+            vals["asset_tag"] = "%s-%d" % (
+                workshop_name.replace(" ", "_"), unit_idx + 1)
         else:
             vals["asset_tag"] = "%s-%d" % (workshop_name.replace(" ", "_"), unit_idx + 1)
         Unit.sudo().create(vals)
