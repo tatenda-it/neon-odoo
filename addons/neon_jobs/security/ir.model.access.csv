@@ -94,3 +94,13 @@ access_neon_equipment_reservation_user,neon.equipment.reservation user (read-onl
 access_neon_equipment_reservation_crew_leader,neon.equipment.reservation crew_leader (read+update — workshop ops),model_neon_equipment_reservation,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
 access_neon_equipment_reservation_crew,neon.equipment.reservation crew (read-only),model_neon_equipment_reservation,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_neon_equipment_reservation_manager,neon.equipment.reservation manager (full),model_neon_equipment_reservation,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_commercial_event_job_equipment_line_user,commercial.event.job.equipment.line user (read-only),model_commercial_event_job_equipment_line,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_commercial_event_job_equipment_line_crew_leader,commercial.event.job.equipment.line crew_leader (R/U/C),model_commercial_event_job_equipment_line,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_commercial_event_job_equipment_line_crew,commercial.event.job.equipment.line crew (read-only),model_commercial_event_job_equipment_line,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_commercial_event_job_equipment_line_manager,commercial.event.job.equipment.line manager (full),model_commercial_event_job_equipment_line,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_movement_user,neon.equipment.movement user (read-only),model_neon_equipment_movement,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_movement_crew_leader,neon.equipment.movement crew_leader (read+create — workshop ops),model_neon_equipment_movement,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_equipment_movement_crew,neon.equipment.movement crew (read-only),model_neon_equipment_movement,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_neon_equipment_movement_manager,neon.equipment.movement manager (full),model_neon_equipment_movement,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_allocate_wizard_crew_leader,neon.equipment.allocate.wizard crew_leader,model_neon_equipment_allocate_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_neon_equipment_allocate_wizard_manager,neon.equipment.allocate.wizard manager,model_neon_equipment_allocate_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1

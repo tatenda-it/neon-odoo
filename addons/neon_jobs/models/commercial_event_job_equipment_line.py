@@ -1,0 +1,313 @@
+# -*- coding: utf-8 -*-
+"""P5.M5 — Equipment line on commercial.event.job.
+
+One row per (event_job, product, planned_qty). Lines drive:
+  * Auto-creation of soft_hold reservations on event_job create
+    (P5.M4 deferred D3, now delivered).
+  * Unit allocation flow — wizard / programmatic action binds
+    available units to the line's soft_hold reservations.
+  * Bulk checkout — atomic transition of the line's reservations
+    from confirmed → fulfilled, units from reserved → checked_out,
+    plus a neon.equipment.movement audit row per checkout.
+
+Authority for checkout (Q7): manager, crew_leader, or Crew Chief
+for THIS event_job's parent commercial_job. Inline raise on the
+action method matches the action_centre_item._user_can_close
+shape — no soft-fail booleans.
+
+Line state is computed off reservation states:
+  planned   — 0 reservations fulfilled
+  partial   — 0 < fulfilled < planned
+  fulfilled — fulfilled >= planned
+  cancelled — set explicitly by action_cancel (manual line drop)
+"""
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
+
+
+_LINE_STATES = [
+    ("planned",   "Planned"),
+    ("partial",   "Partial"),
+    ("fulfilled", "Fulfilled"),
+    ("cancelled", "Cancelled"),
+]
+
+
+class CommercialEventJobEquipmentLine(models.Model):
+    _name = "commercial.event.job.equipment.line"
+    _description = "Event Job Equipment Line"
+    _inherit = ["mail.thread"]
+    _order = "event_job_id, sequence, id"
+
+    event_job_id = fields.Many2one(
+        "commercial.event.job",
+        string="Event Job",
+        required=True,
+        ondelete="cascade",
+        index=True,
+    )
+    product_template_id = fields.Many2one(
+        "product.template",
+        string="Product",
+        required=True,
+        domain="[('is_workshop_item', '=', True)]",
+        tracking=True,
+    )
+    category_id = fields.Many2one(
+        related="product_template_id.equipment_category_id",
+        store=True,
+        readonly=True,
+        string="Category",
+    )
+    tracking_mode = fields.Selection(
+        related="product_template_id.tracking_mode",
+        store=True,
+        readonly=True,
+    )
+    quantity_planned = fields.Integer(
+        string="Planned Qty",
+        required=True,
+        default=1,
+        tracking=True,
+    )
+    quantity_checked_out = fields.Integer(
+        compute="_compute_quantity_checked_out",
+        store=True,
+        string="Checked Out",
+    )
+    quantity_remaining = fields.Integer(
+        compute="_compute_quantity_remaining",
+        string="Remaining",
+    )
+    sequence = fields.Integer(default=10)
+    notes = fields.Text()
+    state = fields.Selection(
+        _LINE_STATES,
+        compute="_compute_state",
+        store=True,
+        default="planned",
+        tracking=True,
+    )
+    cancelled_explicit = fields.Boolean(
+        default=False,
+        readonly=True,
+        help="Set by action_cancel; sticky so the compute doesn't "
+        "drift back to 'planned' on subsequent reservation edits.",
+    )
+    reservation_ids = fields.One2many(
+        "neon.equipment.reservation",
+        "equipment_line_id",
+        string="Reservations",
+    )
+
+    _sql_constraints = [
+        ("quantity_planned_positive",
+         "CHECK (quantity_planned > 0)",
+         "Planned quantity must be a positive integer."),
+    ]
+
+    # ============================================================
+    # === Computes
+    # ============================================================
+    @api.depends("reservation_ids.state")
+    def _compute_quantity_checked_out(self):
+        for rec in self:
+            rec.quantity_checked_out = len(rec.reservation_ids.filtered(
+                lambda r: r.state == "fulfilled"))
+
+    @api.depends("quantity_checked_out", "quantity_planned")
+    def _compute_quantity_remaining(self):
+        for rec in self:
+            rec.quantity_remaining = max(
+                rec.quantity_planned - rec.quantity_checked_out, 0)
+
+    @api.depends("quantity_checked_out", "quantity_planned",
+                 "cancelled_explicit")
+    def _compute_state(self):
+        for rec in self:
+            if rec.cancelled_explicit:
+                rec.state = "cancelled"
+            elif rec.quantity_checked_out >= rec.quantity_planned:
+                rec.state = "fulfilled"
+            elif rec.quantity_checked_out > 0:
+                rec.state = "partial"
+            else:
+                rec.state = "planned"
+
+    # ============================================================
+    # === Authority — Q7 checkout authorization
+    # Manager, Lead Tech (crew_leader group), or Crew Chief for the
+    # parent commercial_job. The crew_chief check goes through the
+    # existing _is_crew_chief_of_job helper on commercial.event.job.
+    # ============================================================
+    def _user_can_checkout(self):
+        self.ensure_one()
+        user = self.env.user
+        if user.has_group("neon_jobs.group_neon_jobs_manager"):
+            return True
+        if user.has_group("neon_jobs.group_neon_jobs_crew_leader"):
+            return True
+        ej = self.event_job_id
+        if ej and ej._is_crew_chief_of_job(ej.commercial_job_id):
+            return True
+        return False
+
+    # ============================================================
+    # === Unit allocation
+    # action_open_allocate_wizard opens the wizard for the UI flow;
+    # action_allocate_units is the programmatic path (smoke tests +
+    # any future automation) — picks first-available matching units.
+    # ============================================================
+    def action_open_allocate_wizard(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Allocate Units"),
+            "res_model": "neon.equipment.allocate.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_equipment_line_id": self.id},
+        }
+
+    def action_allocate_units(self, units=None):
+        """Bind units to this line's unit-less soft_hold reservations.
+
+        units: optional neon.equipment.unit recordset. When None,
+        picks the first available units matching product +
+        state='active' + no overlapping reservation.
+
+        Returns the recordset of reservations newly bound to a unit.
+        """
+        self.ensure_one()
+        remaining = self.quantity_remaining
+        if remaining <= 0:
+            raise UserError(_(
+                "Line %(name)s is already fully allocated and "
+                "checked out."
+            ) % {"name": self.display_name})
+        if units is None:
+            units = self._find_available_units(remaining)
+        if len(units) != remaining:
+            raise UserError(_(
+                "Allocation requires exactly %(need)d unit(s); "
+                "got %(got)d. Adjust the selection or the planned "
+                "quantity."
+            ) % {"need": remaining, "got": len(units)})
+        return self._bind_units_to_reservations(units)
+
+    def _find_available_units(self, count):
+        """Search for `count` units of product_template_id in state
+        'active' whose schedules don't overlap this line's window.
+        Returns a recordset of up to `count` units."""
+        Unit = self.env["neon.equipment.unit"]
+        Reservation = self.env["neon.equipment.reservation"].sudo()
+        domain = [
+            ("product_template_id", "=", self.product_template_id.id),
+            ("state", "=", "active"),
+        ]
+        # Derive the candidate window from the line's existing
+        # reservations (they all share the same window — auto-created
+        # from the event_job's prep_start / return_eta).
+        sample = self.reservation_ids[:1]
+        candidates = Unit.search(domain)
+        if not candidates or not sample:
+            return candidates[:count]
+        # Filter out units with an overlapping reservation in
+        # non-terminal state.
+        clashing_unit_ids = Reservation.search([
+            ("unit_id", "in", candidates.ids),
+            ("state", "in", ("soft_hold", "confirmed")),
+            ("reserve_from", "<", sample.reserve_to),
+            ("reserve_to", ">", sample.reserve_from),
+        ]).mapped("unit_id").ids
+        free = candidates.filtered(lambda u: u.id not in clashing_unit_ids)
+        return free[:count]
+
+    def _bind_units_to_reservations(self, units):
+        """Attach the given units to this line's unit-less soft_hold
+        reservations and confirm them. Each bound reservation moves
+        soft_hold -> confirmed and its unit moves active -> reserved.
+        Returns the recordset of reservations updated."""
+        self.ensure_one()
+        unallocated = self.reservation_ids.filtered(
+            lambda r: r.state == "soft_hold" and not r.unit_id)
+        if len(units) > len(unallocated):
+            raise UserError(_(
+                "Cannot bind %(n)d unit(s) to only %(slot)d "
+                "open soft_hold reservation(s) on this line."
+            ) % {"n": len(units), "slot": len(unallocated)})
+        bound = self.env["neon.equipment.reservation"]
+        for unit, reservation in zip(units, unallocated):
+            reservation.write({"unit_id": unit.id})
+            reservation._do_transition("confirmed")
+            unit._do_transition("reserved")
+            bound |= reservation
+        return bound
+
+    # ============================================================
+    # === Checkout — Q7 authority + atomic across the line
+    # Iterates this line's confirmed reservations; transitions each
+    # unit reserved -> checked_out and each reservation confirmed ->
+    # fulfilled; creates a neon.equipment.movement row per unit.
+    # If any single transition raises, the savepoint rolls back the
+    # entire line — all-or-nothing per the spec D5.
+    # ============================================================
+    def action_checkout(self):
+        """Authority check runs in the caller's context (so unauthorised
+        users see UserError, not AccessError). The actual transitions
+        and movement-record writes run sudo because crew-tier users
+        legitimately authorised as Crew Chief don't carry write rights
+        on neon.equipment.unit / reservation / movement at the ACL
+        level — the authority gate is the access control. actor_uid
+        is captured pre-sudo so the audit log attributes to the real
+        operator, not the superuser."""
+        for rec in self:
+            if not rec._user_can_checkout():
+                raise UserError(_(
+                    "You are not authorised to check out equipment "
+                    "for %(event)s. Manager, Lead Tech, or Crew "
+                    "Chief on this event only."
+                ) % {"event": rec.event_job_id.name})
+            rec.sudo()._checkout_atomic(actor_uid=rec.env.uid)
+        return True
+
+    def _checkout_atomic(self, actor_uid=None):
+        """Per-line atomic checkout. The cursor savepoint ensures
+        partial failures roll back: zero movements, zero state
+        changes if any one unit raises."""
+        self.ensure_one()
+        actor_uid = actor_uid or self.env.uid
+        actor = self.env["res.users"].sudo().browse(actor_uid)
+        confirmed = self.reservation_ids.filtered(
+            lambda r: r.state == "confirmed" and r.unit_id)
+        if not confirmed:
+            raise UserError(_(
+                "No confirmed reservations on line %(name)s to "
+                "check out. Allocate units first."
+            ) % {"name": self.display_name})
+        Movement = self.env["neon.equipment.movement"].sudo()
+        with self.env.cr.savepoint():
+            for reservation in confirmed:
+                unit = reservation.unit_id
+                unit._do_transition("checked_out")
+                reservation._do_transition("fulfilled")
+                Movement.create({
+                    "unit_id": unit.id,
+                    "event_job_id": self.event_job_id.id,
+                    "equipment_line_id": self.id,
+                    "reservation_id": reservation.id,
+                    "movement_type": "checkout",
+                    "actor_id": actor.id,
+                    "assignee_id": actor.partner_id.id,
+                    "from_location_text": unit.workshop_location or "",
+                })
+        return True
+
+    def action_cancel(self):
+        """Manually drop the line. Cancels every non-terminal
+        reservation and sticks state at 'cancelled'."""
+        for rec in self:
+            for reservation in rec.reservation_ids.filtered(
+                    lambda r: r.state in ("soft_hold", "confirmed")):
+                reservation._do_transition("cancelled")
+            rec.cancelled_explicit = True

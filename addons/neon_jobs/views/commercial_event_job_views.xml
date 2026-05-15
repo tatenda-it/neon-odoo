@@ -327,15 +327,43 @@
                                     <field name="sub_hire_required" readonly="1"/>
                                     <field name="logistics_flag" readonly="1"/>
                                 </group>
+                                <group>
+                                    <button name="action_checkout_all_equipment"
+                                            string="Check Out All Equipment"
+                                            type="object"
+                                            class="oe_highlight"
+                                            confirm="Check out every allocated unit across this event's equipment lines? Manager / Lead Tech / Crew Chief only."/>
+                                </group>
                             </group>
-                            <separator string="Equipment Summary"/>
+                            <separator string="Equipment Lines (P5.M5)"/>
+                            <field name="equipment_line_ids" nolabel="1">
+                                <tree editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="product_template_id"
+                                           options="{'no_create': True}"/>
+                                    <field name="category_id" readonly="1"
+                                           optional="show"/>
+                                    <field name="tracking_mode" readonly="1"
+                                           optional="hide"/>
+                                    <field name="quantity_planned"/>
+                                    <field name="quantity_checked_out"
+                                           readonly="1"/>
+                                    <field name="quantity_remaining"
+                                           readonly="1"/>
+                                    <field name="state" widget="badge"/>
+                                    <button name="action_open_allocate_wizard"
+                                            string="Allocate"
+                                            type="object"
+                                            icon="fa-link"/>
+                                    <button name="action_checkout"
+                                            string="Check Out"
+                                            type="object"
+                                            icon="fa-truck"/>
+                                </tree>
+                            </field>
+                            <separator string="Equipment Summary (free-form)"/>
                             <field name="equipment_summary" nolabel="1" colspan="2"
-                                   placeholder="Main items: line array PA, monitor mix, moving heads, dimmer packs, sub-hire…"/>
-                            <div class="text-muted" role="alert">
-                                Phase 5 replaces this free-form summary
-                                with per-item equipment movement
-                                records linked to event_job.
-                            </div>
+                                   placeholder="Client-facing context or quirks not captured by the lines above…"/>
                         </page>
 
                         <!-- Tab 9 — Quality (Readiness) -->

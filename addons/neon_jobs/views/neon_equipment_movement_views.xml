@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_movement_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.movement.tree</field>
+        <field name="model">neon.equipment.movement</field>
+        <field name="arch" type="xml">
+            <tree string="Equipment Movements" create="false">
+                <field name="create_date" string="When"/>
+                <field name="name"/>
+                <field name="movement_type"/>
+                <field name="unit_id"/>
+                <field name="event_job_id" optional="show"/>
+                <field name="actor_id" optional="show"/>
+                <field name="assignee_id" optional="hide"/>
+                <field name="from_location_text" optional="hide"/>
+                <field name="to_location_text" optional="hide"/>
+                <field name="condition_at_event" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_movement_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.movement.form</field>
+        <field name="model">neon.equipment.movement</field>
+        <field name="arch" type="xml">
+            <form string="Equipment Movement" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Subject">
+                            <field name="movement_type" readonly="1"/>
+                            <field name="unit_id" readonly="1"/>
+                            <field name="event_job_id" readonly="1"/>
+                            <field name="equipment_line_id" readonly="1"/>
+                            <field name="reservation_id" readonly="1"/>
+                        </group>
+                        <group string="Actor + Context">
+                            <field name="actor_id" readonly="1"/>
+                            <field name="assignee_id" readonly="1"/>
+                            <field name="create_date" readonly="1"/>
+                            <field name="condition_at_event" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Location">
+                            <field name="from_location_text" readonly="1"/>
+                            <field name="to_location_text" readonly="1"/>
+                        </group>
+                        <group string="Approval (transfers)">
+                            <field name="requires_approval" readonly="1"/>
+                            <field name="approved_by_id" readonly="1"/>
+                            <field name="approved_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Photo" name="photo"
+                              invisible="not photo">
+                            <field name="photo" widget="image" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_movement_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.movement.search</field>
+        <field name="model">neon.equipment.movement</field>
+        <field name="arch" type="xml">
+            <search string="Equipment Movements">
+                <field name="name"/>
+                <field name="unit_id"/>
+                <field name="event_job_id"/>
+                <field name="actor_id"/>
+                <separator/>
+                <filter name="type_checkout" string="Checkouts"
+                        domain="[('movement_type', '=', 'checkout')]"/>
+                <filter name="type_checkin" string="Check-Ins"
+                        domain="[('movement_type', '=', 'checkin')]"/>
+                <filter name="type_transfer" string="Transfers"
+                        domain="[('movement_type', 'in', ('transfer_out', 'transfer_in'))]"/>
+                <separator/>
+                <filter name="today" string="Today"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_type" string="Type"
+                            context="{'group_by': 'movement_type'}"/>
+                    <filter name="group_unit" string="Unit"
+                            context="{'group_by': 'unit_id'}"/>
+                    <filter name="group_event_job" string="Event Job"
+                            context="{'group_by': 'event_job_id'}"/>
+                    <filter name="group_actor" string="Actor"
+                            context="{'group_by': 'actor_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_equipment_movement_action" model="ir.actions.act_window">
+        <field name="name">Equipment Movements</field>
+        <field name="res_model">neon.equipment.movement</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="neon_equipment_movement_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No equipment movements recorded yet
+            </p>
+            <p>
+                Movements are an append-only audit log of physical
+                equipment events: checkouts to jobs, transfers between
+                jobs, check-ins back to the workshop.
+            </p>
+        </field>
+    </record>
+
+</odoo>

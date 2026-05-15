@@ -83,9 +83,21 @@ class NeonEquipmentReservation(models.Model):
     unit_id = fields.Many2one(
         "neon.equipment.unit",
         string="Equipment Unit",
-        required=True,
         ondelete="restrict",
         tracking=True,
+        help="The physical unit this reservation holds. May be NULL "
+        "while the reservation is in soft_hold (P5.M5 auto-creation "
+        "spawns unit-less holds at event_job creation; allocation "
+        "fills unit_id later). Must be set before transitioning to "
+        "confirmed.",
+    )
+    equipment_line_id = fields.Many2one(
+        "commercial.event.job.equipment.line",
+        string="Equipment Line",
+        ondelete="set null",
+        index=True,
+        help="The planned-equipment line this reservation belongs to "
+        "(P5.M5). NULL for manual / standalone reservations.",
     )
     product_template_id = fields.Many2one(
         related="unit_id.product_template_id",
@@ -153,6 +165,20 @@ class NeonEquipmentReservation(models.Model):
          "CHECK (reserve_from < reserve_to)",
          "Reservation start must be before end."),
     ]
+
+    @api.constrains("state", "unit_id")
+    def _check_unit_set_when_active(self):
+        """A reservation can sit in soft_hold without a unit assigned
+        (P5.M5 auto-creation flow), but any transition to confirmed /
+        fulfilled requires a unit. This guard catches direct writes
+        that bypass _do_transition."""
+        for rec in self:
+            if rec.state in ("confirmed", "fulfilled") and not rec.unit_id:
+                raise UserError(_(
+                    "Reservation %(name)s cannot be %(state)s without "
+                    "a unit assigned. Allocate a unit first."
+                ) % {"name": rec.name or _("(new)"),
+                     "state": rec.state})
 
     # ============================================================
     # === Computes

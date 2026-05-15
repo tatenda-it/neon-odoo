@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="commercial_event_job_equipment_line_view_form" model="ir.ui.view">
+        <field name="name">commercial.event.job.equipment.line.form</field>
+        <field name="model">commercial.event.job.equipment.line</field>
+        <field name="arch" type="xml">
+            <form string="Equipment Line">
+                <header>
+                    <button name="action_open_allocate_wizard"
+                            string="Allocate Units"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'planned' and state != 'partial'"/>
+                    <button name="action_checkout"
+                            string="Check Out"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state == 'fulfilled' or state == 'cancelled'"/>
+                    <button name="action_cancel"
+                            string="Cancel Line"
+                            type="object"
+                            invisible="state == 'cancelled' or state == 'fulfilled'"
+                            confirm="Cancel this equipment line? All open reservations on it will be cancelled."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="planned,partial,fulfilled"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Identity">
+                            <field name="event_job_id"
+                                   options="{'no_create': True}"/>
+                            <field name="product_template_id"
+                                   options="{'no_create': True}"/>
+                            <field name="category_id" readonly="1"/>
+                            <field name="tracking_mode" readonly="1"/>
+                        </group>
+                        <group string="Quantity">
+                            <field name="quantity_planned"/>
+                            <field name="quantity_checked_out" readonly="1"/>
+                            <field name="quantity_remaining" readonly="1"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Reservations" name="reservations">
+                            <field name="reservation_ids" readonly="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="unit_id"/>
+                                    <field name="reserve_from"/>
+                                    <field name="reserve_to"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="has_conflict" widget="boolean_toggle"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+</odoo>

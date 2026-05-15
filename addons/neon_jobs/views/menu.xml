@@ -141,6 +141,14 @@
               action="neon_equipment_reservation_action"
               sequence="30"/>
 
+    <!-- P5.M5 — Equipment Movements. Append-only audit log of
+         checkouts, transfers, check-ins. -->
+    <menuitem id="menu_workshop_equipment_movements"
+              name="Movements"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_movement_action"
+              sequence="40"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"

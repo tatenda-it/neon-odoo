@@ -273,15 +273,20 @@ class CommercialEventJob(models.Model):
         "current Readiness Score.",
     )
 
-    # === Equipment (placeholder for Phase 5 integration) ===
+    # === Equipment (P5.M5 — structured equipment lines) ===
     equipment_summary = fields.Text(
         string="Equipment Summary",
-        help="Free-form for now; Phase 5 introduces per-item movement "
-        "records linked to event_job.",
+        help="Free-form supplement to the structured equipment lines "
+        "below — captures client-facing context or quirks.",
     )
     equipment_count = fields.Integer(
         related="commercial_job_id.equipment_count",
         readonly=True,
+    )
+    equipment_line_ids = fields.One2many(
+        "commercial.event.job.equipment.line",
+        "event_job_id",
+        string="Equipment Lines",
     )
     sub_hire_required = fields.Boolean(
         related="commercial_job_id.sub_hire_required",
@@ -837,7 +842,78 @@ class CommercialEventJob(models.Model):
                     "Action Centre event_created trigger failed "
                     "for %s: %s", rec.name, e,
                 )
+        # P5.M5 — auto-spawn soft_hold reservations for any equipment
+        # lines that landed in the same create() (typically via
+        # default values or copy()). Existing event_jobs are NOT
+        # backfilled — auto-creation only applies to newly-created
+        # rows from this commit onwards. Defensive try/except mirrors
+        # the Action Centre pattern: a reservation failure must not
+        # block event_job creation.
+        for rec in records:
+            if not rec.equipment_line_ids:
+                continue
+            try:
+                rec._autocreate_reservations_for_lines(rec.equipment_line_ids)
+            except Exception as e:
+                _logger.warning(
+                    "Auto-reservation for equipment lines failed on "
+                    "%s: %s", rec.name, e,
+                )
         return records
+
+    def _autocreate_reservations_for_lines(self, lines):
+        """For each line in `lines`, spawn quantity_planned soft_hold
+        reservations on this event_job. unit_id is left NULL — the
+        allocation flow (P5.M5) fills it later. Idempotent: lines
+        that already have reservations are skipped."""
+        Reservation = self.env["neon.equipment.reservation"].sudo()
+        reserve_from, reserve_to = self._reservation_window_for_autocreate()
+        for line in lines:
+            if line.reservation_ids:
+                continue
+            for _i in range(line.quantity_planned):
+                Reservation.create({
+                    "event_job_id": self.id,
+                    "equipment_line_id": line.id,
+                    "unit_id": False,
+                    "reserve_from": reserve_from,
+                    "reserve_to": reserve_to,
+                    "state": "soft_hold",
+                })
+
+    def _reservation_window_for_autocreate(self):
+        """Pick reserve_from / reserve_to for auto-spawned soft_holds.
+        Prefer the Schedule-tab datetimes (prep_start → return_eta);
+        fall back to event_date 00:00:00 / 23:59:59 when those are
+        NULL (most event_jobs are pre-planning at creation time)."""
+        self.ensure_one()
+        rf = self.prep_start_datetime
+        rt = self.return_eta_datetime
+        if not rf and self.event_date:
+            rf = fields.Datetime.to_datetime(
+                f"{self.event_date} 00:00:00")
+        if not rt and self.event_date:
+            rt = fields.Datetime.to_datetime(
+                f"{self.event_date} 23:59:59")
+        return rf, rt
+
+    def action_checkout_all_equipment(self):
+        """Bulk checkout — atomic across every equipment line on
+        this event_job. If ANY line raises (authority denied, unit
+        in wrong state, etc.) the savepoint rolls back the whole
+        batch."""
+        self.ensure_one()
+        lines = self.equipment_line_ids.filtered(
+            lambda l: l.state in ("planned", "partial"))
+        if not lines:
+            raise UserError(_(
+                "No equipment lines on %(name)s have units ready "
+                "to check out. Allocate units first."
+            ) % {"name": self.name})
+        with self.env.cr.savepoint():
+            for line in lines:
+                line.action_checkout()
+        return True
 
     def _create_event_job_checklists(self):
         """Idempotent: if instances already exist for this event_job,
