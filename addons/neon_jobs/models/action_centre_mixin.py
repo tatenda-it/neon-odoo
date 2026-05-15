@@ -67,6 +67,9 @@ TRIGGER_REGISTRY = {
     "feedback_followup": {
         "default_title": "Feedback follow-up required for {source.event_job_id.name}",
     },
+    "equipment_conflict": {
+        "default_title": "Equipment conflict on {source.unit_id.display_name} ({source.name})",
+    },
     "manual": {
         "default_title": "Manual action item",
     },

@@ -133,6 +133,18 @@
             <field name="description">Fires when client feedback is missing or low-score on a completed event (P3.M7). Manager drives the follow-up loop.</field>
         </record>
 
+        <record id="trigger_config_equipment_conflict" model="action.centre.trigger.config">
+            <field name="trigger_type">equipment_conflict</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">alert</field>
+            <field name="primary_role">manager</field>
+            <field name="priority">high</field>
+            <field name="escalation_minutes">240</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="True"/>
+            <field name="description">Alert: two open reservations (soft_hold or confirmed) overlap on the same equipment unit. Auto-closes when the conflict clears (one side cancelled, dates moved apart, or one fulfilled).</field>
+        </record>
+
         <record id="trigger_config_manual" model="action.centre.trigger.config">
             <field name="trigger_type">manual</field>
             <field name="is_enabled" eval="True"/>

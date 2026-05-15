@@ -28,3 +28,5 @@ from . import action_centre_item_history
 from . import neon_equipment_category
 from . import product_template_extension
 from . import neon_equipment_unit
+# P5.M4 — Equipment reservation (time-window holds on units)
+from . import neon_equipment_reservation

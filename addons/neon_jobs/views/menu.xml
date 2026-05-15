@@ -133,6 +133,14 @@
               action="neon_equipment_category_action"
               sequence="20"/>
 
+    <!-- P5.M4 — Equipment Reservations. Soft holds + confirmed
+         bookings; conflicts route through Action Centre. -->
+    <menuitem id="menu_workshop_equipment_reservations"
+              name="Reservations"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_reservation_action"
+              sequence="30"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"

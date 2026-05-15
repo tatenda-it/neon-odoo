@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_equipment_reservation_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.reservation.tree</field>
+        <field name="model">neon.equipment.reservation</field>
+        <field name="arch" type="xml">
+            <tree string="Equipment Reservations"
+                  decoration-warning="has_conflict"
+                  decoration-muted="state == 'cancelled'"
+                  decoration-success="state == 'fulfilled'">
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="unit_id"/>
+                <field name="reserve_from"/>
+                <field name="reserve_to"/>
+                <field name="state" widget="badge"/>
+                <field name="has_conflict" widget="boolean_toggle"
+                       readonly="1"/>
+                <field name="equipment_category_id" optional="hide"/>
+                <field name="product_template_id" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_reservation_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.reservation.form</field>
+        <field name="model">neon.equipment.reservation</field>
+        <field name="arch" type="xml">
+            <form string="Equipment Reservation">
+                <header>
+                    <field name="can_confirm" invisible="1"/>
+                    <field name="can_fulfil" invisible="1"/>
+                    <field name="can_cancel" invisible="1"/>
+                    <button name="action_confirm"
+                            string="Confirm"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_confirm"/>
+                    <button name="action_fulfil"
+                            string="Fulfil"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_fulfil"/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            invisible="not can_cancel"
+                            confirm="Cancel this reservation? The unit will be released back to availability."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="soft_hold,confirmed,fulfilled"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="event_job_id"
+                                   options="{'no_create': True}"/>
+                            <field name="unit_id"
+                                   options="{'no_create': True}"/>
+                            <field name="product_template_id"
+                                   readonly="1"/>
+                            <field name="equipment_category_id"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Window">
+                            <field name="reserve_from"/>
+                            <field name="reserve_to"/>
+                            <field name="has_conflict" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Conflicts" name="conflicts"
+                              invisible="not has_conflict">
+                            <field name="conflicting_reservation_ids"
+                                   readonly="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="event_job_id"/>
+                                    <field name="reserve_from"/>
+                                    <field name="reserve_to"/>
+                                    <field name="state"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"
+                                   placeholder="Anything worth knowing about this hold..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_reservation_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.reservation.search</field>
+        <field name="model">neon.equipment.reservation</field>
+        <field name="arch" type="xml">
+            <search string="Equipment Reservations">
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="unit_id"/>
+                <field name="product_template_id"/>
+                <separator/>
+                <filter name="state_soft_hold" string="Soft Hold"
+                        domain="[('state', '=', 'soft_hold')]"/>
+                <filter name="state_confirmed" string="Confirmed"
+                        domain="[('state', '=', 'confirmed')]"/>
+                <filter name="state_fulfilled" string="Fulfilled"
+                        domain="[('state', '=', 'fulfilled')]"/>
+                <filter name="state_cancelled" string="Cancelled"
+                        domain="[('state', '=', 'cancelled')]"/>
+                <separator/>
+                <filter name="has_conflict" string="Has Conflict"
+                        domain="[('has_conflict', '=', True)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_unit" string="Unit"
+                            context="{'group_by': 'unit_id'}"/>
+                    <filter name="group_event_job" string="Event Job"
+                            context="{'group_by': 'event_job_id'}"/>
+                    <filter name="group_category" string="Category"
+                            context="{'group_by': 'equipment_category_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_equipment_reservation_action" model="ir.actions.act_window">
+        <field name="name">Equipment Reservations</field>
+        <field name="res_model">neon.equipment.reservation</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="neon_equipment_reservation_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No reservations recorded yet
+            </p>
+            <p>
+                Each row holds one equipment unit for one event job's
+                window. Conflicts (overlapping holds on the same unit)
+                are surfaced in the Action Centre for manager review.
+            </p>
+        </field>
+    </record>
+
+</odoo>

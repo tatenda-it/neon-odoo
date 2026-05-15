@@ -30,6 +30,7 @@ TRIGGER_TYPE_SELECTION = [
     ("closeout_overdue", "Closeout Overdue"),
     ("sla_passed", "Closeout SLA Passed"),
     ("feedback_followup", "Feedback Follow-up Required"),
+    ("equipment_conflict", "Equipment Reservation Conflict"),
     ("manual", "Manual"),
 ]
 

@@ -58,13 +58,15 @@ print("=" * 72)
 expected = {
     "capacity_gate", "lost", "event_created",
     "readiness_50", "readiness_70", "scope_change",
-    "closeout_overdue", "sla_passed", "feedback_followup", "manual",
+    "closeout_overdue", "sla_passed", "feedback_followup",
+    "equipment_conflict",  # P5.M4
+    "manual",
 }
 configs = env["action.centre.trigger.config"].sudo().search([])
 got = set(configs.mapped("trigger_type"))
-print("  total configs:", len(configs), "(want 10)")
+print("  total configs:", len(configs), "(want 11)")
 print("  trigger types covered:", sorted(got))
-ok = len(configs) == 10 and got == expected
+ok = len(configs) == 11 and got == expected
 print("T170:", "PASS" if ok else "FAIL")
 results["T170"] = ok
 
@@ -322,7 +324,7 @@ results["T177"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T178 - trigger_type Selection extended to all 10 values")
+print("T178 - trigger_type Selection extended to all 11 values")
 print("=" * 72)
 fdef = env["action.centre.item"].fields_get(
     ["trigger_type"])["trigger_type"]
@@ -330,7 +332,9 @@ sel_values = set(v for v, _label in fdef["selection"])
 expected_values = {
     "capacity_gate", "lost", "event_created", "readiness_50",
     "readiness_70", "scope_change", "closeout_overdue", "sla_passed",
-    "feedback_followup", "manual",
+    "feedback_followup",
+    "equipment_conflict",  # P5.M4
+    "manual",
 }
 ok = sel_values == expected_values
 # Also: manual item default still 'manual'
