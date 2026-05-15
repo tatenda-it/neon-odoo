@@ -70,6 +70,9 @@ TRIGGER_REGISTRY = {
     "equipment_conflict": {
         "default_title": "Equipment conflict on {source.unit_id.display_name} ({source.name})",
     },
+    "transfer_pending": {
+        "default_title": "Pending transfer {source.name}: {source.unit_id.display_name} → {source.destination_event_job_id.name}",
+    },
     "manual": {
         "default_title": "Manual action item",
     },

@@ -10,7 +10,7 @@ SMOKES=(
   p2m8
   p3m1 p3m2 p3m3 p3m4 p3m5 p3m6 p3m7 p3m8
   p4m1 p4m2 p4m3 p4m4 p4m5_m6 p4m7 p4m8
-  p5m1 p5m1_subtask_a p5m2 p5m3 p5m4 p5m5
+  p5m1 p5m1_subtask_a p5m2 p5m3 p5m4 p5m5 p5m6
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

@@ -104,3 +104,6 @@ access_neon_equipment_movement_crew,neon.equipment.movement crew (read-only),mod
 access_neon_equipment_movement_manager,neon.equipment.movement manager (full),model_neon_equipment_movement,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_neon_equipment_allocate_wizard_crew_leader,neon.equipment.allocate.wizard crew_leader,model_neon_equipment_allocate_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
 access_neon_equipment_allocate_wizard_manager,neon.equipment.allocate.wizard manager,model_neon_equipment_allocate_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_transfer_wizard_crew_leader,neon.equipment.transfer.wizard crew_leader,model_neon_equipment_transfer_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
+access_neon_equipment_transfer_wizard_manager,neon.equipment.transfer.wizard manager,model_neon_equipment_transfer_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_transfer_wizard_crew,neon.equipment.transfer.wizard crew (chief authority enforced in action),model_neon_equipment_transfer_wizard,neon_jobs.group_neon_jobs_crew,1,1,1,1

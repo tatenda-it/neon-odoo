@@ -820,4 +820,17 @@ class ActionCentreItem(models.Model):
                 _logger.exception(
                     "Action Centre feedback_followup backfill raised")
 
+        # transfer_pending — escalates equipment transfers that have
+        # been awaiting destination acceptance for >24h (P5.M6).
+        cfg_transfer = Config.search(
+            [("trigger_type", "=", "transfer_pending")], limit=1)
+        if cfg_transfer and cfg_transfer.is_enabled:
+            try:
+                self.env[
+                    "neon.equipment.movement"
+                ].sudo()._evaluate_transfer_pending_trigger()
+            except Exception:
+                _logger.exception(
+                    "Action Centre transfer_pending evaluator raised")
+
         return True

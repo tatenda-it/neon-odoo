@@ -24,7 +24,28 @@
         <field name="name">neon.equipment.movement.form</field>
         <field name="model">neon.equipment.movement</field>
         <field name="arch" type="xml">
-            <form string="Equipment Movement" create="false" edit="false">
+            <form string="Equipment Movement" create="false">
+                <header>
+                    <!-- P5.M6 — destination Accept / Decline buttons
+                         on pending transfer_out records. Authority
+                         is enforced in the action method, but the
+                         button only shows when the record is in a
+                         state that the action accepts. -->
+                    <button name="action_accept_transfer"
+                            string="Accept Transfer"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="movement_type != 'transfer_out' or transfer_state not in ('pending', 'expired')"/>
+                    <button name="action_decline_transfer"
+                            string="Decline Transfer"
+                            type="object"
+                            class="btn-danger"
+                            invisible="movement_type != 'transfer_out' or transfer_state not in ('pending', 'expired')"
+                            confirm="Decline this transfer? The unit will be returned to the source event."/>
+                    <field name="transfer_state" widget="statusbar"
+                           invisible="movement_type != 'transfer_out'"
+                           statusbar_visible="pending,accepted,declined"/>
+                </header>
                 <sheet>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
@@ -33,9 +54,16 @@
                         <group string="Subject">
                             <field name="movement_type" readonly="1"/>
                             <field name="unit_id" readonly="1"/>
-                            <field name="event_job_id" readonly="1"/>
+                            <field name="event_job_id" readonly="1"
+                                   string="Event Job (source / current)"/>
+                            <field name="destination_event_job_id"
+                                   readonly="1"
+                                   invisible="movement_type not in ('transfer_out', 'transfer_in')"/>
                             <field name="equipment_line_id" readonly="1"/>
                             <field name="reservation_id" readonly="1"/>
+                            <field name="transfer_out_movement_id"
+                                   readonly="1"
+                                   invisible="movement_type != 'transfer_in'"/>
                         </group>
                         <group string="Actor + Context">
                             <field name="actor_id" readonly="1"/>
@@ -59,14 +87,37 @@
                         <page string="Notes" name="notes">
                             <field name="notes" nolabel="1" readonly="1"/>
                         </page>
+                        <page string="Decline" name="decline"
+                              invisible="not decline_reason">
+                            <field name="decline_reason" nolabel="1"
+                                   readonly="1"/>
+                        </page>
                         <page string="Photo" name="photo"
                               invisible="not photo">
                             <field name="photo" widget="image" readonly="1"/>
                         </page>
                     </notebook>
                 </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
             </form>
         </field>
+    </record>
+
+    <!-- P5.M6 — pending transfers list (action used by the new
+         Workshop > Equipment > Pending Transfers menu). -->
+    <record id="neon_equipment_movement_pending_transfers_action"
+            model="ir.actions.act_window">
+        <field name="name">Pending Transfers</field>
+        <field name="res_model">neon.equipment.movement</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('movement_type', '=', 'transfer_out'),
+                              ('transfer_state', 'in',
+                               ('pending', 'expired'))]</field>
+        <field name="search_view_id"
+               ref="neon_equipment_movement_view_search"/>
     </record>
 
     <record id="neon_equipment_movement_view_search" model="ir.ui.view">

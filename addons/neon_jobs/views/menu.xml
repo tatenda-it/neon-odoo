@@ -149,6 +149,14 @@
               action="neon_equipment_movement_action"
               sequence="40"/>
 
+    <!-- P5.M6 — Pending Transfers. Filtered view of transfer_out
+         movements still awaiting destination acceptance. -->
+    <menuitem id="menu_workshop_equipment_pending_transfers"
+              name="Pending Transfers"
+              parent="menu_workshop_equipment"
+              action="neon_equipment_movement_pending_transfers_action"
+              sequence="35"/>
+
     <menuitem id="menu_operations_config"
               name="Configuration"
               parent="menu_operations_root"

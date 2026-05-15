@@ -145,6 +145,18 @@
             <field name="description">Alert: two open reservations (soft_hold or confirmed) overlap on the same equipment unit. Auto-closes when the conflict clears (one side cancelled, dates moved apart, or one fulfilled).</field>
         </record>
 
+        <record id="trigger_config_transfer_pending" model="action.centre.trigger.config">
+            <field name="trigger_type">transfer_pending</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">lead_tech</field>
+            <field name="priority">high</field>
+            <field name="escalation_minutes">1440</field>
+            <field name="escalated_to_role">manager</field>
+            <field name="auto_close_when_condition_clears" eval="True"/>
+            <field name="description">Fires when an equipment transfer has been pending for more than 24 hours without destination acceptance. Auto-closes on accept / decline.</field>
+        </record>
+
         <record id="trigger_config_manual" model="action.centre.trigger.config">
             <field name="trigger_type">manual</field>
             <field name="is_enabled" eval="True"/>

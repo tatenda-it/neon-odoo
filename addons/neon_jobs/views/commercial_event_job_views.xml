@@ -333,6 +333,10 @@
                                             type="object"
                                             class="oe_highlight"
                                             confirm="Check out every allocated unit across this event's equipment lines? Manager / Lead Tech / Crew Chief only."/>
+                                    <button name="action_initiate_transfer"
+                                            string="Initiate Transfer"
+                                            type="object"
+                                            help="Open the transfer wizard to send checked-out units from this event to another active event."/>
                                 </group>
                             </group>
                             <separator string="Equipment Lines (P5.M5)"/>

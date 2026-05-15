@@ -37,6 +37,11 @@ _EVENT_JOB_STATES = [
 ]
 
 _TERMINAL_STATES = ("cancelled", "released")
+# P5.M6 — states that disqualify an event_job from RECEIVING a transfer.
+# Terminal (cancelled/released) plus post-event (completed/closed) —
+# you don't ship gear to a finished or abandoned job.
+_EVENT_JOB_TERMINAL_FOR_TRANSFER = (
+    "cancelled", "released", "completed", "closed")
 
 # P3.M3 — transition spec table. Each forward transition lists:
 #   from:             tuple of source states (only one in practice today)
@@ -903,6 +908,114 @@ class CommercialEventJob(models.Model):
             rt = fields.Datetime.to_datetime(
                 f"{self.event_date} 23:59:59")
         return rf, rt
+
+    # ============================================================
+    # === P5.M6 — Transfer authority + initiation
+    # _user_can_accept_transfer mirrors the equipment_line
+    # _user_can_checkout shape but scoped to self (the destination
+    # event_job). Used by neon.equipment.movement.action_accept_*
+    # / action_decline_transfer to gate destination operations.
+    # ============================================================
+    def _user_can_accept_transfer(self):
+        self.ensure_one()
+        user = self.env.user
+        if user.has_group("neon_jobs.group_neon_jobs_manager"):
+            return True
+        if user.has_group("neon_jobs.group_neon_jobs_crew_leader"):
+            return True
+        if self._is_crew_chief_of_job(self.commercial_job_id):
+            return True
+        return False
+
+    def action_initiate_transfer(self):
+        """Open the transfer wizard with this event_job pre-filled
+        as the source. The wizard surfaces the source's checked_out
+        units + a destination domain that excludes self and terminal
+        event_job states."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Initiate Equipment Transfer"),
+            "res_model": "neon.equipment.transfer.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_source_event_job_id": self.id},
+        }
+
+    def _initiate_transfer(self, units, destination):
+        """Programmatic transfer initiation. Authority enforced here
+        so wizard + smoke + any other caller share the same gate.
+        Atomic: one savepoint wraps the whole batch — a single unit
+        failure rolls back the whole transfer."""
+        self.ensure_one()
+        if not self._user_can_checkout_source_for_transfer():
+            raise UserError(_(
+                "You are not authorised to initiate transfers from "
+                "%(event)s. Manager, Lead Tech, or Crew Chief on "
+                "this event only."
+            ) % {"event": self.name})
+        if not destination:
+            raise UserError(_("Pick a destination event job."))
+        if destination.id == self.id:
+            raise UserError(_(
+                "Cannot transfer equipment to the same event job. "
+                "Source and destination must differ."))
+        if destination.state in _EVENT_JOB_TERMINAL_FOR_TRANSFER:
+            raise UserError(_(
+                "%(dest)s is in state %(state)s and cannot receive "
+                "transfers."
+            ) % {"dest": destination.name,
+                 "state": destination.state})
+        if not units:
+            raise UserError(_("Pick at least one unit to transfer."))
+        movements = self.env["neon.equipment.movement"].sudo()
+        actor_uid = self.env.uid
+        actor = self.env["res.users"].sudo().browse(actor_uid)
+        with self.env.cr.savepoint():
+            for unit in units:
+                if unit.state != "checked_out":
+                    raise UserError(_(
+                        "Unit %(name)s is in state %(state)s; only "
+                        "checked_out units can be transferred."
+                    ) % {"name": unit.display_name,
+                         "state": unit.state})
+                # Resolve the source-side fulfilled reservation (the
+                # one that put this unit on this event_job). Helps
+                # the transfer_in companion attribute correctly.
+                source_res = self.env[
+                    "neon.equipment.reservation"].sudo().search([
+                    ("unit_id", "=", unit.id),
+                    ("event_job_id", "=", self.id),
+                    ("state", "=", "fulfilled"),
+                ], limit=1, order="reserve_from desc, id desc")
+                unit._do_transition("transferred")
+                movements |= movements.create({
+                    "unit_id": unit.id,
+                    "event_job_id": self.id,
+                    "destination_event_job_id": destination.id,
+                    "reservation_id": source_res.id or False,
+                    "movement_type": "transfer_out",
+                    "transfer_state": "pending",
+                    "actor_id": actor.id,
+                    "assignee_id": actor.partner_id.id,
+                    "from_location_text": unit.workshop_location or "",
+                    "to_location_text": destination.name or "",
+                })
+        return movements
+
+    def _user_can_checkout_source_for_transfer(self):
+        """Authority for INITIATING a transfer (gate on source side).
+        Mirrors the equipment_line.checkout shape — manager,
+        crew_leader, or Crew Chief on the source event_job."""
+        self.ensure_one()
+        user = self.env.user
+        if user.has_group("neon_jobs.group_neon_jobs_manager"):
+            return True
+        if user.has_group("neon_jobs.group_neon_jobs_crew_leader"):
+            return True
+        if self._is_crew_chief_of_job(self.commercial_job_id):
+            return True
+        return False
 
     def action_checkout_all_equipment(self):
         """Bulk checkout — atomic across every equipment line on

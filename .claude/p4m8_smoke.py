@@ -290,8 +290,8 @@ for c in cfgs:
         problems.append((c.trigger_type, "NULL"))
     elif c.escalation_minutes <= 0 and c.trigger_type not in zero_allowed:
         problems.append((c.trigger_type, c.escalation_minutes))
-ok = len(problems) == 0 and len(cfgs) == 11
-print("  total configs:", len(cfgs), "(want 11)")
+ok = len(problems) == 0 and len(cfgs) == 12
+print("  total configs:", len(cfgs), "(want 12)")
 print("  problematic configs:", problems, "(want [])")
 print("T240:", "PASS" if ok else "FAIL")
 results["T240"] = ok
