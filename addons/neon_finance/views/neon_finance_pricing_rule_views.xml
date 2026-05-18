@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_pricing_rule_view_tree"
+            model="ir.ui.view">
+        <field name="name">neon.finance.pricing.rule.tree</field>
+        <field name="model">neon.finance.pricing.rule</field>
+        <field name="arch" type="xml">
+            <tree string="Pricing Rules"
+                  decoration-muted="not active">
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="currency_id"/>
+                <field name="base_rate" widget="monetary"/>
+                <field name="effective_date"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_pricing_rule_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.finance.pricing.rule.form</field>
+        <field name="model">neon.finance.pricing.rule</field>
+        <field name="arch" type="xml">
+            <form string="Pricing Rule">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Scope">
+                            <field name="category_id"/>
+                            <field name="currency_id"/>
+                            <field name="effective_date"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group string="Base Rate">
+                            <field name="base_rate" widget="monetary"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Brackets" name="brackets">
+                            <field name="bracket_ids">
+                                <tree editable="bottom">
+                                    <field name="sequence"
+                                           widget="handle"/>
+                                    <field name="day_from"/>
+                                    <field name="day_to"/>
+                                    <field name="multiplier"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Override Formula"
+                              name="override_formula">
+                            <field name="override_formula"
+                                   placeholder="Optional Python expression (parsed in P6.M3)."/>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_finance_pricing_rule_view_search"
+            model="ir.ui.view">
+        <field name="name">neon.finance.pricing.rule.search</field>
+        <field name="model">neon.finance.pricing.rule</field>
+        <field name="arch" type="xml">
+            <search string="Pricing Rules">
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="currency_id"/>
+                <separator/>
+                <filter name="active" string="Active"
+                        domain="[('active', '=', True)]"/>
+                <filter name="archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_category" string="Category"
+                            context="{'group_by': 'category_id'}"/>
+                    <filter name="group_currency" string="Currency"
+                            context="{'group_by': 'currency_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_finance_pricing_rule_action"
+            model="ir.actions.act_window">
+        <field name="name">Pricing Rules</field>
+        <field name="res_model">neon.finance.pricing.rule</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_finance_pricing_rule_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No pricing rules yet
+            </p>
+            <p>
+                A pricing rule is a rate card for one equipment
+                category in one currency, dated by effective_date.
+                Brackets within the rule encode the multi-day
+                discount taper.
+            </p>
+        </field>
+    </record>
+
+</odoo>

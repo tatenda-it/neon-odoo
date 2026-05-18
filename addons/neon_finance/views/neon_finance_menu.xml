@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P6.M1 — Finance configuration menus.
+
+        Mounted under Accounting > Configuration. A new "Finance"
+        intermediate menu groups the three Phase 6 configuration
+        screens together. Visible only to bookkeeper and approver
+        groups (sales sees the underlying data through the quote
+        form path that arrives in P6.M2; sales doesn't need menu
+        access to edit rate cards).
+
+        P6.M1.2 — Cross-module menu gating. The parent menu
+        account.menu_finance_configuration normally requires
+        Odoo's account.group_account_manager group. Bookkeeper +
+        Approver carry account.group_account_invoice (basic invoice
+        user, granted via implied_ids in security.xml) but NOT the
+        full Billing Administrator scope, so without this override
+        the Configuration parent stays hidden and our Finance
+        submenu is unreachable. The override below grants reach to
+        our two finance roles surgically — without implying
+        account.group_account_manager (which would broaden their
+        Odoo accounting scope to journals / taxes / chart of
+        accounts beyond the Phase 6 contract). Pattern matches
+        addons/neon_jobs/data/cross_module_menu_security.xml. The
+        (4, id) idempotent-add preserves the existing
+        account.group_account_manager gate. No noupdate wrapper, so
+        the override re-applies on every -u in case a future Odoo
+        upgrade resets the upstream groups_id. Migration script at
+        migrations/17.0.6.0.2/post-migrate.py runs the same write
+        defensively for installs upgrading from 17.0.6.0.1.
+    -->
+
+    <record id="account.menu_finance_configuration" model="ir.ui.menu">
+        <field name="groups_id" eval="[
+            (4, ref('account.group_account_manager')),
+            (4, ref('neon_finance.group_neon_finance_bookkeeper')),
+            (4, ref('neon_finance.group_neon_finance_approver')),
+        ]"/>
+    </record>
+
+    <menuitem id="menu_neon_finance_config"
+              name="Finance"
+              parent="account.menu_finance_configuration"
+              sequence="80"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+
+    <menuitem id="menu_neon_finance_pricing_rules"
+              name="Pricing Rules"
+              parent="menu_neon_finance_config"
+              action="neon_finance_pricing_rule_action"
+              sequence="10"/>
+
+    <menuitem id="menu_neon_finance_day_multipliers"
+              name="Day Multipliers"
+              parent="menu_neon_finance_config"
+              action="neon_finance_day_multiplier_action"
+              sequence="20"/>
+
+    <menuitem id="menu_neon_finance_conversion_rates"
+              name="Conversion Rates"
+              parent="menu_neon_finance_config"
+              action="neon_finance_conversion_rate_action"
+              sequence="30"/>
+
+</odoo>

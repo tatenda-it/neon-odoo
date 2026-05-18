@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P6.M1 — Neon Finance security groups.
+
+        Four roles cover the Phase 6 finance lifecycle:
+
+        - user:        base. Granted to all finance-touching staff.
+                       Implies nothing extra beyond Odoo base.
+        - sales:       quote drafting + read-only on rate cards.
+                       Implies user.
+        - bookkeeper:  rate-card maintenance, conversion rates, day
+                       multipliers. Cannot final-approve a quote.
+                       Implies user.
+        - approver:    quote / cost-line approval authority.
+                       Implies user.
+
+        Production user assignment (handled at deploy time, not in
+        this XML; values listed here for reference only):
+
+          sales:       Tatenda, Lisa, Evrill
+          bookkeeper:  Kudzi (login admin@neonhiring.co.zw)
+          approver:    Robin, Munashe
+
+        The legacy neon_crm_extensions.group_neon_finance_manager
+        (Phase 1 payment-confirm wizard) coexists — we do not touch
+        or replace it. New code references the four groups defined
+        here.
+    -->
+    <data noupdate="1">
+
+        <record id="module_category_neon_finance"
+                model="ir.module.category">
+            <field name="name">Neon Finance</field>
+            <field name="description">Access rights for the Neon Finance module — pricing rules, day multipliers, conversion rates, quotes (Phase 6+).</field>
+            <field name="sequence">42</field>
+        </record>
+
+        <record id="group_neon_finance_user" model="res.groups">
+            <field name="name">User</field>
+            <field name="category_id"
+                   ref="module_category_neon_finance"/>
+            <field name="comment">Base finance access. Read-only on rate cards and conversion rates. Implied by every other finance role.</field>
+        </record>
+
+        <record id="group_neon_finance_sales" model="res.groups">
+            <field name="name">Sales</field>
+            <field name="category_id"
+                   ref="module_category_neon_finance"/>
+            <field name="comment">Quote drafting. Reads rate cards, day multipliers, and conversion rates to price quotes. Cannot edit them.</field>
+            <field name="implied_ids" eval="[
+                (4, ref('neon_finance.group_neon_finance_user')),
+            ]"/>
+        </record>
+
+        <record id="group_neon_finance_bookkeeper" model="res.groups">
+            <field name="name">Bookkeeper</field>
+            <field name="category_id"
+                   ref="module_category_neon_finance"/>
+            <field name="comment">Rate-card and conversion-rate maintenance. Creates and edits pricing rules, brackets, day multipliers, and conversion rates. Cannot final-approve quotes (that is the approver role).</field>
+            <!-- Implies Billing Administrator. Kudzi works native
+                 Odoo Invoicing in addition to the Neon-specific
+                 finance config; the Neon role IS a Billing Admin
+                 plus Neon scopes. This is also what gates the
+                 Accounting > Configuration parent menu where our
+                 Finance submenu hangs. -->
+            <field name="implied_ids" eval="[
+                (4, ref('neon_finance.group_neon_finance_user')),
+                (4, ref('account.group_account_invoice')),
+            ]"/>
+        </record>
+
+        <record id="group_neon_finance_approver" model="res.groups">
+            <field name="name">Approver</field>
+            <field name="category_id"
+                   ref="module_category_neon_finance"/>
+            <field name="comment">Quote and cost-line approval authority. Also has bookkeeper-level edit rights on rate cards and conversion rates.</field>
+            <!-- Same Billing Administrator implication as Bookkeeper —
+                 approvers work the native Odoo invoicing UI too. -->
+            <field name="implied_ids" eval="[
+                (4, ref('neon_finance.group_neon_finance_user')),
+                (4, ref('account.group_account_invoice')),
+            ]"/>
+        </record>
+
+    </data>
+</odoo>

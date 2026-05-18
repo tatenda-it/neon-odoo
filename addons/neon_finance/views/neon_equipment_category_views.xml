@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P6.M1 — extend the existing neon.equipment.category form so
+        the finance fields (cost_strategy, consumable_cost_per_unit,
+        currency_id) appear alongside the operations fields. The base
+        form lives in addons/neon_jobs/views/neon_equipment_category_views.xml.
+
+        We inherit and append a "Finance" group inside the sheet. No
+        new top-level menu — this just adds fields to the existing
+        Workshop > Categories form.
+    -->
+
+    <record id="neon_finance_equipment_category_view_form_inherit"
+            model="ir.ui.view">
+        <field name="name">neon.equipment.category.form.finance.inherit</field>
+        <field name="model">neon.equipment.category</field>
+        <field name="inherit_id"
+               ref="neon_jobs.neon_equipment_category_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group[last()]" position="after">
+                <group string="Finance" name="finance">
+                    <field name="cost_strategy"/>
+                    <field name="currency_id"
+                           invisible="cost_strategy != 'consumable_actual'"/>
+                    <field name="consumable_cost_per_unit"
+                           widget="monetary"
+                           invisible="cost_strategy != 'consumable_actual'"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

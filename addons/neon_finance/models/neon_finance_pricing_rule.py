@@ -1,0 +1,87 @@
+# -*- coding: utf-8 -*-
+"""
+P6.M1 — top-level pricing rule per (category, currency, effective_date).
+
+A pricing rule is a rate card for a single equipment category in a
+single currency, dated. Brackets attached to the rule encode the
+multi-day discount taper. Day-type multipliers (event / setup / strike)
+live on a separate per-category model (neon.finance.day.multiplier).
+
+The actual quote-line compute (rule + brackets + multipliers + days)
+arrives in P6.M3. For P6.M1 we ship the schema, constraints, and
+seed data; downstream milestones consume.
+"""
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
+
+
+class NeonFinancePricingRule(models.Model):
+    _name = "neon.finance.pricing.rule"
+    _description = "Finance Pricing Rule"
+    _order = "category_id, currency_id, effective_date desc, id desc"
+    _rec_name = "name"
+
+    name = fields.Char(
+        required=True,
+        default=lambda self: self.env["ir.sequence"].next_by_code(
+            "neon.finance.pricing.rule") or _("New"),
+        copy=False,
+        readonly=True,
+        index=True,
+    )
+    category_id = fields.Many2one(
+        "neon.equipment.category",
+        string="Category",
+        required=True,
+        ondelete="restrict",
+        index=True,
+    )
+    currency_id = fields.Many2one(
+        "res.currency",
+        string="Currency",
+        required=True,
+        index=True,
+    )
+    base_rate = fields.Monetary(
+        string="Day-1 Base Rate",
+        required=True,
+        currency_field="currency_id",
+        help="Base rate for day 1 in this rule's currency. Multi-day "
+        "discounts apply via the bracket multipliers.",
+    )
+    bracket_ids = fields.One2many(
+        "neon.finance.pricing.bracket",
+        "rule_id",
+        string="Brackets",
+    )
+    override_formula = fields.Text(
+        string="Override Formula",
+        help="Optional Python expression for advanced pricing. "
+        "Parsing happens in P6.M3 — for P6.M1 this is a freeform "
+        "text field for future use.",
+    )
+    active = fields.Boolean(default=True, index=True)
+    effective_date = fields.Date(
+        required=True,
+        default=fields.Date.context_today,
+        index=True,
+        help="Date this rate card takes effect. Pricing lookups choose "
+        "the row with the latest effective_date <= the quote date.",
+    )
+    notes = fields.Text()
+
+    _sql_constraints = [
+        ("unique_category_currency_effective",
+         "UNIQUE (category_id, currency_id, effective_date)",
+         "A pricing rule already exists for this category, currency, "
+         "and effective date. Adjust the existing record or pick a "
+         "new effective date."),
+    ]
+
+    @api.constrains("base_rate")
+    def _check_base_rate_non_negative(self):
+        for rec in self:
+            if rec.base_rate < 0:
+                raise ValidationError(_(
+                    "Base rate must be zero or positive (got %s) "
+                    "on rule %s.") % (rec.base_rate, rec.display_name))

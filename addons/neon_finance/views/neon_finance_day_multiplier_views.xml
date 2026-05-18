@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_day_multiplier_view_tree"
+            model="ir.ui.view">
+        <field name="name">neon.finance.day.multiplier.tree</field>
+        <field name="model">neon.finance.day.multiplier</field>
+        <field name="arch" type="xml">
+            <tree string="Day Multipliers"
+                  editable="bottom"
+                  create="false">
+                <field name="category_id" readonly="1"/>
+                <field name="event_day_multiplier"/>
+                <field name="setup_day_multiplier"/>
+                <field name="strike_day_multiplier"/>
+                <field name="notes" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_day_multiplier_action"
+            model="ir.actions.act_window">
+        <field name="name">Day Multipliers</field>
+        <field name="res_model">neon.finance.day.multiplier</field>
+        <field name="view_mode">tree</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No day multipliers yet
+            </p>
+            <p>
+                Each equipment category has one row controlling the
+                event-day / setup-day / strike-day rate ratios.
+                Rows are auto-created when a category is added;
+                edit values inline.
+            </p>
+        </field>
+    </record>
+
+</odoo>

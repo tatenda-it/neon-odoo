@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P6.M1 — placeholder pricing rules (18 rows: 9 categories
+        × 2 currencies = USD + ZWG).
+
+        PLACEHOLDER VALUES — Munashe to override during P6.M2 or
+        P6.M3 build with real rate cards before Phase 6 production
+        deploy (P6.M12).
+
+        Only the Sound (USD $50 / ZiG 500) and Visual (USD $80 /
+        ZiG 800) values come from the spec; the rest are
+        order-of-magnitude placeholders. Real rates land via the
+        Configuration > Finance > Pricing Rules form once Munashe
+        provides them.
+
+        Standard bracket per rule:
+            1-2 days   → multiplier 1.00 (full rate)
+            3-7 days   → multiplier 0.80
+            8-14 days  → multiplier 0.70
+            15-∞ days  → multiplier 0.60 (open-ended tail)
+
+        noupdate="1" — these are install-time seeds. Editing the
+        bracket values in this XML afterwards will NOT reapply on
+        -u; edits happen through the form view.
+    -->
+    <data noupdate="1">
+
+        <!-- ============================================================
+             Sound (spec-canonical values)
+             ============================================================ -->
+        <record id="pricing_rule_sound_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_sound"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">50.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_sound_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_sound"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">500.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Visual (spec-canonical values)
+             ============================================================ -->
+        <record id="pricing_rule_visual_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_visual"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">80.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_visual_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_visual"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">800.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Lighting (placeholder magnitudes)
+             ============================================================ -->
+        <record id="pricing_rule_lighting_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_lighting"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">60.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_lighting_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_lighting"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">600.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Cabling and Accessories (placeholder magnitudes)
+             ============================================================ -->
+        <record id="pricing_rule_cabling_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_cabling"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">15.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_cabling_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_cabling"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">150.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Laptops (placeholder magnitudes)
+             ============================================================ -->
+        <record id="pricing_rule_laptops_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_laptops"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">40.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_laptops_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_laptops"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">400.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Staging (placeholder magnitudes)
+             ============================================================ -->
+        <record id="pricing_rule_staging_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_staging"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">70.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_staging_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_staging"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">700.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Dance Floor (placeholder magnitudes)
+             ============================================================ -->
+        <record id="pricing_rule_dance_floor_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_dance_floor"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">90.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_dance_floor_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_dance_floor"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">900.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Effects (placeholder magnitudes)
+             ============================================================ -->
+        <record id="pricing_rule_effects_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_effects"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">45.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_effects_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_effects"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">450.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Trussing (placeholder magnitudes)
+             ============================================================ -->
+        <record id="pricing_rule_trussing_usd"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_trussing"/>
+            <field name="currency_id" ref="base.USD"/>
+            <field name="base_rate">30.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+        <record id="pricing_rule_trussing_zwg"
+                model="neon.finance.pricing.rule">
+            <field name="category_id"
+                   ref="neon_jobs.equipment_category_trussing"/>
+            <field name="currency_id"
+                   ref="neon_finance.currency_zwg"/>
+            <field name="base_rate">300.00</field>
+            <field name="notes">PLACEHOLDER — Munashe to override.</field>
+            <field name="bracket_ids" eval="[
+                (0, 0, {'sequence': 10, 'day_from': 1, 'day_to': 2, 'multiplier': 1.00}),
+                (0, 0, {'sequence': 20, 'day_from': 3, 'day_to': 7, 'multiplier': 0.80}),
+                (0, 0, {'sequence': 30, 'day_from': 8, 'day_to': 14, 'multiplier': 0.70}),
+                (0, 0, {'sequence': 40, 'day_from': 15, 'day_to': -1, 'multiplier': 0.60}),
+            ]"/>
+        </record>
+
+        <!-- ============================================================
+             Initial conversion rate seed (placeholder).
+             1 USD = 25000 ZiG is unrealistically high; placeholder
+             retained as spec'd so the smoke tests have something to
+             read. Kudzi to refresh with real RBZ-derived rate before
+             Phase 6 production deploy.
+             ============================================================ -->
+        <record id="conversion_rate_seed"
+                model="neon.finance.conversion.rate">
+            <field name="effective_date" eval="time.strftime('%Y-%m-%d')"/>
+            <field name="usd_per_zig">0.000040</field>
+            <field name="zig_per_usd">25000.000000</field>
+            <field name="source_note">P6.M1 placeholder seed — Kudzi to refresh.</field>
+        </record>
+
+    </data>
+</odoo>

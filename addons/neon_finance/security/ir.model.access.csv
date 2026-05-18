@@ -1,0 +1,13 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_finance_pricing_rule_sales,neon.finance.pricing.rule sales (read-only),model_neon_finance_pricing_rule,neon_finance.group_neon_finance_sales,1,0,0,0
+access_neon_finance_pricing_rule_bookkeeper,neon.finance.pricing.rule bookkeeper (R/W/C),model_neon_finance_pricing_rule,neon_finance.group_neon_finance_bookkeeper,1,1,1,0
+access_neon_finance_pricing_rule_approver,neon.finance.pricing.rule approver (R/W/C),model_neon_finance_pricing_rule,neon_finance.group_neon_finance_approver,1,1,1,0
+access_neon_finance_pricing_bracket_sales,neon.finance.pricing.bracket sales (read-only),model_neon_finance_pricing_bracket,neon_finance.group_neon_finance_sales,1,0,0,0
+access_neon_finance_pricing_bracket_bookkeeper,neon.finance.pricing.bracket bookkeeper (R/W/C),model_neon_finance_pricing_bracket,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_neon_finance_pricing_bracket_approver,neon.finance.pricing.bracket approver (R/W/C),model_neon_finance_pricing_bracket,neon_finance.group_neon_finance_approver,1,1,1,1
+access_neon_finance_day_multiplier_sales,neon.finance.day.multiplier sales (read-only),model_neon_finance_day_multiplier,neon_finance.group_neon_finance_sales,1,0,0,0
+access_neon_finance_day_multiplier_bookkeeper,neon.finance.day.multiplier bookkeeper (R/W),model_neon_finance_day_multiplier,neon_finance.group_neon_finance_bookkeeper,1,1,1,0
+access_neon_finance_day_multiplier_approver,neon.finance.day.multiplier approver (R/W),model_neon_finance_day_multiplier,neon_finance.group_neon_finance_approver,1,1,1,0
+access_neon_finance_conversion_rate_sales,neon.finance.conversion.rate sales (read-only),model_neon_finance_conversion_rate,neon_finance.group_neon_finance_sales,1,0,0,0
+access_neon_finance_conversion_rate_bookkeeper,neon.finance.conversion.rate bookkeeper (R/W/C),model_neon_finance_conversion_rate,neon_finance.group_neon_finance_bookkeeper,1,1,1,0
+access_neon_finance_conversion_rate_approver,neon.finance.conversion.rate approver (R/W/C),model_neon_finance_conversion_rate,neon_finance.group_neon_finance_approver,1,1,1,0

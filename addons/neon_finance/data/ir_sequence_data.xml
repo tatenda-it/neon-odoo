@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            P6.M1 — sequences for the Phase 6 finance models.
+
+            PRC- pads 4 digits (max 9999 pricing rules). At one rule
+            per category-currency pair, with 9 categories × 2
+            currencies = 18 baseline rules and rare additions over
+            time, 4 digits is comfortable headroom.
+
+            FX- pads 6 digits (max 999999 conversion rates). High
+            potential volume if Kudzi maintains daily rates; 6
+            digits keeps padding stable across the deployment life.
+
+            neon.finance.pricing.bracket and neon.finance.day.multiplier
+            do not get sequences — brackets are child records and
+            day multipliers are one-per-category (categories carry
+            the human-readable identity).
+        -->
+
+        <record id="seq_neon_finance_pricing_rule" model="ir.sequence">
+            <field name="name">Pricing Rule</field>
+            <field name="code">neon.finance.pricing.rule</field>
+            <field name="prefix">PRC-</field>
+            <field name="padding">4</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
+        <record id="seq_neon_finance_conversion_rate" model="ir.sequence">
+            <field name="name">Conversion Rate</field>
+            <field name="code">neon.finance.conversion.rate</field>
+            <field name="prefix">FX-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
+    </data>
+</odoo>
