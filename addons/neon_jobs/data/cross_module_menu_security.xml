@@ -42,7 +42,18 @@
              they need the Invoicing menu. Crew + Crew Leader stay
              excluded. Pairs with the security.xml implication
              (neon_jobs_user → account.group_account_invoice) so the
-             menu actually leads somewhere they can act on. -->
+             menu actually leads somewhere they can act on.
+
+             P6.M1.3 NOTE: account.menu_finance is ALSO extended by
+             neon_finance via (4, ...) ADD ops for Bookkeeper /
+             Approver / Billing Admin / Billing groups (see
+             addons/neon_finance/views/neon_finance_menu.xml). Load
+             order: neon_jobs REPLACE here, then neon_finance ADD on
+             the same -u pass. Converged final state lets pure
+             finance-tier users reach the Accounting app even if
+             they carry no operations group. Do not narrow this
+             gate further without coordinating with neon_finance —
+             the Phase 6 finance roles depend on the extension. -->
         <record id="account.menu_finance" model="ir.ui.menu">
             <field name="groups_id" eval="[(6, 0, [
                 ref('neon_jobs.group_neon_jobs_user'),

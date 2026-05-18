@@ -6,10 +6,43 @@ the released `neon_jobs` addon — these files are tooling.
 
 ## Test users (`p2m75_*`) — fixture policy
 
-The `p2m75_*` test users (`sales`, `mgr`, `lead`, `crew`, `other`,
-`t20`) are **stable fixtures** created once during P2.M7. They have
-correct group bindings and password hashes. They **should not be
-recreated** as part of normal workflow.
+> **Local dev only.** These test users live ONLY on the local dev
+> database. They do NOT exist on the Hetzner production database.
+> The real Neon team accounts (`robin@neonhiring.co.zw`,
+> `munashe@neonhiring.co.zw`, `lisar@neonhiring.co.zw`,
+> `evrill@neonhiring.co.zw`, `ranganai@neonhiring.co.zw`,
+> `admin@neonhiring.co.zw`) are reserved for cutover and are
+> **never** used for automated testing.
+
+Eight persistent test fixtures, managed by `.claude/p2m7_5_smoke.py`
+via a `_get_or_create_user` helper. `user_id`s are **stable across
+regression runs** — the smoke does not unlink-and-recreate. On every
+setUp the helper re-asserts the **baseline** `groups_id` set via
+`(6, 0, [...])` replace semantics; manual UI customisations on these
+users (an admin adding a group via Settings → Users) are wiped on
+next setUp. If a scenario needs a user with non-baseline groups,
+**add a new fixture** — don't mutate an existing one.
+
+| Login           | Role                  | Groups                                                       | Purpose                                                            |
+|-----------------|-----------------------|--------------------------------------------------------------|--------------------------------------------------------------------|
+| p2m75_sales     | Sales rep             | `base.group_user`, `neon_jobs.group_neon_jobs_user`          | Quote drafting; read-only on operations                            |
+| p2m75_mgr       | Operations manager    | `base.group_user`, `neon_jobs.group_neon_jobs_manager`       | Full ops authority. **NOT a finance role.**                        |
+| p2m75_lead      | Lead Tech             | `base.group_user`, `neon_jobs.group_neon_jobs_crew_leader`   | Workshop ops, crew assignment authority                            |
+| p2m75_crew      | Crew member           | `base.group_user`, `neon_jobs.group_neon_jobs_crew`          | Own-assignment edit; "self" tier in ownership-isolation tests      |
+| p2m75_other     | Other crew            | `base.group_user`, `neon_jobs.group_neon_jobs_crew`          | Counterpart for "other person's record" tests                      |
+| p2m75_t20       | Throwaway crew        | `base.group_user`, `neon_jobs.group_neon_jobs_crew`          | Spawned mid-T20 to dodge a UNIQUE (job_id, user_id) constraint     |
+| p2m75_book      | Bookkeeper            | `base.group_user`, `neon_finance.group_neon_finance_bookkeeper` | Phase 6+ rate-card / conversion-rate maintenance role            |
+| p2m75_approver  | Approver              | `base.group_user`, `neon_finance.group_neon_finance_approver`   | Phase 6+ quote / cost-line approval authority                    |
+
+To wipe completely (rare — only when group bindings or
+implications genuinely drift): drop the database and re-install.
+A normal `-u` does **not** advance the `res_users_id_seq` because
+the helper finds existing rows by login and reuses them.
+
+The P2.M7-era guidance below — referring to "stable fixtures created
+once during P2.M7" — was aspirational until the P2.M7.5.1 refactor
+(2026-05-18); from that commit forward, the description matches the
+implementation.
 
 ### If a session reports "Wrong login/password"
 
@@ -46,8 +79,10 @@ EOF
 
 ### The destructive recreate scripts (`.deprecated`)
 
-Two retired scripts live under `.deprecated` for historical
-reference. **Do not run either.**
+These pre-date the P2.M7.5.1 fixture refactor when `p2m7_5_smoke.py`
+also did unlink-and-recreate on every run; the refactor removed
+that anti-pattern from the active smoke, and the scripts below
+remain only for historical reference. **Do not run either.**
 
 - `recreate_test_users.py.deprecated` — original (P2.M7)
 - `recreate_users_v3.py.deprecated` — variant that also manufactures

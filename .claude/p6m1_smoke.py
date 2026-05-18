@@ -20,6 +20,7 @@ T516 bookkeeper group implies account.group_account_invoice
 T517 approver group implies account.group_account_invoice
 T518 sales group does NOT imply account.group_account_invoice
 T519 account.menu_finance_configuration grants Bookkeeper + Approver reach
+T520 account.menu_finance (Invoicing app root) grants Bookkeeper + Approver
 """
 from datetime import date, timedelta
 
@@ -481,9 +482,30 @@ results["T519"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T520 - Invoicing app root grants Bookkeeper + Approver reach")
+print("=" * 72)
+# account.menu_finance (the Accounting app root) is narrowed by
+# P2.M7.8.1 cross-module gate to [neon_jobs_user, neon_jobs_manager].
+# Pure finance roles must also reach the app root or the
+# Configuration submenu fix from T519 is unreachable (Odoo cascades
+# menu visibility top-down).
+app_root = env.ref("account.menu_finance")
+ok_bookkeeper = g_bookkeeper in app_root.groups_id
+ok_approver = g_approver in app_root.groups_id
+ok = ok_bookkeeper and ok_approver
+print("  app root groups_id:", [g.name for g in app_root.groups_id])
+print("  bookkeeper present:", ok_bookkeeper,
+      " approver present:", ok_approver)
+print("T520:", "PASS" if ok else "FAIL")
+results["T520"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
-order = ["T%d" % i for i in range(500, 520)]
+order = ["T%d" % i for i in range(500, 521)]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")

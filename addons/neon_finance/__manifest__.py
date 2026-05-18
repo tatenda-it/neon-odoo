@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.6.0.2',
+    'version': '17.0.6.0.3',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                'foundation for Neon Events Elements',
     'description': """

@@ -1,7 +1,87 @@
-"""P2.M7.5 smoke — role model hardening + Lead Tech + crew calendar."""
+"""P2.M7.5 smoke — role model hardening + Lead Tech + crew calendar.
+
+P2.M7.5.1 refactor (2026-05-18): test users are now PERSISTENT via
+_get_or_create_user. user_ids stay stable across regression runs,
+which avoids advancing the res_users id sequence on every cycle and
+preserves audit-trail FKs (mail.activity, action.centre.item.history)
+pointing at the fixtures.
+
+Baseline groups_id is enforced on every setUp via (6, 0, [...])
+replace semantics. Manual UI customisations on the fixture users
+(e.g. an admin granting an extra group via Settings → Users) are
+WIPED on next setUp. Tests that mutate fixture groups mid-run
+(notably T25 — adds crew_leader to sales) rely on this reset
+between regression cycles to start each run from a clean baseline;
+within a single run, downstream tests must not depend on the
+baseline state of a mid-test-mutated user.
+
+Sub-record state — commercial.job, commercial.job.crew,
+mail.activity tied to p2m75_* users, P2M75-prefixed partners — IS
+still cleared on every setUp by _cleanup_per_test_state. Fixture
+users live; their per-test debris does not.
+"""
 from odoo import fields, SUPERUSER_ID
 from odoo.exceptions import AccessError
 
+
+# ============================================================
+# Fixture helpers — get-or-create pattern.
+# Mirrors .claude/seed_p4m9_production_smoke.py:_get_or_create_user.
+# ============================================================
+def _get_or_create_user(login, name, group_xmlids):
+    """Return the user with this login, or create it. On existing
+    users, write the baseline groups_id (replace, not add) so the
+    fixture starts each smoke run in a known state."""
+    user = env["res.users"].sudo().search(
+        [("login", "=", login)], limit=1)
+    grp_ids = [env.ref(x).id for x in group_xmlids]
+    if user:
+        user.sudo().write({
+            "name": name,
+            "password": "test123",
+            "groups_id": [(6, 0, grp_ids)],
+        })
+        return user, False
+    return env["res.users"].sudo().create({
+        "login": login,
+        "name": name,
+        "email": "%s@test.local" % login,
+        "password": "test123",
+        "groups_id": [(6, 0, grp_ids)],
+    }), True
+
+
+def _cleanup_per_test_state():
+    """Clear sub-records that accumulate between regression runs.
+    Does NOT touch res.users — those are persistent fixtures.
+    Test-fixture partners ("P2M75 Venue" / "P2M75 Client") are
+    cleared and re-created each run; user partners ("P2M75 Sales"
+    etc.) are skipped because Odoo's _unlink_except_user blocks
+    unlink of any partner with a linked active user."""
+    p2m75_users = env["res.users"].sudo().search(
+        [("login", "like", "p2m75_")])
+    p2m75_user_ids = p2m75_users.ids
+    p2m75_user_partner_ids = p2m75_users.partner_id.ids
+    env["mail.activity"].sudo().search(
+        [("user_id", "in", p2m75_user_ids)]).unlink()
+    env["commercial.job.crew"].sudo().search([]).unlink()
+    # Polish-backlog: narrow this LIKE 'JOB-' match to test-marked
+    # records only. Currently matches every commercial.job in the DB
+    # because JOB-NNNNNN is the auto-sequence prefix. Acceptable on
+    # local dev DB; reckless on production. Don't run this smoke
+    # against any DB that holds real job records.
+    env["commercial.job"].sudo().search(
+        [("name", "like", "JOB-")]).unlink()
+    env["res.partner"].sudo().search([
+        ("name", "like", "P2M75"),
+        ("id", "not in", p2m75_user_partner_ids),
+    ]).unlink()
+    env.cr.commit()
+
+
+# ============================================================
+# SETUP
+# ============================================================
 print("=" * 72)
 print("SETUP")
 print("=" * 72)
@@ -9,14 +89,10 @@ env.user.write({
     "groups_id": [(4, env.ref("neon_jobs.group_neon_jobs_manager").id)],
 })
 
-# Cleanup
-env["commercial.job"].sudo().search([("name", "like", "JOB-")]).unlink()
-env["commercial.job.crew"].sudo().search([]).unlink()
-env["res.users"].sudo().search([("login", "like", "p2m75_")]).unlink()
-env["res.partner"].sudo().search([("name", "like", "P2M75")]).unlink()
-env.cr.commit()
+_cleanup_per_test_state()
 
-# Fixtures
+# Fixture partners (re-created each run — these are scoped to the
+# smoke and not referenced across smokes).
 venue = env["res.partner"].create({
     "name": "P2M75 Venue", "is_company": True, "is_venue": True,
 })
@@ -24,63 +100,51 @@ client = env["res.partner"].create({
     "name": "P2M75 Client", "is_company": True,
 })
 
-# Users:
-# - sales: internal user, neon_jobs_user only (via base.group_user → implies)
-# - manager: internal + manager
-# - crew_leader: portal-tier with crew_leader only (clean isolation)
-# - crew_only: portal-tier with crew only
-# - other_crew: portal-tier with crew only (for the "other person's record" test)
-sales = env["res.users"].create({
-    "name": "P2M75 Sales", "login": "p2m75_sales",
-    "email": "p2m75_sales@test.local",
-    "password": "test123",
-    # P2.M7.6 removed the base.group_user → neon_jobs_user implication.
-    # Explicit grant required for sales reps now.
-    "groups_id": [(6, 0, [
-        env.ref("base.group_user").id,
-        env.ref("neon_jobs.group_neon_jobs_user").id,
-    ])],
-})
-manager = env["res.users"].create({
-    "name": "P2M75 Manager", "login": "p2m75_mgr",
-    "email": "p2m75_mgr@test.local",
-    "password": "test123",
-    "groups_id": [(6, 0, [
-        env.ref("base.group_user").id,
-        env.ref("neon_jobs.group_neon_jobs_manager").id,
-    ])],
-})
-# crew_leader: realistic Lead Tech = internal user with crew_leader group.
-# base.group_user implies neon_jobs_user, so this user also has user-tier
-# read access on the operational models. The crew_leader grant adds the
-# operational CRUD on commercial.job.crew and write on commercial.job.
-crew_leader = env["res.users"].create({
-    "name": "P2M75 Crew Leader", "login": "p2m75_lead",
-    "email": "p2m75_lead@test.local",
-    "password": "test123",
-    "groups_id": [(6, 0, [
-        env.ref("base.group_user").id,
-        env.ref("neon_jobs.group_neon_jobs_crew_leader").id,
-    ])],
-})
-crew_only = env["res.users"].create({
-    "name": "P2M75 Crew", "login": "p2m75_crew",
-    "email": "p2m75_crew@test.local",
-    "password": "test123",
-    "groups_id": [(6, 0, [
-        env.ref("base.group_user").id,
-        env.ref("neon_jobs.group_neon_jobs_crew").id,
-    ])],
-})
-other_crew = env["res.users"].create({
-    "name": "P2M75 Other Crew", "login": "p2m75_other",
-    "email": "p2m75_other@test.local",
-    "password": "test123",
-    "groups_id": [(6, 0, [
-        env.ref("base.group_user").id,
-        env.ref("neon_jobs.group_neon_jobs_crew").id,
-    ])],
-})
+# Fixture users — 7 baseline + p2m75_t20 spawned mid-T20.
+# - sales:     internal user, neon_jobs_user; quote drafting / read
+# - mgr:       Operations manager (NOT a finance role)
+# - lead:      Lead Tech, internal + crew_leader
+# - crew:      internal + crew tier ("self" in ownership tests)
+# - other:     internal + crew tier (counterpart in ownership tests)
+# - book:      Phase 6+ bookkeeper — rate cards, conversion rates
+# - approver:  Phase 6+ approver — quote / cost-line approval
+USER_SPECS = [
+    ("p2m75_sales",    "P2M75 Sales", [
+        "base.group_user",
+        "neon_jobs.group_neon_jobs_user"]),
+    ("p2m75_mgr",      "P2M75 Manager", [
+        "base.group_user",
+        "neon_jobs.group_neon_jobs_manager"]),
+    ("p2m75_lead",     "P2M75 Crew Leader", [
+        "base.group_user",
+        "neon_jobs.group_neon_jobs_crew_leader"]),
+    ("p2m75_crew",     "P2M75 Crew", [
+        "base.group_user",
+        "neon_jobs.group_neon_jobs_crew"]),
+    ("p2m75_other",    "P2M75 Other Crew", [
+        "base.group_user",
+        "neon_jobs.group_neon_jobs_crew"]),
+    ("p2m75_book",     "P2M75 Bookkeeper", [
+        "base.group_user",
+        "neon_finance.group_neon_finance_bookkeeper"]),
+    ("p2m75_approver", "P2M75 Approver", [
+        "base.group_user",
+        "neon_finance.group_neon_finance_approver"]),
+]
+
+users = {}
+for login, name, groups in USER_SPECS:
+    u, _was_new = _get_or_create_user(login, name, groups)
+    users[login] = u
+
+sales = users["p2m75_sales"]
+manager = users["p2m75_mgr"]
+crew_leader = users["p2m75_lead"]
+crew_only = users["p2m75_crew"]
+other_crew = users["p2m75_other"]
+bookkeeper = users["p2m75_book"]
+approver = users["p2m75_approver"]
+env.cr.commit()
 
 print("sales: user=", sales.has_group("neon_jobs.group_neon_jobs_user"),
       " manager=", sales.has_group("neon_jobs.group_neon_jobs_manager"),
@@ -151,15 +215,12 @@ print("=" * 72)
 print("T20 - Crew leader CAN create commercial.job.crew")
 print("=" * 72)
 # Use a fresh user to avoid the unique (job_id, user_id) constraint.
-t20_user = env["res.users"].create({
-    "name": "P2M75 T20 Target", "login": "p2m75_t20",
-    "email": "p2m75_t20@test.local",
-    "password": "test123",
-    "groups_id": [(6, 0, [
-        env.ref("base.group_user").id,
-        env.ref("neon_jobs.group_neon_jobs_crew").id,
-    ])],
-})
+# Get-or-create so the second regression run finds the existing
+# p2m75_t20 instead of hitting a UNIQUE login violation. Baseline
+# groups are re-asserted on every run.
+t20_user, _ = _get_or_create_user(
+    "p2m75_t20", "P2M75 T20 Target",
+    ["base.group_user", "neon_jobs.group_neon_jobs_crew"])
 env.cr.commit()
 try:
     new_assign = env["commercial.job.crew"].with_user(crew_leader).create({
@@ -357,9 +418,122 @@ env.cr.commit()
 # ============================================================
 print()
 print("=" * 72)
+print("T_USER_STABILITY - setUp twice; all p2m75_* user_ids unchanged")
+print("=" * 72)
+# Capture baseline ids from the current setUp, then re-invoke the
+# get-or-create helpers for every fixture login. Existing rows must
+# be found and reused; no new res.users records may appear.
+baseline_ids = {
+    login: env["res.users"].sudo().search(
+        [("login", "=", login)], limit=1).id
+    for login, _, _ in USER_SPECS
+}
+baseline_ids["p2m75_t20"] = env["res.users"].sudo().search(
+    [("login", "=", "p2m75_t20")], limit=1).id
+
+for login, name, groups in USER_SPECS:
+    _get_or_create_user(login, name, groups)
+_get_or_create_user(
+    "p2m75_t20", "P2M75 T20 Target",
+    ["base.group_user", "neon_jobs.group_neon_jobs_crew"])
+env.cr.commit()
+
+post_ids = {
+    login: env["res.users"].sudo().search(
+        [("login", "=", login)], limit=1).id
+    for login in baseline_ids
+}
+diffs = [
+    (login, baseline_ids[login], post_ids[login])
+    for login in baseline_ids
+    if baseline_ids[login] != post_ids[login]
+]
+ok = not diffs
+for login in sorted(baseline_ids):
+    before = baseline_ids[login]
+    after = post_ids[login]
+    print("  %-16s id=%d  -> %d  %s" % (
+        login, before, after,
+        "OK" if before == after else "CHANGED"))
+print("T_USER_STABILITY:", "PASS" if ok else "FAIL")
+results["T_USER_STABILITY"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T_USER_BOOK_EXISTS - p2m75_book has bookkeeper group")
+print("=" * 72)
+book = env["res.users"].sudo().search(
+    [("login", "=", "p2m75_book")], limit=1)
+g_book = env.ref("neon_finance.group_neon_finance_bookkeeper")
+ok = bool(book) and book.has_group(
+    "neon_finance.group_neon_finance_bookkeeper")
+print("  user exists:", bool(book), " id:", book.id if book else None)
+print("  in group_neon_finance_bookkeeper:",
+      book.has_group("neon_finance.group_neon_finance_bookkeeper")
+      if book else None)
+print("T_USER_BOOK_EXISTS:", "PASS" if ok else "FAIL")
+results["T_USER_BOOK_EXISTS"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T_USER_APPROVER_EXISTS - p2m75_approver has approver group")
+print("=" * 72)
+appr = env["res.users"].sudo().search(
+    [("login", "=", "p2m75_approver")], limit=1)
+g_appr = env.ref("neon_finance.group_neon_finance_approver")
+ok = bool(appr) and appr.has_group(
+    "neon_finance.group_neon_finance_approver")
+print("  user exists:", bool(appr), " id:", appr.id if appr else None)
+print("  in group_neon_finance_approver:",
+      appr.has_group("neon_finance.group_neon_finance_approver")
+      if appr else None)
+print("T_USER_APPROVER_EXISTS:", "PASS" if ok else "FAIL")
+results["T_USER_APPROVER_EXISTS"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T_USER_BASELINE_SYNC - non-baseline group on p2m75_mgr wiped by setUp")
+print("=" * 72)
+# Guardrail against future regressions toward a "preserve manual
+# grants" anti-pattern. Add an extra group to p2m75_mgr that is NOT
+# in its baseline spec, re-invoke the get-or-create helper, then
+# assert the extra group is gone.
+extra_group = env.ref("neon_jobs.group_neon_jobs_crew_leader")
+manager.sudo().write({"groups_id": [(4, extra_group.id)]})
+manager.invalidate_recordset()
+assert extra_group in manager.groups_id, (
+    "Pre-condition failed: extra group did not land on p2m75_mgr.")
+
+# Re-invoke the same get-or-create spec from USER_SPECS — the
+# baseline groups_id should be re-asserted via (6, 0, [...]).
+_get_or_create_user(
+    "p2m75_mgr", "P2M75 Manager",
+    ["base.group_user", "neon_jobs.group_neon_jobs_manager"])
+env.cr.commit()
+manager.invalidate_recordset()
+ok = extra_group not in manager.groups_id
+print("  extra group (crew_leader) after re-setUp:",
+      "absent (good)" if ok else "still present (bad)")
+print("  p2m75_mgr current groups:",
+      [g.name for g in manager.groups_id])
+print("T_USER_BASELINE_SYNC:", "PASS" if ok else "FAIL")
+results["T_USER_BASELINE_SYNC"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
-order = ["T18", "T19", "T20", "T21", "T22", "T23", "T24", "T25", "T26"]
+order = ["T18", "T19", "T20", "T21", "T22", "T23", "T24", "T25", "T26",
+         "T_USER_STABILITY", "T_USER_BOOK_EXISTS",
+         "T_USER_APPROVER_EXISTS", "T_USER_BASELINE_SYNC"]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")
