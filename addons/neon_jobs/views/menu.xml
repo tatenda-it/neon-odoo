@@ -108,13 +108,16 @@
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="38"/>
 
-    <!-- P5.M1 — Workshop top-level navigation. Gated to manager
-         tier; Phase 5 later milestones layer in dedicated workshop
-         roles (lead tech, stores keeper) on top of this. -->
+    <!-- P5.M1 — Workshop top-level navigation. Gated to manager +
+         crew_leader (crew_leader added in P5.M10 hotfix so the
+         dashboard Overview is reachable from the menu — the deeper
+         Equipment / Movements / Repair Orders entries inherit the
+         action-level ACLs already defined on each underlying model).
+         -->
     <menuitem id="menu_workshop_root"
               name="Workshop"
               sequence="45"
-              groups="neon_jobs.group_neon_jobs_manager"/>
+              groups="neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"/>
 
     <menuitem id="menu_workshop_equipment"
               name="Equipment"

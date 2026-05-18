@@ -17,8 +17,14 @@ T409  _count_incidents_open excludes resolved_* + cancelled
 T410  _count_high_impact_30d window: 35-day line NOT counted
 T411  get_dashboard_data wire shape — 10 keys + last_updated
 T412  every action_id resolves to a valid ir.actions.act_window
+T413  AccessError on get_dashboard_data for crew tier
+T414  Manager passes (no error, returns dict)
+T415  Crew Leader passes (no error, returns dict)
+T416  Other non-allowed user blocked
 """
 from datetime import datetime, timedelta
+
+from odoo.exceptions import AccessError
 
 
 print("=" * 72)
@@ -39,7 +45,15 @@ ActWindow = env["ir.actions.act_window"]
 Category = env["neon.equipment.category"]
 
 manager = env["res.users"].search([("login", "=", "p2m75_mgr")], limit=1)
+lead = env["res.users"].search([("login", "=", "p2m75_lead")], limit=1)
+crew_user = env["res.users"].search(
+    [("login", "=", "p2m75_crew")], limit=1)
+other_user = env["res.users"].search(
+    [("login", "=", "p2m75_other")], limit=1)
 assert manager, "p2m75_mgr seed user missing"
+assert lead, "p2m75_lead seed user missing"
+assert crew_user, "p2m75_crew seed user missing"
+assert other_user, "p2m75_other seed user missing"
 
 
 # ============================================================
@@ -352,9 +366,89 @@ results["T412"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T413 - AccessError on get_dashboard_data for crew tier")
+print("=" * 72)
+try:
+    env["neon.equipment.dashboard"].with_user(
+        crew_user).get_dashboard_data()
+    raised = None
+except AccessError as e:
+    raised = e
+except Exception as e:  # noqa: BLE001
+    raised = e
+ok = isinstance(raised, AccessError)
+print("  raised:", type(raised).__name__ if raised else None,
+      " msg:", (str(raised) or "")[:120])
+print("T413:", "PASS" if ok else "FAIL")
+results["T413"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T414 - Manager passes (returns dict)")
+print("=" * 72)
+try:
+    data_mgr = env["neon.equipment.dashboard"].with_user(
+        manager).get_dashboard_data()
+    err = None
+except Exception as e:  # noqa: BLE001
+    data_mgr = None
+    err = e
+ok = (err is None and isinstance(data_mgr, dict)
+      and "active_units" in data_mgr)
+print("  err:", type(err).__name__ if err else None,
+      " keys:", sorted(data_mgr.keys())[:3] if data_mgr else None)
+print("T414:", "PASS" if ok else "FAIL")
+results["T414"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T415 - Crew Leader passes (returns dict)")
+print("=" * 72)
+try:
+    data_lead = env["neon.equipment.dashboard"].with_user(
+        lead).get_dashboard_data()
+    err = None
+except Exception as e:  # noqa: BLE001
+    data_lead = None
+    err = e
+ok = (err is None and isinstance(data_lead, dict)
+      and "active_units" in data_lead)
+print("  err:", type(err).__name__ if err else None,
+      " keys:", sorted(data_lead.keys())[:3] if data_lead else None)
+print("T415:", "PASS" if ok else "FAIL")
+results["T415"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T416 - Other non-allowed user blocked")
+print("=" * 72)
+try:
+    env["neon.equipment.dashboard"].with_user(
+        other_user).get_dashboard_data()
+    raised = None
+except AccessError as e:
+    raised = e
+except Exception as e:  # noqa: BLE001
+    raised = e
+ok = isinstance(raised, AccessError)
+print("  raised:", type(raised).__name__ if raised else None,
+      " msg:", (str(raised) or "")[:120])
+print("T416:", "PASS" if ok else "FAIL")
+results["T416"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
-order = [f"T{i}" for i in range(400, 413)]
+order = [f"T{i}" for i in range(400, 417)]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")

@@ -17,6 +17,7 @@ records in views/ and the helpers here cannot drift.
 from datetime import timedelta
 
 from odoo import _, api, fields, models
+from odoo.exceptions import AccessError
 
 
 class NeonEquipmentDashboard(models.Model):
@@ -25,6 +26,39 @@ class NeonEquipmentDashboard(models.Model):
 
     # No fields. ACL grants read to manager + crew_leader so they
     # can call get_dashboard_data; no records ever exist.
+
+    # ============================================================
+    # === Group-check helper
+    # The dashboard is visible only to manager + crew_leader.
+    # Centralised so the server-action wrapper and the RPC entry
+    # point share one definition.
+    # ============================================================
+    @api.model
+    def _check_dashboard_access(self):
+        user = self.env.user
+        if not (
+            user.has_group("neon_jobs.group_neon_jobs_manager")
+            or user.has_group("neon_jobs.group_neon_jobs_crew_leader")
+        ):
+            raise AccessError(_(
+                "You don't have permission to view the workshop "
+                "dashboard."))
+
+    # ============================================================
+    # === Server-action entry point.
+    # Called by the menu's ir.actions.server record. Returns the
+    # client-action descriptor INLINE rather than via a persisted
+    # ir.actions.client record so there's no direct-URL bypass.
+    # ============================================================
+    @api.model
+    def action_open_workshop_dashboard(self):
+        self._check_dashboard_access()
+        return {
+            "type": "ir.actions.client",
+            "tag": "neon_workshop_dashboard",
+            "name": _("Workshop Overview"),
+            "target": "current",
+        }
 
     # ============================================================
     # === Tile 1: active_units — units currently in service
@@ -143,6 +177,11 @@ class NeonEquipmentDashboard(models.Model):
     # ============================================================
     @api.model
     def get_dashboard_data(self):
+        # P5.M10 hotfix: defence-in-depth. The server-action wrapper
+        # also enforces the same check, but a caller who bypasses the
+        # action layer (direct RPC, scripted client) must still be
+        # rejected here.
+        self._check_dashboard_access()
         ref = self.env.ref
         return {
             "active_units": {

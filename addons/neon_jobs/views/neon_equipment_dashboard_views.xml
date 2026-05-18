@@ -106,24 +106,42 @@
     </record>
 
     <!-- ============================================================
-         Client action — binds the OWL component
+         Server-action wrapper for the OWL client action.
+
+         P5.M10 hotfix: ir.actions.client has no groups_id field in
+         Odoo 17 (only ir.actions.act_window does), so gating must
+         happen at a layer the framework actually enforces. Pattern
+         matches P3.M8 Closeout Queue and P4.M3 Action Centre — the
+         menu invokes a server action whose Python body checks the
+         caller's groups and returns the client-action descriptor
+         INLINE (no persisted ir.actions.client record). Without a
+         persisted record there is no action ID for an attacker to
+         /web#action=ID against; the dashboard is reachable only
+         through this server action, and the server action raises
+         AccessError for callers outside the manager + crew_leader
+         set. Defence-in-depth: the RPC method get_dashboard_data
+         enforces the same check at the data layer.
          ============================================================ -->
 
-    <record id="action_workshop_dashboard" model="ir.actions.client">
+    <record id="action_workshop_dashboard_server" model="ir.actions.server">
         <field name="name">Workshop Overview</field>
-        <field name="tag">neon_workshop_dashboard</field>
+        <field name="model_id" ref="model_neon_equipment_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_workshop_dashboard()</field>
     </record>
 
     <!-- ============================================================
          Menu entry — sequence=5 so it sits above Equipment (10) under
-         the existing Workshop root. Manager-tier visibility is
-         inherited from menu_workshop_root.
+         the existing Workshop root. Group visibility is enforced at
+         three layers: menu_workshop_root groups, this server action's
+         action_open_workshop_dashboard guard, and the model RPC's
+         get_dashboard_data guard.
          ============================================================ -->
 
     <menuitem id="menu_workshop_overview"
               name="Overview"
               parent="menu_workshop_root"
-              action="action_workshop_dashboard"
+              action="action_workshop_dashboard_server"
               sequence="5"/>
 
 </odoo>
