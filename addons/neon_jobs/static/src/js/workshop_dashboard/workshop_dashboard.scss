@@ -1,0 +1,234 @@
+// =========================================================================
+// P5.M10 — Workshop Dashboard styling.
+//
+// Brand colours are exposed as CSS custom properties on :root so they can
+// be overridden by a future global theme file (Phase 11) without forcing
+// a rebuild here. Tile palette derives from semantic urgency tokens
+// (normal / attention / critical), each with a border and a subtle label
+// tint so colour status is immediately legible without relying on the
+// value alone.
+// =========================================================================
+
+:root {
+    --neon-purple-primary: #6B2DBF;
+    --neon-purple-deep: #4A1F87;
+    --neon-tile-border-normal: #d0d5dd;
+    --neon-tile-border-attention: #f59e0b;
+    --neon-tile-border-critical: #dc2626;
+    --neon-tile-label-attention: #92400e;
+    --neon-tile-label-critical: #991b1b;
+    --neon-tile-bg: #ffffff;
+    --neon-tile-hover-shadow: 0 6px 16px rgba(107, 45, 191, 0.12);
+    --neon-group-label-color: #4b5563;
+}
+
+.o_neon_workshop_dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    color: #1f2937;
+
+    .o_neon_dashboard_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+
+        .o_neon_dashboard_title {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+
+            h2 {
+                margin: 0;
+                font-weight: 600;
+                color: var(--neon-purple-deep);
+            }
+        }
+
+        .o_neon_dashboard_refresh {
+            background-color: var(--neon-purple-primary);
+            border-color: var(--neon-purple-primary);
+
+            &:hover:not(:disabled) {
+                background-color: var(--neon-purple-deep);
+                border-color: var(--neon-purple-deep);
+            }
+        }
+    }
+
+    .o_neon_dashboard_error {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .o_neon_dashboard_group {
+        margin-bottom: 2rem;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    .o_neon_group_label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--neon-group-label-color);
+        margin-bottom: 0.75rem;
+    }
+
+    .o_neon_tile_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .o_neon_tile {
+        position: relative;
+        background: var(--neon-tile-bg);
+        border: 1px solid var(--neon-tile-border-normal);
+        border-radius: 12px;
+        padding: 1.25rem;
+        cursor: pointer;
+        transition:
+            transform 0.15s ease,
+            box-shadow 0.15s ease,
+            border-color 0.15s ease;
+        min-height: 120px;
+        // Touch-target safety per mobile design D7.
+        min-width: 44px;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--neon-tile-hover-shadow);
+            border-color: var(--neon-purple-primary);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--neon-purple-primary);
+            outline-offset: 2px;
+        }
+
+        .o_neon_tile_icon {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            opacity: 0.35;
+            font-size: 1.25rem;
+        }
+
+        .o_neon_tile_value {
+            font-size: 32px;
+            font-weight: 500;
+            line-height: 1.1;
+            margin-bottom: 0.5rem;
+        }
+
+        .o_neon_tile_title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #374151;
+        }
+
+        .o_neon_tile_subtitle {
+            font-size: 12px;
+            color: #6b7280;
+        }
+    }
+
+    // --- Urgency variants ----------------------------------------
+    .o_neon_tile_normal {
+        border-color: var(--neon-tile-border-normal);
+    }
+
+    .o_neon_tile_attention {
+        border-color: var(--neon-tile-border-attention);
+
+        .o_neon_tile_title {
+            color: var(--neon-tile-label-attention);
+        }
+        .o_neon_tile_icon {
+            color: var(--neon-tile-border-attention);
+            opacity: 0.6;
+        }
+    }
+
+    .o_neon_tile_critical {
+        border-color: var(--neon-tile-border-critical);
+        border-width: 1.5px;
+
+        .o_neon_tile_title {
+            color: var(--neon-tile-label-critical);
+        }
+        .o_neon_tile_icon {
+            color: var(--neon-tile-border-critical);
+            opacity: 0.7;
+        }
+    }
+
+    // --- Skeleton loading state ----------------------------------
+    .o_neon_dashboard_loading {
+        .o_neon_skeleton_group {
+            margin-bottom: 2rem;
+        }
+
+        .o_neon_skeleton_label {
+            width: 180px;
+            height: 12px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            margin-bottom: 0.75rem;
+        }
+
+        .o_neon_skeleton_grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .o_neon_skeleton_tile {
+            background: #f3f4f6;
+            border-radius: 12px;
+            min-height: 120px;
+            animation: o_neon_skeleton_pulse 1.4s ease-in-out infinite;
+        }
+    }
+
+    @keyframes o_neon_skeleton_pulse {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    // --- Mobile reflow (basic — Phase 11 hardens) ----------------
+    @media (max-width: 700px) {
+        padding: 1rem;
+
+        .o_neon_tile_grid,
+        .o_neon_dashboard_loading .o_neon_skeleton_grid {
+            grid-template-columns: 1fr;
+        }
+
+        .o_neon_dashboard_header {
+            flex-direction: column;
+            align-items: stretch;
+
+            .o_neon_dashboard_refresh {
+                width: 100%;
+            }
+        }
+    }
+}

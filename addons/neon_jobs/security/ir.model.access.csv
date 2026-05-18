@@ -131,3 +131,5 @@ access_neon_equipment_incident_user,neon.equipment.incident user (read-only),mod
 access_neon_equipment_incident_crew_leader,neon.equipment.incident crew_leader (R/U/C),model_neon_equipment_incident,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
 access_neon_equipment_incident_crew,neon.equipment.incident crew (read-only),model_neon_equipment_incident,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_neon_equipment_incident_manager,neon.equipment.incident manager (full),model_neon_equipment_incident,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_dashboard_manager,neon.equipment.dashboard manager (read-only — virtual model),model_neon_equipment_dashboard,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_neon_equipment_dashboard_crew_leader,neon.equipment.dashboard crew_leader (read-only — virtual model),model_neon_equipment_dashboard,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0

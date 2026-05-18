@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.4.0.11",
+    "version": "17.0.4.0.12",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -106,7 +106,18 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         # the -i codepath was unexercised until production.
         "views/menu.xml",
         "data/operations_submenu_security.xml",
+        # P5.M10 — Workshop Dashboard. Loads after menu.xml so the
+        # menuitem can resolve menu_workshop_root as its parent.
+        "views/neon_equipment_dashboard_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            # P5.M10 — Workshop Dashboard OWL client action.
+            "neon_jobs/static/src/js/workshop_dashboard/workshop_dashboard.js",
+            "neon_jobs/static/src/js/workshop_dashboard/workshop_dashboard.xml",
+            "neon_jobs/static/src/js/workshop_dashboard/workshop_dashboard.scss",
+        ],
+    },
     "installable": True,
     "application": True,
     "auto_install": False,

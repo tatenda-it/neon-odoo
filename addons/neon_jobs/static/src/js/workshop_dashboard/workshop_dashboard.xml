@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_jobs.WorkshopDashboard">
+        <div class="o_neon_workshop_dashboard">
+
+            <!-- Header -->
+            <div class="o_neon_dashboard_header">
+                <div class="o_neon_dashboard_title">
+                    <h2>Workshop Overview</h2>
+                    <small t-if="lastUpdated" class="text-muted">
+                        Last updated: <t t-esc="lastUpdated"/>
+                    </small>
+                </div>
+                <button class="btn btn-primary o_neon_dashboard_refresh"
+                        t-on-click="onRefreshClick"
+                        t-att-disabled="state.loading">
+                    <i class="fa fa-refresh" t-att-class="state.loading ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <!-- Error banner -->
+            <div t-if="state.error" class="alert alert-danger o_neon_dashboard_error" role="alert">
+                <div>
+                    <i class="fa fa-exclamation-circle me-2"/>
+                    <span>Failed to load dashboard data: </span>
+                    <span t-esc="state.error"/>
+                </div>
+                <button class="btn btn-sm btn-outline-danger ms-3"
+                        t-on-click="onRefreshClick">Retry</button>
+            </div>
+
+            <!-- Loading skeleton (first load only) -->
+            <div t-if="state.loading and !state.data" class="o_neon_dashboard_loading">
+                <div class="o_neon_skeleton_group">
+                    <div class="o_neon_skeleton_label"></div>
+                    <div class="o_neon_skeleton_grid">
+                        <t t-foreach="[1, 2, 3, 4, 5]" t-as="_" t-key="_">
+                            <div class="o_neon_skeleton_tile"/>
+                        </t>
+                    </div>
+                </div>
+                <div class="o_neon_skeleton_group">
+                    <div class="o_neon_skeleton_label"></div>
+                    <div class="o_neon_skeleton_grid">
+                        <t t-foreach="[1, 2, 3, 4, 5]" t-as="_" t-key="_">
+                            <div class="o_neon_skeleton_tile"/>
+                        </t>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rendered tiles -->
+            <div t-if="state.data" class="o_neon_dashboard_content">
+
+                <div class="o_neon_dashboard_group">
+                    <h3 class="o_neon_group_label">Inventory Snapshot</h3>
+                    <div class="o_neon_tile_grid">
+                        <t t-foreach="tiles.inventory" t-as="tile" t-key="tile.key">
+                            <div class="o_neon_tile"
+                                 t-att-class="'o_neon_tile_' + tile.urgency"
+                                 t-on-click="() => this.onTileClick(tile.key)">
+                                <div class="o_neon_tile_icon">
+                                    <i class="fa" t-att-class="tile.icon"/>
+                                </div>
+                                <div class="o_neon_tile_value" t-esc="tile.value"/>
+                                <div class="o_neon_tile_title" t-esc="tile.title"/>
+                                <div class="o_neon_tile_subtitle" t-esc="tile.subtitle"/>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+
+                <div class="o_neon_dashboard_group">
+                    <h3 class="o_neon_group_label">Attention Needed</h3>
+                    <div class="o_neon_tile_grid">
+                        <t t-foreach="tiles.attention" t-as="tile" t-key="tile.key">
+                            <div class="o_neon_tile"
+                                 t-att-class="'o_neon_tile_' + tile.urgency"
+                                 t-on-click="() => this.onTileClick(tile.key)">
+                                <div class="o_neon_tile_icon">
+                                    <i class="fa" t-att-class="tile.icon"/>
+                                </div>
+                                <div class="o_neon_tile_value" t-esc="tile.value"/>
+                                <div class="o_neon_tile_title" t-esc="tile.title"/>
+                                <div class="o_neon_tile_subtitle" t-esc="tile.subtitle"/>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

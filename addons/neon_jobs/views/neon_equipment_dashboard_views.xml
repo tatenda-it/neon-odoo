@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P5.M10 — Workshop Dashboard
+
+    Per-tile ir.actions.act_window records (10), the ir.actions.client
+    record bound to the OWL component, and the top-level Workshop >
+    Overview menu entry. Domains here MUST stay in lock-step with the
+    count helpers in models/neon_equipment_dashboard.py.
+-->
+<odoo>
+
+    <!-- ============================================================
+         Inventory Snapshot — 5 tiles
+         ============================================================ -->
+
+    <record id="action_dashboard_active_units" model="ir.actions.act_window">
+        <field name="name">Active Units</field>
+        <field name="res_model">neon.equipment.unit</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('state', '=', 'active')]</field>
+    </record>
+
+    <record id="action_dashboard_units_out" model="ir.actions.act_window">
+        <field name="name">Units Checked Out</field>
+        <field name="res_model">neon.equipment.unit</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('state', '=', 'checked_out')]</field>
+    </record>
+
+    <record id="action_dashboard_reservations_7d" model="ir.actions.act_window">
+        <field name="name">Reservations — Next 7 Days</field>
+        <field name="res_model">neon.equipment.reservation</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('state', 'in', ('soft_hold', 'confirmed')),
+            ('reserve_from', '&gt;=', datetime.datetime.now()),
+            ('reserve_from', '&lt;=', datetime.datetime.now() + datetime.timedelta(days=7))
+        ]</field>
+    </record>
+
+    <record id="action_dashboard_pending_transfers" model="ir.actions.act_window">
+        <field name="name">Pending Transfers</field>
+        <field name="res_model">neon.equipment.movement</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('transfer_state', '=', 'pending')]</field>
+    </record>
+
+    <record id="action_dashboard_late_returns" model="ir.actions.act_window">
+        <field name="name">Late Returns</field>
+        <field name="res_model">neon.equipment.reservation</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('late_return_pending', '=', True)]</field>
+    </record>
+
+    <!-- ============================================================
+         Attention Needed — 5 tiles
+         ============================================================ -->
+
+    <record id="action_dashboard_equipment_conflicts" model="ir.actions.act_window">
+        <field name="name">Equipment Conflicts — Open</field>
+        <field name="res_model">action.centre.item</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('trigger_type', '=', 'equipment_conflict'),
+            ('state', 'in', ('open', 'in_progress'))
+        ]</field>
+    </record>
+
+    <record id="action_dashboard_stock_discrepancies" model="ir.actions.act_window">
+        <field name="name">Stock Discrepancies — Open</field>
+        <field name="res_model">neon.equipment.stock.take.line</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('has_discrepancy', '=', True),
+            ('resolved', '=', False)
+        ]</field>
+    </record>
+
+    <record id="action_dashboard_repair_orders" model="ir.actions.act_window">
+        <field name="name">Repair Orders — Open</field>
+        <field name="res_model">neon.equipment.repair.order</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('state', 'in', ('open', 'diagnosed', 'quoted', 'approved', 'in_progress'))
+        ]</field>
+    </record>
+
+    <record id="action_dashboard_incidents" model="ir.actions.act_window">
+        <field name="name">Incidents — Open</field>
+        <field name="res_model">neon.equipment.incident</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('state', 'not in', ('resolved_recovered', 'resolved_writeoff', 'resolved_claim', 'cancelled'))
+        ]</field>
+    </record>
+
+    <record id="action_dashboard_high_impact_30d" model="ir.actions.act_window">
+        <field name="name">High-Impact Discrepancies — Last 30 Days</field>
+        <field name="res_model">neon.equipment.stock.take.line</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('is_high_impact', '=', True),
+            ('has_discrepancy', '=', True),
+            ('create_date', '&gt;=', (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S'))
+        ]</field>
+    </record>
+
+    <!-- ============================================================
+         Client action — binds the OWL component
+         ============================================================ -->
+
+    <record id="action_workshop_dashboard" model="ir.actions.client">
+        <field name="name">Workshop Overview</field>
+        <field name="tag">neon_workshop_dashboard</field>
+    </record>
+
+    <!-- ============================================================
+         Menu entry — sequence=5 so it sits above Equipment (10) under
+         the existing Workshop root. Manager-tier visibility is
+         inherited from menu_workshop_root.
+         ============================================================ -->
+
+    <menuitem id="menu_workshop_overview"
+              name="Overview"
+              parent="menu_workshop_root"
+              action="action_workshop_dashboard"
+              sequence="5"/>
+
+</odoo>
