@@ -106,20 +106,17 @@
         </field>
     </record>
 
-    <!-- P5.M6 — pending transfers list (action used by the new
-         Workshop > Equipment > Pending Transfers menu). -->
-    <record id="neon_equipment_movement_pending_transfers_action"
-            model="ir.actions.act_window">
-        <field name="name">Pending Transfers</field>
-        <field name="res_model">neon.equipment.movement</field>
-        <field name="view_mode">tree,form</field>
-        <field name="domain">[('movement_type', '=', 'transfer_out'),
-                              ('transfer_state', 'in',
-                               ('pending', 'expired'))]</field>
-        <field name="search_view_id"
-               ref="neon_equipment_movement_view_search"/>
-    </record>
-
+    <!-- Search view defined BEFORE the actions that reference it.
+         Odoo's data loader resolves ref() against records already
+         materialised in ir_model_data plus those loaded earlier in
+         the current XML file. On a fresh-install upgrade path
+         (production going from a pre-P5 version), the search view
+         must exist by the time the pending_transfers_action's
+         search_view_id ref is resolved — local upgrades hid this
+         load-order bug because the records were already in
+         ir_model_data from prior loads. (Discovered during P5.M11
+         Hetzner deploy 2026-05-18; rolled back cleanly via
+         transaction abort, no DB state corruption.) -->
     <record id="neon_equipment_movement_view_search" model="ir.ui.view">
         <field name="name">neon.equipment.movement.search</field>
         <field name="model">neon.equipment.movement</field>
@@ -151,6 +148,20 @@
                 </group>
             </search>
         </field>
+    </record>
+
+    <!-- P5.M6 — pending transfers list (action used by the new
+         Workshop > Equipment > Pending Transfers menu). -->
+    <record id="neon_equipment_movement_pending_transfers_action"
+            model="ir.actions.act_window">
+        <field name="name">Pending Transfers</field>
+        <field name="res_model">neon.equipment.movement</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('movement_type', '=', 'transfer_out'),
+                              ('transfer_state', 'in',
+                               ('pending', 'expired'))]</field>
+        <field name="search_view_id"
+               ref="neon_equipment_movement_view_search"/>
     </record>
 
     <record id="neon_equipment_movement_action" model="ir.actions.act_window">
