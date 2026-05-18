@@ -128,6 +128,16 @@
         <field name="model_id" ref="model_neon_equipment_dashboard"/>
         <field name="state">code</field>
         <field name="code">action = model.action_open_workshop_dashboard()</field>
+        <!-- P5.M10 hotfix #2: groups_id MUST be set on every
+             ir.actions.server wrapper. Without it, Odoo's run()
+             at ir_actions.py:912-922 falls into an else branch
+             that requires write access on the model_id model;
+             our virtual dashboard model only grants read, so even
+             manager + crew_leader hit "no group allows modify".
+             Setting groups_id sends the runner into the
+             permitted-groups branch and skips the write check.
+             Matches P3.M8 / P4.M3 wrapper pattern. -->
+        <field name="groups_id" eval="[(6, 0, [ref('neon_jobs.group_neon_jobs_manager'), ref('neon_jobs.group_neon_jobs_crew_leader')])]"/>
     </record>
 
     <!-- ============================================================

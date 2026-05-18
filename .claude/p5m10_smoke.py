@@ -21,6 +21,9 @@ T413  AccessError on get_dashboard_data for crew tier
 T414  Manager passes (no error, returns dict)
 T415  Crew Leader passes (no error, returns dict)
 T416  Other non-allowed user blocked
+T417  Server-action wrapper .run() as manager — returns client-action dict
+T418  Server-action wrapper .run() as crew — AccessError
+T419  Server-action wrapper .run() as crew_leader — returns client-action dict
 """
 from datetime import datetime, timedelta
 
@@ -446,9 +449,81 @@ results["T416"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T417 - Server-action wrapper .run() as manager — returns dict")
+print("=" * 72)
+server_action = env.ref(
+    "neon_jobs.action_workshop_dashboard_server")
+ctx_mgr = {
+    "active_id": server_action.id,
+    "active_model": "ir.actions.server",
+}
+try:
+    res_mgr = server_action.with_user(manager).with_context(
+        **ctx_mgr).run()
+    err = None
+except Exception as e:  # noqa: BLE001
+    res_mgr = None
+    err = e
+ok = (err is None and isinstance(res_mgr, dict)
+      and res_mgr.get("type") == "ir.actions.client"
+      and res_mgr.get("tag") == "neon_workshop_dashboard")
+print("  err:", type(err).__name__ if err else None,
+      " result.type:", (res_mgr or {}).get("type"),
+      " tag:", (res_mgr or {}).get("tag"))
+print("T417:", "PASS" if ok else "FAIL")
+results["T417"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T418 - Server-action wrapper .run() as crew — AccessError")
+print("=" * 72)
+try:
+    server_action.with_user(crew_user).with_context(
+        active_id=server_action.id,
+        active_model="ir.actions.server").run()
+    raised = None
+except AccessError as e:
+    raised = e
+except Exception as e:  # noqa: BLE001
+    raised = e
+ok = isinstance(raised, AccessError)
+print("  raised:", type(raised).__name__ if raised else None,
+      " msg:", (str(raised) or "")[:120])
+print("T418:", "PASS" if ok else "FAIL")
+results["T418"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T419 - Server-action wrapper .run() as crew_leader — returns dict")
+print("=" * 72)
+try:
+    res_lead = server_action.with_user(lead).with_context(
+        active_id=server_action.id,
+        active_model="ir.actions.server").run()
+    err = None
+except Exception as e:  # noqa: BLE001
+    res_lead = None
+    err = e
+ok = (err is None and isinstance(res_lead, dict)
+      and res_lead.get("type") == "ir.actions.client"
+      and res_lead.get("tag") == "neon_workshop_dashboard")
+print("  err:", type(err).__name__ if err else None,
+      " result.type:", (res_lead or {}).get("type"),
+      " tag:", (res_lead or {}).get("tag"))
+print("T419:", "PASS" if ok else "FAIL")
+results["T419"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
-order = [f"T{i}" for i in range(400, 417)]
+order = [f"T{i}" for i in range(400, 420)]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")
