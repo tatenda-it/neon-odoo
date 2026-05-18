@@ -14,6 +14,8 @@ T370 marking line.resolved=True auto-closes the high-impact item
 T371 'Attest All As Expected' bulk-attests every unattested line
 T372 state machine: pending → in_progress → completed; complete
      with unattested lines raises
+T420 P5.M11 hotfix — stock_take_line tree view exists with multiple
+     columns and the required field set for dashboard drill-through
 """
 from datetime import date
 
@@ -426,10 +428,39 @@ results["T372"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T420 - stock_take_line tree view: multi-column, required fields")
+print("=" * 72)
+# P5.M11 hotfix verification. Before the fix the act_window for
+# the dashboard's drill-through tiles fell back to an Odoo
+# auto-generated tree showing only id. We require >=5 fields and
+# the key signal columns (unit_id, stock_take_id, has_discrepancy,
+# is_high_impact, resolved) to be present in the arch.
+view = env.ref(
+    "neon_jobs.neon_equipment_stock_take_line_view_tree",
+    raise_if_not_found=False,
+)
+arch = view.arch_db if view else ""
+required = (
+    "unit_id", "stock_take_id", "has_discrepancy",
+    "is_high_impact", "resolved",
+)
+missing = [f for f in required if 'name="%s"' % f not in arch]
+field_count = arch.count("<field name=")
+ok = bool(view) and not missing and field_count >= 5
+print("  view resolved:", bool(view))
+print("  field count in arch:", field_count, "(want >=5)")
+print("  required fields missing:", missing or "(none)")
+print("T420:", "PASS" if ok else "FAIL")
+results["T420"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
 order = ["T360", "T361", "T362", "T363", "T364", "T365", "T366",
-         "T367", "T368", "T369", "T370", "T371", "T372"]
+         "T367", "T368", "T369", "T370", "T371", "T372", "T420"]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")

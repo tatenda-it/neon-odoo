@@ -162,6 +162,83 @@
         </field>
     </record>
 
+    <!-- ============================================================
+         P5.M11 hotfix — top-level tree + search for the line model.
+
+         Two dashboard tile drill-throughs (Stock Discrepancies — Open
+         and High-Impact — Last 30 Days) open act_windows against
+         neon.equipment.stock.take.line without specifying a view_id.
+         Without a top-level tree view registered for the model, Odoo
+         falls back to a single-column auto-generated tree showing
+         only the ID. Columns here mirror the embedded tree inside
+         neon.equipment.stock.take's form view, plus stock_take_id
+         and create_date because this view spans sessions.
+         ============================================================ -->
+
+    <record id="neon_equipment_stock_take_line_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.stock.take.line.tree</field>
+        <field name="model">neon.equipment.stock.take.line</field>
+        <field name="arch" type="xml">
+            <tree string="Stock Take Lines"
+                  create="false"
+                  decoration-warning="has_discrepancy"
+                  decoration-danger="has_discrepancy and is_high_impact"
+                  decoration-muted="resolved">
+                <field name="create_date" string="Recorded" optional="show"/>
+                <field name="stock_take_id" optional="show"/>
+                <field name="unit_id"/>
+                <field name="product_template_id" optional="show"/>
+                <field name="category_id" optional="show"/>
+                <field name="expected_state" optional="hide"/>
+                <field name="found_state" optional="show"/>
+                <field name="physical_condition" optional="show"/>
+                <field name="has_discrepancy"
+                       widget="boolean_toggle" readonly="1"/>
+                <field name="is_high_impact"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="resolved"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="attested" widget="boolean_toggle"
+                       readonly="1" optional="hide"/>
+                <field name="resolution_method" optional="hide"/>
+                <field name="attested_by_id" optional="hide"/>
+                <field name="attested_at" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_stock_take_line_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.stock.take.line.search</field>
+        <field name="model">neon.equipment.stock.take.line</field>
+        <field name="arch" type="xml">
+            <search string="Stock Take Lines">
+                <field name="unit_id"/>
+                <field name="stock_take_id"/>
+                <field name="category_id"/>
+                <separator/>
+                <filter name="has_discrepancy" string="With Discrepancy"
+                        domain="[('has_discrepancy', '=', True)]"/>
+                <filter name="unresolved" string="Unresolved"
+                        domain="[('resolved', '=', False)]"/>
+                <filter name="high_impact" string="High-Impact"
+                        domain="[('is_high_impact', '=', True)]"/>
+                <separator/>
+                <filter name="attested" string="Attested"
+                        domain="[('attested', '=', True)]"/>
+                <filter name="unattested" string="Unattested"
+                        domain="[('attested', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_session" string="Session"
+                            context="{'group_by': 'stock_take_id'}"/>
+                    <filter name="group_category" string="Category"
+                            context="{'group_by': 'category_id'}"/>
+                    <filter name="group_condition" string="Condition"
+                            context="{'group_by': 'physical_condition'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="neon_equipment_stock_take_action" model="ir.actions.act_window">
         <field name="name">Stock Takes</field>
         <field name="res_model">neon.equipment.stock.take</field>
