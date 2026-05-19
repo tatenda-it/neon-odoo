@@ -40,3 +40,5 @@ from . import account_payment_register
 from . import res_partner
 # P6.M10 -- Cash Flow Dashboard virtual model.
 from . import neon_finance_dashboard
+# P6.M11 -- workshop write-off integration via incident extension.
+from . import neon_equipment_incident

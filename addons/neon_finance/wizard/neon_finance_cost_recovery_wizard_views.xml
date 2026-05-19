@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_cost_recovery_wizard_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.finance.cost.recovery.wizard.form</field>
+        <field name="model">neon.finance.cost.recovery.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Create Cost Recovery Invoice">
+                <sheet>
+                    <group>
+                        <group string="Context">
+                            <field name="event_job_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="cost_line_id" readonly="1"/>
+                        </group>
+                        <group string="Invoice">
+                            <field name="amount"
+                                   widget="monetary"/>
+                            <field name="currency_id"
+                                   options="{'no_create': True}"/>
+                            <field name="handling_fee_pct"/>
+                            <field name="invoice_date"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_create_recovery_invoice"
+                            type="object"
+                            string="Create Invoice"
+                            class="btn-primary"/>
+                    <button string="Cancel" special="cancel"
+                            class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

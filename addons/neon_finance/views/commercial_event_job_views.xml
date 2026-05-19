@@ -46,6 +46,30 @@
                             class="btn btn-warning btn-sm"
                             groups="neon_finance.group_neon_finance_approver"/>
                 </div>
+                <!--
+                    P6.M11 banner. Visible to ALL roles (sales sees
+                    it too, per design pause) so client-relationship
+                    awareness is in place. The Create Cost Recovery
+                    Invoice button is approver-only via groups
+                    attribute; sales sees the banner but no action.
+                    The invisible field below makes pending_cost_recovery
+                    available to the modifier without rendering it.
+                -->
+                <field name="pending_cost_recovery" invisible="1"/>
+                <div class="alert alert-info"
+                     role="alert"
+                     invisible="not pending_cost_recovery"
+                     style="margin: 8px 16px;">
+                    <strong>Cost recovery pending.</strong>
+                    A client-caused write-off has been recorded on
+                    this event. Bookkeeper / Approver review needed
+                    before invoicing the client.
+                    <button name="action_open_cost_recovery_wizard"
+                            type="object"
+                            string="Create Cost Recovery Invoice"
+                            class="btn btn-info btn-sm"
+                            groups="neon_finance.group_neon_finance_approver"/>
+                </div>
             </xpath>
             <xpath expr="//page[@name='page_finance']"
                    position="after">

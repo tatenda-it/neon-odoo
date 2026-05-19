@@ -47,3 +47,5 @@ access_neon_finance_dashboard_sales,neon.finance.dashboard sales R only,model_ne
 access_neon_finance_dashboard_bookkeeper,neon.finance.dashboard bookkeeper R only,model_neon_finance_dashboard,neon_finance.group_neon_finance_bookkeeper,1,0,0,0
 access_neon_finance_dashboard_approver,neon.finance.dashboard approver R only,model_neon_finance_dashboard,neon_finance.group_neon_finance_approver,1,0,0,0
 access_neon_finance_dashboard_crew_leader,neon.finance.dashboard crew_leader R only,model_neon_finance_dashboard,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_finance_cost_recovery_wizard_approver,neon.finance.cost.recovery.wizard approver,model_neon_finance_cost_recovery_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
+access_neon_finance_cost_recovery_wizard_bookkeeper,neon.finance.cost.recovery.wizard bookkeeper R,model_neon_finance_cost_recovery_wizard,neon_finance.group_neon_finance_bookkeeper,1,1,1,1

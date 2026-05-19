@@ -634,6 +634,56 @@ class CommercialEventJob(models.Model):
             return self.cost_total_zig
         return 0.0
 
+    # ============================================================
+    # === P6.M11 -- client-caused write-off recovery flag
+    # ============================================================
+    pending_cost_recovery = fields.Boolean(
+        string="Pending Cost Recovery",
+        default=False,
+        readonly=True,
+        tracking=True,
+        copy=False,
+        help="Set by P6.M11 incident-resolution flow when an "
+        "equipment write-off attributed to client conduct is "
+        "recorded against this event. Approver clears the flag by "
+        "creating a cost-recovery invoice via the form button; OR "
+        "by manual write (bookkeeper override).",
+    )
+
+    def action_open_cost_recovery_wizard(self):
+        """Approver-only entry point that opens the cost recovery
+        wizard. Approver fills amount + currency + handling fee +
+        notes; wizard creates the recovery invoice + clears the
+        pending flag.
+
+        Marker 8: clearing of pending_cost_recovery happens INSIDE
+        the wizard's confirm action, not here, so the flag stays
+        set if the approver cancels the wizard mid-flow.
+        """
+        self.ensure_one()
+        if not (self.env.user.has_group(
+                    "neon_finance.group_neon_finance_approver")):
+            from odoo.exceptions import AccessError
+            raise AccessError(_(
+                "Only users in the Finance Approver group can "
+                "create a cost-recovery invoice. Bookkeeper / "
+                "Sales tiers see the banner but cannot action it."))
+        if not self.pending_cost_recovery:
+            from odoo.exceptions import UserError
+            raise UserError(_(
+                "No cost recovery is pending on %(event)s."
+            ) % {"event": self.name})
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Create Cost Recovery Invoice"),
+            "res_model": "neon.finance.cost.recovery.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_event_job_id": self.id,
+            },
+        }
+
     def action_acknowledge_over_budget(self):
         """Approver button on the event_job form. Clears
         suggest_reapproval (the action-required flag) but leaves

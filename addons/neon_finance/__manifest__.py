@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.7.8.0',
+    'version': '17.0.7.9.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -78,6 +78,8 @@ and cost-line behaviour downstream.
         'views/neon_finance_invoice_schedule_views.xml',
         'views/neon_finance_invoice_schedule_template_views.xml',
         'wizard/neon_finance_payment_term_wizard_views.xml',
+        # P6.M11 -- cost recovery wizard (TransientModel + form view).
+        'wizard/neon_finance_cost_recovery_wizard_views.xml',
         # P6.M9 -- res.partner credit hold flag + clear action button.
         # Bookkeeper/Approver groups gate visibility in the form view.
         'views/res_partner_views.xml',
