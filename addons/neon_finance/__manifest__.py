@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.7.4.0',
+    'version': '17.0.7.5.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
-               'P&L + budget variance tracking for Neon Events Elements',
+               'P&L + budget variance tracking + multi-stage invoicing '
+               'schedule for Neon Events Elements',
     'description': """
 Neon Finance
 ============
@@ -73,6 +74,9 @@ and cost-line behaviour downstream.
         # Financial Summary tabs).
         'views/neon_finance_cost_line_views.xml',
         'views/commercial_event_job_views.xml',
+        # P6.M7 — multi-stage invoicing schedule + per-client templates.
+        'views/neon_finance_invoice_schedule_views.xml',
+        'views/neon_finance_invoice_schedule_template_views.xml',
         'wizard/neon_finance_payment_term_wizard_views.xml',
         # Menus load last so action ref()s resolve.
         'views/neon_finance_menu.xml',

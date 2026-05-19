@@ -183,5 +183,100 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P6.M7 — invoice schedule scoping. Sales reps see only
+            schedules attached to their own quotes; bookkeeper +
+            approver see all. perm_unlink=False on every rule:
+            append-only financial record.
+        -->
+        <record id="invoice_schedule_rule_sales_own_only"
+                model="ir.rule">
+            <field name="name">Invoice Schedule: Sales see own quotes only</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule"/>
+            <field name="domain_force">[('quote_id.salesperson_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_sales'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="invoice_schedule_rule_bookkeeper_all"
+                model="ir.rule">
+            <field name="name">Invoice Schedule: Bookkeeper sees all</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="invoice_schedule_rule_approver_all"
+                model="ir.rule">
+            <field name="name">Invoice Schedule: Approver sees all</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_approver'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!--
+            P6.M7 — schedule template scoping. Sales reps see + manage
+            templates for clients on quotes they own (via partner_id
+            chain through any quote). Bookkeeper + approver see all.
+        -->
+        <record id="invoice_schedule_template_rule_sales_own_clients"
+                model="ir.rule">
+            <field name="name">Schedule Template: Sales see own clients only</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule_template"/>
+            <field name="domain_force">[
+                ('partner_id', 'in',
+                 user.env['neon.finance.quote'].sudo().search(
+                     [('salesperson_id', '=', user.id)]
+                 ).mapped('partner_id').ids
+                )
+            ]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_sales'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="invoice_schedule_template_rule_bookkeeper_all"
+                model="ir.rule">
+            <field name="name">Schedule Template: Bookkeeper sees all</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule_template"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="invoice_schedule_template_rule_approver_all"
+                model="ir.rule">
+            <field name="name">Schedule Template: Approver sees all</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule_template"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_approver'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

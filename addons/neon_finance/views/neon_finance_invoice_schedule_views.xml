@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_invoice_schedule_view_tree"
+            model="ir.ui.view">
+        <field name="name">neon.finance.invoice.schedule.tree</field>
+        <field name="model">neon.finance.invoice.schedule</field>
+        <field name="arch" type="xml">
+            <tree string="Invoice Schedules"
+                  decoration-success="state == 'paid'"
+                  decoration-info="state == 'invoiced'"
+                  decoration-warning="state == 'overdue'"
+                  decoration-muted="state in ('scheduled','cancelled')">
+                <field name="name"/>
+                <field name="quote_id"/>
+                <field name="sequence" widget="handle"/>
+                <field name="stage" widget="badge"/>
+                <field name="trigger"/>
+                <field name="trigger_date" optional="show"/>
+                <field name="trigger_event_state" optional="hide"/>
+                <field name="percentage"/>
+                <field name="amount" widget="monetary"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'paid'"
+                       decoration-info="state == 'invoiced'"
+                       decoration-warning="state == 'overdue'"/>
+                <field name="invoice_id" optional="show"/>
+                <field name="triggered_at" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_invoice_schedule_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.finance.invoice.schedule.form</field>
+        <field name="model">neon.finance.invoice.schedule</field>
+        <field name="arch" type="xml">
+            <form string="Invoice Schedule">
+                <header>
+                    <button name="action_trigger_now"
+                            type="object"
+                            string="Trigger Now"
+                            class="oe_highlight"
+                            invisible="state != 'scheduled' or trigger == 'on_acceptance'"
+                            groups="neon_finance.group_neon_finance_approver"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="scheduled,triggered,invoiced,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Scope">
+                            <field name="quote_id"/>
+                            <field name="stage"/>
+                            <field name="percentage"/>
+                            <field name="amount" widget="monetary"/>
+                            <field name="currency_id" readonly="1"/>
+                        </group>
+                        <group string="Trigger">
+                            <field name="trigger"/>
+                            <field name="trigger_date"
+                                   invisible="trigger != 'on_date'"
+                                   required="trigger == 'on_date'"/>
+                            <field name="trigger_event_state"
+                                   invisible="trigger != 'on_event_state'"
+                                   required="trigger == 'on_event_state'"/>
+                            <field name="triggered_at" readonly="1"/>
+                            <field name="invoice_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_finance_invoice_schedule_view_search"
+            model="ir.ui.view">
+        <field name="name">neon.finance.invoice.schedule.search</field>
+        <field name="model">neon.finance.invoice.schedule</field>
+        <field name="arch" type="xml">
+            <search string="Invoice Schedules">
+                <field name="name"/>
+                <field name="quote_id"/>
+                <separator/>
+                <filter name="state_scheduled" string="Scheduled"
+                        domain="[('state', '=', 'scheduled')]"/>
+                <filter name="state_invoiced" string="Invoiced"
+                        domain="[('state', '=', 'invoiced')]"/>
+                <filter name="state_paid" string="Paid"
+                        domain="[('state', '=', 'paid')]"/>
+                <separator/>
+                <filter name="stage_deposit" string="Deposit"
+                        domain="[('stage', '=', 'deposit')]"/>
+                <filter name="stage_progress" string="Progress"
+                        domain="[('stage', '=', 'progress')]"/>
+                <filter name="stage_final" string="Final"
+                        domain="[('stage', '=', 'final')]"/>
+                <filter name="stage_retention" string="Retention"
+                        domain="[('stage', '=', 'retention')]"/>
+                <separator/>
+                <filter name="trigger_on_date" string="On Date"
+                        domain="[('trigger', '=', 'on_date')]"/>
+                <filter name="trigger_on_event_state" string="On Event State"
+                        domain="[('trigger', '=', 'on_event_state')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_stage" string="Stage"
+                            context="{'group_by': 'stage'}"/>
+                    <filter name="group_quote" string="Quote"
+                            context="{'group_by': 'quote_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_finance_invoice_schedule_action"
+            model="ir.actions.act_window">
+        <field name="name">Invoice Schedule</field>
+        <field name="res_model">neon.finance.invoice.schedule</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_finance_invoice_schedule_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No invoice schedules yet
+            </p>
+            <p>
+                Schedules materialise when a quote is accepted, drawn
+                from the client's saved template or a default 100%
+                on-acceptance fallback. Triggers fire automatically
+                (on_acceptance, on_date via daily cron,
+                on_event_state via event_job write hook) or manually
+                via the Trigger Now button.
+            </p>
+        </field>
+    </record>
+
+</odoo>

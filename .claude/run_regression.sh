@@ -11,7 +11,7 @@ SMOKES=(
   p3m1 p3m2 p3m3 p3m4 p3m5 p3m6 p3m7 p3m8
   p4m1 p4m2 p4m3 p4m4 p4m5_m6 p4m7 p4m8
   p5m1 p5m1_subtask_a p5m2 p5m3 p5m4 p5m5 p5m6 p5m7 p5m8 p5m9 p5m10
-  p6m1 p6m2 p6m3 p6m4 p6m5 p6m6
+  p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0
@@ -64,7 +64,7 @@ echo
 echo "================================================="
 echo "BROWSER SMOKES (Playwright, headless)"
 echo "================================================="
-BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6)
+BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7)
 VENV_PY="${SCRIPT_DIR}/.venv-browser/Scripts/python.exe"
 if [[ ! -x "$VENV_PY" ]] && [[ ! -f "$VENV_PY" ]]; then
   echo "MISSING venv: $VENV_PY"

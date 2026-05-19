@@ -20,7 +20,12 @@ is computed in the quote's currency; cross-currency contributions
 appear as labelled rows in the P&L view so finance can see what got
 billed in which currency without invisible FX conversion.
 """
+import logging
+
 from odoo import _, api, fields, models
+
+
+_logger = logging.getLogger(__name__)
 
 
 class CommercialEventJob(models.Model):
@@ -650,3 +655,63 @@ class CommercialEventJob(models.Model):
                     rec.budget_alert_level, rec.budget_alert_level),
             ))
         return True
+
+    # ============================================================
+    # === P6.M7 -- write() override for on_event_state schedule
+    # === trigger detection
+    # ============================================================
+    # ⚠️ DECISION (P6.M7): write() override on the inherited model
+    # captures pre-state per record BEFORE super().write() applies,
+    # so post-write we can detect state transitions and fire any
+    # neon.finance.invoice.schedule rows where
+    # trigger='on_event_state' and trigger_event_state matches the
+    # new state. The neon_jobs base write() (commercial_event_job.py
+    # :2349) has a state-write guard requiring _allow_state_write
+    # context -- super() flows through that guard untouched, so
+    # legitimate state transitions via action methods continue to
+    # work and direct writes still get blocked.
+    #
+    # ⚠️ DECISION (P6.M7, Tatenda optimisation): pre-check whether
+    # ANY on_event_state schedules exist for this recordset before
+    # doing the prev_states snapshot. For event_jobs without
+    # schedules the override is effectively zero-cost.
+    def write(self, vals):
+        prev_states = {}
+        # Optimisation: only pay the snapshot cost if state is in
+        # vals AND at least one on_event_state schedule references
+        # one of these event_jobs.
+        if "state" in vals:
+            Sched = self.env["neon.finance.invoice.schedule"].sudo()
+            if Sched.search_count([
+                ("quote_id.event_job_id", "in", self.ids),
+                ("trigger", "=", "on_event_state"),
+                ("state", "=", "scheduled"),
+            ]):
+                prev_states = {rec.id: rec.state for rec in self}
+        result = super().write(vals)
+        if not prev_states:
+            return result
+        if self.env.context.get("skip_finance_notification"):
+            return result
+        Schedule = self.env["neon.finance.invoice.schedule"].sudo()
+        for rec in self:
+            old = prev_states.get(rec.id)
+            new = rec.state
+            if old == new:
+                continue
+            due = Schedule.search([
+                ("quote_id.event_job_id", "=", rec.id),
+                ("trigger", "=", "on_event_state"),
+                ("trigger_event_state", "=", new),
+                ("state", "=", "scheduled"),
+            ])
+            for sched in due:
+                try:
+                    sched.action_create_invoice()
+                except Exception as e:  # noqa: BLE001
+                    _logger.error(
+                        "on_event_state schedule %s failed on "
+                        "event_job %s state transition %s -> %s: %s",
+                        sched.name, rec.name, old, new, e)
+        return result
+

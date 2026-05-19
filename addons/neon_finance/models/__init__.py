@@ -24,3 +24,9 @@ from . import res_config_settings
 # the extension resolves cleanly.
 from . import neon_finance_cost_line
 from . import commercial_event_job
+# P6.M7 — invoice schedule + per-client template. Template + line load
+# before schedule (template_line is a foreign-key target on schedule
+# instantiation via _from_template). Schedule loads before quote
+# extension (the o2m reverse from quote needs schedule registered).
+from . import neon_finance_invoice_schedule_template
+from . import neon_finance_invoice_schedule

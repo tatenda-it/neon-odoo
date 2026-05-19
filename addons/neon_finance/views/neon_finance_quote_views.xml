@@ -184,6 +184,58 @@
                                 </group>
                             </group>
                         </page>
+                        <page string="Invoice Schedule"
+                              name="invoice_schedule">
+                            <div class="alert alert-warning"
+                                 role="alert"
+                                 invisible="state != 'draft' or invoice_schedule_pct_total == 100">
+                                Stage percentages sum to
+                                <field name="invoice_schedule_pct_total"
+                                       nolabel="1" class="oe_inline"/>%
+                                -- accept will be blocked unless this
+                                equals 100. (Empty is also acceptable:
+                                the default single-stage 100%
+                                on-acceptance schedule will be
+                                materialised at accept time.)
+                            </div>
+                            <field name="invoice_schedule_ids"
+                                   readonly="state not in ('draft',)"
+                                   context="{'default_quote_id': id,
+                                             'default_currency_id':
+                                                 currency_id}">
+                                <tree string="Invoice Schedule"
+                                      editable="bottom"
+                                      decoration-success="state == 'paid'"
+                                      decoration-info="state == 'invoiced'"
+                                      decoration-warning="state == 'overdue'"
+                                      decoration-muted="state in ('scheduled','cancelled')">
+                                    <field name="sequence"
+                                           widget="handle"/>
+                                    <field name="stage"/>
+                                    <field name="trigger"/>
+                                    <field name="trigger_date"
+                                           invisible="trigger != 'on_date'"
+                                           required="trigger == 'on_date'"/>
+                                    <field name="trigger_event_state"
+                                           invisible="trigger != 'on_event_state'"
+                                           required="trigger == 'on_event_state'"/>
+                                    <field name="percentage"
+                                           sum="Total"/>
+                                    <field name="amount"
+                                           widget="monetary"
+                                           sum="Total"/>
+                                    <field name="state"
+                                           widget="badge"
+                                           decoration-success="state == 'paid'"
+                                           decoration-info="state == 'invoiced'"
+                                           decoration-warning="state == 'overdue'"/>
+                                    <field name="invoice_id"
+                                           readonly="1"/>
+                                    <field name="currency_id"
+                                           column_invisible="True"/>
+                                </tree>
+                            </field>
+                        </page>
                         <page string="Notes" name="notes">
                             <field name="notes" nolabel="1"/>
                         </page>

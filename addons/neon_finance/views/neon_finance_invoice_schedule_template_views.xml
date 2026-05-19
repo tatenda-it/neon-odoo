@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_invoice_schedule_template_view_tree"
+            model="ir.ui.view">
+        <field name="name">neon.finance.invoice.schedule.template.tree</field>
+        <field name="model">neon.finance.invoice.schedule.template</field>
+        <field name="arch" type="xml">
+            <tree string="Schedule Templates"
+                  decoration-muted="not active">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_invoice_schedule_template_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.finance.invoice.schedule.template.form</field>
+        <field name="model">neon.finance.invoice.schedule.template</field>
+        <field name="arch" type="xml">
+            <form string="Schedule Template">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Scope">
+                            <field name="partner_id"
+                                   options="{'no_create': True}"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Stages">
+                        <field name="line_ids" nolabel="1">
+                            <tree string="Stages" editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="stage"/>
+                                <field name="trigger"/>
+                                <field name="trigger_offset_days"
+                                       invisible="trigger != 'on_date'"/>
+                                <field name="trigger_event_state"
+                                       invisible="trigger != 'on_event_state'"/>
+                                <field name="percentage" sum="Total"/>
+                                <field name="notes" optional="hide"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_finance_invoice_schedule_template_action"
+            model="ir.actions.act_window">
+        <field name="name">Schedule Templates</field>
+        <field name="res_model">neon.finance.invoice.schedule.template</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No schedule templates yet
+            </p>
+            <p>
+                Templates capture a client's preferred billing cadence
+                (e.g. 50% deposit on acceptance + 50% on event
+                completion). Quotes for that client auto-instantiate
+                a schedule from the template on acceptance. Sales reps
+                can override per-quote on the quote form before
+                submitting.
+            </p>
+        </field>
+    </record>
+
+</odoo>

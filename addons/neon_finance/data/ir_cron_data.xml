@@ -22,5 +22,27 @@
             <field name="numbercall">-1</field>
             <field name="doall" eval="False"/>
         </record>
+
+        <!--
+            P6.M7 — daily sweep for on_date invoice schedules. Other
+            trigger types fire elsewhere: on_acceptance inside
+            quote.action_accept, on_event_state inside the
+            commercial.event.job.write() override, manual via the
+            action_trigger_now button.
+        -->
+        <record id="ir_cron_neon_finance_invoice_schedule"
+                model="ir.cron">
+            <field name="name">Neon Finance: Invoice Schedule On-Date Sweep</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_check_invoice_schedules()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+        </record>
     </data>
 </odoo>

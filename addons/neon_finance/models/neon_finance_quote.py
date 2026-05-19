@@ -175,6 +175,22 @@ class NeonFinanceQuote(models.Model):
         copy=False,
         tracking=True,
     )
+    # P6.M7 -- multi-stage invoicing schedule reverse o2m. Populated by
+    # action_accept (instantiated from partner template or default
+    # 100% on_acceptance fallback). Sales rep edits while state='draft';
+    # locked after submit. Append-only: no perm_unlink on the child.
+    invoice_schedule_ids = fields.One2many(
+        "neon.finance.invoice.schedule",
+        "quote_id",
+        string="Invoice Schedule",
+    )
+    invoice_schedule_pct_total = fields.Float(
+        compute="_compute_invoice_schedule_pct_total",
+        string="Schedule % Total",
+        help="Sum of stage percentages on this quote. The form banner "
+             "warns the sales rep while drafting when this is not 100. "
+             "Non-stored: recomputes on every form open.",
+    )
     approved_by_id = fields.Many2one(
         "res.users",
         readonly=True,
@@ -301,6 +317,12 @@ class NeonFinanceQuote(models.Model):
                     rec.margin_total / rec.amount_untaxed * 100.0)
             else:
                 rec.margin_pct = 0.0
+
+    @api.depends("invoice_schedule_ids", "invoice_schedule_ids.percentage")
+    def _compute_invoice_schedule_pct_total(self):
+        for rec in self:
+            rec.invoice_schedule_pct_total = sum(
+                rec.invoice_schedule_ids.mapped("percentage"))
 
     # ============================================================
     # === State machine actions
@@ -526,9 +548,12 @@ class NeonFinanceQuote(models.Model):
         happen but is defensive) overwrites with current amount_total
         and currency without raising.
 
-        P6.M2 PLACEHOLDER (still active): state-only transition for
-        the quote itself. P6.M7 wires multi-stage invoice schedule
-        materialisation here.
+        P6.M7 ADD: invoice schedule materialisation. If no schedules
+        exist on the quote yet (sales rep didn't pre-design one),
+        instantiate from the partner's most recent active template;
+        fall back to a single-stage 100% on_acceptance schedule when
+        no template exists. After instantiation, fire any
+        on_acceptance-triggered schedules immediately.
         """
         for rec in self:
             if rec.state != "sent":
@@ -540,6 +565,18 @@ class NeonFinanceQuote(models.Model):
                     "Only the quote's salesperson or a Finance "
                     "Bookkeeper / Approver can mark %s as accepted."
                 ) % rec.name)
+            # P6.M7 -- a pre-designed schedule must sum to exactly 100.
+            # Empty o2m is fine; _materialise_invoice_schedule below
+            # will fall back to the default single-stage 100%
+            # on_acceptance row.
+            if rec.invoice_schedule_ids and abs(
+                    rec.invoice_schedule_pct_total - 100.0) > 0.01:
+                raise UserError(_(
+                    "Cannot accept %s: invoice schedule stage "
+                    "percentages sum to %.2f, not 100. Adjust the "
+                    "Invoice Schedule tab or clear it to use the "
+                    "default 100%% on-acceptance fallback."
+                ) % (rec.name, rec.invoice_schedule_pct_total))
             rec.write({
                 "state": "accepted",
                 "accepted_at": fields.Datetime.now(),
@@ -549,7 +586,66 @@ class NeonFinanceQuote(models.Model):
                     "quoted_budget": rec.amount_total,
                     "quoted_budget_currency_id": rec.currency_id.id,
                 })
+            # P6.M7 -- schedule materialisation + on_acceptance fire.
+            rec._materialise_invoice_schedule()
+            for sched in rec.invoice_schedule_ids.filtered(
+                lambda s: s.state == "scheduled" and s.trigger == "on_acceptance"
+            ):
+                sched.sudo().action_create_invoice()
         return True
+
+    def _materialise_invoice_schedule(self):
+        """P6.M7 -- instantiate invoice schedule rows on a freshly
+        accepted quote. Skips if rows already exist (sales rep
+        pre-designed). Looks up partner's most recent active template;
+        falls back to a single-stage 100% on_acceptance schedule.
+
+        sudo() the create: sales reps have R-only on schedule when
+        their own quote's salesperson, but at the moment of accept
+        the workflow is the only legitimate creation path. We mint
+        the records on the user's behalf.
+        """
+        self.ensure_one()
+        if self.invoice_schedule_ids:
+            # Sales rep designed it pre-submit; respect that.
+            return
+        Schedule = self.env["neon.finance.invoice.schedule"].sudo()
+        Template = self.env[
+            "neon.finance.invoice.schedule.template"].sudo()
+        template = Template.search([
+            ("partner_id", "=", self.partner_id.id),
+            ("active", "=", True),
+        ], order="id desc", limit=1)
+        if template and template.line_ids:
+            # Instantiate from template lines as a single batch create
+            # so the constraint _check_percentage_sum_on_accepted sees
+            # the final 100% sum, not intermediate partials.
+            today = fields.Date.context_today(self)
+            vals_list = []
+            for tline in template.line_ids.sorted("sequence"):
+                vals = {
+                    "quote_id": self.id,
+                    "sequence": tline.sequence,
+                    "stage": tline.stage,
+                    "trigger": tline.trigger,
+                    "percentage": tline.percentage,
+                }
+                if tline.trigger == "on_date":
+                    vals["trigger_date"] = fields.Date.add(
+                        today, days=tline.trigger_offset_days or 0)
+                if tline.trigger == "on_event_state":
+                    vals["trigger_event_state"] = tline.trigger_event_state
+                vals_list.append(vals)
+            Schedule.create(vals_list)
+            return
+        # Fallback: single-stage 100% on_acceptance.
+        Schedule.create([{
+            "quote_id": self.id,
+            "sequence": 10,
+            "stage": "final",
+            "trigger": "on_acceptance",
+            "percentage": 100.0,
+        }])
 
     def action_cancel(self):
         """Any non-terminal -> cancelled. Requires cancelled_reason

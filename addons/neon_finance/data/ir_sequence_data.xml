@@ -96,5 +96,19 @@
             <field name="implementation">standard</field>
         </record>
 
+        <!--
+            P6.M7 — invoice schedule. SCH-NNNNNN, 6-pad matches the
+            QUO- / APR- / COST- / FX- precedent.
+        -->
+        <record id="seq_neon_finance_invoice_schedule" model="ir.sequence">
+            <field name="name">Invoice Schedule</field>
+            <field name="code">neon.finance.invoice.schedule</field>
+            <field name="prefix">SCH-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
     </data>
 </odoo>

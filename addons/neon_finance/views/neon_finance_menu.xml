@@ -155,4 +155,32 @@
               action="neon_finance_payment_term_action"
               sequence="40"/>
 
+    <!--
+        P6.M7: Invoice schedule machinery.
+
+        Invoice Schedule under Customers: a sales rep sees only own
+        rows (record rule via quote.salesperson_id); bookkeeper +
+        approver see all. Approver-only action button (Trigger Now)
+        lives on the form. Cost Lines stays at sequence 7; schedule
+        slots in at 8.
+
+        Schedule Templates under Configuration > Finance: client-
+        scoped reusable cadences. Sales reps can author for clients
+        on their own quotes (record rule); bookkeeper + approver see
+        all.
+    -->
+    <menuitem id="menu_neon_finance_invoice_schedule"
+              name="Invoice Schedule"
+              parent="account.menu_finance_receivables"
+              action="neon_finance_invoice_schedule_action"
+              sequence="8"
+              groups="neon_finance.group_neon_finance_sales,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+
+    <menuitem id="menu_neon_finance_invoice_schedule_templates"
+              name="Schedule Templates"
+              parent="menu_neon_finance_config"
+              action="neon_finance_invoice_schedule_template_action"
+              sequence="50"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+
 </odoo>
