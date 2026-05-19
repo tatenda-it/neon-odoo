@@ -87,5 +87,45 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P6.M4 — approval queue scoping. Sales reps see only
+            approvals attached to their own quotes (read-only); both
+            bookkeeper and approver see all. Approver has the write
+            grant from the CSV; bookkeeper is read-only on workflow.
+            No unlink for any group — append-only audit trail.
+        -->
+        <record id="approval_rule_sales_own_only" model="ir.rule">
+            <field name="name">Approval: Sales see own quote approvals only</field>
+            <field name="model_id" ref="model_neon_finance_approval"/>
+            <field name="domain_force">[('quote_id.salesperson_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_sales'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="approval_rule_bookkeeper_all" model="ir.rule">
+            <field name="name">Approval: Bookkeeper sees all</field>
+            <field name="model_id" ref="model_neon_finance_approval"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="approval_rule_approver_all" model="ir.rule">
+            <field name="name">Approval: Approver sees all</field>
+            <field name="model_id" ref="model_neon_finance_approval"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_approver'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

@@ -228,6 +228,50 @@ class NeonFinanceQuoteLine(models.Model):
         for rec in self:
             rec.line_margin = rec.line_subtotal - rec.line_cost
 
+    def write(self, vals):
+        """P6.M4 — flip pricing_status from 'priced' to 'manual' when
+        a sales rep manually edits unit_rate on a line whose price
+        was previously stamped by the engine.
+
+        Recordset-aware: each line evaluates the flip condition
+        independently. Lines that don't trip (status != 'priced',
+        same-value write, write without unit_rate, or a write that
+        already specifies pricing_status itself) take the standard
+        super().write() path. Lines that do trip get a per-record
+        write with pricing_status='manual' merged in.
+
+        IMPORTANT: only intercepts when the caller has NOT already
+        specified pricing_status in vals. The pricing engine's
+        _compute_line_pricing writes unit_rate + pricing_status
+        together (intentionally stamping 'priced') -- without this
+        guard we would override the engine's explicit value with
+        'manual' on every Recalculate, breaking M3 semantics.
+
+        Does NOT clear snapshot_taken -- the bracket/day breakdown
+        snapshot is still valid; only the unit_rate has diverged.
+        Sales rep can revert via the parent quote's Recalculate
+        Pricing action.
+        """
+        if "unit_rate" in vals and "pricing_status" not in vals:
+            new_rate = vals["unit_rate"]
+            flippers = self.filtered(
+                lambda l: (
+                    l.pricing_status == "priced"
+                    and l.unit_rate != new_rate
+                )
+            )
+            untouched = self - flippers
+            if flippers:
+                # Per-line write avoids mutating the caller's vals
+                # dict and keeps the pricing_status override scoped
+                # to just the lines that need it.
+                manual_vals = dict(vals, pricing_status="manual")
+                super(NeonFinanceQuoteLine, flippers).write(manual_vals)
+            if untouched:
+                super(NeonFinanceQuoteLine, untouched).write(vals)
+            return True
+        return super().write(vals)
+
     @api.constrains("line_type", "equipment_line_id")
     def _check_equipment_line_consistency(self):
         for rec in self:

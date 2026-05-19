@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.7.1.0',
+    'version': '17.0.7.2.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
-               'model for Neon Events Elements',
+               'model + OD/MD approval workflow for Neon Events Elements',
     'description': """
 Neon Finance
 ============
@@ -53,6 +53,8 @@ and cost-line behaviour downstream.
         'data/pricing_rule_seed_data.xml',
         # P6.M2 — daily cron for quote expiry.
         'data/ir_cron_data.xml',
+        # P6.M4 — approval-feature-flag + reserved threshold params.
+        'data/ir_config_parameter.xml',
         # Views.
         'views/res_partner_bank_views.xml',
         'views/neon_finance_pricing_rule_views.xml',
@@ -63,6 +65,9 @@ and cost-line behaviour downstream.
         'views/neon_finance_payment_term_views.xml',
         'views/neon_finance_quote_line_views.xml',
         'views/neon_finance_quote_views.xml',
+        # P6.M4 — approval views + Finance Approval settings section.
+        'views/neon_finance_approval_views.xml',
+        'views/res_config_settings_views.xml',
         'wizard/neon_finance_payment_term_wizard_views.xml',
         # Menus load last so action ref()s resolve.
         'views/neon_finance_menu.xml',

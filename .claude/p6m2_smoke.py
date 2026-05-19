@@ -19,7 +19,7 @@ T615  quote.line equipment_line_id on non-equipment type -> ValidationError
 T616  quote amount_untaxed = sum of line subtotals
 T617  quote amount_total = sum of taxed totals
 T618  quote margin_pct = margin_total / amount_untaxed * 100
-T619  action_submit_for_approval from draft (with lines + term) -> auto-approved
+T619  action_submit_for_approval from draft (with lines + term) -> pending_approval + approval record (P6.M4 replaces M2's auto-approve)
 T620  action_submit_for_approval without lines -> UserError
 T621  action_submit_for_approval without payment_term -> UserError
 T622  action_submit_for_approval from non-draft state -> UserError
@@ -425,7 +425,7 @@ results["T618"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T619 - action_submit_for_approval from draft + lines + term -> auto-approved")
+print("T619 - action_submit_for_approval from draft -> pending_approval (P6.M4 replaces M2 auto-approve)")
 print("=" * 72)
 q_t619 = Quote.create({
     "event_job_id": event_job.id,
@@ -439,9 +439,16 @@ QuoteLine.create({
     "unit_rate": 100.0, "duration_days": 1,
 })
 err, _ = _try(lambda: q_t619.with_user(sales_user).action_submit_for_approval())
-# M2 placeholder: auto-approve runs inline. End state should be 'approved'.
-ok = err is None and q_t619.state == "approved" and q_t619.approved_by_id == sales_user
-print("  state:", q_t619.state, "approved_by:", q_t619.approved_by_id.login)
+# P6.M4 replaced M2's auto-approve placeholder. End state should
+# now be pending_approval with an approval record attached.
+ok = (
+    err is None
+    and q_t619.state == "pending_approval"
+    and bool(q_t619.approval_id)
+    and q_t619.approval_id.state == "pending"
+)
+print("  state:", q_t619.state,
+      "approval:", q_t619.approval_id.name if q_t619.approval_id else None)
 print("T619:", "PASS" if ok else "FAIL")
 results["T619"] = ok
 
@@ -491,7 +498,8 @@ print()
 print("=" * 72)
 print("T622 - action_submit_for_approval from non-draft state -> UserError")
 print("=" * 72)
-# q_t619 is now 'approved' (post T619 auto-approval).
+# q_t619 is now 'pending_approval' (post-P6.M4 workflow). Submitting
+# again must raise UserError -- pending_approval != draft.
 err, _ = _try(lambda: q_t619.action_submit_for_approval())
 ok = isinstance(err, UserError)
 print("  err:", type(err).__name__ if err else None, " state:", q_t619.state)
@@ -504,8 +512,8 @@ print()
 print("=" * 72)
 print("T623 - action_approve from pending_approval with approver -> success")
 print("=" * 72)
-# Set up a quote in pending_approval state without triggering auto-
-# approve. Bypass the action by writing state directly.
+# P6.M4: action_approve requires an approval record, so go through
+# the full workflow rather than bypassing state.
 q_t623 = Quote.create({
     "event_job_id": event_job.id,
     "currency_id": usd.id,
@@ -517,7 +525,7 @@ QuoteLine.create({
     "name": "x", "quantity": 1.0,
     "unit_rate": 1.0, "duration_days": 1,
 })
-q_t623.state = "pending_approval"
+q_t623.with_user(sales_user).action_submit_for_approval()
 err, _ = _try(lambda: q_t623.with_user(approver_user).action_approve())
 ok = err is None and q_t623.state == "approved"
 print("  state:", q_t623.state, "approved_by:", q_t623.approved_by_id.login)
@@ -548,7 +556,12 @@ q_t625 = Quote.create({
     "salesperson_id": sales_user.id,
     "payment_term_id": term.id,
 })
-q_t625.state = "pending_approval"
+QuoteLine.create({
+    "quote_id": q_t625.id, "line_type": "other",
+    "name": "y", "quantity": 1.0,
+    "unit_rate": 1.0, "duration_days": 1,
+})
+q_t625.with_user(sales_user).action_submit_for_approval()
 err, _ = _try(lambda: q_t625.with_user(book_user).action_approve())
 ok = isinstance(err, AccessError)
 print("  err:", type(err).__name__ if err else None)
@@ -581,7 +594,12 @@ q_t627 = Quote.create({
     "salesperson_id": sales_user.id,
     "payment_term_id": term.id,
 })
-q_t627.state = "pending_approval"
+QuoteLine.create({
+    "quote_id": q_t627.id, "line_type": "other",
+    "name": "z", "quantity": 1.0,
+    "unit_rate": 1.0, "duration_days": 1,
+})
+q_t627.with_user(sales_user).action_submit_for_approval()
 err, _ = _try(lambda: q_t627.with_user(approver_user).action_reject())
 ok = isinstance(err, UserError)
 print("  err:", type(err).__name__ if err else None)

@@ -160,11 +160,21 @@ class NeonFinanceQuote(models.Model):
     # === Approval / send / accept / cancel audit (M2 placeholders
     # === for fields the workflow milestones will fully wire)
     # ============================================================
-    # ⚠️ DECISION (P6.M2 / A): approval_id Many2one to the
-    # neon.finance.approval model is DEFERRED to P6.M4 per the design
-    # gate. Carrying a forward-reference Many2one for two milestones
-    # adds noise without value; M4 adds the field via a one-line
-    # additive migration.
+    # P6.M4 resolves the P6.M2 DECISION deferral: approval_id is now
+    # the M2O to the live neon.finance.approval record. Populated by
+    # action_submit_for_approval (Standard branch) and read by
+    # action_approve / action_reject / action_cancel for state
+    # delegation + activity dismissal. ondelete='set null' so the
+    # quote keeps its lifecycle state even if an approval somehow
+    # gets force-unlinked outside the workflow.
+    approval_id = fields.Many2one(
+        "neon.finance.approval",
+        string="Approval Record",
+        ondelete="set null",
+        readonly=True,
+        copy=False,
+        tracking=True,
+    )
     approved_by_id = fields.Many2one(
         "res.users",
         readonly=True,
@@ -296,12 +306,17 @@ class NeonFinanceQuote(models.Model):
     # === State machine actions
     # ============================================================
     def action_submit_for_approval(self):
-        """Draft -> pending_approval -> approved (auto, M2 placeholder).
+        """Draft -> pending_approval (standard branch) or directly to
+        approved (config-flag relaxation).
 
-        P6.M2 PLACEHOLDER: auto-approves immediately after passing the
-        same validation a real submission would. P6.M4 replaces the
-        auto-approve tail with an approval queue + neon.finance.approval
-        record + Approver notification.
+        Reads ir.config_parameter ``neon_finance.approval_required_for_all``
+        (default "True"): the True branch creates a
+        neon.finance.approval record + schedules mail.activity TODOs
+        for every user in group_neon_finance_approver. The False
+        branch is an atomic draft->approved write that NEVER touches
+        the pending_approval state -- this prevents orphaning a
+        pending quote with no approval record if anything between two
+        writes were to raise.
         """
         for rec in self:
             if rec.state != "draft":
@@ -317,23 +332,93 @@ class NeonFinanceQuote(models.Model):
                     "Cannot submit %s -- set payment terms first "
                     "(use the 'Set Payment Terms' button)."
                 ) % rec.name)
-            rec.state = "pending_approval"
-            # P6.M2 PLACEHOLDER: auto-approve. Replaced in P6.M4 with
-            # an approval queue + Approver notification.
-            rec._auto_approve_placeholder()
+
+            require_all = (self.env["ir.config_parameter"].sudo().get_param(
+                "neon_finance.approval_required_for_all", "True"
+            ) == "True")
+
+            if not require_all:
+                # ⚠️ DECISION (P6.M4): atomic single-write transition
+                # draft -> approved. We deliberately skip the
+                # pending_approval intermediate state and do NOT
+                # create an approval record. Future audits of
+                # "auto-approved" quotes derive from approved_by_id +
+                # approved_at + the absence of approval_id.
+                rec.write({
+                    "state": "approved",
+                    "approved_by_id": self.env.user.id,
+                    "approved_at": fields.Datetime.now(),
+                })
+                rec.message_post(body=_(
+                    "Auto-approved (config relaxation: "
+                    "approval_required_for_all = False)."))
+                continue
+
+            # ⚠️ DECISION (P6.M4): create the approval record BEFORE
+            # touching quote.state -- so rec.approval_id is populated
+            # atomically with the state transition. If the create
+            # raises, the quote stays in draft.
+            #
+            # sudo() on the create: sales reps have perm_create=0 on
+            # neon.finance.approval at the ACL layer (only Approver
+            # has create rights) -- the workflow IS the only
+            # legitimate creation path, so we mint the record on the
+            # user's behalf. The requested_by_id is captured from
+            # env.user before the sudo so attribution is honest.
+            approval = self.env["neon.finance.approval"].sudo().create({
+                "quote_id": rec.id,
+                "requested_by_id": self.env.user.id,
+                "requested_at": fields.Datetime.now(),
+                "quote_amount_total_snapshot": rec.amount_total,
+                "quote_currency_id_snapshot": rec.currency_id.id,
+            })
+            rec.write({
+                "state": "pending_approval",
+                "approval_id": approval.id,
+            })
+
+            # ⚠️ DECISION (P6.M4): schedule activities on the APPROVAL
+            # record, not the parent quote. activity_feedback() on
+            # approve/reject/cancel is scoped to ``self``; targeting
+            # the approval keeps dismissal precise and avoids
+            # clobbering unrelated TODOs on the quote.
+            #
+            # activity_schedule() is the higher-level mail.activity.mixin
+            # helper; project precedent (crm_lead.py:128) uses manual
+            # mail.activity.create(), but the helper is the right
+            # Odoo API and we set the precedent for Phase 6 here.
+            approver_group = self.env.ref(
+                "neon_finance.group_neon_finance_approver")
+            for user in approver_group.users:
+                approval.activity_schedule(
+                    "mail.mail_activity_data_todo",
+                    user_id=user.id,
+                    summary=_("Quote approval requested: %s") % rec.name,
+                    note=_(
+                        "Quote %(name)s for %(partner)s "
+                        "(%(total)s %(currency)s). Submitted by %(user)s. "
+                        "Review in the Approval Queue."
+                    ) % {
+                        "name": rec.name,
+                        "partner": rec.partner_id.display_name,
+                        "total": rec.amount_total,
+                        "currency": rec.currency_id.name,
+                        "user": self.env.user.name,
+                    },
+                )
+
+            # Phase 9 will read approval records with state=pending
+            # and notification_sent=False and dispatch WhatsApp to
+            # OD/MD. M4 leaves notification_sent at the default False.
+            rec.message_post(body=_(
+                "Submitted for approval. Approval record: %s. "
+                "%d approver(s) notified via TODO activity."
+            ) % (approval.name, len(approver_group.users)))
         return True
 
-    def _auto_approve_placeholder(self):
-        """P6.M2 PLACEHOLDER -- replaced in P6.M4 with proper queue."""
-        self.ensure_one()
-        self.write({
-            "state": "approved",
-            "approved_by_id": self.env.user.id,
-            "approved_at": fields.Datetime.now(),
-        })
-
     def action_approve(self):
-        """Pending -> approved. Restricted to Approver group."""
+        """Pending -> approved. Delegates to the approval record;
+        approver-only via group check + ACL."""
         if not self.env.user.has_group(
                 "neon_finance.group_neon_finance_approver"):
             raise AccessError(_(
@@ -345,16 +430,30 @@ class NeonFinanceQuote(models.Model):
                     "Only Pending Approval quotes can be approved "
                     "(%s is %s)."
                 ) % (rec.name, dict(_QUOTE_STATES)[rec.state]))
+            if not rec.approval_id:
+                raise UserError(_(
+                    "Quote %s is in pending_approval state but has "
+                    "no approval record. Internal consistency error."
+                ) % rec.name)
+            rec.approval_id.write({
+                "state": "approved",
+                "resolved_by_id": self.env.user.id,
+                "resolved_at": fields.Datetime.now(),
+            })
             rec.write({
                 "state": "approved",
                 "approved_by_id": self.env.user.id,
                 "approved_at": fields.Datetime.now(),
             })
+            rec.approval_id.activity_feedback(
+                ["mail.mail_activity_data_todo"],
+                feedback=_("Approved by %s") % self.env.user.name,
+            )
         return True
 
     def action_reject(self):
-        """Pending -> rejected. Restricted to Approver group. Requires
-        a ``rejection_reason`` in the context."""
+        """Pending -> rejected. Approver-only. Requires a
+        ``rejection_reason`` in the context."""
         if not self.env.user.has_group(
                 "neon_finance.group_neon_finance_approver"):
             raise AccessError(_(
@@ -372,11 +471,27 @@ class NeonFinanceQuote(models.Model):
                     "Only Pending Approval quotes can be rejected "
                     "(%s is %s)."
                 ) % (rec.name, dict(_QUOTE_STATES)[rec.state]))
+            if not rec.approval_id:
+                raise UserError(_(
+                    "Quote %s is in pending_approval state but has "
+                    "no approval record. Internal consistency error."
+                ) % rec.name)
+            rec.approval_id.write({
+                "state": "rejected",
+                "resolved_by_id": self.env.user.id,
+                "resolved_at": fields.Datetime.now(),
+                "rejection_reason": reason,
+            })
             rec.write({
                 "state": "rejected",
                 "rejection_reason": reason,
                 "rejected_at": fields.Datetime.now(),
             })
+            rec.approval_id.activity_feedback(
+                ["mail.mail_activity_data_todo"],
+                feedback=_("Rejected by %s: %s") % (
+                    self.env.user.name, reason),
+            )
         return True
 
     def action_send(self):
@@ -425,7 +540,9 @@ class NeonFinanceQuote(models.Model):
 
     def action_cancel(self):
         """Any non-terminal -> cancelled. Requires cancelled_reason
-        in the context."""
+        in the context. If cancelling from pending_approval state,
+        cascades to the approval record via _cancel_pending_approval
+        (which dismisses the approvers' TODO activities)."""
         reason = (
             self.env.context.get("cancelled_reason") or ""
         ).strip()
@@ -444,6 +561,12 @@ class NeonFinanceQuote(models.Model):
                     "Only the quote's salesperson or a Finance "
                     "Bookkeeper / Approver can cancel %s."
                 ) % rec.name)
+            # P6.M4 — cascade to the approval record BEFORE flipping
+            # the quote state so the activity dismissal sees the
+            # approval still resolvable. The helper is idempotent for
+            # already-terminal approvals (no-op).
+            if rec.approval_id and rec.approval_id.state == "pending":
+                rec.approval_id._cancel_pending_approval(reason=reason)
             rec.write({
                 "state": "cancelled",
                 "cancelled_at": fields.Datetime.now(),

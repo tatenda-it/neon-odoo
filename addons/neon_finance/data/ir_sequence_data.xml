@@ -67,5 +67,20 @@
             <field name="implementation">standard</field>
         </record>
 
+        <!--
+            P6.M4 — approval queue. One record per quote submission,
+            6-digit padding follows the QUO- / FX- precedent so
+            identifiers stay stable across the system's lifetime.
+        -->
+        <record id="seq_neon_finance_approval" model="ir.sequence">
+            <field name="name">Quote Approval</field>
+            <field name="code">neon.finance.approval</field>
+            <field name="prefix">APR-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
     </data>
 </odoo>

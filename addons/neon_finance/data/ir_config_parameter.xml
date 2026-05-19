@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            P6.M4 — Finance Approval config parameters.
+
+            approval_required_for_all (default "True") drives
+            quote.action_submit_for_approval. When "True" every
+            quote routes through the OD/MD approval queue
+            (Robin's Q14 standard). When "False" submission goes
+            draft -> approved atomically without creating an
+            approval record (relaxation path).
+
+            The threshold + margin parameters are RESERVED for
+            future threshold-based relaxation logic (e.g. "auto-
+            approve quotes under $5K, margin > 30%"). M4 reads
+            ONLY approval_required_for_all; the others exist on
+            disk as empty strings, captured in the Finance
+            Approval section of Odoo Settings as read-only fields
+            with help text.
+
+            noupdate="1" so runtime UI changes via the Settings
+            section survive -u.
+        -->
+        <record id="ir_config_param_approval_required_for_all"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.approval_required_for_all</field>
+            <field name="value">True</field>
+        </record>
+
+        <record id="ir_config_param_approval_threshold_usd"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.approval_threshold_usd</field>
+            <field name="value"></field>
+        </record>
+
+        <record id="ir_config_param_approval_threshold_zig"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.approval_threshold_zig</field>
+            <field name="value"></field>
+        </record>
+
+        <record id="ir_config_param_approval_margin_min"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.approval_margin_min</field>
+            <field name="value"></field>
+        </record>
+
+    </data>
+</odoo>

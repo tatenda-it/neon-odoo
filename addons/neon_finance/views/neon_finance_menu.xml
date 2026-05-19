@@ -118,6 +118,19 @@
               sequence="5"
               groups="neon_finance.group_neon_finance_sales,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
 
+    <!--
+        P6.M4 — Approval Queue submenu. Sales reps don't see it
+        (their interaction with approvals is via the quote form's
+        approval-status badge); bookkeepers see it read-only;
+        approvers see + action it.
+    -->
+    <menuitem id="menu_neon_finance_approvals"
+              name="Approval Queue"
+              parent="account.menu_finance_receivables"
+              action="neon_finance_approval_action"
+              sequence="6"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+
     <menuitem id="menu_neon_finance_payment_terms"
               name="Payment Terms"
               parent="menu_neon_finance_config"

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P6.M4 — Finance Approval section in Odoo's general
+        Settings. First res.config.settings inherit in this
+        project; xpath anchors on a stable insertion point
+        (the main settings container) rather than on a Sales/CRM
+        section that may not be loaded depending on the
+        deployment's module mix.
+
+        The "Reserved" threshold fields are present but readonly
+        with help text explaining they're forward-compatibility
+        placeholders.
+    -->
+    <record id="res_config_settings_view_form_finance_approval"
+            model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.neon.finance.approval</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[1]" position="before">
+                <block title="Finance Approval (Neon)"
+                       id="neon_finance_approval_settings">
+                    <setting id="neon_finance_approval_required_for_all_setting"
+                             string="Require OD/MD approval for every quote"
+                             help="When enabled, every quote submission creates an approval record and notifies the Approver group. When disabled, submission auto-approves.">
+                        <field name="neon_finance_approval_required_for_all"/>
+                    </setting>
+                    <setting id="neon_finance_approval_threshold_usd_setting"
+                             string="USD auto-approve threshold (Reserved)"
+                             help="Reserved for future threshold-based relaxation. Not yet active in P6.M4 logic.">
+                        <field name="neon_finance_approval_threshold_usd"
+                               readonly="1"/>
+                    </setting>
+                    <setting id="neon_finance_approval_threshold_zig_setting"
+                             string="ZiG auto-approve threshold (Reserved)"
+                             help="Reserved for future threshold-based relaxation. Not yet active.">
+                        <field name="neon_finance_approval_threshold_zig"
+                               readonly="1"/>
+                    </setting>
+                    <setting id="neon_finance_approval_margin_min_setting"
+                             string="Minimum margin %% for auto-approve (Reserved)"
+                             help="Reserved for future relaxation logic. Not yet active.">
+                        <field name="neon_finance_approval_margin_min"
+                               readonly="1"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_approval_view_tree" model="ir.ui.view">
+        <field name="name">neon.finance.approval.tree</field>
+        <field name="model">neon.finance.approval</field>
+        <field name="arch" type="xml">
+            <tree string="Quote Approvals"
+                  decoration-muted="state in ('cancelled','rejected')"
+                  decoration-success="state == 'approved'"
+                  decoration-warning="state == 'pending'">
+                <field name="name"/>
+                <field name="quote_id"/>
+                <field name="requested_by_id"/>
+                <field name="requested_at"/>
+                <field name="quote_amount_total_snapshot"
+                       widget="monetary"/>
+                <field name="quote_currency_id_snapshot"
+                       column_invisible="True"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state == 'pending'"
+                       decoration-danger="state == 'rejected'"
+                       decoration-muted="state == 'cancelled'"/>
+                <field name="resolved_by_id" optional="show"/>
+                <field name="resolved_at" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_approval_view_form" model="ir.ui.view">
+        <field name="name">neon.finance.approval.form</field>
+        <field name="model">neon.finance.approval</field>
+        <field name="arch" type="xml">
+            <form string="Quote Approval">
+                <header>
+                    <button name="action_approve_from_form"
+                            type="object"
+                            string="Approve"
+                            class="oe_highlight"
+                            invisible="state != 'pending'"
+                            groups="neon_finance.group_neon_finance_approver"/>
+                    <button name="action_reject_from_form"
+                            type="object"
+                            string="Reject"
+                            invisible="state != 'pending'"
+                            groups="neon_finance.group_neon_finance_approver"
+                            context="{'rejection_reason': 'Rejected via approval queue'}"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Quote">
+                            <field name="quote_id"/>
+                            <field name="quote_amount_total_snapshot"
+                                   widget="monetary"/>
+                            <field name="quote_currency_id_snapshot"/>
+                        </group>
+                        <group string="Request">
+                            <field name="requested_by_id"/>
+                            <field name="requested_at"/>
+                        </group>
+                    </group>
+                    <group string="Resolution"
+                           invisible="state == 'pending'">
+                        <group>
+                            <field name="resolved_by_id"/>
+                            <field name="resolved_at"/>
+                        </group>
+                        <group>
+                            <field name="rejection_reason"
+                                   invisible="state != 'rejected'"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_finance_approval_view_search" model="ir.ui.view">
+        <field name="name">neon.finance.approval.search</field>
+        <field name="model">neon.finance.approval</field>
+        <field name="arch" type="xml">
+            <search string="Approvals">
+                <field name="name"/>
+                <field name="quote_id"/>
+                <field name="requested_by_id"/>
+                <separator/>
+                <filter name="state_pending" string="Pending"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="state_approved" string="Approved"
+                        domain="[('state', '=', 'approved')]"/>
+                <filter name="state_rejected" string="Rejected"
+                        domain="[('state', '=', 'rejected')]"/>
+                <filter name="state_cancelled" string="Cancelled"
+                        domain="[('state', '=', 'cancelled')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_requester" string="Requester"
+                            context="{'group_by': 'requested_by_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_finance_approval_action"
+            model="ir.actions.act_window">
+        <field name="name">Approval Queue</field>
+        <field name="res_model">neon.finance.approval</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_finance_approval_view_search"/>
+        <field name="context">{'search_default_state_pending': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No approval records yet
+            </p>
+            <p>
+                Quotes submitted by sales reps land here for OD/MD
+                review. Pending entries trigger a TODO activity on
+                every approver's inbox; resolving the entry
+                dismisses those TODOs.
+            </p>
+        </field>
+    </record>
+
+</odoo>

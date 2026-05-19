@@ -11,3 +11,11 @@ from . import neon_finance_conversion_rate
 from . import neon_finance_payment_term
 from . import neon_finance_quote_line
 from . import neon_finance_quote
+# P6.M4 — approval queue + Finance Approval settings inherit.
+# Approval must load before quote uses it via the now-resolved
+# forward-ref approval_id field, but quote.py imports happen at
+# class-def time and the field's comodel_name is a string, so order
+# inside this file is not load-order critical; Odoo's registry
+# resolves comodel_name lazily.
+from . import neon_finance_approval
+from . import res_config_settings
