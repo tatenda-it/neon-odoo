@@ -303,9 +303,11 @@
                 No quotes yet
             </p>
             <p>
-                A quote starts in Draft. Add at least one line and set
-                payment terms, then Submit for Approval. P6.M2 auto-
-                approves; M4 will route through the Approver queue.
+                Quotes start in Draft. Add equipment lines and set
+                payment terms, then submit for OD/MD approval.
+                Robin / Munashe review submitted quotes; once
+                approved, the quote can be sent to the client and
+                accepted.
             </p>
         </field>
     </record>

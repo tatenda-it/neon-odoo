@@ -64,7 +64,7 @@ echo
 echo "================================================="
 echo "BROWSER SMOKES (Playwright, headless)"
 echo "================================================="
-BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11)
+BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11 p6_predeploy_fixes)
 VENV_PY="${SCRIPT_DIR}/.venv-browser/Scripts/python.exe"
 if [[ ! -x "$VENV_PY" ]] && [[ ! -f "$VENV_PY" ]]; then
   echo "MISSING venv: $VENV_PY"

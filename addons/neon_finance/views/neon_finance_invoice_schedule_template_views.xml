@@ -65,12 +65,12 @@
                 No schedule templates yet
             </p>
             <p>
-                Templates capture a client's preferred billing cadence
-                (e.g. 50% deposit on acceptance + 50% on event
-                completion). Quotes for that client auto-instantiate
-                a schedule from the template on acceptance. Sales reps
-                can override per-quote on the quote form before
-                submitting.
+                Templates capture a client's preferred billing
+                cadence (e.g. 50% deposit on acceptance + 50% on
+                event completion). When a quote for that client is
+                accepted, an invoice schedule is automatically
+                created from the template. Sales reps can override
+                per-quote on the quote form before submitting.
             </p>
         </field>
     </record>

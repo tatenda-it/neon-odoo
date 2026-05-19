@@ -136,12 +136,15 @@
                 No invoice schedules yet
             </p>
             <p>
-                Schedules materialise when a quote is accepted, drawn
-                from the client's saved template or a default 100%
-                on-acceptance fallback. Triggers fire automatically
-                (on_acceptance, on_date via daily cron,
-                on_event_state via event_job write hook) or manually
-                via the Trigger Now button.
+                Invoice schedules are created when a quote is
+                accepted. They follow the client's payment template
+                (deposit + progress + final) or fall back to a
+                single 100% invoice on acceptance. Each stage
+                invoices automatically when its trigger fires --
+                on quote acceptance, on a specific date, or when
+                the event reaches a particular status. Approvers
+                can also trigger any stage manually via the
+                Trigger Now button.
             </p>
         </field>
     </record>
