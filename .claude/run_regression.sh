@@ -48,3 +48,46 @@ if [[ ${#FAILED_SUITES[@]} -gt 0 ]]; then
   printf '  - %s\n' "${FAILED_SUITES[@]}"
   exit 1
 fi
+
+# -------------------------------------------------------------------
+# Browser-smoke gate -- runs AFTER all in-process Python smokes pass.
+# Hits the live HTTP surface (http://localhost:8069) with headless
+# Chromium via Playwright, exercising menu visibility + action depth
+# for each milestone's relevant role tiers.
+#
+# Failure aborts the pipeline with the same exit-1 discipline as the
+# Python smokes above; screenshots + DOM snippets + diagnosis for
+# any failing assertion land in .claude/smoke-output/<smoke>/
+# <YYYY-MM-DD_HHMMSS>/. See .claude/README.md "Browser smokes".
+# -------------------------------------------------------------------
+echo
+echo "================================================="
+echo "BROWSER SMOKES (Playwright, headless)"
+echo "================================================="
+BROWSER_SMOKES=(p6m1)
+VENV_PY="${SCRIPT_DIR}/.venv-browser/Scripts/python.exe"
+if [[ ! -x "$VENV_PY" ]] && [[ ! -f "$VENV_PY" ]]; then
+  echo "MISSING venv: $VENV_PY"
+  echo "  Set up per .claude/README.md 'Browser smokes / one-time install'."
+  exit 1
+fi
+BROWSER_FAILED=()
+for s in "${BROWSER_SMOKES[@]}"; do
+  SF="${SCRIPT_DIR}/${s}_browser_smoke.py"
+  [[ -f "$SF" ]] || { echo "MISSING: $SF"; BROWSER_FAILED+=("$s (missing)"); continue; }
+  if "$VENV_PY" "$SF"; then
+    echo "[$s] browser PASS"
+  else
+    echo "[$s] browser FAIL"
+    BROWSER_FAILED+=("$s")
+  fi
+done
+if [[ ${#BROWSER_FAILED[@]} -gt 0 ]]; then
+  echo
+  echo "FAILED BROWSER SMOKES:"
+  printf '  - %s\n' "${BROWSER_FAILED[@]}"
+  echo "Inspect screenshots and DOM snippets under .claude/smoke-output/"
+  exit 1
+fi
+echo
+echo "ALL GATES PASSED."

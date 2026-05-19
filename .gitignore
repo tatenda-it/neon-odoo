@@ -22,3 +22,10 @@ __pycache__/
 
 # Database backups — local only, never push to GitHub
 backups/
+
+# Browser-smoke artefacts — never commit. The venv carries the
+# Playwright + bundled Chromium download (~250 MB); smoke-output
+# carries per-run screenshots that bloat the repo and leak no
+# value once a smoke has passed.
+.claude/.venv-browser/
+.claude/smoke-output/
