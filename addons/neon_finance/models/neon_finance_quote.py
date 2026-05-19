@@ -469,6 +469,42 @@ class NeonFinanceQuote(models.Model):
     # ============================================================
     # === Payment term wizard entry point
     # ============================================================
+    def action_recalculate_pricing(self):
+        """Clear the pricing snapshot on every line and re-run the
+        engine. Draft-only -- once a quote has moved past draft, the
+        snapshot is contractual.
+
+        Posts a chatter message attributing the recalc to the
+        invoking user for audit.
+        """
+        for quote in self:
+            if quote.state != "draft":
+                raise UserError(_(
+                    "Recalculate Pricing is only available while %s is "
+                    "in Draft state (currently %s). Cancel and reopen "
+                    "the quote to recompute."
+                ) % (quote.name, dict(_QUOTE_STATES)[quote.state]))
+            if not quote.line_ids:
+                raise UserError(_(
+                    "Quote %s has no lines to recalculate."
+                ) % quote.name)
+            for line in quote.line_ids:
+                # Clear the snapshot and re-run. Manual-entry lines
+                # (no equipment_line_id and no rule) flip to pricing_
+                # status='manual' if unit_rate > 0, else 'not_yet'.
+                line.snapshot_taken = False
+                if line.line_type == "equipment" and line.equipment_line_id:
+                    line._compute_line_pricing()
+                elif line.unit_rate > 0:
+                    line.pricing_status = "manual"
+                else:
+                    line.pricing_status = "not_yet"
+            quote.message_post(body=_(
+                "Pricing recalculated by %s. %d line(s) refreshed against "
+                "current rules."
+            ) % (self.env.user.name, len(quote.line_ids)))
+        return True
+
     def action_open_payment_term_wizard(self):
         """Open the per-quote payment term wizard. Pre-populates from
         the partner's most recent term when one exists."""

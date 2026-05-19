@@ -53,8 +53,16 @@
                         </page>
                         <page string="Override Formula"
                               name="override_formula">
+                            <p class="text-muted">
+                                Reserved for future use. P6.M3's
+                                pricing engine evaluates against the
+                                bracket table only; this formula
+                                field is captured for forward
+                                compatibility and is not yet active
+                                in line pricing calculations.
+                            </p>
                             <field name="override_formula"
-                                   placeholder="Optional Python expression (parsed in P6.M3)."/>
+                                   placeholder="Optional Python expression (not yet active)."/>
                         </page>
                         <page string="Notes" name="notes">
                             <field name="notes" nolabel="1"/>

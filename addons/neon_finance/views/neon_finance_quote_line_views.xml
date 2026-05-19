@@ -24,6 +24,16 @@
                 <field name="tax_id" optional="show"/>
                 <field name="line_total_taxed" widget="monetary"
                        sum="Total" optional="show"/>
+                <field name="pricing_status" widget="badge"
+                       decoration-success="pricing_status == 'priced'"
+                       decoration-warning="pricing_status == 'manual'"
+                       decoration-danger="pricing_status == 'no_rule'"
+                       decoration-muted="pricing_status == 'not_yet'"
+                       optional="show"/>
+                <field name="bracket_multiplier" optional="show"
+                       readonly="1"/>
+                <field name="snapshot_taken" optional="hide"
+                       readonly="1"/>
                 <field name="currency_id" column_invisible="True"/>
                 <field name="equipment_line_id" optional="hide"/>
                 <field name="product_template_id" optional="hide"/>

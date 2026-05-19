@@ -70,6 +70,11 @@
                             type="object"
                             string="Set Payment Terms"
                             invisible="state != 'draft'"/>
+                    <button name="action_recalculate_pricing"
+                            type="object"
+                            string="Recalculate Pricing"
+                            invisible="state != 'draft'"
+                            help="Refresh all equipment line rates against the current pricing.rule + day.multiplier tables. Pricing is otherwise snapshotted at line creation."/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,pending_approval,approved,sent,accepted"/>
                 </header>
@@ -120,6 +125,15 @@
                                     <field name="line_total_taxed"
                                            widget="monetary"
                                            sum="Total"/>
+                                    <field name="pricing_status"
+                                           widget="badge"
+                                           decoration-success="pricing_status == 'priced'"
+                                           decoration-warning="pricing_status == 'manual'"
+                                           decoration-danger="pricing_status == 'no_rule'"
+                                           decoration-muted="pricing_status == 'not_yet'"/>
+                                    <field name="bracket_multiplier"
+                                           readonly="1"
+                                           optional="show"/>
                                     <field name="currency_id"
                                            column_invisible="True"/>
                                 </tree>
