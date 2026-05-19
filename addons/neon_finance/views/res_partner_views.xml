@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P6.M9: res.partner credit hold UI. Bookkeeper/Approver see
+        the flag + Clear button on the partner form. Sales rep
+        sees nothing (their group is excluded from the field
+        groups attribute). The flag itself is automatically flipped
+        by _cron_check_overdue_payments when payment.term policy is
+        'account_hold'; the Clear action is the only manual path.
+    -->
+
+    <record id="res_partner_view_form_neon_credit_hold"
+            model="ir.ui.view">
+        <field name="name">res.partner.form.neon.credit.hold</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Smart-button-style banner at the top of the form when
+                 a credit hold is active. Visible to bookkeeper +
+                 approver only. -->
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-warning mb-0"
+                     role="alert"
+                     invisible="not x_neon_credit_hold"
+                     groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver">
+                    <strong>Credit Hold Active.</strong>
+                    Automatic flag from a payment term with
+                    late_policy = account_hold.
+                    <button name="action_clear_credit_hold"
+                            type="object"
+                            string="Clear Credit Hold"
+                            class="btn-link"
+                            groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+                </div>
+            </xpath>
+
+            <!-- Field placement: inside the existing sales &
+                 purchases tab block, alongside Odoo's own credit-
+                 related fields if present. Bookkeeper / Approver
+                 can also flip it manually via the field itself for
+                 edge cases the cron didn't pick up. -->
+            <xpath expr="//field[@name='vat']" position="after">
+                <field name="x_neon_credit_hold"
+                       widget="boolean_toggle"
+                       groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

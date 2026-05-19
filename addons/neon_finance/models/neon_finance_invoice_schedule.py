@@ -57,6 +57,7 @@ _SCHEDULE_STATES = [
     ("scheduled", "Scheduled"),
     ("triggered", "Triggered"),
     ("invoiced", "Invoiced"),
+    ("partial", "Partially Paid"),  # P6.M9
     ("paid", "Paid"),
     ("overdue", "Overdue"),
     ("cancelled", "Cancelled"),
@@ -68,7 +69,7 @@ class NeonFinanceInvoiceSchedule(models.Model):
     _description = "Invoice Schedule"
     _order = "quote_id, sequence, id"
     _rec_name = "name"
-    _inherit = ["mail.thread"]
+    _inherit = ["mail.thread", "mail.activity.mixin"]
 
     name = fields.Char(
         required=True,
@@ -324,3 +325,97 @@ class NeonFinanceInvoiceSchedule(models.Model):
             "neon.finance.invoice.schedule: cron fired %d "
             "on_date invoices.", count)
         return count
+
+    # ============================================================
+    # === P6.M9: overdue detection + late-policy enforcement
+    # ============================================================
+    @api.model
+    def _cron_check_overdue_payments(self):
+        """Daily sweep. Transitions invoiced schedules to overdue
+        when the underlying invoice's due date has elapsed and
+        payment has not arrived. Idempotent: a schedule already in
+        overdue is skipped.
+
+        Late-policy enforcement is delegated to _apply_late_policy:
+        - none: no automated action
+        - reminder: dispatch mail.activity TODO
+        - account_hold: dispatch TODO + flip partner.x_neon_credit_hold
+
+        Returns the count of schedules transitioned this run.
+        """
+        today = fields.Date.context_today(self)
+        candidates = self.sudo().search([
+            ("state", "=", "invoiced"),
+            ("invoice_id", "!=", False),
+        ])
+        count = 0
+        for rec in candidates:
+            inv = rec.invoice_id
+            if not inv.invoice_date_due:
+                continue
+            if inv.invoice_date_due >= today:
+                continue
+            if inv.payment_state in ("paid", "in_payment"):
+                # Race window: invoice paid since the search;
+                # state propagator will catch up. Skip.
+                continue
+            rec.sudo().write({"state": "overdue"})
+            try:
+                rec._apply_late_policy()
+            except Exception as e:  # noqa: BLE001
+                _logger.error(
+                    "Schedule %s late-policy dispatch failed: %s",
+                    rec.name, e)
+            count += 1
+        _logger.info(
+            "neon.finance.invoice.schedule: overdue cron flipped "
+            "%d schedules.", count)
+        return count
+
+    def _apply_late_policy(self):
+        """Honour quote.payment_term_id.late_policy on overdue
+        transition. Marker 7 (locked P6.M9): account_hold flips
+        partner.x_neon_credit_hold = True; clearing is manual via
+        partner.action_clear_credit_hold (no auto-clear on payment)
+        so the historical event survives review.
+        """
+        self.ensure_one()
+        term = self.quote_id.payment_term_id
+        policy = term.late_policy if term else "none"
+        if policy == "none":
+            return
+        # Dispatch TODO activity for finance roles. Same pattern as
+        # M6's budget-alert dispatch.
+        bookkeeper_users = self.env.ref(
+            "neon_finance.group_neon_finance_bookkeeper").users
+        approver_users = self.env.ref(
+            "neon_finance.group_neon_finance_approver").users
+        recipients = (bookkeeper_users | approver_users)
+        for user in recipients:
+            self.sudo().activity_schedule(
+                "mail.mail_activity_data_todo",
+                user_id=user.id,
+                summary=_("Overdue payment: %s") % self.name,
+                note=_(
+                    "Schedule %(sched)s overdue. Invoice %(inv)s "
+                    "for partner %(partner)s due %(due)s. Policy: "
+                    "%(policy)s."
+                ) % {
+                    "sched": self.name,
+                    "inv": self.invoice_id.name
+                           or self.invoice_id.display_name,
+                    "partner": self.quote_id.partner_id.name,
+                    "due": self.invoice_id.invoice_date_due,
+                    "policy": policy,
+                },
+            )
+        if policy == "account_hold":
+            partner = self.quote_id.partner_id
+            if not partner.x_neon_credit_hold:
+                partner.sudo().write({"x_neon_credit_hold": True})
+                partner.message_post(body=_(
+                    "Credit hold applied automatically: schedule "
+                    "%(sched)s overdue (payment.term late_policy = "
+                    "account_hold). Clear via the Clear Credit Hold "
+                    "action."
+                ) % {"sched": self.name})

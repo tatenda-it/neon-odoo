@@ -30,3 +30,11 @@ from . import commercial_event_job
 # extension (the o2m reverse from quote needs schedule registered).
 from . import neon_finance_invoice_schedule_template
 from . import neon_finance_invoice_schedule
+# P6.M9 -- customer payment matching. account.move extends the stored
+# compute that drives schedule state propagation; res.partner adds the
+# credit-hold flag; account_payment_register adds cross-currency
+# enforcement at the register-payment wizard entry point. Load order
+# doesn't matter (all three _inherit pure stock Odoo).
+from . import account_move
+from . import account_payment_register
+from . import res_partner

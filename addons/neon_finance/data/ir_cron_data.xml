@@ -44,5 +44,28 @@
             <field name="numbercall">-1</field>
             <field name="doall" eval="False"/>
         </record>
+
+        <!--
+            P6.M9: daily overdue payment sweep. Transitions
+            schedules from 'invoiced' to 'overdue' when their
+            account.move.invoice_date_due has elapsed without
+            payment. Late-policy enforcement (reminder activity +
+            account_hold credit flag) dispatches as a side-effect.
+            Same daily cadence as the on_date sweep.
+        -->
+        <record id="ir_cron_neon_finance_overdue_payments"
+                model="ir.cron">
+            <field name="name">Neon Finance: Overdue Payment Sweep</field>
+            <field name="model_id"
+                   ref="model_neon_finance_invoice_schedule"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_check_overdue_payments()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+        </record>
     </data>
 </odoo>
