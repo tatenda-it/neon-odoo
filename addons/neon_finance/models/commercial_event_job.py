@@ -137,6 +137,45 @@ class CommercialEventJob(models.Model):
     )
 
     # ============================================================
+    # === P6.M6 budget alert tracking
+    # ============================================================
+    budget_alert_level = fields.Selection(
+        [
+            ("ok", "On Budget"),
+            ("warn", "Warning"),
+            ("breach", "Over Budget"),
+            ("severe", "Severely Over Budget"),
+        ],
+        compute="_compute_budget_alert_level",
+        store=True,
+        readonly=True,
+        copy=False,
+        index=True,
+        default="ok",
+        help="Derived from cost_total vs quoted_budget. Thresholds "
+        "are configured via Settings > Budget Alerts (Neon): warn / "
+        "breach / severe pct defaults 80 / 100 / 120. 'ok' when "
+        "quoted_budget is null (no accepted quote to compare against).",
+    )
+    last_alert_dispatched_at = fields.Datetime(
+        readonly=True,
+        copy=False,
+        help="Timestamp of the last mail.activity dispatched for this "
+        "event_job's budget level. Used by the write() override to "
+        "implement a 1-hour idempotency window -- prevents alert "
+        "storms during bulk cost imports at the same level.",
+    )
+    suggest_reapproval = fields.Boolean(
+        default=False,
+        copy=False,
+        help="Set to True automatically when budget_alert_level "
+        "reaches 'severe'. Surfaces as a banner on the event_job "
+        "form prompting Robin / Munashe to consider re-quote and "
+        "re-approval. Manually flippable by approvers; cleared by "
+        "the Acknowledge over-budget button.",
+    )
+
+    # ============================================================
     # === Computes
     # ============================================================
     @api.depends()
@@ -228,7 +267,14 @@ class CommercialEventJob(models.Model):
         REVENUE (from related quote(s)), COST (per cost_type x
         currency), and MARGIN (headline + variance).
         """
-        Quote = self.env["neon.finance.quote"]
+        # ⚠️ DECISION (P6.M6 follow-up to M5 P&L): the pnl_html compute
+        # reads neon.finance.quote, but users with event_job access via
+        # operational groups (Lead Tech / Manager / Crew) don't have R
+        # on neon.finance.quote at the ACL layer. The P&L view is a
+        # derived financial summary that anyone with event_job read
+        # should see, so we sudo() the quote search. requesting user's
+        # identity is preserved for the compute itself.
+        Quote = self.env["neon.finance.quote"].sudo()
         usd = self.env.ref("base.USD", raise_if_not_found=False)
         zwg = self.env.ref(
             "neon_finance.currency_zwg", raise_if_not_found=False)
@@ -382,3 +428,225 @@ class CommercialEventJob(models.Model):
             parts.append("</table>")
             parts.append("</div>")
             rec.pnl_html = "".join(parts)
+
+    # ============================================================
+    # === P6.M6 budget alert: compute level + write() dispatch
+    # ============================================================
+    # ⚠️ DECISION (P6.M6): 1-hour idempotency window is hardcoded as
+    # a module-level constant rather than a 4th config_parameter. The
+    # value is a UX-rate-limit tied to human review cadence, not a
+    # tunable business policy -- adding a knob would be over-
+    # engineering for a value nobody is going to change.
+    _ALERT_IDEMPOTENCY_MINUTES = 60
+
+    _LEVEL_ORDER = {"ok": 0, "warn": 1, "breach": 2, "severe": 3}
+
+    @api.depends("cost_total_usd", "cost_total_zig",
+                 "quoted_budget", "quoted_budget_currency_id")
+    def _compute_budget_alert_level(self):
+        """Derive budget_alert_level from same-currency cost vs.
+        quoted_budget. Reads three thresholds from ir.config_parameter
+        (warn/breach/severe pct, defaults 80/100/120). Returns 'ok'
+        when quoted_budget is null (no accepted quote to compare).
+
+        ⚠️ DECISION (P6.M6): same-currency-only comparison carries the
+        M5 margin_gross invariant forward. Cross-currency cost
+        contributions appear in the P&L view but don't escalate the
+        alert level -- finance reviewers see what they need without
+        invisible FX conversion in the alert path.
+
+        ⚠️ DECISION (P6.M6): dispatch fires INSIDE the compute, not
+        from a separate write() override. Stored-computed-field
+        updates bypass model.write() entirely, so a write()-based
+        trigger wouldn't fire on cost.line.create -> cost_total
+        recompute -> budget_alert_level recompute. The compute reads
+        the previous stored value via direct SQL (bypasses ORM cache
+        + recursion) so old/new comparison is reliable.
+        """
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        zwg = self.env.ref(
+            "neon_finance.currency_zwg", raise_if_not_found=False)
+        ICP = self.env["ir.config_parameter"].sudo()
+        warn_pct = float(ICP.get_param(
+            "neon_finance.budget_warn_pct", "80"))
+        breach_pct = float(ICP.get_param(
+            "neon_finance.budget_breach_pct", "100"))
+        severe_pct = float(ICP.get_param(
+            "neon_finance.budget_severe_pct", "120"))
+        suppress = self.env.context.get("skip_finance_notification")
+
+        for rec in self:
+            # Read prior stored value via SQL so we can detect
+            # escalation/de-escalation. ORM cache reads would either
+            # return the just-being-computed value or recurse.
+            old_level = "ok"
+            if rec.id:
+                self.env.cr.execute(
+                    "SELECT budget_alert_level FROM commercial_event_job"
+                    " WHERE id = %s", (rec.id,))
+                row = self.env.cr.fetchone()
+                if row and row[0]:
+                    old_level = row[0]
+
+            if not rec.quoted_budget:
+                new_level = "ok"
+            elif rec.quoted_budget_currency_id == usd:
+                pct = (rec.cost_total_usd / rec.quoted_budget) * 100.0
+                new_level = self._level_for_pct(
+                    pct, warn_pct, breach_pct, severe_pct)
+            elif rec.quoted_budget_currency_id == zwg:
+                pct = (rec.cost_total_zig / rec.quoted_budget) * 100.0
+                new_level = self._level_for_pct(
+                    pct, warn_pct, breach_pct, severe_pct)
+            else:
+                new_level = "ok"
+
+            rec.budget_alert_level = new_level
+
+            if suppress:
+                continue
+
+            old_rank = self._LEVEL_ORDER.get(old_level, 0)
+            new_rank = self._LEVEL_ORDER.get(new_level, 0)
+            if new_rank > old_rank:
+                rec._dispatch_budget_alert(old_level, new_level)
+            elif new_rank < old_rank and old_level == "severe":
+                # De-escalation out of severe -- clear the flag, no
+                # activity dispatch (silent good news).
+                if rec.suggest_reapproval:
+                    rec.sudo().write({"suggest_reapproval": False})
+                    rec.sudo().message_post(body=_(
+                        "Budget level dropped from %s to %s; "
+                        "suggest_reapproval auto-cleared."
+                    ) % (old_level, new_level))
+
+    @staticmethod
+    def _level_for_pct(pct, warn_pct, breach_pct, severe_pct):
+        """Pure helper -- map percent to level using the configured
+        thresholds. Order matters: check severe first."""
+        if pct >= severe_pct:
+            return "severe"
+        if pct >= breach_pct:
+            return "breach"
+        if pct >= warn_pct:
+            return "warn"
+        return "ok"
+
+    def _dispatch_budget_alert(self, old_level, new_level):
+        """Schedule mail.activity TODO for every Approver + Bookkeeper
+        when budget_alert_level escalates. Idempotency: skip if
+        last_alert_dispatched_at is within 60 min AND the new level
+        is the same as the level that triggered the previous alert.
+        Escalation beyond the previous level breaks the idempotency.
+
+        Sets suggest_reapproval=True when new_level='severe'.
+        Activities are scheduled on the event_job record itself --
+        matches the M4 (approval) + M5 (cost.line) pattern; future
+        dismiss-on-acknowledge logic stays scoped.
+        """
+        self.ensure_one()
+        # Idempotency: if we dispatched recently at this same level,
+        # skip. Escalation to a higher level bypasses the check.
+        now = fields.Datetime.now()
+        if self.last_alert_dispatched_at:
+            elapsed = (now - self.last_alert_dispatched_at).total_seconds()
+            if (elapsed < self._ALERT_IDEMPOTENCY_MINUTES * 60
+                    and self._LEVEL_ORDER.get(new_level, 0)
+                    <= self._LEVEL_ORDER.get(old_level, 0)):
+                # No escalation AND within window -- skip.
+                return
+
+        approvers = self.env.ref(
+            "neon_finance.group_neon_finance_approver",
+            raise_if_not_found=False,
+        )
+        bookkeepers = self.env.ref(
+            "neon_finance.group_neon_finance_bookkeeper",
+            raise_if_not_found=False,
+        )
+        recipients = self.env["res.users"]
+        if approvers:
+            recipients |= approvers.users
+        if bookkeepers:
+            recipients |= bookkeepers.users
+
+        level_labels = dict(self._fields["budget_alert_level"].selection)
+        summary = _(
+            "Budget alert on %s: %s (%.0f%% of quoted budget)"
+        ) % (
+            self.name,
+            level_labels.get(new_level, new_level),
+            (self._same_currency_cost() / self.quoted_budget * 100.0)
+            if self.quoted_budget else 0.0,
+        )
+        note = _(
+            "Event %(name)s budget level escalated from %(old)s to "
+            "%(new)s.\nQuoted budget: %(qb)s %(cur)s\nCost so far: "
+            "%(cost)s %(cur)s\nReview the Financial Summary tab."
+        ) % {
+            "name": self.name,
+            "old": level_labels.get(old_level, old_level),
+            "new": level_labels.get(new_level, new_level),
+            "qb": self.quoted_budget,
+            "cur": (self.quoted_budget_currency_id.name
+                    if self.quoted_budget_currency_id else "?"),
+            "cost": self._same_currency_cost(),
+        }
+        for user in recipients:
+            self.sudo().activity_schedule(
+                "mail.mail_activity_data_todo",
+                user_id=user.id,
+                summary=summary,
+                note=note,
+            )
+
+        # Chatter post on breach + severe; warn is activity-only.
+        if new_level in ("breach", "severe"):
+            self.sudo().message_post(body=_(
+                "Budget alert: %s is now %s (escalated from %s)."
+            ) % (
+                self.name,
+                level_labels.get(new_level, new_level),
+                level_labels.get(old_level, old_level),
+            ))
+
+        # severe additionally flips the suggest_reapproval flag.
+        if new_level == "severe":
+            self.sudo().write({"suggest_reapproval": True})
+
+        self.sudo().write({"last_alert_dispatched_at": now})
+
+    def _same_currency_cost(self):
+        """Return the cost_total in quoted_budget_currency_id (the
+        same-currency value used in margin + alert level)."""
+        self.ensure_one()
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        zwg = self.env.ref(
+            "neon_finance.currency_zwg", raise_if_not_found=False)
+        if self.quoted_budget_currency_id == usd:
+            return self.cost_total_usd
+        if self.quoted_budget_currency_id == zwg:
+            return self.cost_total_zig
+        return 0.0
+
+    def action_acknowledge_over_budget(self):
+        """Approver button on the event_job form. Clears
+        suggest_reapproval (the action-required flag) but leaves
+        budget_alert_level untouched -- the level is data-derived
+        and cost data hasn't changed. Posts chatter for audit.
+        """
+        for rec in self:
+            if not rec.suggest_reapproval:
+                # Idempotent no-op for users clicking twice.
+                continue
+            rec.sudo().write({"suggest_reapproval": False})
+            rec.sudo().message_post(body=_(
+                "Over-budget acknowledged by %s. Budget level "
+                "remains %s; suggest_reapproval cleared. Cost "
+                "data is unchanged."
+            ) % (
+                self.env.user.name,
+                dict(self._fields["budget_alert_level"].selection).get(
+                    rec.budget_alert_level, rec.budget_alert_level),
+            ))
+        return True

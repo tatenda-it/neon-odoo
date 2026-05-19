@@ -46,5 +46,28 @@
             <field name="value"></field>
         </record>
 
+        <!--
+            P6.M6 — Budget Alert thresholds. Defaults match the
+            design pause: 80% warn, 100% breach, 120% severe.
+            warn<breach<severe enforced by res.config.settings
+            constrains. Tunable via Settings > Budget Alerts (Neon).
+            Robin can sign off the final numbers after live use.
+        -->
+        <record id="ir_config_param_budget_warn_pct"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.budget_warn_pct</field>
+            <field name="value">80</field>
+        </record>
+        <record id="ir_config_param_budget_breach_pct"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.budget_breach_pct</field>
+            <field name="value">100</field>
+        </record>
+        <record id="ir_config_param_budget_severe_pct"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.budget_severe_pct</field>
+            <field name="value">120</field>
+        </record>
+
     </data>
 </odoo>

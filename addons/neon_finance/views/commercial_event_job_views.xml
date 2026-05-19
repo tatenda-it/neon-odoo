@@ -19,6 +19,34 @@
         <field name="inherit_id"
                ref="neon_jobs.commercial_event_job_view_form"/>
         <field name="arch" type="xml">
+            <!--
+                P6.M6 banner. Sits above the sheet so it's visible
+                regardless of which notebook tab is active. Only
+                renders when suggest_reapproval=True (set by the
+                _dispatch_budget_alert helper on severe escalation,
+                or manually flipped by an approver). The Acknowledge
+                button clears the flag without touching
+                budget_alert_level (the level is data-derived; the
+                flag is action-required).
+            -->
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-warning"
+                     role="alert"
+                     invisible="not suggest_reapproval"
+                     style="margin: 8px 16px;">
+                    <strong>Severely over budget.</strong>
+                    Cost vs quoted budget has exceeded the severe
+                    threshold. Consider re-quoting and re-approving
+                    via the standard quote workflow. Acknowledge to
+                    clear the banner (the level stays, only the
+                    action-required flag is reset.
+                    <button name="action_acknowledge_over_budget"
+                            type="object"
+                            string="Acknowledge over-budget"
+                            class="btn btn-warning btn-sm"
+                            groups="neon_finance.group_neon_finance_approver"/>
+                </div>
+            </xpath>
             <xpath expr="//page[@name='page_finance']"
                    position="after">
                 <page string="Budgets" name="page_neon_finance_budgets">
@@ -78,6 +106,20 @@
                 </page>
                 <page string="Financial Summary"
                       name="page_neon_finance_pnl">
+                    <group>
+                        <group string="Budget Status">
+                            <field name="budget_alert_level"
+                                   widget="badge"
+                                   decoration-success="budget_alert_level == 'ok'"
+                                   decoration-warning="budget_alert_level == 'warn'"
+                                   decoration-danger="budget_alert_level in ('breach','severe')"
+                                   readonly="1"/>
+                            <field name="last_alert_dispatched_at"
+                                   readonly="1"/>
+                            <field name="suggest_reapproval"
+                                   readonly="1"/>
+                        </group>
+                    </group>
                     <field name="pnl_html"
                            widget="html"
                            readonly="1"

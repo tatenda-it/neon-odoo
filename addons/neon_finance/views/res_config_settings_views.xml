@@ -46,6 +46,24 @@
                                readonly="1"/>
                     </setting>
                 </block>
+                <block title="Budget Alerts (Neon)"
+                       id="neon_finance_budget_alert_settings">
+                    <setting id="neon_finance_budget_warn_pct_setting"
+                             string="Warning threshold (%%)"
+                             help="Same-currency cost vs quoted_budget percent at which mail.activity TODOs fire to Bookkeeper + Approver. Default 80.">
+                        <field name="neon_finance_budget_warn_pct"/>
+                    </setting>
+                    <setting id="neon_finance_budget_breach_pct_setting"
+                             string="Breach threshold (%%)"
+                             help="Activities + chatter post fire at this percent. Default 100 (over budget).">
+                        <field name="neon_finance_budget_breach_pct"/>
+                    </setting>
+                    <setting id="neon_finance_budget_severe_pct_setting"
+                             string="Severe threshold (%%)"
+                             help="Activities + chatter + suggest_reapproval banner. Default 120. Must be greater than breach threshold.">
+                        <field name="neon_finance_budget_severe_pct"/>
+                    </setting>
+                </block>
             </xpath>
         </field>
     </record>
