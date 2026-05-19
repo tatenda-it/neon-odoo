@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_payment_term_view_tree" model="ir.ui.view">
+        <field name="name">neon.finance.payment.term.tree</field>
+        <field name="model">neon.finance.payment.term</field>
+        <field name="arch" type="xml">
+            <tree string="Payment Terms">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="deposit_pct"/>
+                <field name="deposit_due_days"/>
+                <field name="final_due_days"/>
+                <field name="late_policy"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_payment_term_view_form" model="ir.ui.view">
+        <field name="name">neon.finance.payment.term.form</field>
+        <field name="model">neon.finance.payment.term</field>
+        <field name="arch" type="xml">
+            <form string="Payment Term">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Scope">
+                            <field name="partner_id"/>
+                        </group>
+                        <group string="Cadence">
+                            <field name="deposit_pct"/>
+                            <field name="deposit_due_days"/>
+                            <field name="final_due_days"/>
+                            <field name="late_policy"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_finance_payment_term_action"
+            model="ir.actions.act_window">
+        <field name="name">Payment Terms</field>
+        <field name="res_model">neon.finance.payment.term</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

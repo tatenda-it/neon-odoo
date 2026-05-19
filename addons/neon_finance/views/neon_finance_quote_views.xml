@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_quote_view_tree" model="ir.ui.view">
+        <field name="name">neon.finance.quote.tree</field>
+        <field name="model">neon.finance.quote</field>
+        <field name="arch" type="xml">
+            <tree string="Quotes"
+                  decoration-muted="state in ('cancelled','expired','rejected')"
+                  decoration-success="state == 'accepted'"
+                  decoration-info="state == 'sent'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="event_job_id"/>
+                <field name="currency_id"/>
+                <field name="amount_total" widget="monetary"
+                       sum="Total"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'accepted'"
+                       decoration-info="state == 'sent'"
+                       decoration-warning="state == 'pending_approval'"
+                       decoration-danger="state in ('rejected','expired')"
+                       decoration-muted="state == 'cancelled'"/>
+                <field name="salesperson_id"/>
+                <field name="expires_at"/>
+                <field name="create_date"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_quote_view_form" model="ir.ui.view">
+        <field name="name">neon.finance.quote.form</field>
+        <field name="model">neon.finance.quote</field>
+        <field name="arch" type="xml">
+            <form string="Quote">
+                <header>
+                    <button name="action_submit_for_approval"
+                            type="object"
+                            string="Submit for Approval"
+                            class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_approve"
+                            type="object"
+                            string="Approve"
+                            class="oe_highlight"
+                            invisible="state != 'pending_approval'"
+                            groups="neon_finance.group_neon_finance_approver"/>
+                    <button name="action_reject"
+                            type="object"
+                            string="Reject"
+                            invisible="state != 'pending_approval'"
+                            groups="neon_finance.group_neon_finance_approver"
+                            context="{'rejection_reason': 'Rejected via form'}"/>
+                    <button name="action_send"
+                            type="object"
+                            string="Send to Client"
+                            class="oe_highlight"
+                            invisible="state != 'approved'"/>
+                    <button name="action_accept"
+                            type="object"
+                            string="Mark Accepted"
+                            class="oe_highlight"
+                            invisible="state != 'sent'"/>
+                    <button name="action_cancel"
+                            type="object"
+                            string="Cancel"
+                            invisible="state in ('accepted','rejected','expired','cancelled')"
+                            context="{'cancelled_reason': 'Cancelled via form'}"/>
+                    <button name="action_open_payment_term_wizard"
+                            type="object"
+                            string="Set Payment Terms"
+                            invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,pending_approval,approved,sent,accepted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Scope">
+                            <field name="event_job_id"
+                                   readonly="state != 'draft'"/>
+                            <field name="partner_id"/>
+                            <field name="salesperson_id"
+                                   readonly="state != 'draft'"/>
+                            <field name="currency_id"
+                                   readonly="id"/>
+                        </group>
+                        <group string="Schedule">
+                            <field name="expires_at"
+                                   readonly="state != 'draft'"/>
+                            <field name="crew_display_mode"
+                                   readonly="state != 'draft'"/>
+                            <field name="payment_term_id"
+                                   readonly="state != 'draft'"/>
+                            <field name="conversion_rate_id"
+                                   readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines" name="lines">
+                            <field name="line_ids"
+                                   readonly="state not in ('draft',)"
+                                   context="{'default_quote_id': id}">
+                                <tree string="Quote Lines"
+                                      editable="bottom">
+                                    <field name="sequence"
+                                           widget="handle"/>
+                                    <field name="line_type"/>
+                                    <field name="name"/>
+                                    <field name="quantity"/>
+                                    <field name="duration_days"/>
+                                    <field name="unit_rate"
+                                           widget="monetary"/>
+                                    <field name="line_subtotal"
+                                           widget="monetary"
+                                           sum="Subtotal"/>
+                                    <field name="tax_id"/>
+                                    <field name="line_total_taxed"
+                                           widget="monetary"
+                                           sum="Total"/>
+                                    <field name="currency_id"
+                                           column_invisible="True"/>
+                                </tree>
+                            </field>
+                            <group class="oe_subtotal_footer
+                                          oe_right">
+                                <field name="amount_untaxed"
+                                       widget="monetary"/>
+                                <field name="amount_tax"
+                                       widget="monetary"/>
+                                <field name="amount_total"
+                                       widget="monetary"
+                                       class="oe_subtotal_footer_separator"/>
+                            </group>
+                        </page>
+                        <page string="Margin" name="margin">
+                            <group>
+                                <field name="margin_total"
+                                       widget="monetary"/>
+                                <field name="margin_pct"/>
+                            </group>
+                            <p class="text-muted">
+                                P6.M2 placeholder values --
+                                quote_line.line_cost defaults to 0
+                                until P6.M5 wires the cost-strategy
+                                compute. Margin currently equals
+                                untaxed total.
+                            </p>
+                        </page>
+                        <page string="Approval / Audit"
+                              name="approval">
+                            <group>
+                                <group string="Approval">
+                                    <field name="approved_by_id"/>
+                                    <field name="approved_at"/>
+                                    <field name="rejection_reason"
+                                           invisible="state != 'rejected'"/>
+                                    <field name="rejected_at"
+                                           invisible="state != 'rejected'"/>
+                                </group>
+                                <group string="Lifecycle">
+                                    <field name="sent_at"/>
+                                    <field name="accepted_at"/>
+                                    <field name="cancelled_at"
+                                           invisible="state != 'cancelled'"/>
+                                    <field name="cancelled_reason"
+                                           invisible="state != 'cancelled'"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_finance_quote_view_search" model="ir.ui.view">
+        <field name="name">neon.finance.quote.search</field>
+        <field name="model">neon.finance.quote</field>
+        <field name="arch" type="xml">
+            <search string="Quotes">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="event_job_id"/>
+                <field name="salesperson_id"/>
+                <separator/>
+                <filter name="my_quotes" string="My Quotes"
+                        domain="[('salesperson_id', '=', uid)]"/>
+                <separator/>
+                <filter name="state_draft" string="Draft"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="state_pending" string="Pending Approval"
+                        domain="[('state', '=', 'pending_approval')]"/>
+                <filter name="state_approved" string="Approved"
+                        domain="[('state', '=', 'approved')]"/>
+                <filter name="state_sent" string="Sent"
+                        domain="[('state', '=', 'sent')]"/>
+                <filter name="state_accepted" string="Accepted"
+                        domain="[('state', '=', 'accepted')]"/>
+                <filter name="state_terminal" string="Terminal"
+                        domain="[('state', 'in',
+                            ('rejected','expired','cancelled'))]"/>
+                <separator/>
+                <filter name="currency_usd" string="USD"
+                        domain="[('currency_id.name', '=', 'USD')]"/>
+                <filter name="currency_zwg" string="ZiG"
+                        domain="[('currency_id.name', '=', 'ZWG')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="Stage"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_salesperson"
+                            string="Salesperson"
+                            context="{'group_by': 'salesperson_id'}"/>
+                    <filter name="group_partner" string="Customer"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_currency" string="Currency"
+                            context="{'group_by': 'currency_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_finance_quote_action"
+            model="ir.actions.act_window">
+        <field name="name">Quotes</field>
+        <field name="res_model">neon.finance.quote</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_finance_quote_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No quotes yet
+            </p>
+            <p>
+                A quote starts in Draft. Add at least one line and set
+                payment terms, then Submit for Approval. P6.M2 auto-
+                approves; M4 will route through the Approver queue.
+            </p>
+        </field>
+    </record>
+
+</odoo>

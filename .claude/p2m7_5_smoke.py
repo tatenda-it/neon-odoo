@@ -111,7 +111,12 @@ client = env["res.partner"].create({
 USER_SPECS = [
     ("p2m75_sales",    "P2M75 Sales", [
         "base.group_user",
-        "neon_jobs.group_neon_jobs_user"]),
+        "neon_jobs.group_neon_jobs_user",
+        # P6.M2 — Phase 6 sales reps carry the finance/sales group in
+        # production so they can draft quotes. Adding here keeps the
+        # fixture consistent with that reality; P6.M1's transient
+        # bind in p6m1_smoke.py is now idempotent (no breakage).
+        "neon_finance.group_neon_finance_sales"]),
     ("p2m75_mgr",      "P2M75 Manager", [
         "base.group_user",
         "neon_jobs.group_neon_jobs_manager"]),

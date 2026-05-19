@@ -99,4 +99,29 @@
               action="neon_finance_conversion_rate_action"
               sequence="30"/>
 
+    <!--
+        P6.M2 — quote stack menus.
+
+        Quotes hang under the Invoicing app's "Customers" branch
+        (account.menu_finance_receivables is the standard "Customer
+        Invoices / Receivables" parent in Odoo 17). All three
+        finance roles already reach this submenu via the P6.M1
+        account.menu_finance override.
+
+        Payment Terms sit under Configuration > Finance alongside
+        Pricing Rules / Day Multipliers / Conversion Rates.
+    -->
+    <menuitem id="menu_neon_finance_quotes"
+              name="Quotes"
+              parent="account.menu_finance_receivables"
+              action="neon_finance_quote_action"
+              sequence="5"
+              groups="neon_finance.group_neon_finance_sales,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+
+    <menuitem id="menu_neon_finance_payment_terms"
+              name="Payment Terms"
+              parent="menu_neon_finance_config"
+              action="neon_finance_payment_term_action"
+              sequence="40"/>
+
 </odoo>

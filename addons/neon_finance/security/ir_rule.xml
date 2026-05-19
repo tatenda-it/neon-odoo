@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            P6.M2 — quote record rules. Sales see only their own
+            quotes; Bookkeeper and Approver see all. The CSV grants
+            both Bookkeeper and Approver unrestricted R/W/C on the
+            model; an unconditional rule on each group is required so
+            those grants survive the OR-combine with the sales-tier
+            restriction (Odoo evaluates all rules for a user; a
+            restrictive rule on one group still applies unless an
+            unconditional rule on another group lifts it).
+
+            None of these rules grant unlink — perm_unlink=0 on every
+            CSV row already blocks it. Listing perm_unlink=False here
+            is documentation, not enforcement.
+        -->
+
+        <record id="quote_rule_sales_own_only" model="ir.rule">
+            <field name="name">Quote: Sales see own only</field>
+            <field name="model_id" ref="model_neon_finance_quote"/>
+            <field name="domain_force">[('salesperson_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_sales'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="quote_rule_bookkeeper_all" model="ir.rule">
+            <field name="name">Quote: Bookkeeper sees all</field>
+            <field name="model_id" ref="model_neon_finance_quote"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="quote_rule_approver_all" model="ir.rule">
+            <field name="name">Quote: Approver sees all</field>
+            <field name="model_id" ref="model_neon_finance_quote"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_approver'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!--
+            P6.M2 — quote.line follows the same triangle scoped via
+            the line's parent quote_id. Sales reps can only see /
+            edit lines whose quote they own.
+        -->
+        <record id="quote_line_rule_sales_own_only" model="ir.rule">
+            <field name="name">Quote Line: Sales see own quote's lines only</field>
+            <field name="model_id" ref="model_neon_finance_quote_line"/>
+            <field name="domain_force">[('quote_id.salesperson_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_sales'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="quote_line_rule_bookkeeper_all" model="ir.rule">
+            <field name="name">Quote Line: Bookkeeper sees all</field>
+            <field name="model_id" ref="model_neon_finance_quote_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="quote_line_rule_approver_all" model="ir.rule">
+            <field name="name">Quote Line: Approver sees all</field>
+            <field name="model_id" ref="model_neon_finance_quote_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_approver'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

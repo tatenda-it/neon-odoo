@@ -263,20 +263,34 @@ ConvRate.create({
     "zig_per_usd": 10000.0,
     "source_note": "smoke T509 older",
 })
-# Should return the rate that was seeded by data XML (today) since
-# that's the latest with effective_date <= today.
+# Resolve the expected latest dynamically: get_active_rate's contract
+# is "the record with the greatest effective_date <= on_date". This
+# used to compare against hardcoded values from the 2026-05-18 seed,
+# but real manual browser testing routinely adds newer dated rates
+# (e.g. "Browser smoke test entry" rows), breaking the absolute
+# comparison. Tying the assertion to the same ORDER BY the function
+# uses keeps the test robust to extra DB state while still verifying
+# the latest-wins semantics.
+expected_latest = ConvRate.search(
+    [("effective_date", "<=", date.today())],
+    order="effective_date desc, id desc",
+    limit=1,
+)
 rate_zwg_to_usd = ConvRate.get_active_rate(zwg, usd)
 rate_usd_to_zwg = ConvRate.get_active_rate(usd, zwg)
 # Same-currency identity
 rate_same = ConvRate.get_active_rate(usd, usd)
 ok = (
-    rate_zwg_to_usd == 0.000040
-    and rate_usd_to_zwg == 25000.000000
+    bool(expected_latest)
+    and rate_zwg_to_usd == expected_latest.usd_per_zig
+    and rate_usd_to_zwg == expected_latest.zig_per_usd
     and rate_same == 1.0
 )
-print("  zwg->usd:", rate_zwg_to_usd, "(want 0.000040)")
-print("  usd->zwg:", rate_usd_to_zwg, "(want 25000.0)")
-print("  usd->usd:", rate_same, "(want 1.0)")
+print("  expected_latest:", expected_latest.effective_date,
+      expected_latest.usd_per_zig, expected_latest.zig_per_usd)
+print("  zwg->usd:", rate_zwg_to_usd,
+      "  usd->zwg:", rate_usd_to_zwg,
+      "  usd->usd:", rate_same)
 print("T509:", "PASS" if ok else "FAIL")
 results["T509"] = ok
 

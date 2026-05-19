@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Quote lines are exclusively a One2many on the quote form: no
+        standalone menu, no act_window. Defining the editable list
+        here keeps the inline editor's column order, sequence handle,
+        and tax widget separate from the parent form's XML.
+    -->
+    <record id="neon_finance_quote_line_view_tree_editable"
+            model="ir.ui.view">
+        <field name="name">neon.finance.quote.line.tree.editable</field>
+        <field name="model">neon.finance.quote.line</field>
+        <field name="arch" type="xml">
+            <tree string="Quote Lines" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="line_type"/>
+                <field name="name"/>
+                <field name="quantity"/>
+                <field name="duration_days"/>
+                <field name="unit_rate" widget="monetary"/>
+                <field name="line_subtotal" widget="monetary"
+                       sum="Subtotal"/>
+                <field name="tax_id" optional="show"/>
+                <field name="line_total_taxed" widget="monetary"
+                       sum="Total" optional="show"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="equipment_line_id" optional="hide"/>
+                <field name="product_template_id" optional="hide"/>
+                <field name="line_cost" optional="hide"
+                       widget="monetary"/>
+                <field name="line_margin" optional="hide"
+                       widget="monetary"/>
+            </tree>
+        </field>
+    </record>
+
+</odoo>

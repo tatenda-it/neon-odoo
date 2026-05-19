@@ -39,5 +39,33 @@
             <field name="implementation">standard</field>
         </record>
 
+        <!--
+            P6.M2 — quote sequences. One per currency so the human-
+            readable identifier carries the currency, matching the
+            PRC- pattern. 6-digit padding follows the FX- precedent —
+            quote volume grows steadily over the system's life and
+            5-digit padding would roll over within 5 years at Neon's
+            current pace.
+        -->
+        <record id="seq_neon_finance_quote_usd" model="ir.sequence">
+            <field name="name">Quote (USD)</field>
+            <field name="code">neon.finance.quote.usd</field>
+            <field name="prefix">QUO-USD-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
+        <record id="seq_neon_finance_quote_zwg" model="ir.sequence">
+            <field name="name">Quote (ZiG)</field>
+            <field name="code">neon.finance.quote.zwg</field>
+            <field name="prefix">QUO-ZIG-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
     </data>
 </odoo>

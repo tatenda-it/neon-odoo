@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_payment_term_wizard_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.finance.payment.term.wizard.form</field>
+        <field name="model">neon.finance.payment.term.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Set Payment Terms">
+                <group>
+                    <field name="quote_id" readonly="1"/>
+                    <field name="partner_id" readonly="1"/>
+                </group>
+                <group string="Cadence">
+                    <field name="deposit_pct"/>
+                    <field name="deposit_due_days"/>
+                    <field name="final_due_days"/>
+                    <field name="late_policy"/>
+                </group>
+                <group string="Notes">
+                    <field name="notes" nolabel="1"/>
+                </group>
+                <footer>
+                    <button name="action_save"
+                            type="object"
+                            string="Save"
+                            class="btn-primary"/>
+                    <button special="cancel"
+                            string="Cancel"
+                            class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>
