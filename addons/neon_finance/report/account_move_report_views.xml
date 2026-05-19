@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P6.M8: Invoice PDF override.
+
+        Inherits account.report_invoice_document, mirroring the
+        Phase 1 QUOTE override at
+        neon_sales/views/sale_report_templates.xml. Five anchor
+        points:
+
+            1. ZIMRA strip - after #informations (TIN / BPN / VAT;
+               suppressed when all three are null so the template
+               gracefully degrades while Robin populates them).
+            2. Stage indicator - before main line items table (only
+               when invoice.ref matches SCH-NNNNNN and the schedule
+               resolves; suppressed for non-Neon invoices and
+               single-stage quotes).
+            3. Payment terms summary block - after #payment_term
+               (resolves quote via invoice_origin regex; suppressed
+               when parse fails).
+            4. Currency-matched banking block - after the payment
+               terms summary (highlights account whose currency
+               matches the invoice).
+            5. T&Cs footer - inside .page (boilerplate Neon terms).
+
+        Defensive: every block is t-if-guarded so non-Neon invoices
+        (vendor bills, refunds outside the QUO-/SCH- flow) render
+        the stock Odoo template untouched.
+
+        Marker 4 from the design pause: no quote_id related field
+        added to account.move. invoice_origin / ref carry the
+        backlinks; the template parses them at render time.
+    -->
+
+    <template id="report_invoice_document_neon_finance"
+              inherit_id="account.report_invoice_document">
+
+        <!-- 1. ZIMRA strip - after #informations -->
+        <xpath expr="//div[@id='informations']" position="after">
+            <div class="row mt-2 mb-3" name="neon_zimra_strip"
+                 t-if="o.company_id.x_zimra_tin or
+                       o.company_id.x_zimra_bpn or
+                       o.company_id.partner_id.vat">
+                <div class="col-12">
+                    <div class="p-2"
+                         style="background-color: #F4F2F8;
+                                border-left: 3px solid #7165AC;
+                                font-size: 0.85em;">
+                        <strong>Tax Information:</strong>
+                        <span t-if="o.company_id.x_zimra_tin">
+                            TIN <t t-out="o.company_id.x_zimra_tin"/>
+                        </span>
+                        <span t-if="o.company_id.x_zimra_bpn"
+                              class="ms-3">
+                            BPN <t t-out="o.company_id.x_zimra_bpn"/>
+                        </span>
+                        <span t-if="o.company_id.partner_id.vat"
+                              class="ms-3">
+                            VAT <t t-out="o.company_id.partner_id.vat"/>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- 2. Multi-stage indicator - before main line items table.
+
+             Marker 2: resolves the schedule + its quote's siblings
+             via invoice.ref. Single-stage (n_total == 1) is
+             suppressed - mentioning "Stage 1 of 1" is clutter. -->
+        <xpath expr="//table[@name='invoice_line_table']"
+               position="before">
+            <t t-set="_sched_search"
+               t-value="o.ref and
+                        o.env['neon.finance.invoice.schedule'].sudo().search(
+                            [('name', '=', o.ref)], limit=1)"/>
+            <t t-if="_sched_search"
+               t-set="_sched_siblings"
+               t-value="_sched_search.quote_id.invoice_schedule_ids.sorted('sequence')"/>
+            <t t-if="_sched_search"
+               t-set="_sched_position"
+               t-value="list(_sched_siblings.ids).index(_sched_search.id) + 1"/>
+            <t t-if="_sched_search"
+               t-set="_sched_total"
+               t-value="len(_sched_siblings)"/>
+            <div class="mb-3" name="neon_stage_indicator"
+                 t-if="_sched_search and _sched_total &gt; 1">
+                <div class="p-2"
+                     style="background-color: #F4F2F8;
+                            border-left: 3px solid #7165AC;
+                            font-size: 0.9em;">
+                    <strong>Stage
+                        <t t-out="_sched_position"/>
+                        of
+                        <t t-out="_sched_total"/>
+                        --
+                        <t t-out="dict(_sched_search._fields['stage'].selection).get(
+                                       _sched_search.stage,
+                                       _sched_search.stage)"/>
+                        (<t t-out="'%.0f' % _sched_search.percentage"/>%
+                         of quote total).
+                    </strong>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- 3 + 4 + 5: append after the stock payment_term block.
+
+             Strategy: the stock template renders Odoo's
+             invoice_payment_term_id.note here. We add OUR neon
+             finance payment.term summary (from the originating
+             quote) PLUS the banking block PLUS the T&Cs.
+
+             The quote is resolved by parsing invoice_origin which
+             carries '<QUOTE_NAME> [<stage_label>]'. Single regex
+             handles both QUO-USD- and QUO-ZIG- prefixes. -->
+        <xpath expr="//div[@id='payment_term']" position="after">
+
+            <!-- 3. Payment terms summary (Neon's per-quote term). -->
+            <t t-set="_quote_name"
+               t-value="o.invoice_origin and
+                        (o.invoice_origin.split(' [')[0]
+                         if o.invoice_origin.startswith('QUO-') else False)"/>
+            <t t-if="_quote_name"
+               t-set="_quote"
+               t-value="o.env['neon.finance.quote'].sudo().search(
+                            [('name', '=', _quote_name)], limit=1)"/>
+            <div class="mb-3" name="neon_payment_terms"
+                 t-if="_quote_name and _quote and _quote.payment_term_id">
+                <h5 style="color: #7165AC;
+                           border-bottom: 1px solid #7165AC;
+                           padding-bottom: 4px;">
+                    Payment Terms
+                </h5>
+                <p style="font-size: 0.9em;">
+                    <t t-out="_quote.payment_term_id.name"/>
+                </p>
+                <p t-if="_quote.payment_term_id.notes"
+                   class="text-muted"
+                   style="font-size: 0.85em;">
+                    <t t-out="_quote.payment_term_id.notes"/>
+                </p>
+            </div>
+
+            <!-- 4. Banking section - currency-matched. -->
+            <div class="mt-4 mb-3" name="neon_banking"
+                 t-if="o.company_id.bank_ids">
+                <h5 style="color: #7165AC;
+                           border-bottom: 1px solid #7165AC;
+                           padding-bottom: 4px;">
+                    Banking Details
+                </h5>
+                <p class="text-muted" style="font-size: 0.85em;">
+                    Please pay into the account matching the
+                    invoice currency.
+                </p>
+                <div class="row">
+                    <t t-foreach="o.company_id.bank_ids"
+                       t-as="bank">
+                        <t t-set="is_match"
+                           t-value="bank.currency_id and
+                                    bank.currency_id == o.currency_id"/>
+                        <div class="col-6 mb-2">
+                            <div class="p-2"
+                                 t-attf-style="border: 1px solid {{
+                                     '#7165AC' if is_match
+                                     else '#DDDDDD'
+                                 }};
+                                 background-color: {{
+                                     '#F4F2F8' if is_match
+                                     else 'transparent'
+                                 }};
+                                 border-radius: 4px;">
+                                <div t-if="is_match"
+                                     style="font-size: 0.75em;
+                                            color: #7165AC;
+                                            font-weight: bold;">
+                                    * PAY IN THIS CURRENCY
+                                </div>
+                                <strong>
+                                    <t t-out="bank.currency_id.name
+                                              or 'Account'"/>
+                                </strong>
+                                <br/>
+                                <span style="font-size: 0.9em;">
+                                    Bank:
+                                    <t t-out="bank.bank_id.name
+                                              or ''"/>
+                                    <br/>
+                                    Branch:
+                                    <t t-out="bank.x_branch_name
+                                              or ''"/>
+                                    <br/>
+                                    Account Name:
+                                    <t t-out="bank.acc_holder_name
+                                              or o.company_id.name"/>
+                                    <br/>
+                                    Account Number:
+                                    <t t-out="bank.acc_number"/>
+                                </span>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </div>
+
+            <!-- 5. Standard Neon T&Cs footer. -->
+            <div class="mt-4" name="neon_tcs_placeholder"
+                 style="font-size: 0.8em;
+                        color: #777777;
+                        border-top: 1px dashed #CCCCCC;
+                        padding-top: 8px;">
+                <strong>Standard Terms &amp; Conditions:</strong>
+                Goods and services remain the property of Neon
+                Events Elements Pvt Ltd until paid in full.
+                Full Terms and Conditions available on request
+                from accounts@neonhiring.co.zw.
+            </div>
+
+        </xpath>
+
+    </template>
+
+</odoo>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.7.5.0',
+    'version': '17.0.7.6.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -78,6 +78,12 @@ and cost-line behaviour downstream.
         'views/neon_finance_invoice_schedule_views.xml',
         'views/neon_finance_invoice_schedule_template_views.xml',
         'wizard/neon_finance_payment_term_wizard_views.xml',
+        # P6.M8 -- invoice PDF template (inherits account.report_invoice_document
+        # with ZIMRA strip + multi-stage indicator + payment terms summary +
+        # currency-matched banking + T&Cs footer). Mirrors the neon_sales
+        # QUOTE PDF override; the patterns are proven in production for
+        # quotes (Phase 1) so M8 ports the same approach to invoices.
+        'report/account_move_report_views.xml',
         # Menus load last so action ref()s resolve.
         'views/neon_finance_menu.xml',
     ],
