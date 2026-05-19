@@ -440,7 +440,15 @@ class NeonFinanceQuote(models.Model):
 
     def action_approve(self):
         """Pending -> approved. Delegates to the approval record;
-        approver-only via group check + ACL."""
+        approver-only via group check + ACL.
+
+        Separation-of-duties guard (P6.predeploy): the approver
+        cannot be the same user as the quote's salesperson. In the
+        production matrix, Robin / Munashe / superuser hold both
+        sales AND approver groups so the group check alone permits
+        self-approval -- this method-level check enforces SoD.
+        Approvers may still approve OTHER reps' quotes freely.
+        """
         if not self.env.user.has_group(
                 "neon_finance.group_neon_finance_approver"):
             raise AccessError(_(
@@ -452,6 +460,12 @@ class NeonFinanceQuote(models.Model):
                     "Only Pending Approval quotes can be approved "
                     "(%s is %s)."
                 ) % (rec.name, dict(_QUOTE_STATES)[rec.state]))
+            if rec.salesperson_id == self.env.user:
+                raise UserError(_(
+                    "Separation of duties: you cannot approve "
+                    "%(name)s because you are also the quote's "
+                    "salesperson. Another approver must review."
+                ) % {"name": rec.name})
             if not rec.approval_id:
                 raise UserError(_(
                     "Quote %s is in pending_approval state but has "
@@ -493,6 +507,12 @@ class NeonFinanceQuote(models.Model):
                     "Only Pending Approval quotes can be rejected "
                     "(%s is %s)."
                 ) % (rec.name, dict(_QUOTE_STATES)[rec.state]))
+            if rec.salesperson_id == self.env.user:
+                raise UserError(_(
+                    "Separation of duties: you cannot reject "
+                    "%(name)s because you are also the quote's "
+                    "salesperson. Another approver must review."
+                ) % {"name": rec.name})
             if not rec.approval_id:
                 raise UserError(_(
                     "Quote %s is in pending_approval state but has "

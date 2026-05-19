@@ -757,11 +757,52 @@ results["T831"] = ok
 
 
 # ============================================================
+# P6 predeploy fix: separation-of-duties guards on approve/reject.
+# In the production matrix, Robin / Munashe / superuser hold both
+# sales AND approver groups -- the group check alone permits
+# self-approval. T832 + T833 regression-guard the method-level
+# salesperson_id != self.env.user check.
+# ============================================================
+print()
+print("=" * 72)
+print("T832 - self-approval blocked: salesperson cannot approve own quote")
+print("=" * 72)
+# Use approver_user as the salesperson so they have BOTH groups
+# (they're already in approver_group from fixture). They submit
+# their own quote, then attempt to approve it -- must raise.
+q_t832 = _new_priced_quote(sp=approver_user)
+q_t832.with_user(approver_user).action_submit_for_approval()
+err, _ = _try(lambda: q_t832.with_user(
+    approver_user).action_approve())
+ok = isinstance(err, UserError) and "Separation of duties" in str(err)
+print("  err:", type(err).__name__ if err else "None",
+      "msg:", (str(err)[:80] if err else ""))
+print("T832:", "PASS" if ok else "FAIL")
+results["T832"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T833 - self-rejection blocked: salesperson cannot reject own quote")
+print("=" * 72)
+q_t833 = _new_priced_quote(sp=approver_user)
+q_t833.with_user(approver_user).action_submit_for_approval()
+err, _ = _try(lambda: q_t833.with_user(approver_user).with_context(
+    rejection_reason="self test").action_reject())
+ok = isinstance(err, UserError) and "Separation of duties" in str(err)
+print("  err:", type(err).__name__ if err else "None",
+      "msg:", (str(err)[:80] if err else ""))
+print("T833:", "PASS" if ok else "FAIL")
+results["T833"] = ok
+
+
+# ============================================================
 print()
 print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
-order = ["T%d" % i for i in range(800, 832)]
+order = ["T%d" % i for i in range(800, 834)]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")
