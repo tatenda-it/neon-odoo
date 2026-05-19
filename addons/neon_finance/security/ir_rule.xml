@@ -127,5 +127,61 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P6.M5 — cost.line scoping. Crew leader (Ranganai) sees +
+            records cost on event_jobs where they are the lead_tech.
+            Bookkeeper + Approver see all. perm_unlink=False on every
+            rule: append-only audit trail.
+
+            Sales-tier scoping is INTENTIONALLY ABSENT (Option A from
+            P6.M5 design pause). event_job has no salesperson_id and
+            adding a derived one is M6+ polish work. Sales reps see
+            the P&L mini-statement on the event_job form via the
+            standard neon_jobs ACL on commercial.event.job.
+        -->
+        <record id="cost_line_rule_crew_leader_own" model="ir.rule">
+            <field name="name">Cost Line: Crew Leader sees own event_jobs only</field>
+            <field name="model_id" ref="model_neon_finance_cost_line"/>
+            <field name="domain_force">[('event_job_id.lead_tech_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew_leader'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="cost_line_rule_bookkeeper_all" model="ir.rule">
+            <field name="name">Cost Line: Bookkeeper sees all</field>
+            <field name="model_id" ref="model_neon_finance_cost_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="cost_line_rule_approver_all" model="ir.rule">
+            <field name="name">Cost Line: Approver sees all</field>
+            <field name="model_id" ref="model_neon_finance_cost_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_approver'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="cost_line_rule_jobs_manager_all" model="ir.rule">
+            <field name="name">Cost Line: Jobs Manager sees all</field>
+            <field name="model_id" ref="model_neon_finance_cost_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

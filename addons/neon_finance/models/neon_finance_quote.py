@@ -519,8 +519,16 @@ class NeonFinanceQuote(models.Model):
     def action_accept(self):
         """Sent -> accepted. Salesperson or finance role.
 
-        P6.M2 PLACEHOLDER: state-only transition. P6.M7 wires the
-        multi-stage invoice schedule materialisation here.
+        P6.M5 ADD: writes quoted_budget + currency onto the linked
+        event_job. Multi-quote events: latest accept wins (the most
+        recently accepted quote stamps its total as the event's
+        quoted_budget). Idempotent -- re-accepting (which shouldn't
+        happen but is defensive) overwrites with current amount_total
+        and currency without raising.
+
+        P6.M2 PLACEHOLDER (still active): state-only transition for
+        the quote itself. P6.M7 wires multi-stage invoice schedule
+        materialisation here.
         """
         for rec in self:
             if rec.state != "sent":
@@ -536,6 +544,11 @@ class NeonFinanceQuote(models.Model):
                 "state": "accepted",
                 "accepted_at": fields.Datetime.now(),
             })
+            if rec.event_job_id:
+                rec.event_job_id.sudo().write({
+                    "quoted_budget": rec.amount_total,
+                    "quoted_budget_currency_id": rec.currency_id.id,
+                })
         return True
 
     def action_cancel(self):

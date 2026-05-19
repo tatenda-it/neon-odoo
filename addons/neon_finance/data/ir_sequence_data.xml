@@ -82,5 +82,19 @@
             <field name="implementation">standard</field>
         </record>
 
+        <!--
+            P6.M5 — event cost lines. 6-pad matches the QUO- / APR- /
+            FX- precedent.
+        -->
+        <record id="seq_neon_finance_cost_line" model="ir.sequence">
+            <field name="name">Event Cost Line</field>
+            <field name="code">neon.finance.cost.line</field>
+            <field name="prefix">COST-</field>
+            <field name="padding">6</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+        </record>
+
     </data>
 </odoo>

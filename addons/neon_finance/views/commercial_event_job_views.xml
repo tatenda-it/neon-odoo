@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        P6.M5 — extend commercial.event.job form with two new tabs:
+        Cost Lines (embedded list of neon.finance.cost.line) and
+        Financial Summary (rendered P&L mini-statement HTML).
+
+        Insertion point: right after the existing "Finance" page (which
+        mirrors commercial.job financials, see addons/neon_jobs/views/
+        commercial_event_job_views.xml). Keeping cost/P&L visually
+        adjacent to the existing finance summary makes the form read
+        naturally for the operational + finance audience.
+    -->
+    <record id="commercial_event_job_view_form_neon_finance_extension"
+            model="ir.ui.view">
+        <field name="name">commercial.event.job.form.neon_finance.cost</field>
+        <field name="model">commercial.event.job</field>
+        <field name="inherit_id"
+               ref="neon_jobs.commercial_event_job_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='page_finance']"
+                   position="after">
+                <page string="Budgets" name="page_neon_finance_budgets">
+                    <group>
+                        <group string="Initial budget (salesperson)">
+                            <field name="initial_budget"
+                                   widget="monetary"/>
+                            <field name="initial_budget_currency_id"
+                                   options="{'no_create': True}"/>
+                        </group>
+                        <group string="Quoted budget (auto-stamped)">
+                            <field name="quoted_budget"
+                                   widget="monetary"
+                                   readonly="1"/>
+                            <field name="quoted_budget_currency_id"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <p class="text-muted">
+                        Initial budget is salesperson-entered at
+                        event_job creation. Quoted budget auto-stamps
+                        from the linked quote.amount_total when that
+                        quote transitions to 'accepted'.
+                    </p>
+                </page>
+                <page string="Cost Lines" name="page_neon_finance_costs">
+                    <field name="cost_line_ids"
+                           context="{'default_event_job_id': id}">
+                        <tree string="Cost Lines" editable="bottom">
+                            <field name="date_incurred"/>
+                            <field name="cost_type"/>
+                            <field name="name"/>
+                            <field name="vendor_id"
+                                   options="{'no_create': True}"/>
+                            <field name="amount" widget="monetary"/>
+                            <field name="currency_id"
+                                   options="{'no_create': True}"/>
+                            <field name="payment_state"
+                                   widget="badge"/>
+                            <field name="recorded_by_id"
+                                   readonly="1"
+                                   optional="show"/>
+                        </tree>
+                    </field>
+                    <group>
+                        <group>
+                            <field name="cost_total_usd"
+                                   widget="monetary"
+                                   readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="cost_total_zig"
+                                   widget="monetary"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page string="Financial Summary"
+                      name="page_neon_finance_pnl">
+                    <field name="pnl_html"
+                           widget="html"
+                           readonly="1"
+                           nolabel="1"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

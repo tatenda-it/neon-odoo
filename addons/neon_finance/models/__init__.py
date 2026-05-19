@@ -19,3 +19,8 @@ from . import neon_finance_quote
 # resolves comodel_name lazily.
 from . import neon_finance_approval
 from . import res_config_settings
+# P6.M5 — event cost line + commercial.event.job extension. cost.line
+# is loaded before the event_job extension so the One2many target on
+# the extension resolves cleanly.
+from . import neon_finance_cost_line
+from . import commercial_event_job

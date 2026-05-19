@@ -26,3 +26,9 @@ access_neon_finance_payment_term_wizard_approver,neon.finance.payment.term.wizar
 access_neon_finance_approval_sales,neon.finance.approval sales (R own via ir.rule),model_neon_finance_approval,neon_finance.group_neon_finance_sales,1,0,0,0
 access_neon_finance_approval_bookkeeper,neon.finance.approval bookkeeper (R all read-only),model_neon_finance_approval,neon_finance.group_neon_finance_bookkeeper,1,0,0,0
 access_neon_finance_approval_approver,neon.finance.approval approver (R/W/C),model_neon_finance_approval,neon_finance.group_neon_finance_approver,1,1,1,0
+access_neon_finance_cost_line_crew_leader,neon.finance.cost.line crew_leader (R/W/C own via ir.rule),model_neon_finance_cost_line,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_finance_cost_line_bookkeeper,neon.finance.cost.line bookkeeper (R/W/C all),model_neon_finance_cost_line,neon_finance.group_neon_finance_bookkeeper,1,1,1,0
+access_neon_finance_cost_line_approver,neon.finance.cost.line approver (R/W/C all),model_neon_finance_cost_line,neon_finance.group_neon_finance_approver,1,1,1,0
+access_neon_finance_cost_line_manager,neon.finance.cost.line jobs_manager (R/W/C all),model_neon_finance_cost_line,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_commercial_event_job_neon_finance_bookkeeper,commercial.event.job (Phase 6: bookkeeper read for P&L),neon_jobs.model_commercial_event_job,neon_finance.group_neon_finance_bookkeeper,1,0,0,0
+access_commercial_event_job_neon_finance_approver,commercial.event.job (Phase 6: approver read for P&L),neon_jobs.model_commercial_event_job,neon_finance.group_neon_finance_approver,1,0,0,0

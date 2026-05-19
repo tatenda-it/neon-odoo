@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_cost_line_view_tree" model="ir.ui.view">
+        <field name="name">neon.finance.cost.line.tree</field>
+        <field name="model">neon.finance.cost.line</field>
+        <field name="arch" type="xml">
+            <tree string="Event Cost Lines"
+                  decoration-success="payment_state == 'paid'"
+                  decoration-warning="payment_state == 'partial'"
+                  decoration-muted="payment_state == 'unpaid'">
+                <field name="date_incurred"/>
+                <field name="cost_type" widget="badge"/>
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="vendor_id" optional="show"/>
+                <field name="amount" widget="monetary"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="payment_state" widget="badge"
+                       decoration-success="payment_state == 'paid'"
+                       decoration-warning="payment_state == 'partial'"
+                       decoration-muted="payment_state == 'unpaid'"/>
+                <field name="recorded_by_id" optional="show"/>
+                <field name="date_paid" optional="hide"/>
+                <field name="vendor_bill_id" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_finance_cost_line_view_form" model="ir.ui.view">
+        <field name="name">neon.finance.cost.line.form</field>
+        <field name="model">neon.finance.cost.line</field>
+        <field name="arch" type="xml">
+            <form string="Event Cost Line">
+                <header>
+                    <field name="payment_state" widget="statusbar"
+                           statusbar_visible="unpaid,partial,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Cost">
+                            <field name="event_job_id"
+                                   options="{'no_create': True}"/>
+                            <field name="cost_type"/>
+                            <field name="vendor_id"
+                                   options="{'no_create': True}"/>
+                            <field name="amount" widget="monetary"/>
+                            <field name="currency_id"
+                                   options="{'no_create': True}"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="date_incurred"/>
+                            <field name="date_paid"/>
+                            <field name="recorded_by_id" readonly="1"/>
+                            <field name="recorded_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Links">
+                        <group>
+                            <field name="source_movement_id"
+                                   readonly="1"
+                                   options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="vendor_bill_id"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_finance_cost_line_view_search"
+            model="ir.ui.view">
+        <field name="name">neon.finance.cost.line.search</field>
+        <field name="model">neon.finance.cost.line</field>
+        <field name="arch" type="xml">
+            <search string="Cost Lines">
+                <field name="name"/>
+                <field name="event_job_id"/>
+                <field name="vendor_id"/>
+                <field name="recorded_by_id"/>
+                <separator/>
+                <filter name="cost_type_crew" string="Crew Labour"
+                        domain="[('cost_type', '=', 'crew')]"/>
+                <filter name="cost_type_sub_rental" string="Sub-rental"
+                        domain="[('cost_type', '=', 'sub_rental')]"/>
+                <filter name="cost_type_consumable" string="Consumable"
+                        domain="[('cost_type', '=', 'consumable')]"/>
+                <filter name="cost_type_transport" string="Transport"
+                        domain="[('cost_type', '=', 'transport')]"/>
+                <filter name="cost_type_venue" string="Venue"
+                        domain="[('cost_type', '=', 'venue')]"/>
+                <filter name="cost_type_write_off" string="Write-Off"
+                        domain="[('cost_type', '=', 'write_off')]"/>
+                <separator/>
+                <filter name="payment_unpaid" string="Unpaid"
+                        domain="[('payment_state', '=', 'unpaid')]"/>
+                <filter name="payment_paid" string="Paid"
+                        domain="[('payment_state', '=', 'paid')]"/>
+                <separator/>
+                <filter name="my_records" string="My Records"
+                        domain="[('recorded_by_id', '=', uid)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_cost_type" string="Cost Type"
+                            context="{'group_by': 'cost_type'}"/>
+                    <filter name="group_event_job" string="Event"
+                            context="{'group_by': 'event_job_id'}"/>
+                    <filter name="group_payment_state"
+                            string="Payment State"
+                            context="{'group_by': 'payment_state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_finance_cost_line_action"
+            model="ir.actions.act_window">
+        <field name="name">Cost Lines</field>
+        <field name="res_model">neon.finance.cost.line</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_finance_cost_line_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No cost lines yet
+            </p>
+            <p>
+                Cost lines record discrete costs incurred against an
+                event (crew, sub-rentals, consumables, transport,
+                etc.). The Lead Tech records as costs materialise;
+                Robin / Munashe / Kudzi get a TODO activity on every
+                new cost line.
+            </p>
+        </field>
+    </record>
+
+</odoo>

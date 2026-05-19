@@ -64,6 +64,7 @@
             (4, ref('account.group_account_invoice')),
             (4, ref('neon_finance.group_neon_finance_bookkeeper')),
             (4, ref('neon_finance.group_neon_finance_approver')),
+            (4, ref('neon_jobs.group_neon_jobs_crew_leader')),
         ]"/>
     </record>
 
@@ -130,6 +131,23 @@
               action="neon_finance_approval_action"
               sequence="6"
               groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+
+    <!--
+        P6.M5 — Cost Lines menu. Crew leader (Ranganai) sees the menu
+        but the record rule filters to their own event_jobs;
+        bookkeeper + approver + jobs manager see all.
+
+        Sales tier is intentionally absent (Option A from M5 design
+        pause: event_job has no salesperson_id chain). Sales reps
+        see the P&L mini-statement on the event_job form via the
+        existing neon_jobs ACLs.
+    -->
+    <menuitem id="menu_neon_finance_cost_lines"
+              name="Cost Lines"
+              parent="account.menu_finance_receivables"
+              action="neon_finance_cost_line_action"
+              sequence="7"
+              groups="neon_jobs.group_neon_jobs_crew_leader,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver,neon_jobs.group_neon_jobs_manager"/>
 
     <menuitem id="menu_neon_finance_payment_terms"
               name="Payment Terms"
