@@ -1,0 +1,205 @@
+// P6.M10 -- Cash Flow Dashboard styling.
+// Mirrors P5.M10 Workshop Dashboard palette + structure.
+
+.o_neon_cashflow_dashboard {
+    padding: 20px;
+    background: #F8F8FA;
+    min-height: 100%;
+
+    .o_neon_dashboard_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+
+        .o_neon_dashboard_title h2 {
+            margin: 0;
+            color: #2B2738;
+            font-weight: 600;
+        }
+
+        .o_neon_dashboard_title small {
+            display: block;
+            margin-top: 4px;
+        }
+    }
+
+    .o_neon_dashboard_error {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .o_neon_cashflow_grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+
+        @media (max-width: 1100px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        @media (max-width: 700px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .o_neon_cf_tile {
+        background: white;
+        border-radius: 8px;
+        padding: 18px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        border-left: 4px solid #7165AC;
+        transition: transform 0.1s ease,
+                    box-shadow 0.1s ease;
+
+        &.o_neon_cf_tile_clickable {
+            cursor: pointer;
+
+            &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+            }
+        }
+
+        &.o_neon_cf_tile_wide {
+            grid-column: span 2;
+
+            @media (max-width: 1100px) {
+                grid-column: span 2;
+            }
+
+            @media (max-width: 700px) {
+                grid-column: span 1;
+            }
+        }
+
+        .o_neon_cf_tile_header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #EEEEF2;
+
+            .o_neon_cf_tile_title {
+                font-weight: 600;
+                color: #2B2738;
+                font-size: 0.95em;
+            }
+
+            .fa {
+                color: #7165AC;
+            }
+        }
+
+        .o_neon_cf_tile_body {
+            min-height: 60px;
+        }
+
+        .o_neon_cf_currency_row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.95em;
+
+            .o_neon_cf_currency_label {
+                font-weight: 600;
+                color: #6B6878;
+                font-size: 0.8em;
+                min-width: 36px;
+            }
+
+            .o_neon_cf_currency_value {
+                font-weight: 600;
+                color: #2B2738;
+                flex-grow: 1;
+                text-align: right;
+            }
+
+            .o_neon_cf_currency_count {
+                color: #888;
+                font-size: 0.85em;
+                margin-left: 8px;
+            }
+        }
+
+        .o_neon_cf_subline {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed #EEEEF2;
+            font-size: 0.85em;
+            color: #C0392B;
+        }
+
+        .o_neon_cf_overdue_table {
+            width: 100%;
+            font-size: 0.85em;
+
+            th {
+                color: #6B6878;
+                font-weight: 600;
+                padding: 4px 6px;
+                border-bottom: 1px solid #EEEEF2;
+            }
+
+            td {
+                padding: 4px 6px;
+                color: #2B2738;
+            }
+
+            tr:hover td {
+                background: #F4F2F8;
+            }
+        }
+
+        .o_neon_cf_empty {
+            color: #999;
+            font-style: italic;
+            padding: 12px 0;
+            text-align: center;
+        }
+
+        .o_neon_cf_alert_row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+
+            .o_neon_cf_alert_label {
+                font-weight: 600;
+                font-size: 0.85em;
+            }
+
+            &.o_neon_cf_alert_ok .o_neon_cf_alert_label {
+                color: #27AE60;
+            }
+            &.o_neon_cf_alert_warn .o_neon_cf_alert_label {
+                color: #F39C12;
+            }
+            &.o_neon_cf_alert_breach .o_neon_cf_alert_label {
+                color: #E67E22;
+            }
+            &.o_neon_cf_alert_severe .o_neon_cf_alert_label {
+                color: #C0392B;
+            }
+        }
+    }
+
+    // Skeleton loader
+    .o_neon_dashboard_loading {
+        .o_neon_skeleton_tile {
+            background: linear-gradient(
+                90deg, #EEEEF2 0%, #F8F8FA 50%, #EEEEF2 100%);
+            background-size: 200% 100%;
+            animation: o_neon_skeleton_pulse 1.5s ease-in-out infinite;
+            height: 120px;
+            border-radius: 8px;
+        }
+    }
+}
+
+@keyframes o_neon_skeleton_pulse {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}

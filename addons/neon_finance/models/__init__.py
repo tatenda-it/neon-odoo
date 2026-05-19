@@ -38,3 +38,5 @@ from . import neon_finance_invoice_schedule
 from . import account_move
 from . import account_payment_register
 from . import res_partner
+# P6.M10 -- Cash Flow Dashboard virtual model.
+from . import neon_finance_dashboard

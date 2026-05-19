@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P6.M10: Cash Flow Dashboard.
+
+    Per-tile ir.actions.act_window records (6), the server-action
+    wrapper bound to the OWL component, and the Dashboard menu entry
+    under Invoicing > Customers (sequence=4, above Quotes at 5).
+    Domains here MUST stay in lock-step with the _count_* helpers in
+    models/neon_finance_dashboard.py.
+
+    Marker 2 (locked P6.M10): inline-return server-action pattern.
+    NO persisted ir.actions.client record. Direct URL /web#action=
+    bypass is impossible.
+
+    Marker 3 (locked P6.M10): groups_id MUST be set on the
+    ir.actions.server wrapper. Without it, Odoo's run() at
+    ir_actions.py:912-922 falls into the write-ACL branch and our
+    virtual model only grants read. Same lesson learned at P5.M10
+    and captured in reference_odoo17_server_action_groups_id.
+-->
+<odoo>
+
+    <!-- ============================================================
+         Tile 1: outstanding receivables drill-through
+         ============================================================ -->
+    <record id="action_dashboard_outstanding_receivables"
+            model="ir.actions.act_window">
+        <field name="name">Outstanding Receivables</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', 'in', ('not_paid', 'partial', 'in_payment'))
+        ]</field>
+        <field name="context">{'search_default_unpaid': 1}</field>
+    </record>
+
+    <!-- ============================================================
+         Tile 2: pipeline drill-through
+         ============================================================ -->
+    <record id="action_dashboard_pipeline"
+            model="ir.actions.act_window">
+        <field name="name">Pipeline (Pending + Approved + Sent Quotes)</field>
+        <field name="res_model">neon.finance.quote</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('state', 'in', ('pending_approval', 'approved', 'sent'))
+        ]</field>
+    </record>
+
+    <!-- ============================================================
+         Tile 3: recent payments drill-through
+         ============================================================ -->
+    <record id="action_dashboard_recent_payments"
+            model="ir.actions.act_window">
+        <field name="name">Recent Payments (last 30 days)</field>
+        <field name="res_model">account.payment</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('state', '=', 'posted'),
+            ('payment_type', '=', 'inbound'),
+            ('date', '&gt;=', (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))
+        ]</field>
+    </record>
+
+    <!-- ============================================================
+         Tile 4: recent costs drill-through
+         ============================================================ -->
+    <record id="action_dashboard_recent_costs"
+            model="ir.actions.act_window">
+        <field name="name">Recent Costs (last 30 days)</field>
+        <field name="res_model">neon.finance.cost.line</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('date_incurred', '&gt;=', (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))
+        ]</field>
+    </record>
+
+    <!-- ============================================================
+         Tile 5: top overdue drill-through
+         (Same target as outstanding receivables, but filtered to
+         overdue only. Tile UI lists top-5 partners directly; this
+         drill opens the underlying invoice list.)
+         ============================================================ -->
+    <record id="action_dashboard_top_overdue"
+            model="ir.actions.act_window">
+        <field name="name">Overdue Invoices</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', 'in', ('not_paid', 'partial')),
+            ('invoice_date_due', '&lt;', datetime.date.today().strftime('%Y-%m-%d'))
+        ]</field>
+    </record>
+
+    <!-- ============================================================
+         Tile 6: budget alert drill-through
+         ============================================================ -->
+    <record id="action_dashboard_budget_alerts"
+            model="ir.actions.act_window">
+        <field name="name">Events by Budget Alert Level</field>
+        <field name="res_model">commercial.event.job</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[
+            ('budget_alert_level', 'in', ('warn', 'breach', 'severe'))
+        ]</field>
+    </record>
+
+    <!-- ============================================================
+         Server-action wrapper. Marker 3: groups_id is mandatory.
+         ============================================================ -->
+    <record id="action_cash_flow_dashboard_server"
+            model="ir.actions.server">
+        <field name="name">Cash Flow Dashboard</field>
+        <field name="model_id" ref="model_neon_finance_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_cash_flow_dashboard()</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_finance.group_neon_finance_sales'),
+            ref('neon_finance.group_neon_finance_bookkeeper'),
+            ref('neon_finance.group_neon_finance_approver'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
+    </record>
+
+    <!-- ============================================================
+         Menu entry. sequence=4 sits above Quotes (5) under the
+         Invoicing > Customers branch (same parent as Quotes /
+         Approval Queue / Cost Lines / Invoice Schedule from M2-M7).
+         Group gating is enforced at three layers: menu groups,
+         server-action groups_id, RPC _check_dashboard_access guard.
+         ============================================================ -->
+    <menuitem id="menu_neon_finance_dashboard"
+              name="Cash Flow Dashboard"
+              parent="account.menu_finance_receivables"
+              action="action_cash_flow_dashboard_server"
+              sequence="4"
+              groups="neon_finance.group_neon_finance_sales,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver,neon_jobs.group_neon_jobs_crew_leader"/>
+
+</odoo>

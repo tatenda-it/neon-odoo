@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_finance.NeonCashFlowDashboard">
+        <div class="o_neon_cashflow_dashboard">
+
+            <!-- Header -->
+            <div class="o_neon_dashboard_header">
+                <div class="o_neon_dashboard_title">
+                    <h2>Cash Flow Dashboard</h2>
+                    <small t-if="lastUpdated" class="text-muted">
+                        Last updated: <t t-esc="lastUpdated"/>
+                        <span t-if="userRole" class="ms-2">
+                            (role: <t t-esc="userRole"/>)
+                        </span>
+                    </small>
+                </div>
+                <button class="btn btn-primary o_neon_dashboard_refresh"
+                        t-on-click="onRefreshClick"
+                        t-att-disabled="state.loading">
+                    <i class="fa" t-att-class="state.loading ? 'fa-refresh fa-spin' : 'fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <!-- Error banner -->
+            <div t-if="state.error"
+                 class="alert alert-danger o_neon_dashboard_error"
+                 role="alert">
+                <div>
+                    <i class="fa fa-exclamation-circle me-2"/>
+                    <span>Failed to load dashboard data: </span>
+                    <span t-esc="state.error"/>
+                </div>
+                <button class="btn btn-sm btn-outline-danger ms-3"
+                        t-on-click="onRefreshClick">Retry</button>
+            </div>
+
+            <!-- Loading skeleton (first load only) -->
+            <div t-if="state.loading and !state.data"
+                 class="o_neon_dashboard_loading">
+                <div class="o_neon_cashflow_grid">
+                    <t t-foreach="[1,2,3,4,5,6]" t-as="_" t-key="_">
+                        <div class="o_neon_skeleton_tile"/>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Rendered tiles -->
+            <div t-if="state.data" class="o_neon_dashboard_content">
+
+                <div class="o_neon_cashflow_grid">
+
+                    <!-- Tile 1: Outstanding Receivables -->
+                    <div class="o_neon_cf_tile"
+                         t-att-class="tile_outstanding.action_id ? 'o_neon_cf_tile_clickable' : ''"
+                         t-on-click="() => this.onTileClick(tile_outstanding.action_id)">
+                        <div class="o_neon_cf_tile_header">
+                            <i class="fa fa-money me-2"/>
+                            <span class="o_neon_cf_tile_title">
+                                Outstanding Receivables
+                            </span>
+                        </div>
+                        <div class="o_neon_cf_tile_body">
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">USD</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtUsd(tile_outstanding.usd and tile_outstanding.usd.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_outstanding.usd">
+                                    (<t t-esc="tile_outstanding.usd.count"/>)
+                                </span>
+                            </div>
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">ZWG</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtZwg(tile_outstanding.zwg and tile_outstanding.zwg.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_outstanding.zwg">
+                                    (<t t-esc="tile_outstanding.zwg.count"/>)
+                                </span>
+                            </div>
+                            <div class="o_neon_cf_subline"
+                                 t-if="tile_outstanding.usd and tile_outstanding.usd.overdue_count">
+                                Overdue:
+                                <span t-esc="fmtUsd(tile_outstanding.usd.overdue_value)"/>
+                                /
+                                <span t-esc="fmtZwg(tile_outstanding.zwg and tile_outstanding.zwg.overdue_value or 0)"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tile 2: Pipeline -->
+                    <div class="o_neon_cf_tile"
+                         t-att-class="tile_pipeline.action_id ? 'o_neon_cf_tile_clickable' : ''"
+                         t-on-click="() => this.onTileClick(tile_pipeline.action_id)">
+                        <div class="o_neon_cf_tile_header">
+                            <i class="fa fa-bullhorn me-2"/>
+                            <span class="o_neon_cf_tile_title">
+                                Pipeline
+                            </span>
+                        </div>
+                        <div class="o_neon_cf_tile_body">
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">USD</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtUsd(tile_pipeline.usd and tile_pipeline.usd.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_pipeline.usd">
+                                    (<t t-esc="tile_pipeline.usd.count"/>)
+                                </span>
+                            </div>
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">ZWG</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtZwg(tile_pipeline.zwg and tile_pipeline.zwg.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_pipeline.zwg">
+                                    (<t t-esc="tile_pipeline.zwg.count"/>)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tile 3: Recent Payments -->
+                    <div class="o_neon_cf_tile"
+                         t-att-class="tile_recent_payments.action_id ? 'o_neon_cf_tile_clickable' : ''"
+                         t-on-click="() => this.onTileClick(tile_recent_payments.action_id)">
+                        <div class="o_neon_cf_tile_header">
+                            <i class="fa fa-arrow-down me-2"/>
+                            <span class="o_neon_cf_tile_title">
+                                Recent Payments (30d)
+                            </span>
+                        </div>
+                        <div class="o_neon_cf_tile_body">
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">USD</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtUsd(tile_recent_payments.usd and tile_recent_payments.usd.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_recent_payments.usd">
+                                    (<t t-esc="tile_recent_payments.usd.count"/>)
+                                </span>
+                            </div>
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">ZWG</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtZwg(tile_recent_payments.zwg and tile_recent_payments.zwg.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_recent_payments.zwg">
+                                    (<t t-esc="tile_recent_payments.zwg.count"/>)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tile 4: Recent Costs -->
+                    <div class="o_neon_cf_tile"
+                         t-att-class="tile_recent_costs.action_id ? 'o_neon_cf_tile_clickable' : ''"
+                         t-on-click="() => this.onTileClick(tile_recent_costs.action_id)">
+                        <div class="o_neon_cf_tile_header">
+                            <i class="fa fa-arrow-up me-2"/>
+                            <span class="o_neon_cf_tile_title">
+                                Recent Costs (30d)
+                            </span>
+                        </div>
+                        <div class="o_neon_cf_tile_body">
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">USD</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtUsd(tile_recent_costs.usd and tile_recent_costs.usd.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_recent_costs.usd">
+                                    (<t t-esc="tile_recent_costs.usd.count"/>)
+                                </span>
+                            </div>
+                            <div class="o_neon_cf_currency_row">
+                                <span class="o_neon_cf_currency_label">ZWG</span>
+                                <span class="o_neon_cf_currency_value"
+                                      t-esc="fmtZwg(tile_recent_costs.zwg and tile_recent_costs.zwg.value)"/>
+                                <span class="o_neon_cf_currency_count"
+                                      t-if="tile_recent_costs.zwg">
+                                    (<t t-esc="tile_recent_costs.zwg.count"/>)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tile 5: Top Overdue Accounts -->
+                    <div class="o_neon_cf_tile o_neon_cf_tile_wide"
+                         t-att-class="tile_top_overdue.action_id ? 'o_neon_cf_tile_clickable' : ''"
+                         t-on-click="() => this.onTileClick(tile_top_overdue.action_id)">
+                        <div class="o_neon_cf_tile_header">
+                            <i class="fa fa-exclamation-triangle me-2"/>
+                            <span class="o_neon_cf_tile_title">
+                                Top Overdue Accounts
+                            </span>
+                        </div>
+                        <div class="o_neon_cf_tile_body">
+                            <table t-if="tile_top_overdue.rows.length"
+                                   class="o_neon_cf_overdue_table">
+                                <thead>
+                                    <tr>
+                                        <th>Partner</th>
+                                        <th class="text-end">Amount</th>
+                                        <th class="text-end">Max Days</th>
+                                        <th class="text-end">#</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="tile_top_overdue.rows"
+                                       t-as="row" t-key="row.partner_id">
+                                        <tr>
+                                            <td t-esc="row.partner_name"/>
+                                            <td class="text-end"
+                                                t-esc="fmtUsd(row.amount)"/>
+                                            <td class="text-end"
+                                                t-esc="row.max_days"/>
+                                            <td class="text-end"
+                                                t-esc="row.invoice_count"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                            <div t-if="!tile_top_overdue.rows.length"
+                                 class="o_neon_cf_empty">
+                                No overdue accounts.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tile 6: Budget Alert Summary -->
+                    <div class="o_neon_cf_tile"
+                         t-att-class="tile_budget_alerts.action_id ? 'o_neon_cf_tile_clickable' : ''"
+                         t-on-click="() => this.onTileClick(tile_budget_alerts.action_id)">
+                        <div class="o_neon_cf_tile_header">
+                            <i class="fa fa-tachometer me-2"/>
+                            <span class="o_neon_cf_tile_title">
+                                Budget Alerts
+                            </span>
+                        </div>
+                        <div class="o_neon_cf_tile_body">
+                            <div class="o_neon_cf_alert_row o_neon_cf_alert_ok">
+                                <span class="o_neon_cf_alert_label">OK</span>
+                                <span t-esc="tile_budget_alerts.levels.ok"/>
+                            </div>
+                            <div class="o_neon_cf_alert_row o_neon_cf_alert_warn">
+                                <span class="o_neon_cf_alert_label">Warn</span>
+                                <span t-esc="tile_budget_alerts.levels.warn"/>
+                            </div>
+                            <div class="o_neon_cf_alert_row o_neon_cf_alert_breach">
+                                <span class="o_neon_cf_alert_label">Breach</span>
+                                <span t-esc="tile_budget_alerts.levels.breach"/>
+                            </div>
+                            <div class="o_neon_cf_alert_row o_neon_cf_alert_severe">
+                                <span class="o_neon_cf_alert_label">Severe</span>
+                                <span t-esc="tile_budget_alerts.levels.severe"/>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>

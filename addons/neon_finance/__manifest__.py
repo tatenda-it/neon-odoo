@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.7.7.0',
+    'version': '17.0.7.8.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -87,9 +87,22 @@ and cost-line behaviour downstream.
         # QUOTE PDF override; the patterns are proven in production for
         # quotes (Phase 1) so M8 ports the same approach to invoices.
         'report/account_move_report_views.xml',
+        # P6.M10 -- Cash Flow Dashboard. Six tiles + drill-through act_window
+        # records + server-action wrapper + virtual model RPC. Mirrors the
+        # P5.M10 Workshop Dashboard pattern (inline-return server-action,
+        # no persisted ir.actions.client record, groups_id on wrapper).
+        'views/neon_finance_dashboard_views.xml',
         # Menus load last so action ref()s resolve.
         'views/neon_finance_menu.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            # P6.M10 -- Cash Flow Dashboard OWL client action.
+            'neon_finance/static/src/js/cash_flow_dashboard/cash_flow_dashboard.js',
+            'neon_finance/static/src/js/cash_flow_dashboard/cash_flow_dashboard.xml',
+            'neon_finance/static/src/js/cash_flow_dashboard/cash_flow_dashboard.scss',
+        ],
+    },
     'installable': True,
     'auto_install': False,
     'application': False,
