@@ -144,10 +144,33 @@ class NeonTrainingCrossCompetency(models.Model):
         default=False,
         tracking=True,
         help="Flag for follow-up: should this observation trigger "
-        "a formal certification draft for review? M6 ships the "
-        "flag; M7 sign-off authority workflow defines the "
-        "promotion mechanic.",
+        "a formal certification draft for review? M6 shipped the "
+        "flag; M7 wires the actual promote-to-cert mechanism via "
+        "action_promote_to_cert.",
     )
+    # P7a.M7 -- reverse linkage to the cert(s) that were promoted
+    # from this observation. Used by is_promoted to gate the
+    # 'Promote' button visibility (hide after promotion to prevent
+    # duplicates). One2many because the constraint allows only one
+    # cert per source, but the relation shape is naturally o2m.
+    promoted_cert_ids = fields.One2many(
+        "neon.training.certification",
+        "source_cross_competency_id",
+        string="Promoted Certifications",
+    )
+    is_promoted = fields.Boolean(
+        string="Already Promoted",
+        compute="_compute_is_promoted",
+        help="True when this observation has been promoted to a "
+        "formal certification draft. Drives form-view button "
+        "visibility -- the Promote action is hidden after first "
+        "promotion to prevent duplicates.",
+    )
+
+    @api.depends("promoted_cert_ids")
+    def _compute_is_promoted(self):
+        for rec in self:
+            rec.is_promoted = bool(rec.promoted_cert_ids)
 
     # ============================================================
     # Display
@@ -298,3 +321,143 @@ class NeonTrainingCrossCompetency(models.Model):
                         "start": anchor_start,
                         "end": anchor_end,
                     })
+
+    # P7a.M7 -- field-lock after promotion. Once a cert has been
+    # created from this observation, the user_id and certification
+    # _type_id become source-of-truth values that the cert constraint
+    # also enforces. Changing them here would orphan the cert OR
+    # cause a constraint violation on the cert side. Block at the
+    # source.
+    @api.constrains("user_id", "certification_type_id",
+                    "promoted_cert_ids")
+    def _check_no_field_changes_after_promotion(self):
+        for rec in self:
+            if not rec.promoted_cert_ids:
+                continue
+            for cert in rec.promoted_cert_ids:
+                if cert.user_id != rec.user_id:
+                    raise ValidationError(_(
+                        "Cannot change user_id on observation "
+                        "%(name)s -- it has been promoted to "
+                        "certification %(cert)s. Source-of-truth "
+                        "locked.") % {
+                            "name": rec.display_name,
+                            "cert": cert.display_name,
+                        })
+                if cert.type_id != rec.certification_type_id:
+                    raise ValidationError(_(
+                        "Cannot change certification_type_id on "
+                        "observation %(name)s -- it has been "
+                        "promoted to certification %(cert)s. "
+                        "Source-of-truth locked.") % {
+                            "name": rec.display_name,
+                            "cert": cert.display_name,
+                        })
+
+    # ============================================================
+    # P7a.M7 -- promote to certification draft
+    # ============================================================
+    def action_promote_to_cert(self):
+        """Create a draft cert record from this observation (DP2).
+
+        Constraints:
+        - leads_to_certification must be True (only flagged
+          observations are promotable)
+        - cannot re-promote: is_promoted must be False (one cert
+          per observation)
+
+        Returns ir.actions.act_window opening the new draft cert
+        so the user can complete date_obtained, attachments, and
+        external_trainer_name before submitting for verification.
+        """
+        self.ensure_one()
+        if not self.leads_to_certification:
+            raise UserError(_(
+                "Observation %s is not flagged for cert promotion. "
+                "Set 'Promote to Cert?' to True first, then retry.") % (
+                    self.display_name,))
+        if self.is_promoted:
+            existing = self.promoted_cert_ids[0]
+            raise UserError(_(
+                "Observation %(name)s has already been promoted to "
+                "certification %(cert)s. Open that draft to complete "
+                "it, or create a fresh observation for a new "
+                "promotion.") % {
+                    "name": self.display_name,
+                    "cert": existing.display_name,
+                })
+
+        Cert = self.env["neon.training.certification"]
+        new_cert = Cert.sudo().create({
+            "user_id": self.user_id.id,
+            "type_id": self.certification_type_id.id,
+            "state": "draft",
+            "source_cross_competency_id": self.id,
+            "notes": _(
+                "Promoted from cross-competency observation on "
+                "%(event)s (%(date)s). Observed by %(observer)s. "
+                "Performance: %(rating)s.\n\n"
+                "Original notes:\n%(notes)s"
+            ) % {
+                "event": self.demonstrated_through_event_id.display_name,
+                "date": fields.Date.to_string(self.demonstrated_at),
+                "observer": self.observed_by_id.name,
+                "rating": dict(
+                    self._fields["performance_rating"].selection
+                ).get(self.performance_rating, self.performance_rating),
+                "notes": self.notes,
+            },
+        })
+
+        # Chatter on both ends so the linkage is discoverable.
+        self.message_post(body=_(
+            "Promoted to certification draft "
+            "<a href='#' data-oe-model='neon.training.certification' "
+            "data-oe-id='%(id)s'>%(name)s</a>"
+        ) % {
+            "id": new_cert.id,
+            "name": new_cert.display_name,
+        })
+        new_cert.message_post(body=_(
+            "Created from cross-competency observation on "
+            "%(event)s dated %(date)s, observed by %(observer)s."
+        ) % {
+            "event": self.demonstrated_through_event_id.display_name,
+            "date": fields.Date.to_string(self.demonstrated_at),
+            "observer": self.observed_by_id.name,
+        })
+
+        # Open the new draft for the user to complete.
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Promoted Certification Draft"),
+            "res_model": "neon.training.certification",
+            "res_id": new_cert.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_open_promoted_certs(self):
+        """Open the cert(s) promoted from this observation. Called
+        from the 'Already Promoted' badge on the form view."""
+        self.ensure_one()
+        certs = self.promoted_cert_ids
+        if not certs:
+            return False
+        if len(certs) == 1:
+            return {
+                "type": "ir.actions.act_window",
+                "name": _("Promoted Certification"),
+                "res_model": "neon.training.certification",
+                "res_id": certs[0].id,
+                "view_mode": "form",
+                "target": "current",
+            }
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Promoted Certifications"),
+            "res_model": "neon.training.certification",
+            "domain": [("id", "in", certs.ids)],
+            "view_mode": "tree,form",
+            "target": "current",
+        }

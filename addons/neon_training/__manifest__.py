@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.5.0',
+    'version': '17.0.7.6.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -128,9 +128,41 @@ M6 (17.0.7.5.0): cross-competency model.
 
 * Append-only audit (H3=A): perm_unlink=0 on every group.
 
-Subsequent milestones (M7-M12) layer on sign-off authority
-routing, event_job role line extensions, and the three-tier
-assignment gating.
+M7 (17.0.7.6.0): sign-off authority workflow.
+
+* _SIGN_OFF_AUTHORITY_GROUP module-level constant maps
+  sign_off_authority enum to the Odoo group xmlid that holds
+  the verification authority. Single source of truth consumed
+  by M5's _resolve_cc_partners (refactored) + M7's new
+  _resolve_verify_authority_partners + future M8 routing.
+
+* Authority-routed verification TODOs: when a cert transitions
+  to pending_verification, _create_verification_todo fires a
+  mail.activity on the first user in the resolved authority
+  group (DP1=a). Empty authority group falls back to admin
+  with a chatter note for production deploy-gap detection
+  (DP4).
+
+* action_verify hardened with an authority gate: verifier
+  must hold the authority group OR be admin/SUPERUSER. Admin
+  bypass preserves emergency edits when the proper authority
+  is unavailable.
+
+* source_cross_competency_id field links a promoted cert back
+  to its originating observation. Consistency constraint
+  enforces user_id + type_id alignment with the source.
+
+* action_promote_to_cert on cross_competency creates a draft
+  cert from a flagged observation. Field-lock constraint on
+  the observation side prevents source-of-truth drift after
+  promotion.
+
+* 4 M2 smoke verifier swaps (u_signoff -> u_admin) per
+  CLAUDE.md 'M_N owns the fix' discipline.
+
+Subsequent milestones (M8-M12) layer on event_job role line
+extensions, equipment-required-cert mapping, and the three-
+tier assignment gating.
 """,
     'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://neonhiring.com',

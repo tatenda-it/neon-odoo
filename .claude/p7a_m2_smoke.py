@@ -212,13 +212,18 @@ results["T7205"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7206 - action_verify by signoff: pending -> active + flags")
+print("T7206 - action_verify by admin: pending -> active + flags")
 print("=" * 72)
-c_t7205.with_user(u_signoff).action_verify()
+# P7a.M7 verifier swap: c_t7205 is MA3 (sign_off_authority=
+# 'lead_tech'). Post-M7, u_signoff lacks group_neon_jobs_crew_
+# leader so authority gate denies. u_admin bypasses authority per
+# DECISION marker #9. Test intent unchanged (verify path works);
+# fixture user adjusted for the hardened gate.
+c_t7205.with_user(u_admin).action_verify()
 c_t7205.invalidate_recordset()
 ok = (c_t7205.state == "active"
       and c_t7205.verified is True
-      and c_t7205.verified_by_id == u_signoff
+      and c_t7205.verified_by_id == u_admin
       and c_t7205.verified_at is not False)
 print("  state:", c_t7205.state,
       "verified:", c_t7205.verified,
@@ -239,7 +244,10 @@ c_t7207 = Cert.create({
     "date_obtained": date.today() - timedelta(days=10),
     "level": "lead_tech",
 })
-c_t7207.with_user(u_signoff).action_verify()
+# P7a.M7 verifier swap: lead_tech_type is sign_off_authority='od_md'.
+# u_signoff lacks group_neon_finance_approver -> denied. u_admin
+# bypasses per M7 admin override.
+c_t7207.with_user(u_admin).action_verify()
 c_t7207.invalidate_recordset()
 ok = (c_t7207.state == "active"
       and c_t7207.verified is True)
@@ -344,7 +352,7 @@ print()
 print("=" * 72)
 print("T7213 - training_user CANNOT suspend")
 print("=" * 72)
-c_t7212.with_user(u_signoff).action_verify()  # promote to active
+c_t7212.with_user(u_admin).action_verify()  # promote to active (P7a.M7: admin bypass for ma3 lead_tech-authority)
 err, _r = _try(lambda: c_t7212.with_user(u_user).with_context(
     suspension_reason="test").action_suspend())
 ok = isinstance(err, AccessError)
@@ -691,7 +699,7 @@ expiring_cert = Cert.create({
     "date_obtained": soon,
     "signed_off_by_id": u_signoff.id,
 })
-expiring_cert.with_user(u_signoff).action_verify()
+expiring_cert.with_user(u_admin).action_verify()  # P7a.M7: first_aid external_trainer-authority routes to admin
 u_subject.invalidate_recordset()
 count = u_subject.expiring_soon_count
 ok = count >= 1

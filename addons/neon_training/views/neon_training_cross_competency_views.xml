@@ -97,7 +97,38 @@
         <field name="model">neon.training.cross_competency</field>
         <field name="arch" type="xml">
             <form string="Cross-Competency">
+                <header>
+                    <!-- P7a.M7: Promote button. Visible only when
+                         the observation is flagged AND has not
+                         already been promoted (is_promoted=False).
+                         Available to signoff + admin (the same
+                         tiers that record cross-competencies). -->
+                    <button name="action_promote_to_cert"
+                            type="object"
+                            string="Promote to Certification Draft"
+                            class="oe_highlight"
+                            invisible="not leads_to_certification or is_promoted"
+                            groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+                </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <!-- "Already Promoted" badge surfaces the
+                             linked cert(s) when promotion happened.
+                             Mutually exclusive with the Promote
+                             button above via the same is_promoted
+                             flag. -->
+                        <button class="oe_stat_button"
+                                type="object"
+                                name="action_open_promoted_certs"
+                                icon="fa-certificate"
+                                invisible="not is_promoted">
+                            <field name="is_promoted" widget="boolean"
+                                   invisible="1"/>
+                            <span class="o_stat_text">
+                                Already Promoted
+                            </span>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <label for="user_id" class="oe_edit_only"/>
                         <h1>

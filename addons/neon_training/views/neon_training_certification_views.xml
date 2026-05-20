@@ -217,6 +217,12 @@
                         <page string="Notes and Compliance" name="notes">
                             <group>
                                 <field name="regulatory_reference"/>
+                                <!-- P7a.M7: source link to the
+                                     observation if this cert was
+                                     promoted. Visible only when
+                                     set; readonly per field config. -->
+                                <field name="source_cross_competency_id"
+                                       invisible="not source_cross_competency_id"/>
                             </group>
                             <field name="notes" nolabel="1"
                                    placeholder="Free-form notes."/>

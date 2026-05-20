@@ -66,6 +66,29 @@ _LEVELS_BY_MODE = {
 }
 
 
+# P7a.M7 -- shared sign_off_authority -> group_xmlid mapping.
+# Consumed by:
+#   - _resolve_cc_partners (M5; renewal-notification CC list)
+#   - _resolve_verify_authority_partners (M7; verify-TODO target)
+#   - future M8 assignment-gate routing
+# Single source of truth for the C1=D mixed-authority routing
+# decisions. Update here, every consumer follows.
+#
+# Routing per Phase 7 ANSWERS document + walkthrough:
+#   lead_tech         -> Ranganai (and any other Lead Tech)
+#   od_md             -> Robin + Munashe (and any other approver)
+#   external_trainer  -> admin tier (no internal trainer; admin
+#                                    coordinates externally)
+#   self_with_peer    -> admin tier (M7 defer; real peer mechanism
+#                                    is Phase 11 polish)
+_SIGN_OFF_AUTHORITY_GROUP = {
+    "lead_tech":        "neon_jobs.group_neon_jobs_crew_leader",
+    "od_md":            "neon_finance.group_neon_finance_approver",
+    "external_trainer": "neon_training.group_neon_training_admin",
+    "self_with_peer":   "neon_training.group_neon_training_admin",
+}
+
+
 class NeonTrainingCertification(models.Model):
     _name = "neon.training.certification"
     _description = "Training Certification Record"
@@ -288,6 +311,23 @@ class NeonTrainingCertification(models.Model):
         "(NSSA work-at-heights cert #, ZERA electrical authorisation "
         "#, etc.). Used in A3=C compliance reports.",
     )
+    # P7a.M7 -- promotion source link. Populated only when the cert
+    # was created from a cross-competency observation via
+    # action_promote_to_cert. readonly=True post-creation (the
+    # field is set by the promote action, not user-editable;
+    # @api.constrains prevents the values from drifting away from
+    # the source after creation).
+    source_cross_competency_id = fields.Many2one(
+        "neon.training.cross_competency",
+        string="Source Observation",
+        ondelete="restrict",
+        readonly=True,
+        copy=False,
+        help="When set, this cert was promoted from the linked "
+        "cross-competency observation. Read-only; user_id and "
+        "type_id remain consistent with the source per the "
+        "post-promotion constraint.",
+    )
 
     # ============================================================
     # Helpers / display
@@ -473,6 +513,36 @@ class NeonTrainingCertification(models.Model):
                             "name": rec.display_name,
                         })
 
+    # P7a.M7 -- source-of-truth consistency between a promoted cert
+    # and its originating cross-competency observation. The promote
+    # action seeds user_id + type_id from the source; this guard
+    # prevents post-creation drift.
+    @api.constrains("source_cross_competency_id", "user_id", "type_id")
+    def _check_source_cross_competency_consistency(self):
+        for rec in self:
+            src = rec.source_cross_competency_id
+            if not src:
+                continue
+            if rec.user_id != src.user_id:
+                raise ValidationError(_(
+                    "Promoted certification %(name)s: user_id "
+                    "(%(cert_user)s) must match the source "
+                    "observation's user_id (%(src_user)s).") % {
+                        "name": rec.display_name,
+                        "cert_user": rec.user_id.name,
+                        "src_user": src.user_id.name,
+                    })
+            if rec.type_id != src.certification_type_id:
+                raise ValidationError(_(
+                    "Promoted certification %(name)s: type_id "
+                    "(%(cert_type)s) must match the source "
+                    "observation's certification_type_id "
+                    "(%(src_type)s).") % {
+                        "name": rec.display_name,
+                        "cert_type": rec.type_id.name,
+                        "src_type": src.certification_type_id.name,
+                    })
+
     # ============================================================
     # P7a.M4 -- state='expired' is automatic-only.
     # ============================================================
@@ -641,13 +711,112 @@ class NeonTrainingCertification(models.Model):
                     "for verification."))
             rec.write({"state": "pending_verification"})
             rec.message_post(body=_("Submitted for verification."))
+            # P7a.M7 -- fire authority-routed verification TODO.
+            rec._create_verification_todo()
+        return True
+
+    def _create_verification_todo(self):
+        """P7a.M7 -- schedule a mail.activity TODO on the
+        authority-routed user (via _resolve_verify_authority_
+        partners + _SIGN_OFF_AUTHORITY_GROUP).
+
+        Dedup: searches existing mail.activity for the same
+        (res_model, res_id, summary ilike 'Verify%'); skips if
+        found. Matches the M5/M6 dedup pattern.
+
+        DP4 fallback handling: when the authority group is empty,
+        the helper returns (admin_user, fallback_applied=True,
+        original_group_xmlid). Post a chatter note about the
+        fallback so production deploy can detect the gap and
+        provision the right user.
+
+        Returns True on creation, False on dedup-skip or empty
+        recipient.
+        """
+        self.ensure_one()
+        existing = self.env["mail.activity"].sudo().search([
+            ("res_model", "=", "neon.training.certification"),
+            ("res_id", "=", self.id),
+            ("summary", "=ilike", "Verify%"),
+        ], limit=1)
+        if existing:
+            return False
+
+        target, fallback_applied, group_xmlid = (
+            self._resolve_verify_authority_partners())
+        if not target:
+            _logger.info(
+                "neon.training.certification: no verifier "
+                "available for %s (authority=%s, group=%s); TODO "
+                "skipped.", self.display_name,
+                self.type_id.sign_off_authority, group_xmlid)
+            return False
+
+        from datetime import timedelta
+        deadline = fields.Date.context_today(self) + timedelta(days=7)
+        self.sudo().activity_schedule(
+            "mail.mail_activity_data_todo",
+            user_id=target.id,
+            summary=_("Verify %(type)s certification for %(user)s") % {
+                "type": self.type_id.name,
+                "user": self.user_id.name,
+            },
+            note=_(
+                "Cert: %(name)s\nState: %(state)s\n"
+                "Date obtained: %(obt)s\nAuthority: %(auth)s"
+            ) % {
+                "name": self.display_name,
+                "state": dict(_CERT_STATES)[self.state],
+                "obt": (
+                    fields.Date.to_string(self.date_obtained)
+                    if self.date_obtained else "-"),
+                "auth": self.type_id.sign_off_authority or "-",
+            },
+            date_deadline=deadline,
+        )
+
+        if fallback_applied:
+            self.sudo().message_post(
+                subject=_("Authority routing fallback"),
+                body=_(
+                    "Authority routing fallback: sign_off_authority="
+                    "'%(authority)s' requires group '%(group)s' but "
+                    "no users hold this group. Verification TODO "
+                    "routed to admin tier as fallback. Production "
+                    "deploy may need to provision the appropriate "
+                    "user."
+                ) % {
+                    "authority": self.type_id.sign_off_authority,
+                    "group": group_xmlid,
+                })
         return True
 
     def action_verify(self):
         """pending_verification -> active (or draft -> active for
-        the admin-record-and-verify-in-one-step path). Signoff or
-        admin only."""
+        the admin-record-and-verify-in-one-step path).
+
+        P7a.M7 authority hardening (DECISION marker #9): the
+        verifier must hold the authority group matching the cert
+        type's sign_off_authority, OR be in
+        group_neon_training_admin (admin override), OR be
+        SUPERUSER_ID. Per-type authority routing per C1=D from the
+        Phase 7 Open Questions:
+
+          lead_tech         -> neon_jobs.group_neon_jobs_crew_leader
+          od_md             -> neon_finance.group_neon_finance_approver
+          external_trainer  -> neon_training.group_neon_training_admin
+          self_with_peer    -> neon_training.group_neon_training_admin
+
+        Admin bypass (and SUPERUSER) preserves emergency edits
+        when the proper authority is unavailable -- e.g. Ranganai
+        out of office, or production deploy before crew_leader
+        users exist.
+        """
         self._require_signoff_or_admin("verify")
+        user = self.env.user
+        is_admin = (
+            user.has_group("neon_training.group_neon_training_admin")
+            or user.id == SUPERUSER_ID)
         for rec in self:
             if rec.state not in ("draft", "pending_verification"):
                 raise UserError(_(
@@ -655,6 +824,24 @@ class NeonTrainingCertification(models.Model):
                     "can be verified (%s is %s).") % (
                         rec.display_name,
                         dict(_CERT_STATES)[rec.state]))
+            # M7 authority gate.
+            if not is_admin:
+                authority = rec.type_id.sign_off_authority
+                required_group_xmlid = (
+                    _SIGN_OFF_AUTHORITY_GROUP.get(authority))
+                if (required_group_xmlid
+                        and not user.has_group(required_group_xmlid)):
+                    raise UserError(_(
+                        "Only %(authority)s authority can verify "
+                        "%(type)s certifications. Contact a user in "
+                        "%(group)s, or have an admin override.") % {
+                            "authority": dict(
+                                rec.type_id._fields[
+                                    "sign_off_authority"].selection
+                            ).get(authority, authority),
+                            "type": rec.type_id.name,
+                            "group": required_group_xmlid,
+                        })
             rec.write({
                 "state": "active",
                 "verified": True,
@@ -804,31 +991,75 @@ class NeonTrainingCertification(models.Model):
     def _resolve_cc_partners(self):
         """Return the recipient partners that should be CC'd on a
         renewal notification, derived from the type's sign_off_
-        authority per gate-1 DP1=c.
+        authority. M5 introduced this helper; M7 refactored it to
+        consume the shared _SIGN_OFF_AUTHORITY_GROUP constant.
 
-        Mapping:
-          lead_tech        -> users in neon_jobs.group_neon_jobs_
-                              crew_leader (Ranganai in prod)
-          od_md            -> users in neon_finance.group_neon_
-                              finance_approver (Robin + Munashe)
-          external_trainer -> none (no Odoo party)
-          self_with_peer   -> none (cert holder only)
+        M5 distinction vs M7's _resolve_verify_authority_partners:
+        M5 returns ALL members of the authority group (broadcast
+        CC); M7 returns a single user (TODO targeting). Both share
+        the authority -> group mapping.
+
+        external_trainer and self_with_peer return empty res.partner
+        for M5 (external trainer is a non-Odoo party; self_with_peer
+        cert holder is already the email_to recipient -- no extra CC
+        needed). The constant maps both to admin for M7's TODO path,
+        but renewal CC stays empty here.
 
         Returns res.partner recordset (possibly empty).
         """
         self.ensure_one()
         authority = self.type_id.sign_off_authority
-        if authority == "lead_tech":
-            grp = self.env.ref(
-                "neon_jobs.group_neon_jobs_crew_leader",
-                raise_if_not_found=False)
-            return grp.users.partner_id if grp else self.env["res.partner"]
-        if authority == "od_md":
-            grp = self.env.ref(
-                "neon_finance.group_neon_finance_approver",
-                raise_if_not_found=False)
-            return grp.users.partner_id if grp else self.env["res.partner"]
-        return self.env["res.partner"]
+        # Renewal CCs go only to lead_tech and od_md. external_trainer
+        # + self_with_peer return empty (admin doesn't need a renewal
+        # CC; the cert holder is the email_to recipient).
+        if authority not in ("lead_tech", "od_md"):
+            return self.env["res.partner"]
+        group_xmlid = _SIGN_OFF_AUTHORITY_GROUP.get(authority)
+        if not group_xmlid:
+            return self.env["res.partner"]
+        grp = self.env.ref(group_xmlid, raise_if_not_found=False)
+        return grp.users.partner_id if grp else self.env["res.partner"]
+
+    def _resolve_verify_authority_partners(self):
+        """P7a.M7 -- resolve the user who should receive the
+        verification TODO when a cert hits pending_verification.
+
+        Routing per _SIGN_OFF_AUTHORITY_GROUP constant. DP1=a:
+        single user (first in group, sorted by id) -- deterministic;
+        non-targeted group members can still verify per the model-
+        level authority gate in action_verify, they just don't get
+        the TODO.
+
+        DP4 fallback: if the routed group has zero users, fall back
+        to neon_training.group_neon_training_admin tier so the TODO
+        doesn't orphan. Caller posts a chatter note recording the
+        fallback for production deploy-gap detection.
+
+        Returns (target_user, fallback_applied, group_xmlid):
+          target_user      -- res.users (single) or empty recordset
+                              if even admin is empty (rare; pure
+                              fresh install)
+          fallback_applied -- True when admin was used because
+                              authority group was empty
+          group_xmlid      -- the resolved group's xmlid (for
+                              chatter log)
+        """
+        self.ensure_one()
+        authority = self.type_id.sign_off_authority
+        group_xmlid = _SIGN_OFF_AUTHORITY_GROUP.get(authority)
+        empty_user = self.env["res.users"]
+        if not group_xmlid:
+            return empty_user, False, ""
+        grp = self.env.ref(group_xmlid, raise_if_not_found=False)
+        if grp and grp.users:
+            return grp.users.sorted("id")[0], False, group_xmlid
+        # Fallback to admin per DP4.
+        admin_grp = self.env.ref(
+            "neon_training.group_neon_training_admin",
+            raise_if_not_found=False)
+        if admin_grp and admin_grp.users:
+            return (admin_grp.users.sorted("id")[0], True, group_xmlid)
+        return empty_user, True, group_xmlid
 
     def _dispatch_renewal_notification(self):
         """Per-record dispatch: send the mail.template matching the
