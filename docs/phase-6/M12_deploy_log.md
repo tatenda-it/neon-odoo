@@ -109,34 +109,115 @@ running `-u neon_finance` on production.**
 
 ## 5. Polish-item resolution decisions (Robin/Kudzi walkthrough)
 
-The following polish items were deferred during Phase 6 build with the
-note "Robin/Kudzi decides at M12 deploy." Capture the decision here
-before going live:
+**Walkthrough completed 20 May 2026 with Robin.** Decisions captured
+below; behavioural fixes ship on hotfix branch `feat/p6-walkthrough-
+fixes` and tag as `v17.0.7.9.1-phase6-walkthrough-fixes`.
 
-- **Item O** (P6.M8): Populate `res.company.x_zimra_tin` + `x_zimra_bpn`
-  for `base.main_company`. Decision: _TBD — Robin to provide values._
+### Item O — ZIMRA values
 
-- **Item T** (P6.M9): `x_neon_credit_hold` enforcement policy.
-  Decisions needed:
-  - (a) Soft-warn (banner only, current state) vs hard-block (UserError)
-  - (b) Which action point: `submit_for_approval`, `accept`, `move.post`,
-    or all of these
-  - (c) Approver bypass with justification, or `action_clear_credit_hold`
-    as the only path?
-  Decision: _TBD._
+Decision: TIN + VAT populated, BPN SKIPPED (Robin: BPN permanently
+outdated, leave null). Decided by Robin 20 May 2026.
 
-- **Item Y** (P6.M11): Sales tier visibility on `commercial.event.job`.
-  Options: (a) add cross-module read so banner is reachable, OR (b) accept
-  current narrower scope (sales sees via quote chain only).
-  Decision: _TBD._
+- TIN `2002085185` → `res.company.x_zimra_tin`
+- VAT `220397046` → `res.company.partner_id.vat` (standard Odoo)
+- BPN: left null per instruction
+- Vendor # `725004`: deferred to Phase 12 polish (PDF line + field
+  rename `x_zimra_bpn` → `x_zimra_vendor_no`). The data currently
+  sits in `x_zimra_bpn` on the production company record; Phase F
+  E1 verifies the values match expectations without overwriting.
 
-- **Item V** (P6.M10): Cash Flow Dashboard as auto-landing for Finance
-  app users? Currently menu-only at sequence=4.
-  Decision: _TBD._
+Implementation: Phase F.E1 (verify-only) + Phase F.C4 (PDF strip
+removes BPN line).
 
-- **Item S** (P6.M9): Auto-match payment by amount? Q21 confirmed
-  manual-only initially. Decision now (post-trial):
-  _TBD — defer to Phase 12 polish unless requested._
+### Item T — Credit hold enforcement
+
+Decision: keep soft-warn (current state). No code change. Robin:
+"banner + chatter is sufficient signal; don't add UserError friction
+to action_submit_for_approval / action_accept / account.move.post".
+Decided by Robin 20 May 2026.
+
+Implementation: no work.
+
+### Item Y — Sales tier event_job visibility
+
+Decision: ADD cross-module record rule (option a from M11 polish
+item). Sales tier reads `commercial.event.job` where they are the
+salesperson on any linked `neon.finance.quote`. Decided by Robin
+20 May 2026 — reverses Tatenda's M11 lean toward narrower scope;
+Robin's framing: "the cost recovery banner is useful awareness for
+the salesperson; show it".
+
+Implementation: Phase F.C2 — ir.rule on `commercial.event.job` for
+`group_neon_finance_sales` + ACL row in `neon_finance/security/
+ir.model.access.csv`.
+
+### Item V — Cash Flow Dashboard auto-land + OD/MD menu shortcut
+
+Decision: BOTH halves. Decided by Robin 20 May 2026.
+
+- Half 1 (top-level menu shortcut): Add a launcher-icon menu visible
+  to `group_neon_finance_approver` (OD/MD: Robin + Munashe). Lands
+  directly on Cash Flow Dashboard.
+- Half 2 (auto-land for finance roles when opening Invoicing app):
+  Set `res.users.action_id` on each user holding
+  `group_neon_finance_bookkeeper` OR `group_neon_finance_approver`
+  to point at the dashboard server action. Per-user write, no code
+  commit — done as Phase F.E4 shell op.
+
+Caveat (logged to project_phase6_status polish backlog + Phase 12):
+new finance-role users added after deploy will NOT auto-inherit
+`action_id`. Either Tatenda runs the snippet again, or Phase 12
+adds an `_post_init_hook` / `groups.users` write trigger.
+
+Implementation: Phase F.C3 (menu shortcut) + Phase F.E4 (per-user
+action_id write).
+
+### Item Z — SoD self-approval guard
+
+Decision: REVERT. Decided by Robin 20 May 2026. Robin's family-
+business trust model: "if I'm the salesperson and also the approver,
+it's because I want to confirm my own quote went out. SoD is
+appropriate for arms-length finance teams; it's friction here."
+
+Reverses the predeploy fix shipped at `e2951ab`
+(`fix(p6.predeploy): block self-approval and self-rejection of
+quotes`).
+
+Implementation: Phase F.C1 — remove the `salesperson_id ==
+self.env.user` guard from `action_approve` + `action_reject`;
+invert p6m4_smoke T832 + T833 from "blocked" to "succeeds".
+
+### Item S — Auto-match payments by amount
+
+Decision: stays deferred. Robin: "manual entry builds trust; revisit
+in Phase 12 if Kudzi asks." No work for Phase F.
+
+### Item K1 — Kudzi partner name correction
+
+Decision: rename `res.partner.name` "Kudzai" → "Kudzaiishe". Decided
+by Robin 20 May 2026 (Kudzi's preferred spelling). Phase F.E2 shell
+op.
+
+### Item K2 — Kudzi elevated groups review
+
+Decision: strip Technical Features ONLY. Keep Multi Currencies +
+Mail Template Editor. Decided by Robin 20 May 2026 (Option B
+refinement: Kudzi needs MC for invoicing in USD/ZiG; MTE for
+modifying email templates as Bookkeeper tooling).
+
+Implementation: Phase F.E3 shell op — remove from `base.group_no_one`
+only; verify `base.group_multi_currency` + `mail.group_mail_template
+_editor` membership retained.
+
+### Phase 7 forward-looking decisions (logged to Phase 7a polish backlog)
+
+- **P7a custom KB confirmed**: Phase 7d build path locked. Not Phase
+  F scope.
+- **P7b Leadership Tier upgrade to tiered**: M3.1 fix-round, ~100 LOC.
+  After Phase F closes.
+- **P7c Client-facing Comfort upgrade to tiered**: M3.1 fix-round,
+  same shape as P7b.
+- **P7d Language tiering stays binary**: no work.
 
 ---
 
