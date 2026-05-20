@@ -194,24 +194,43 @@ results["T2010"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T2011 - ZIMRA strip suppressed when TIN+BPN+VAT all null")
+print("T2011 - ZIMRA strip suppressed when TIN + VAT both null")
 print("=" * 72)
-# Temporarily clear all three to simulate fresh-install state
+# Phase F walkthrough: BPN line removed from the template; outer
+# t-if is now (x_zimra_tin OR vat). Clearing both suppresses the
+# strip; x_zimra_bpn is no longer part of the visibility decision.
 prior = {
     "vat": company.partner_id.vat,
     "tin": company.x_zimra_tin,
-    "bpn": company.x_zimra_bpn,
 }
 company.partner_id.sudo().write({"vat": False})
-company.sudo().write({"x_zimra_tin": False, "x_zimra_bpn": False})
+company.sudo().write({"x_zimra_tin": False})
 html_t2011 = _render(inv_t2010)
 ok = "Tax Information:" not in html_t2011
 print("  Tax Information absent:", ok)
 # Restore
 company.partner_id.sudo().write({"vat": prior["vat"]})
-company.sudo().write({"x_zimra_tin": prior["tin"], "x_zimra_bpn": prior["bpn"]})
+company.sudo().write({"x_zimra_tin": prior["tin"]})
 print("T2011:", "PASS" if ok else "FAIL")
 results["T2011"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T2019 - Phase F walkthrough: BPN line NEVER renders, even when set")
+print("=" * 72)
+# x_zimra_bpn = 725004 on the live DB (legacy Vendor # data
+# kept under the BPN field name for Phase 12 polish). The M8
+# PDF template must NOT render any "BPN ..." line.
+assert company.x_zimra_bpn, (
+    "test prerequisite: x_zimra_bpn is null; nothing to verify")
+html_t2019 = _render(inv_t2010)
+ok = "BPN " not in html_t2019 and "BPN<" not in html_t2019
+print("  BPN absent from PDF html:", ok,
+      "(x_zimra_bpn field value:", company.x_zimra_bpn, ")")
+print("T2019:", "PASS" if ok else "FAIL")
+results["T2019"] = ok
 
 
 # ============================================================
@@ -352,7 +371,7 @@ print("FULL SUMMARY")
 print("=" * 72)
 order = ["T%d" % i for i in (
     2000, 2001, 2002, 2003, 2004, 2005,
-    2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018,
+    2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
 )]
 for k in order:
     v = results.get(k)

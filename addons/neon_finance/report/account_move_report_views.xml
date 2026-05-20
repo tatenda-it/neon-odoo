@@ -36,11 +36,16 @@
     <template id="report_invoice_document_neon_finance"
               inherit_id="account.report_invoice_document">
 
-        <!-- 1. ZIMRA strip - after #informations -->
+        <!-- 1. ZIMRA strip after #informations.
+             Phase F walkthrough (Robin 20 May 2026): BPN line
+             removed. Robin: BPN permanently outdated; render TIN
+             + VAT only. The x_zimra_bpn FIELD stays in the
+             schema; production data on that field is actually
+             the Vendor # (725004), kept for the Phase 12 polish
+             that adds a Vendor # PDF line + field rename. -->
         <xpath expr="//div[@id='informations']" position="after">
             <div class="row mt-2 mb-3" name="neon_zimra_strip"
                  t-if="o.company_id.x_zimra_tin or
-                       o.company_id.x_zimra_bpn or
                        o.company_id.partner_id.vat">
                 <div class="col-12">
                     <div class="p-2"
@@ -50,10 +55,6 @@
                         <strong>Tax Information:</strong>
                         <span t-if="o.company_id.x_zimra_tin">
                             TIN <t t-out="o.company_id.x_zimra_tin"/>
-                        </span>
-                        <span t-if="o.company_id.x_zimra_bpn"
-                              class="ms-3">
-                            BPN <t t-out="o.company_id.x_zimra_bpn"/>
                         </span>
                         <span t-if="o.company_id.partner_id.vat"
                               class="ms-3">
