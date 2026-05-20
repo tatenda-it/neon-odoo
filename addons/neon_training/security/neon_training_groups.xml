@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P7a.M1 — Neon Training security groups.
+
+        Three roles cover the M1 reference-data surface (cert
+        category + type). Operational roles (trainer, employee,
+        cert-grant approver) layer in at M2+.
+
+        - user:     base read on reference data. Granted to every
+                    Neon staff member who may eventually receive
+                    a certification grant. M1 reads categories
+                    and types so the future grant form can render
+                    pickers.
+        - signoff:  lead-tech tier + senior crew. Curates
+                    certification.type rows (new equipment cert
+                    added when Neon takes delivery of new gear,
+                    soft-skill type added when Robin codifies a
+                    new requirement). Cannot edit categories —
+                    the taxonomy is owned by admin only.
+        - admin:    Robin / Munashe + designated shared owners.
+                    Full reference-data authority. NO perm_unlink
+                    on either model (audit discipline H3=A).
+
+        Hierarchy: admin → implied(signoff) → implied(user).
+        Single-click UI assignment via the Odoo group picker;
+        category-side mutual exclusion behaviour preserved.
+    -->
+    <data noupdate="1">
+
+        <record id="module_category_neon_training"
+                model="ir.module.category">
+            <field name="name">Neon Training</field>
+            <field name="description">Access rights for the Neon Training module — certification categories, types, grants, and training events (Phase 7a+).</field>
+            <field name="sequence">43</field>
+        </record>
+
+        <record id="group_neon_training_user" model="res.groups">
+            <field name="name">User</field>
+            <field name="category_id"
+                   ref="module_category_neon_training"/>
+            <field name="comment">Base training access. Read-only on certification categories and types. Granted to every staff member who may receive a certification grant.</field>
+        </record>
+
+        <record id="group_neon_training_signoff" model="res.groups">
+            <field name="name">Sign-Off</field>
+            <field name="category_id"
+                   ref="module_category_neon_training"/>
+            <field name="comment">Lead-tech tier. Creates and edits certification.type rows. Reads categories (cannot edit them). Will sign off individual certification grants from M2+.</field>
+            <field name="implied_ids" eval="[
+                (4, ref('neon_training.group_neon_training_user')),
+            ]"/>
+        </record>
+
+        <record id="group_neon_training_admin" model="res.groups">
+            <field name="name">Admin</field>
+            <field name="category_id"
+                   ref="module_category_neon_training"/>
+            <field name="comment">Full training-module authority. Edits categories AND types. Reserved for Robin, Munashe, and designated shared owners.</field>
+            <field name="implied_ids" eval="[
+                (4, ref('neon_training.group_neon_training_user')),
+                (4, ref('neon_training.group_neon_training_signoff')),
+            ]"/>
+        </record>
+
+    </data>
+</odoo>

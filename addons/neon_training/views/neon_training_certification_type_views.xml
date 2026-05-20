@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_training_certification_type_view_tree"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.type.tree</field>
+        <field name="model">neon.training.certification.type</field>
+        <field name="arch" type="xml">
+            <tree string="Certification Types"
+                  decoration-muted="not active">
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="code"/>
+                <field name="effective_skill_level_mode"/>
+                <field name="sign_off_authority"/>
+                <field name="validity_months"/>
+                <field name="regulatory_body"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_type_view_kanban"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.type.kanban</field>
+        <field name="model">neon.training.certification.type</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="category_id"
+                    class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="category_id"/>
+                <field name="sign_off_authority"/>
+                <field name="validity_months"/>
+                <field name="regulatory_body"/>
+                <field name="active"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click {{ record.active.raw_value ? '' : 'oe_kanban_muted' }}">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title">
+                                        <field name="name"/>
+                                    </strong>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <field name="code"/>
+                                <div t-if="record.regulatory_body.raw_value">
+                                    <i class="fa fa-shield" title="Regulatory body"/>
+                                    <field name="regulatory_body"/>
+                                </div>
+                                <div t-if="record.validity_months.raw_value">
+                                    Validity: <field name="validity_months"/> months
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="oe_kanban_bottom_left">
+                                    <span class="badge text-bg-secondary">
+                                        <field name="sign_off_authority"/>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_type_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.type.form</field>
+        <field name="model">neon.training.certification.type</field>
+        <field name="arch" type="xml">
+            <form string="Certification Type">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" placeholder="e.g. MA3 Console"/></h1>
+                    </div>
+                    <group>
+                        <group string="Classification">
+                            <field name="category_id"/>
+                            <field name="code" placeholder="ma3_console"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group string="Policy">
+                            <field name="skill_level_mode"
+                                   placeholder="Inherit from category"/>
+                            <field name="effective_skill_level_mode"
+                                   readonly="1"/>
+                            <field name="sign_off_authority"/>
+                            <field name="validity_months"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Equipment Linkage"
+                               invisible="not category_id">
+                            <field name="equipment_category_id"/>
+                            <field name="equipment_model_id"
+                                   options="{'no_create': True}"
+                                   invisible="not equipment_category_id"/>
+                        </group>
+                        <group string="Regulatory">
+                            <field name="regulatory_body"
+                                   placeholder="NSSA / ZERA / St John ..."/>
+                            <field name="regulatory_code"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description" name="description">
+                            <field name="description" nolabel="1"
+                                   placeholder="What this certification covers + how it is assessed."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_type_view_search"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.type.search</field>
+        <field name="model">neon.training.certification.type</field>
+        <field name="arch" type="xml">
+            <search string="Certification Types">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="regulatory_body"/>
+                <separator/>
+                <filter name="active" string="Active"
+                        domain="[('active', '=', True)]"/>
+                <filter name="archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="cat_equipment" string="Equipment"
+                        domain="[('category_id.code', '=', 'equipment')]"/>
+                <filter name="cat_role" string="Role Tier"
+                        domain="[('category_id.code', '=', 'role')]"/>
+                <filter name="cat_safety" string="Safety"
+                        domain="[('category_id.code', '=', 'safety')]"/>
+                <filter name="cat_soft" string="Soft Skill"
+                        domain="[('category_id.code', '=', 'soft')]"/>
+                <separator/>
+                <filter name="has_regulatory_body"
+                        string="Has Regulatory Body"
+                        domain="[('regulatory_body', '!=', False)]"/>
+                <filter name="external_trainer"
+                        string="External Trainer Sign-Off"
+                        domain="[('sign_off_authority', '=', 'external_trainer')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_category"
+                            string="Category"
+                            context="{'group_by': 'category_id'}"/>
+                    <filter name="group_signoff"
+                            string="Sign-Off Authority"
+                            context="{'group_by': 'sign_off_authority'}"/>
+                    <filter name="group_regulatory"
+                            string="Regulatory Body"
+                            context="{'group_by': 'regulatory_body'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_type_action"
+            model="ir.actions.act_window">
+        <field name="name">Certification Types</field>
+        <field name="res_model">neon.training.certification.type</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id"
+               ref="neon_training_certification_type_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No certification types yet
+            </p>
+            <p>
+                A certification type is an individual qualification
+                that staff can hold — for example "MA3 Console",
+                "First Aid", or "Class 4 Driver Licence". Each type
+                belongs to a category that sets default policy
+                (skill-level grading, expiry, sign-off authority).
+            </p>
+        </field>
+    </record>
+
+</odoo>

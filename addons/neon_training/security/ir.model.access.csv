@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_training_category_user,neon.training.certification.category user (read-only),model_neon_training_certification_category,neon_training.group_neon_training_user,1,0,0,0
+access_neon_training_category_signoff,neon.training.certification.category signoff (read-only),model_neon_training_certification_category,neon_training.group_neon_training_signoff,1,0,0,0
+access_neon_training_category_admin,neon.training.certification.category admin (R/W/C no-unlink),model_neon_training_certification_category,neon_training.group_neon_training_admin,1,1,1,0
+access_neon_training_type_user,neon.training.certification.type user (read-only),model_neon_training_certification_type,neon_training.group_neon_training_user,1,0,0,0
+access_neon_training_type_signoff,neon.training.certification.type signoff (R/W/C no-unlink),model_neon_training_certification_type,neon_training.group_neon_training_signoff,1,1,1,0
+access_neon_training_type_admin,neon.training.certification.type admin (R/W/C no-unlink),model_neon_training_certification_type,neon_training.group_neon_training_admin,1,1,1,0

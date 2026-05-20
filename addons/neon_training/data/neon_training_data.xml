@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P7a.M1 — Seed data for certification categories + types.
+
+        Loaded with noupdate="1" so subsequent `-u neon_training`
+        reinstalls do NOT stomp manual edits made via the UI by
+        Ranganai / Robin / Munashe post-install. Adding NEW rows
+        in a later milestone requires either a new <record> here
+        (will be created fresh on first install of that build) or
+        manual UI creation — append-only audit discipline.
+
+        Categories MUST load before types (the type's category_id
+        ref="..." resolves at record-load time, not lazily).
+    -->
+    <data noupdate="1">
+
+        <!-- ============================================================
+             Categories (4) — Equipment, Role Tier, Safety, Soft Skill
+             ============================================================ -->
+
+        <record id="cert_category_equipment"
+                model="neon.training.certification.category">
+            <field name="name">Equipment</field>
+            <field name="code">equipment</field>
+            <field name="sequence">10</field>
+            <field name="audit_track" eval="True"/>
+            <field name="requires_external_trainer" eval="False"/>
+            <field name="skill_level_mode">tiered_3</field>
+            <field name="expiry_required" eval="False"/>
+            <field name="default_validity_months">0</field>
+            <field name="icon">fa-cog</field>
+        </record>
+
+        <record id="cert_category_role"
+                model="neon.training.certification.category">
+            <field name="name">Role Tier</field>
+            <field name="code">role</field>
+            <field name="sequence">20</field>
+            <field name="audit_track" eval="True"/>
+            <field name="requires_external_trainer" eval="False"/>
+            <field name="skill_level_mode">custom</field>
+            <field name="expiry_required" eval="False"/>
+            <field name="default_validity_months">0</field>
+            <field name="icon">fa-id-badge</field>
+        </record>
+
+        <record id="cert_category_safety"
+                model="neon.training.certification.category">
+            <field name="name">Safety</field>
+            <field name="code">safety</field>
+            <field name="sequence">30</field>
+            <field name="audit_track" eval="True"/>
+            <field name="requires_external_trainer" eval="True"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="expiry_required" eval="True"/>
+            <field name="default_validity_months">24</field>
+            <field name="icon">fa-shield</field>
+        </record>
+
+        <record id="cert_category_soft"
+                model="neon.training.certification.category">
+            <field name="name">Soft Skill</field>
+            <field name="code">soft</field>
+            <field name="sequence">40</field>
+            <field name="audit_track" eval="False"/>
+            <field name="requires_external_trainer" eval="False"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="expiry_required" eval="False"/>
+            <field name="default_validity_months">0</field>
+            <field name="icon">fa-comments</field>
+        </record>
+
+        <!-- ============================================================
+             Equipment certifications (6)
+             ============================================================ -->
+
+        <record id="cert_type_ma3_console"
+                model="neon.training.certification.type">
+            <field name="name">MA3 Console</field>
+            <field name="code">ma3_console</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">tiered_3</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">MA Lighting grandMA3 console — programming, patch, playback, networking.</field>
+        </record>
+
+        <record id="cert_type_digico_q5"
+                model="neon.training.certification.type">
+            <field name="name">DiGiCo Quantum 5</field>
+            <field name="code">digico_q5</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">tiered_3</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">DiGiCo Quantum 5 console — patching, scene management, multitrack.</field>
+        </record>
+
+        <record id="cert_type_chamsys_magicq"
+                model="neon.training.certification.type">
+            <field name="name">ChamSys MagicQ</field>
+            <field name="code">chamsys_magicq</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">tiered_3</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">ChamSys MagicQ lighting console — patch, programming, execution.</field>
+        </record>
+
+        <record id="cert_type_avolites_tiger_touch"
+                model="neon.training.certification.type">
+            <field name="name">Avolites Tiger Touch</field>
+            <field name="code">avolites_tiger_touch</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">tiered_3</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Avolites Tiger Touch lighting console — Titan OS competency.</field>
+        </record>
+
+        <record id="cert_type_led_wall_absen"
+                model="neon.training.certification.type">
+            <field name="name">LED Wall — Absen</field>
+            <field name="code">led_wall_absen</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Absen LED panel build + processor (NovaStar / Brompton) configuration.</field>
+        </record>
+
+        <record id="cert_type_truss_climbing_trilite"
+                model="neon.training.certification.type">
+            <field name="name">Truss Climbing — Trilite</field>
+            <field name="code">truss_climbing_trilite</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Trilite truss climbing competency — safe ascent, harness, fall protection on-truss.</field>
+        </record>
+
+        <!-- ============================================================
+             Role Tier certifications (4) — custom skill mode
+             ============================================================ -->
+
+        <record id="cert_type_lead_tech"
+                model="neon.training.certification.type">
+            <field name="name">Lead Tech</field>
+            <field name="code">lead_tech</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">custom</field>
+            <field name="sign_off_authority">od_md</field>
+            <field name="description">Lead Tech role — owns event execution on site, supervises crew, escalation point for client.</field>
+        </record>
+
+        <record id="cert_type_tech"
+                model="neon.training.certification.type">
+            <field name="name">Tech</field>
+            <field name="code">tech</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">custom</field>
+            <field name="sign_off_authority">od_md</field>
+            <field name="description">Tech role — executes on-site under Lead Tech direction.</field>
+        </record>
+
+        <record id="cert_type_runner"
+                model="neon.training.certification.type">
+            <field name="name">Runner</field>
+            <field name="code">runner</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">custom</field>
+            <field name="sign_off_authority">od_md</field>
+            <field name="description">Runner role — general support, gopher, load-in / load-out muscle.</field>
+        </record>
+
+        <record id="cert_type_driver"
+                model="neon.training.certification.type">
+            <field name="name">Driver</field>
+            <field name="code">driver</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">custom</field>
+            <field name="sign_off_authority">od_md</field>
+            <field name="description">Driver role — vehicle operation for crew + equipment movements. Pair with Class 4 Driver Licence safety cert.</field>
+        </record>
+
+        <!-- ============================================================
+             Safety certifications (5)
+             ============================================================ -->
+
+        <record id="cert_type_first_aid"
+                model="neon.training.certification.type">
+            <field name="name">First Aid</field>
+            <field name="code">first_aid</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">24</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">St John Ambulance</field>
+            <field name="description">First-aid certification — accredited external course.</field>
+        </record>
+
+        <record id="cert_type_work_at_heights"
+                model="neon.training.certification.type">
+            <field name="name">Work at Heights</field>
+            <field name="code">work_at_heights</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">24</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">NSSA</field>
+            <field name="description">NSSA work-at-heights / fall-protection certification.</field>
+        </record>
+
+        <record id="cert_type_electrical_live_mains"
+                model="neon.training.certification.type">
+            <field name="name">Electrical — Live Mains</field>
+            <field name="code">electrical_live_mains</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">12</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">ZERA</field>
+            <field name="description">Live-mains electrical work authorisation — ZERA-accredited.</field>
+        </record>
+
+        <record id="cert_type_fire_safety_indoor"
+                model="neon.training.certification.type">
+            <field name="name">Fire Safety — Indoor Venues</field>
+            <field name="code">fire_safety_indoor</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">24</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="description">Indoor-venue fire-safety awareness — extinguisher use, evacuation, pyro proximity.</field>
+        </record>
+
+        <record id="cert_type_class_4_driver"
+                model="neon.training.certification.type">
+            <field name="name">Class 4 Driver Licence</field>
+            <field name="code">class_4_driver</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">60</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">Zimbabwe Traffic Safety Council</field>
+            <field name="description">Class 4 driver licence — light commercial vehicle. Renewal cycle per Zim licensing law.</field>
+        </record>
+
+        <!-- ============================================================
+             Soft Skill certifications (7)
+             ============================================================ -->
+
+        <record id="cert_type_lang_english"
+                model="neon.training.certification.type">
+            <field name="name">English</field>
+            <field name="code">lang_english</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">self_with_peer</field>
+            <field name="description">Conversational + professional English fluency.</field>
+        </record>
+
+        <record id="cert_type_lang_shona"
+                model="neon.training.certification.type">
+            <field name="name">Shona</field>
+            <field name="code">lang_shona</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">self_with_peer</field>
+            <field name="description">Conversational Shona fluency.</field>
+        </record>
+
+        <record id="cert_type_lang_ndebele"
+                model="neon.training.certification.type">
+            <field name="name">Ndebele</field>
+            <field name="code">lang_ndebele</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">self_with_peer</field>
+            <field name="description">Conversational Ndebele fluency.</field>
+        </record>
+
+        <record id="cert_type_mc_presentation"
+                model="neon.training.certification.type">
+            <field name="name">MC Presentation</field>
+            <field name="code">mc_presentation</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Master-of-ceremonies + presentation competency for client-facing event roles.</field>
+        </record>
+
+        <record id="cert_type_computer_literacy"
+                model="neon.training.certification.type">
+            <field name="name">Computer Literacy</field>
+            <field name="code">computer_literacy</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">tiered_3</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Computer-literacy proficiency: basic / intermediate / advanced. Drives capability to use Odoo + production tooling.</field>
+        </record>
+
+        <record id="cert_type_heavy_lift"
+                model="neon.training.certification.type">
+            <field name="name">Physical Capability — Heavy Lift</field>
+            <field name="code">heavy_lift</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Demonstrated physical capability for heavy-lift load-in / load-out work.</field>
+        </record>
+
+        <record id="cert_type_venue_knowledge_harare"
+                model="neon.training.certification.type">
+            <field name="name">Local Venue Knowledge — Harare</field>
+            <field name="code">venue_knowledge_harare</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Operational knowledge of Harare event venues: access routes, load-in points, power, dressing rooms, restrictions.</field>
+        </record>
+
+    </data>
+</odoo>

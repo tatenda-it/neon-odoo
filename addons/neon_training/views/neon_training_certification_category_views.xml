@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_training_certification_category_view_tree"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.category.tree</field>
+        <field name="model">neon.training.certification.category</field>
+        <field name="arch" type="xml">
+            <tree string="Certification Categories"
+                  decoration-muted="not active">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="skill_level_mode"/>
+                <field name="audit_track" widget="boolean_toggle"/>
+                <field name="expiry_required" widget="boolean_toggle"/>
+                <field name="default_validity_months"/>
+                <field name="type_count"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_category_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.category.form</field>
+        <field name="model">neon.training.certification.category</field>
+        <field name="arch" type="xml">
+            <form string="Certification Category">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" placeholder="e.g. Equipment"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="code" placeholder="equipment"/>
+                            <field name="sequence"/>
+                            <field name="icon" placeholder="fa-cog"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group string="Policy Defaults">
+                            <field name="skill_level_mode"/>
+                            <field name="audit_track"/>
+                            <field name="requires_external_trainer"/>
+                            <field name="expiry_required"/>
+                            <field name="default_validity_months"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Certification Types"
+                              name="types">
+                            <field name="type_ids" readonly="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="code"/>
+                                    <field name="sign_off_authority"/>
+                                    <field name="validity_months"/>
+                                    <field name="regulatory_body"/>
+                                    <field name="active"
+                                           widget="boolean_toggle"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_category_view_search"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.category.search</field>
+        <field name="model">neon.training.certification.category</field>
+        <field name="arch" type="xml">
+            <search string="Certification Categories">
+                <field name="name"/>
+                <field name="code"/>
+                <separator/>
+                <filter name="active" string="Active"
+                        domain="[('active', '=', True)]"/>
+                <filter name="archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="audit_track" string="Audit-Tracked"
+                        domain="[('audit_track', '=', True)]"/>
+                <filter name="expiry_required" string="Expiry Required"
+                        domain="[('expiry_required', '=', True)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_skill_mode"
+                            string="Skill Level Mode"
+                            context="{'group_by': 'skill_level_mode'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_category_action"
+            model="ir.actions.act_window">
+        <field name="name">Certification Categories</field>
+        <field name="res_model">neon.training.certification.category</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_training_certification_category_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No certification categories yet
+            </p>
+            <p>
+                Categories group related certifications and set the
+                default policy (skill-level mode, expiry, sign-off
+                authority) that individual certification types inherit.
+                Neon ships with four: Equipment, Role Tier, Safety,
+                and Soft Skill.
+            </p>
+        </field>
+    </record>
+
+</odoo>

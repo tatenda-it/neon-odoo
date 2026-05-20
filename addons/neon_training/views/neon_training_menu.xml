@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P7a.M1 menu placement.
+
+        DECISION marker (build-time): deviating from gate-1 plan
+        H "mount under base.menu_custom (Settings, Technical)".
+        Build verification showed base.menu_custom gates on
+        group_no_one (developer mode) and base.menu_administration
+        gates on group_system; neither is reachable by
+        group_neon_training_admin without granting unrelated Odoo
+        admin scopes. The alternative of extending base.menu_
+        custom.groups_id with our admin group would force
+        training_admin to navigate Odoo's full Technical submenu
+        (irrelevant menu items visible, ACLs block actions).
+
+        Cleaner: a top-level "Neon Training" app menu gated
+        entirely on training_admin, so the launcher icon appears
+        for admins only and the contained config surfaces hang
+        directly off it.
+
+        The "no top-level Training app yet" constraint from
+        gate-1 was about USER-FACING surfaces. Admin-only
+        configuration needs a reachable parent. User-facing
+        surfaces (My Certifications, Crew Training Status, etc.)
+        still defer to M2+ and will be gated on training_user /
+        training_signoff separately when they land.
+    -->
+
+    <menuitem id="menu_neon_training_root"
+              name="Neon Training"
+              sequence="80"
+              groups="neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_neon_training_categories"
+              name="Certification Categories"
+              parent="menu_neon_training_root"
+              action="neon_training_certification_category_action"
+              sequence="10"/>
+
+    <menuitem id="menu_neon_training_types"
+              name="Certification Types"
+              parent="menu_neon_training_root"
+              action="neon_training_certification_type_action"
+              sequence="20"/>
+
+</odoo>
