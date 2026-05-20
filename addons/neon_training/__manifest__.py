@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.2.0',
+    'version': '17.0.7.3.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking for Neon Events Elements crew + '
                'employees. M1: category + type reference models. '
@@ -56,7 +56,30 @@ M3 (17.0.7.2.0): per-category level UX + seed completion.
 * Ranganai-knowledge seed polish: MA2 Console, Truss Climbing
   -- Prolyte, Class 2 / 3 / 5 Driver Licences, PSV Endorsement.
 
-Subsequent milestones (M4-M12) layer on expiry cron + reminders,
+M4 (17.0.7.3.0): expiry tracking + daily cron + lifecycle states.
+
+* Daily ir.cron walks active certs whose date_expires has passed
+  into the 'expired' terminal state. Suspended records skipped
+  (admin override trumps time); never-expires certs (validity
+  _months=0) skipped.
+
+* Three non-stored computed fields: days_to_expiry,
+  is_expiring_soon, expiry_urgency. M5 dispatch logic reads
+  expiry_urgency to pick the matching mail.template.
+
+* Three mail.template stubs (90 / 30 / 7 day reminder copy).
+  M4 ships record definitions only; M5 wires the dispatch cron.
+
+* DP3 strict: state='expired' is set by cron only. Manual write
+  raises UserError pointing users to action_suspend. M2's
+  action_mark_expired removed accordingly; _action_force_expire
+  added as protected superuser-only helper for the cron itself.
+
+* action_reactivate now blocks transition when date_expires <=
+  today -- forces a new cert record with a fresh date_obtained
+  rather than reactivating an aged-out record.
+
+Subsequent milestones (M5-M12) layer on notification dispatch,
 cross-competency, sign-off authority routing, and event_job
 assignment gating.
 """,
@@ -90,6 +113,12 @@ assignment gating.
         # seed data: categories MUST load before types so the
         # category_id ref="..." lookups resolve.
         'data/neon_training_data.xml',
+        # P7a.M4 -- daily expiry cron + reminder mail templates.
+        # Load after the seed XML so model_id refs in the cron
+        # record + templates resolve cleanly. noupdate=1 preserves
+        # admin tweaks (cron active flag, template copy) on -u.
+        'data/neon_training_cron.xml',
+        'data/neon_training_mail_templates.xml',
         # views.
         'views/neon_training_certification_category_views.xml',
         'views/neon_training_certification_type_views.xml',

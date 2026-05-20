@@ -19,7 +19,7 @@ for chatter and activity scheduling.
 """
 import logging
 
-from odoo import _, api, fields, models
+from odoo import SUPERUSER_ID, _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 
@@ -169,6 +169,39 @@ class NeonTrainingCertification(models.Model):
     )
 
     # ============================================================
+    # P7a.M4 -- expiry window computed fields. Non-stored: recompute
+    # on read, no overnight recompute storm. M5 reads expiry_urgency
+    # to pick the right mail template; M4 only exposes the field.
+    # ============================================================
+    days_to_expiry = fields.Integer(
+        string="Days to Expiry",
+        compute="_compute_expiry_window",
+        help="Days until date_expires (negative if past). 0 when "
+        "date_expires is empty -- callers should check is_expiring_"
+        "soon / expiry_urgency rather than days_to_expiry directly.",
+    )
+    is_expiring_soon = fields.Boolean(
+        string="Expiring Soon",
+        compute="_compute_expiry_window",
+        help="True when an active cert expires within 90 days. "
+        "Drives the user form badge + list-view warning decoration.",
+    )
+    expiry_urgency = fields.Selection(
+        [
+            ("none",      "None"),
+            ("warn_90",   "Warning (90 days)"),
+            ("warn_30",   "Warning (30 days)"),
+            ("warn_7",    "Warning (7 days)"),
+            ("expired",   "Expired"),
+        ],
+        string="Expiry Urgency",
+        compute="_compute_expiry_window",
+        help="Tier of urgency for renewal reminders. Empty / never-"
+        "expires certs map to 'none'. M5 reads this to dispatch "
+        "the matching mail.template.",
+    )
+
+    # ============================================================
     # Sign-off + verification
     # ============================================================
     signed_off_by_id = fields.Many2one(
@@ -257,6 +290,41 @@ class NeonTrainingCertification(models.Model):
                     months=months)
             else:
                 rec.date_expires = False
+
+    @api.depends("date_expires", "state")
+    def _compute_expiry_window(self):
+        """P7a.M4 -- single compute that fills days_to_expiry,
+        is_expiring_soon, and expiry_urgency. Three derived facets
+        of the same date arithmetic; one compute saves three
+        recompute passes per read.
+
+        State note: expiry_urgency='expired' is set when the
+        underlying state is already 'expired' OR when the record is
+        active-but-past-date_expires (cron about to flip it). The
+        form badge and list decorations show 'Expired' uniformly in
+        either case so the user sees consistent UX whether the cron
+        has run yet or not.
+        """
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if not rec.date_expires:
+                rec.days_to_expiry = 0
+                rec.is_expiring_soon = False
+                rec.expiry_urgency = "none"
+                continue
+            delta = (rec.date_expires - today).days
+            rec.days_to_expiry = delta
+            rec.is_expiring_soon = 0 < delta <= 90
+            if rec.state == "expired" or delta <= 0:
+                rec.expiry_urgency = "expired"
+            elif delta <= 7:
+                rec.expiry_urgency = "warn_7"
+            elif delta <= 30:
+                rec.expiry_urgency = "warn_30"
+            elif delta <= 90:
+                rec.expiry_urgency = "warn_90"
+            else:
+                rec.expiry_urgency = "none"
 
     @api.depends("type_id.effective_skill_level_mode",
                  "type_id.category_id.skill_level_mode")
@@ -380,6 +448,33 @@ class NeonTrainingCertification(models.Model):
                             "do": rec.date_obtained,
                             "name": rec.display_name,
                         })
+
+    # ============================================================
+    # P7a.M4 -- state='expired' is automatic-only.
+    # ============================================================
+    def write(self, vals):
+        """Block manual writes that set state='expired' (DECISION
+        #6 = DP3 strict). The cron and the protected
+        _action_force_expire are the legitimate paths -- they both
+        run as SUPERUSER_ID so this guard skips them. Manual UI or
+        ORM writes from any other user raise UserError telling them
+        to use Suspend instead.
+
+        Implemented as a write() override rather than @api.constrains
+        because the constraint receives the full mutated state and
+        cannot distinguish "user set state=expired" from "user did
+        something else AND the record happened to be expired before".
+        write() sees the incoming vals dict directly.
+        """
+        if (vals.get("state") == "expired"
+                and self.env.uid != SUPERUSER_ID):
+            raise UserError(_(
+                "Certification expiry is set automatically by the "
+                "daily cron. To deactivate a certification manually, "
+                "use Suspend instead -- it captures a reason in the "
+                "audit trail and stays distinct from time-driven "
+                "expiry."))
+        return super().write(vals)
 
     # ============================================================
     # Onchanges
@@ -508,6 +603,7 @@ class NeonTrainingCertification(models.Model):
         """suspended -> active. Admin only. Used when a suspension
         is lifted (e.g. clarification on the original concern)."""
         self._require_admin("reactivate")
+        today = fields.Date.context_today(self)
         for rec in self:
             if rec.state != "suspended":
                 raise UserError(_(
@@ -515,6 +611,16 @@ class NeonTrainingCertification(models.Model):
                     "reactivated (%s is %s).") % (
                         rec.display_name,
                         dict(_CERT_STATES)[rec.state]))
+            # P7a.M4 DECISION #7: block reactivation when the cert
+            # has already aged out. Forces a fresh record with a new
+            # date_obtained -- preserves the audit trail and keeps
+            # the unique-active-per-(user,type) constraint honest.
+            if rec.date_expires and rec.date_expires <= today:
+                raise UserError(_(
+                    "Cannot reactivate %s -- its date_expires "
+                    "(%s) has passed. Create a new certification "
+                    "record with a fresh date_obtained instead.") % (
+                        rec.display_name, rec.date_expires))
             rec.write({
                 "state": "active",
                 "suspension_reason": False,
@@ -523,19 +629,73 @@ class NeonTrainingCertification(models.Model):
                 "Reactivated by %s.") % self.env.user.name)
         return True
 
-    def action_mark_expired(self):
-        """active -> expired. Admin or signoff. Manual transition
-        for M2; cron lands in M4 to fire this automatically when
-        date_expires passes."""
-        self._require_signoff_or_admin("mark expired")
+    def _action_force_expire(self):
+        """P7a.M4 -- internal cron-only expiry transition. Reserved
+        for _cron_expire_certifications and emergency superuser use.
+        NOT exposed on the form (DP3 = strict per gate-1). Manual
+        admin deactivation goes through action_suspend; legitimate
+        time-based expiry goes through the cron which calls this.
+
+        Skips suspended records (admin override trumps time) and
+        records with no expiry (validity_months = 0). Idempotent on
+        already-expired records.
+        """
+        if self.env.uid != SUPERUSER_ID:
+            raise AccessError(_(
+                "_action_force_expire is reserved for the daily "
+                "cron (running as superuser) and emergency "
+                "interventions. Use action_suspend for manual "
+                "deactivation."))
         for rec in self:
-            if rec.state != "active":
-                raise UserError(_(
-                    "Only Active certifications can be marked "
-                    "expired (%s is %s).") % (
-                        rec.display_name,
-                        dict(_CERT_STATES)[rec.state]))
+            if rec.state in ("expired", "suspended"):
+                continue
+            if not rec.date_expires:
+                continue
             rec.write({"state": "expired"})
             rec.message_post(body=_(
-                "Marked expired by %s.") % self.env.user.name)
-        return True
+                "Auto-expired by cron -- date_expires (%s) passed."
+            ) % rec.date_expires)
+
+    @api.model
+    def _cron_expire_certifications(self):
+        """Daily expiry sweep. Active certs whose date_expires has
+        passed flip to 'expired' and the transition is recorded in
+        chatter. Mirrors neon_finance.quote._cron_expire_quotes.
+
+        Suspended records and never-expires records (validity_months
+        = 0) are skipped -- suspended takes precedence over time, and
+        never-expires has no expiry to evaluate.
+
+        Idempotent: re-running within the same day matches nothing
+        new. Race window with admin suspend is narrow and acceptable
+        for daily cadence (gate-1 DP1 = c).
+        """
+        today = fields.Date.context_today(self)
+        expiring = self.sudo().search([
+            ("state", "=", "active"),
+            ("date_expires", "!=", False),
+            ("date_expires", "<=", today),
+        ])
+        if not expiring:
+            _logger.info(
+                "neon.training.certification: no certs to expire "
+                "today (%s).", today)
+            return 0
+        # Per-record write so message_post fires for each (audit
+        # trail per H3=A). Bulk write would lose the per-record
+        # chatter entry that downstream M5 reminders rely on.
+        expiring.sudo()._action_force_expire()
+        # Per-category breakdown for the cron log -- useful for
+        # observability ("how many safety vs equipment certs auto-
+        # expired today").
+        by_category = {}
+        for rec in expiring:
+            cat = rec.category_id.code or "unknown"
+            by_category[cat] = by_category.get(cat, 0) + 1
+        _logger.info(
+            "neon.training.certification: expired %d cert(s) on "
+            "%s. By category: %s",
+            len(expiring), today,
+            ", ".join(f"{k}={v}" for k, v in sorted(by_category.items())),
+        )
+        return len(expiring)

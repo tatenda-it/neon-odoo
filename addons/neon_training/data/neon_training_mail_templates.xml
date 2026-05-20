@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            P7a.M4 mail template stubs.
+
+            Minimal placeholder copy per gate-1 DP2 = a. M5 design
+            pause refines the body_html with Robin/Ranganai input
+            and wires the dispatch cron that reads expiry_urgency
+            and calls the matching template.
+
+            M4 ships ONLY the records. No automatic send. The
+            templates are renderable for testing via render_email
+            (T7418-T7419 in p7a_m4_smoke).
+
+            model: neon.training.certification; variables available
+            in subject + body_html:
+              {{ object.user_id.name }}     (cert holder)
+              {{ object.type_id.name }}     (certification type)
+              {{ object.date_expires }}     (ISO date of expiry)
+              {{ object.days_to_expiry }}   (integer days remaining)
+              {{ object.regulatory_body }}  (safety category bodies)
+        -->
+
+        <record id="template_cert_expiring_90d" model="mail.template">
+            <field name="name">Neon Training: Certification expiring in 90 days</field>
+            <field name="model_id"
+                   ref="model_neon_training_certification"/>
+            <field name="subject">Your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
+            <field name="email_from">{{ user.email_formatted or 'training@neonhiring.com' }}</field>
+            <field name="email_to">{{ object.user_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div>
+                    <p>Hi <t t-out="object.user_id.name or ''"/>,</p>
+                    <p>Your <t t-out="object.type_id.name or ''"/> certification expires on
+                        <t t-out="object.date_expires or ''"/>
+                        (<t t-out="object.days_to_expiry or ''"/> days from now).
+                    </p>
+                    <p>Please contact Neon Training to schedule renewal.</p>
+                    <p>Neon Events Elements</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="template_cert_expiring_30d" model="mail.template">
+            <field name="name">Neon Training: Certification expiring in 30 days</field>
+            <field name="model_id"
+                   ref="model_neon_training_certification"/>
+            <field name="subject">Action needed: your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
+            <field name="email_from">{{ user.email_formatted or 'training@neonhiring.com' }}</field>
+            <field name="email_to">{{ object.user_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div>
+                    <p>Hi <t t-out="object.user_id.name or ''"/>,</p>
+                    <p>Renewal action is needed within 30 days.
+                        Your <t t-out="object.type_id.name or ''"/> certification expires on
+                        <t t-out="object.date_expires or ''"/>.
+                    </p>
+                    <p>Please contact Neon Training to confirm renewal arrangements.</p>
+                    <p>Neon Events Elements</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="template_cert_expiring_7d" model="mail.template">
+            <field name="name">Neon Training: Certification expiring in 7 days</field>
+            <field name="model_id"
+                   ref="model_neon_training_certification"/>
+            <field name="subject">Final warning: your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
+            <field name="email_from">{{ user.email_formatted or 'training@neonhiring.com' }}</field>
+            <field name="email_to">{{ object.user_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div>
+                    <p>Hi <t t-out="object.user_id.name or ''"/>,</p>
+                    <p>This is a final reminder: your <t t-out="object.type_id.name or ''"/>
+                        certification expires on <t t-out="object.date_expires or ''"/>
+                        (<t t-out="object.days_to_expiry or ''"/> days remaining).
+                    </p>
+                    <p>Without renewal you will not be assignable to event jobs that
+                        require this qualification.
+                    </p>
+                    <p>Neon Events Elements</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

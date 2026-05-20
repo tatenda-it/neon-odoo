@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            P7a.M4 daily expiry sweep.
+
+            Walks active certs whose date_expires has passed into
+            the 'expired' terminal state. Suspended records skipped
+            (admin override trumps time). Never-expires records
+            (validity_months=0, date_expires NULL) skipped.
+
+            Pattern matches addons/neon_finance/data/ir_cron_data.xml
+            (quote expiry sweep, invoice schedule sweep, overdue
+            payment sweep). No nextcall: scheduler picks the time
+            on first install. Daily cadence is sufficient; firing
+            at any time of day matches the same record set because
+            the SQL filter compares dates (not times).
+
+            Runs as base.user_root so the cron-driver user has
+            unrestricted ACL on the certification model (training
+            crew users carry only read on the model for own rows;
+            cron needs to read across all users).
+        -->
+        <record id="ir_cron_neon_training_expire_certifications"
+                model="ir.cron">
+            <field name="name">Neon Training: Expire Certifications</field>
+            <field name="model_id"
+                   ref="model_neon_training_certification"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_expire_certifications()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+        </record>
+    </data>
+</odoo>

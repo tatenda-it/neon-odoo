@@ -295,14 +295,31 @@ results["T7210"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7211 - action_mark_expired by signoff: active -> expired")
+print("T7211 - manual write of state='expired' raises UserError (M4 DP3 strict)")
 print("=" * 72)
-c_t7205.with_user(u_signoff).action_mark_expired()
-c_t7205.invalidate_recordset()
-ok = c_t7205.state == "expired"
-print("  state:", c_t7205.state)
+# P7a.M4 reframed this test: state='expired' is cron-only. A
+# signoff or admin attempting to manually set state='expired' from
+# the UI / ORM hits the write() guard and gets UserError pointing
+# them to action_suspend. The cron path (_cron_expire_certifications
+# / _action_force_expire) is exercised by p7a_m4_smoke T7403-T7407.
+err, _r = _try(lambda: c_t7205.with_user(u_signoff).write(
+    {"state": "expired"}))
+ok = isinstance(err, UserError)
+print("  error class:", type(err).__name__ if err else None,
+      "(expected UserError)")
 print("T7211:", "PASS" if ok else "FAIL")
 results["T7211"] = ok
+
+# Setup hygiene: c_t7205 (MA3 active) needs to be off the active
+# slot before T7212+ create another MA3 cert for u_subject.
+# _action_force_expire skips never-expires certs (MA3 has
+# validity_months=0, date_expires=NULL), so use action_suspend
+# instead -- it transitions active to suspended unconditionally
+# and frees the unique-active-per-(user, type) slot.
+c_t7205.with_user(u_admin).with_context(
+    suspension_reason="T7211 cleanup -- free MA3 slot for T7212+"
+).action_suspend()
+c_t7205.invalidate_recordset()
 
 
 # ============================================================
@@ -502,14 +519,22 @@ print()
 print("=" * 72)
 print("T7223 - mail.thread records state transition in chatter")
 print("=" * 72)
-# c_t7212 (MA3 active) -- mark expired and check message_ids grows.
+# P7a.M4 reframed: the original test used action_mark_expired
+# which is gone. _action_force_expire is a no-op for c_t7212
+# (MA3 type, validity_months=0, date_expires=NULL -- never-
+# expires certs are skipped). Switch to action_suspend which
+# also writes to chatter via mail.thread on transition.
+c_t7212.invalidate_recordset()
 prev_count = len(c_t7212.message_ids)
-c_t7212.with_user(u_signoff).action_mark_expired()
+c_t7212.with_user(u_admin).with_context(
+    suspension_reason="T7223 chatter probe"
+).action_suspend()
 c_t7212.invalidate_recordset()
 new_count = len(c_t7212.message_ids)
-ok = new_count > prev_count
+ok = (new_count > prev_count
+      and c_t7212.state == "suspended")
 print("  messages before:", prev_count,
-      "after:", new_count)
+      "after:", new_count, "state:", c_t7212.state)
 print("T7223:", "PASS" if ok else "FAIL")
 results["T7223"] = ok
 

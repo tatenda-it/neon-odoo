@@ -8,10 +8,10 @@
         <field name="arch" type="xml">
             <tree string="Certifications"
                   decoration-info="state == 'draft'"
-                  decoration-warning="state == 'pending_verification'"
-                  decoration-success="state == 'active'"
-                  decoration-muted="state in ('expired', 'suspended')"
-                  decoration-danger="state == 'active' and date_expires and date_expires &lt; current_date">
+                  decoration-warning="state == 'active' and expiry_urgency in ('warn_90', 'warn_30')"
+                  decoration-danger="state == 'active' and expiry_urgency == 'warn_7'"
+                  decoration-success="state == 'active' and expiry_urgency == 'none'"
+                  decoration-muted="state in ('expired', 'suspended')">
                 <field name="display_name" string="Certification"/>
                 <field name="user_id"/>
                 <field name="type_id"/>
@@ -19,6 +19,11 @@
                 <field name="level"/>
                 <field name="date_obtained"/>
                 <field name="date_expires"/>
+                <field name="days_to_expiry" optional="show"/>
+                <field name="expiry_urgency" widget="badge"
+                       optional="show"
+                       decoration-warning="expiry_urgency in ('warn_90', 'warn_30')"
+                       decoration-danger="expiry_urgency in ('warn_7', 'expired')"/>
                 <field name="verified" widget="boolean_toggle"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'draft'"
@@ -44,6 +49,8 @@
                 <field name="date_obtained"/>
                 <field name="date_expires"/>
                 <field name="verified"/>
+                <field name="days_to_expiry"/>
+                <field name="expiry_urgency"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div t-attf-class="oe_kanban_card oe_kanban_global_click">
@@ -75,6 +82,26 @@
                                           class="badge text-bg-secondary">
                                         Unverified
                                     </span>
+                                    <!-- P7a.M4: expiry urgency
+                                         indicator. Green=none /
+                                         yellow=90d / orange=30d /
+                                         red=7d or expired. -->
+                                    <span t-if="record.expiry_urgency.raw_value == 'warn_90'"
+                                          class="badge text-bg-warning ms-1">
+                                        90d
+                                    </span>
+                                    <span t-if="record.expiry_urgency.raw_value == 'warn_30'"
+                                          class="badge text-bg-warning ms-1">
+                                        30d
+                                    </span>
+                                    <span t-if="record.expiry_urgency.raw_value == 'warn_7'"
+                                          class="badge text-bg-danger ms-1">
+                                        7d
+                                    </span>
+                                    <span t-if="record.expiry_urgency.raw_value == 'expired'"
+                                          class="badge text-bg-danger ms-1">
+                                        Expired
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -102,11 +129,11 @@
                             class="oe_highlight"
                             invisible="state not in ('draft', 'pending_verification')"
                             groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
-                    <button name="action_mark_expired"
-                            type="object"
-                            string="Mark Expired"
-                            invisible="state != 'active'"
-                            groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+                    <!-- P7a.M4 DP3 strict: state='expired' is
+                         cron-only. Manual deactivation goes
+                         through action_suspend; no "Mark Expired"
+                         button on the form. action_mark_expired
+                         was removed from the model. -->
                     <button name="action_suspend"
                             type="object"
                             string="Suspend"
@@ -151,6 +178,18 @@
                         <group string="Dates">
                             <field name="date_obtained"/>
                             <field name="date_expires" readonly="1"/>
+                            <!-- P7a.M4: at-a-glance expiry badge.
+                                 Shows "Never expires" when date_
+                                 expires is null, the urgency tier
+                                 when active, or "Expired" when
+                                 already past. -->
+                            <field name="days_to_expiry" readonly="1"
+                                   invisible="not date_expires or state != 'active'"/>
+                            <field name="expiry_urgency"
+                                   widget="badge" readonly="1"
+                                   invisible="state != 'active'"
+                                   decoration-warning="expiry_urgency in ('warn_90', 'warn_30')"
+                                   decoration-danger="expiry_urgency in ('warn_7', 'expired')"/>
                         </group>
                     </group>
                     <group>
@@ -239,6 +278,17 @@
                         domain="[('verified', '=', True)]"/>
                 <filter name="unverified" string="Unverified"
                         domain="[('verified', '=', False)]"/>
+                <!-- P7a.M4 note: is_expiring_soon + expiry_urgency
+                     are non-stored computed fields. Filter / group_
+                     by on them requires either storing the values
+                     (with a daily recompute cron because the
+                     compute depends on today) or implementing a
+                     search method. Both are heavier than needed
+                     for M4; the legacy timedelta filters above
+                     cover the "find expiring soon" use case. M5
+                     polish: evaluate storing + cron-driven
+                     recompute if the boolean / urgency surface is
+                     useful to filter on. -->
                 <group expand="0" string="Group By">
                     <filter name="group_state" string="State"
                             context="{'group_by': 'state'}"/>
