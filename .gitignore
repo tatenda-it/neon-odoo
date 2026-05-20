@@ -29,3 +29,8 @@ backups/
 # value once a smoke has passed.
 .claude/.venv-browser/
 .claude/smoke-output/
+
+# Claude Code per-user settings. settings.json is team-shared
+# (committed); settings.local.json holds personal accumulated
+# allow-list entries and never goes in the repo.
+.claude/settings.local.json
