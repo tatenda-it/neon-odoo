@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M8 (inherit views) surface the training gate inference on
+    commercial.job.crew. Two inherits: tree (status badge column)
+    and form (Training Gate group with required, missing certs,
+    softening cross-competencies).
+
+    DATA LAYER ONLY per M8 design. Fields are read-only; M9 / M10 /
+    M11 add the action buttons and override workflows.
+-->
+<odoo>
+
+    <record id="commercial_job_crew_view_tree_neon_training" model="ir.ui.view">
+        <field name="name">commercial.job.crew.tree.neon_training</field>
+        <field name="model">commercial.job.crew</field>
+        <field name="inherit_id" ref="neon_jobs.commercial_job_crew_view_tree"/>
+        <field name="arch" type="xml">
+            <field name="state" position="after">
+                <field name="gate_status"
+                       widget="badge"
+                       optional="show"
+                       decoration-success="gate_status == 'qualified'"
+                       decoration-info="gate_status == 'pending'"
+                       decoration-warning="gate_status == 'needs_cross_competency'"
+                       decoration-danger="gate_status == 'unqualified'"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="commercial_job_crew_view_form_neon_training" model="ir.ui.view">
+        <field name="name">commercial.job.crew.form.neon_training</field>
+        <field name="model">commercial.job.crew</field>
+        <field name="inherit_id" ref="neon_jobs.commercial_job_crew_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Training Gate"
+                       name="training_gate_group">
+                    <group>
+                        <field name="gate_status"
+                               widget="badge"
+                               decoration-success="gate_status == 'qualified'"
+                               decoration-info="gate_status == 'pending'"
+                               decoration-warning="gate_status == 'needs_cross_competency'"
+                               decoration-danger="gate_status == 'unqualified'"/>
+                        <field name="gate_softening_used"
+                               invisible="gate_status != 'needs_cross_competency'"/>
+                    </group>
+                    <group>
+                        <field name="required_certification_type_ids"
+                               widget="many2many_tags"
+                               readonly="1"/>
+                        <field name="gate_missing_certification_ids"
+                               widget="many2many_tags"
+                               readonly="1"
+                               invisible="gate_status in ('qualified', 'pending')"/>
+                        <field name="gate_softening_cross_competency_ids"
+                               widget="many2many_tags"
+                               readonly="1"
+                               invisible="not gate_softening_used"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

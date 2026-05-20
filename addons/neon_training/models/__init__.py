@@ -17,3 +17,8 @@ from . import res_users
 # model when scheduling the TODO summary.
 from . import neon_training_cross_competency
 from . import commercial_event_job
+# P7a.M8 -- commercial.job.crew inherit for gate inference engine.
+# Loads after cross_competency (gate softening reads cc records) and
+# after event_job (no hard load-order need but keeps the file grouped
+# with the other cross-cutting inherits).
+from . import commercial_job_crew

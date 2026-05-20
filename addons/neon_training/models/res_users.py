@@ -18,6 +18,18 @@ class ResUsers(models.Model):
         "user_id",
         string="Training Certifications",
     )
+    # P7a.M8 -- reverse o2m to cross-competency observations.
+    # Retroactively closes the M6 gap: cross_competency was added
+    # in M6 with a user_id FK but no reverse o2m on res.users.
+    # M8's _compute_gate_softening_cross_competency_ids on
+    # commercial.job.crew reads this to find softening evidence
+    # for unqualified crew. Polish item logged: M6 gate-1 should
+    # have enumerated this reverse o2m.
+    cross_competency_ids = fields.One2many(
+        "neon.training.cross_competency",
+        "user_id",
+        string="Cross-Competency Observations",
+    )
     active_certifications_count = fields.Integer(
         string="Active Certifications",
         compute="_compute_certification_counts",

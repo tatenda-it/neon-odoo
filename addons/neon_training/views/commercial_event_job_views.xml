@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M8 (commercial.event.job view inherits) surface the training
+    gate roll-up. Tree gains an optional column; form gains a status
+    banner above the sheet (info-tier visibility per M8). M9 / M10 /
+    M11 will replace the banner copy and add block / override
+    buttons.
+-->
+<odoo>
+
+    <record id="commercial_event_job_view_tree_neon_training" model="ir.ui.view">
+        <field name="name">commercial.event.job.tree.neon_training</field>
+        <field name="model">commercial.event.job</field>
+        <field name="inherit_id" ref="neon_jobs.commercial_event_job_view_tree"/>
+        <field name="arch" type="xml">
+            <field name="state" position="after">
+                <field name="training_gate_status"
+                       widget="badge"
+                       optional="hide"
+                       decoration-success="training_gate_status == 'qualified'"
+                       decoration-info="training_gate_status in ('pending', 'no_crew')"
+                       decoration-warning="training_gate_status == 'needs_cross_competency'"
+                       decoration-danger="training_gate_status == 'unqualified'"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="commercial_event_job_view_form_neon_training" model="ir.ui.view">
+        <field name="name">commercial.event.job.form.neon_training</field>
+        <field name="model">commercial.event.job</field>
+        <field name="inherit_id" ref="neon_jobs.commercial_event_job_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-warning"
+                     role="alert"
+                     invisible="training_gate_status not in ('unqualified', 'needs_cross_competency')">
+                    <strong>Training Gate:</strong>
+                    <field name="training_gate_status"
+                           readonly="1"
+                           nolabel="1"
+                           class="oe_inline"/>
+                    <span class="text-muted ms-2">
+                        M9-M11 will gate transitions on this status.
+                        Currently informational only.
+                    </span>
+                </div>
+                <div class="alert alert-info"
+                     role="alert"
+                     invisible="training_gate_status not in ('pending', 'no_crew')">
+                    <strong>Training Gate:</strong>
+                    <field name="training_gate_status"
+                           readonly="1"
+                           nolabel="1"
+                           class="oe_inline"/>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

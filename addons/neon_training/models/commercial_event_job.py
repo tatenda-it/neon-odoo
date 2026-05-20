@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-P7a.M6 -- commercial.event.job extension for cross-competency
-TODO surface.
+P7a.M6 + P7a.M8 -- commercial.event.job extension.
+
+M6: cross-competency TODO surface (state='completed' write override).
+M8: training_gate_status roll-up + _action_check_training_gate
+helper for M9-M11 layered gating.
 
 When an event_job's state transitions to 'completed' (the
 operational "event is over" moment, before admin closeout to
@@ -32,6 +35,148 @@ _logger = logging.getLogger(__name__)
 class CommercialEventJob(models.Model):
     _inherit = "commercial.event.job"
 
+    # ============================================================
+    # P7a.M8 -- training gate roll-up
+    # ============================================================
+    training_gate_status = fields.Selection(
+        [
+            ("no_crew",                "No Crew Assigned"),
+            ("qualified",              "Qualified"),
+            ("pending",                "Pending (crew without user)"),
+            ("needs_cross_competency", "Needs Cross-Competency"),
+            ("unqualified",            "Unqualified"),
+        ],
+        string="Training Gate",
+        compute="_compute_training_gate_status",
+        store=False,
+        help="Worst-status-wins roll-up of "
+        "commercial_job_id.crew_assignment_ids.gate_status across "
+        "all crew on the parent job. M8 ships the data only -- "
+        "M9 (info tier) surfaces this in dispatch banner, M10 "
+        "(warn tier) gates ready_for_dispatch -> dispatched, "
+        "M11 (block tier) gates draft -> planning when not "
+        "softened by cross-competency.",
+    )
+
+    @api.depends(
+        "commercial_job_id",
+        "commercial_job_id.crew_assignment_ids",
+        "commercial_job_id.crew_assignment_ids.gate_status",
+    )
+    def _compute_training_gate_status(self):
+        """Roll up per-crew gate_status into a single event-level
+        verdict. Precedence (worst wins): unqualified > needs_
+        cross_competency > pending > qualified. Empty crew ->
+        'no_crew'.
+
+        Note: the per-crew gate_status itself is non-stored, so
+        the dependency on it is best-effort; Odoo recomputes
+        roll-ups whenever the underlying compute trigger
+        (cert state, role, etc.) updates the inner compute. M12
+        dashboard reads will demand stored=True; defer until then.
+        """
+        for rec in self:
+            crew = rec.commercial_job_id.crew_assignment_ids
+            if not crew:
+                rec.training_gate_status = "no_crew"
+                continue
+            statuses = set(crew.mapped("gate_status"))
+            if "unqualified" in statuses:
+                rec.training_gate_status = "unqualified"
+            elif "needs_cross_competency" in statuses:
+                rec.training_gate_status = "needs_cross_competency"
+            elif "pending" in statuses:
+                rec.training_gate_status = "pending"
+            else:
+                rec.training_gate_status = "qualified"
+
+    def _action_check_training_gate(self, tier="info"):
+        """M9-M11 entrypoint: returns a structured dict describing
+        whether the event_job's crew gate passes for the given
+        tier.
+
+        tier:
+          'info'  -- always returns ok=True; populates the
+                     human-readable message + crew breakdown for
+                     M9's dispatch banner.
+          'warn'  -- ok=False when training_gate_status is
+                     'unqualified' OR 'needs_cross_competency'
+                     OR 'pending' OR 'no_crew'. M10 may
+                     downgrade warn -> info per Approver override
+                     (Approver UX in M10).
+          'block' -- ok=False when training_gate_status is
+                     'unqualified'. 'needs_cross_competency'
+                     passes block (the softener applied). 'pending'
+                     and 'no_crew' do not block draft transitions
+                     (crew may be assigned later).
+
+        Returns:
+          {
+            'ok':        bool,
+            'tier':      str,
+            'status':    training_gate_status value,
+            'message':   human-readable summary,
+            'unqualified_crew_ids':  list of crew_id,
+            'needs_cc_crew_ids':     list of crew_id,
+            'pending_crew_ids':      list of crew_id,
+            'softening_used':        bool (any crew softened),
+          }
+
+        M8 ships the helper; M9-M11 call it. No state writes here
+        -- the layered-gate decision logic lives in M9-M11.
+        """
+        self.ensure_one()
+        crew = self.commercial_job_id.crew_assignment_ids
+        unqualified = crew.filtered(
+            lambda c: c.gate_status == "unqualified")
+        needs_cc = crew.filtered(
+            lambda c: c.gate_status == "needs_cross_competency")
+        pending = crew.filtered(
+            lambda c: c.gate_status == "pending")
+        softening_used = any(c.gate_softening_used for c in crew)
+
+        status = self.training_gate_status
+        if tier == "block":
+            ok = (status != "unqualified")
+        elif tier == "warn":
+            ok = (status in ("qualified",))
+        else:  # info
+            ok = True
+
+        if status == "qualified":
+            message = _("All crew qualified.")
+        elif status == "unqualified":
+            names = ", ".join(
+                (c.user_id.name or c.partner_id.name or _("(unnamed)"))
+                for c in unqualified)
+            message = _("Unqualified crew: %s") % names
+        elif status == "needs_cross_competency":
+            names = ", ".join(
+                (c.user_id.name or c.partner_id.name or _("(unnamed)"))
+                for c in needs_cc)
+            message = _("Needs cross-competency: %s") % names
+        elif status == "pending":
+            names = ", ".join(
+                (c.user_id.name or c.partner_id.name or _("(unnamed)"))
+                for c in pending)
+            message = _("Pending (no user assigned): %s") % names
+        else:  # no_crew
+            message = _("No crew assigned yet.")
+
+        return {
+            "ok":                     ok,
+            "tier":                   tier,
+            "status":                 status,
+            "message":                message,
+            "unqualified_crew_ids":   unqualified.ids,
+            "needs_cc_crew_ids":      needs_cc.ids,
+            "pending_crew_ids":       pending.ids,
+            "softening_used":         softening_used,
+        }
+
+    # ============================================================
+    # P7a.M6 -- cross-competency TODO on state='completed'
+    # ============================================================
     def write(self, vals):
         """Detect transition INTO state='completed' (the first time)
         and surface a cross-competency TODO to Lead Tech for each

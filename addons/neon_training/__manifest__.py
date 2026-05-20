@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.6.0',
+    'version': '17.0.7.7.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
                'M3: per-category level UX + complete soft-skill '
                'seeding. M4: expiry cron + lifecycle compute + '
                'mail.template stubs. M5: notification dispatch '
-               'cron + final template copy + TODO activities.',
+               'cron + final template copy + TODO activities. '
+               'M6: cross-competency model. M7: sign-off authority '
+               'workflow. M8: event_job crew gate inference engine '
+               '(inferred requirements + per-crew gate_status + '
+               'event-level roll-up). Data layer only; M9-M11 fire '
+               'the gates.',
     'description': """
 Neon Training
 =============
@@ -160,9 +165,47 @@ M7 (17.0.7.6.0): sign-off authority workflow.
 * 4 M2 smoke verifier swaps (u_signoff -> u_admin) per
   CLAUDE.md 'M_N owns the fix' discipline.
 
-Subsequent milestones (M8-M12) layer on event_job role line
-extensions, equipment-required-cert mapping, and the three-
-tier assignment gating.
+M8 (17.0.7.7.0): event_job crew gate inference engine.
+
+* commercial.job.crew inherit -- five computed (non-stored)
+  fields: required_certification_type_ids, gate_status,
+  gate_missing_certification_ids, gate_softening_cross
+  _competency_ids, gate_softening_used. Six methods:
+  _compute_required_certifications, _infer_role_tier
+  _certifications, _infer_equipment_certifications,
+  _compute_gate_status, _compute_gate_missing_certification
+  _ids, _compute_gate_softening_cross_competency_ids.
+
+* G1=B: requirements are INFERRED from crew.role +
+  event_job equipment context, not declared. Role-tier
+  inference via _ROLE_TIER_TO_CERT_XMLID dict. Equipment
+  inference via job.event_job_ids.equipment_line_ids.product
+  _template_id -> cert_type.equipment_model_id reverse
+  lookup (sudo()).
+
+* Gate status precedence: pending (no user) -> qualified
+  (no requirements or all held) -> needs_cross_competency
+  (gap fully softened by cc observations) -> unqualified
+  (gap with no softener).
+
+* commercial.event.job rollup: training_gate_status field +
+  _compute (worst-status-wins) + _action_check_training_gate
+  helper (returns structured dict for M9-M11 entry points).
+  Tier semantics: info always ok; warn ok only when fully
+  qualified; block ok unless unqualified (softened crew pass
+  block per M6 + M11 design).
+
+* res.users reverse o2m cross_competency_ids retroactively
+  closes the M6 enumeration gap (gate-1 logged Phase 11
+  polish item for the CLAUDE.md amendment).
+
+* DATA LAYER ONLY. No state writes from M8. M9-M11 read the
+  computed fields + call _action_check_training_gate to
+  enact the three-tier layered gating.
+
+Subsequent milestones (M9-M12) layer on the three-tier
+assignment gating (info / warn / block), Approver override
+UX, and the training compliance dashboard.
 """,
     'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://neonhiring.com',
@@ -211,6 +254,13 @@ tier assignment gating.
         # P7a.M6 -- cross-competency views (load before menu so
         # the action ref resolves).
         'views/neon_training_cross_competency_views.xml',
+        # P7a.M8 -- crew + event_job view inherits for training
+        # gate display. Load before menu (no action refs to
+        # resolve, but keeps grouping clean). After cross
+        # _competency_views so any cross-file xpath ordering is
+        # deterministic.
+        'views/commercial_job_crew_views.xml',
+        'views/commercial_event_job_views.xml',
         # menus last so action ref()s resolve. M2 added the
         # Configuration submenu; M6 adds Cross-Competencies at
         # sequence=20 between Certifications and Configuration.
