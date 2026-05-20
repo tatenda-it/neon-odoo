@@ -278,5 +278,30 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!--
+            P6 walkthrough Y (Robin 20 May 2026): cross-module read
+            rule giving sales tier visibility on the event_jobs they
+            are salesperson for. The salesperson_id lives on
+            neon.finance.quote; the rule reaches through the new
+            quote_ids One2many added on commercial.event.job in this
+            commit. Read-only because sales tier already writes the quote
+            but should not be able to mutate the event_job record.
+
+            Bookkeeper + approver already have unconditional access
+            via the M5/M6 ACL rows; no rule needed for those tiers
+            (no restrictive rule means no scoping).
+        -->
+        <record id="event_job_rule_sales_own_quotes"
+                model="ir.rule">
+            <field name="name">Event Job: Sales see only event_jobs of their own quotes</field>
+            <field name="model_id" ref="neon_jobs.model_commercial_event_job"/>
+            <field name="domain_force">[('quote_ids.salesperson_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('neon_finance.group_neon_finance_sales'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

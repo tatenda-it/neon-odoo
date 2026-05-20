@@ -39,6 +39,14 @@ class CommercialEventJob(models.Model):
         "event_job_id",
         string="Cost Lines",
     )
+    # P6 walkthrough Y -- reverse o2m to quotes. Backs the sales-tier
+    # ir.rule that lets a salesperson read event_jobs they own a quote
+    # on. Standard inverse of neon.finance.quote.event_job_id.
+    quote_ids = fields.One2many(
+        "neon.finance.quote",
+        "event_job_id",
+        string="Quotes",
+    )
     cost_total_usd = fields.Monetary(
         compute="_compute_cost_totals",
         store=True,

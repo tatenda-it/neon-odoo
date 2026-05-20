@@ -32,6 +32,7 @@ access_neon_finance_cost_line_approver,neon.finance.cost.line approver (R/W/C al
 access_neon_finance_cost_line_manager,neon.finance.cost.line jobs_manager (R/W/C all),model_neon_finance_cost_line,neon_jobs.group_neon_jobs_manager,1,1,1,0
 access_commercial_event_job_neon_finance_bookkeeper,commercial.event.job (Phase 6: bookkeeper read for P&L),neon_jobs.model_commercial_event_job,neon_finance.group_neon_finance_bookkeeper,1,0,0,0
 access_commercial_event_job_neon_finance_approver,commercial.event.job (Phase 6: approver read for P&L),neon_jobs.model_commercial_event_job,neon_finance.group_neon_finance_approver,1,0,0,0
+access_commercial_event_job_neon_finance_sales,commercial.event.job (P6 walkthrough Y: sales tier read scoped via ir.rule to event_jobs they own a quote on),neon_jobs.model_commercial_event_job,neon_finance.group_neon_finance_sales,1,0,0,0
 access_commercial_event_job_equipment_line_neon_finance_book,commercial.event.job.equipment.line (Phase 6: bookkeeper read so event_job form renders),neon_jobs.model_commercial_event_job_equipment_line,neon_finance.group_neon_finance_bookkeeper,1,0,0,0
 access_commercial_event_job_equipment_line_neon_finance_approver,commercial.event.job.equipment.line (Phase 6: approver read so event_job form renders),neon_jobs.model_commercial_event_job_equipment_line,neon_finance.group_neon_finance_approver,1,0,0,0
 access_neon_finance_invoice_schedule_sales,neon.finance.invoice.schedule sales (R own via ir.rule),model_neon_finance_invoice_schedule,neon_finance.group_neon_finance_sales,1,0,0,0

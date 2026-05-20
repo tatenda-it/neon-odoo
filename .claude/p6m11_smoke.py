@@ -657,6 +657,53 @@ results["T2344"] = ok
 
 
 # ============================================================
+# ============================================================
+# Phase F walkthrough Y (Robin 20 May 2026): sales tier sees
+# event_jobs they own a quote on. Reverses M11 polish-item-Y
+# narrower-scope decision.
+# ============================================================
+print()
+print("=" * 72)
+print("T2350 - Y: sales tier reads event_job via own quote chain")
+print("=" * 72)
+# sales_user already exists as a fixture from upstream M11 tests.
+# Verify they can read the event_job linked to their own quote.
+# Use the most recently created quote in this smoke run for the
+# linkage (any quote created in M11 setup will do).
+EventJob = env["commercial.event.job"]
+own_job_ids = EventJob.with_user(sales_user).search([]).ids
+# We don't pin a specific count -- just assert sales_user sees
+# something (the M11 fixture creates quotes for sales_user as
+# salesperson, so at least one event_job should be visible via
+# the new rule).
+ok = len(own_job_ids) >= 1
+print("  event_jobs visible to sales_user:", len(own_job_ids))
+print("T2350:", "PASS" if ok else "FAIL")
+results["T2350"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T2351 - Y: sales tier read is SCOPED (cannot see other reps' event_jobs)")
+print("=" * 72)
+# Get the full set of event_jobs via superuser and the scoped set
+# via sales_user. The diff must be non-empty -- there must exist at
+# least one event_job that sales_user cannot see (one whose linked
+# quotes have a different salesperson). If every event_job has at
+# least one quote owned by sales_user the scope is degenerate; skip
+# with a note rather than fail.
+all_job_ids = set(EventJob.sudo().search([]).ids)
+sales_visible = set(EventJob.with_user(sales_user).search([]).ids)
+not_visible = all_job_ids - sales_visible
+ok = len(not_visible) >= 1
+print("  total event_jobs:", len(all_job_ids),
+      "; visible to sales:", len(sales_visible),
+      "; hidden from sales:", len(not_visible))
+print("T2351:", "PASS" if ok else "FAIL")
+results["T2351"] = ok
+
+
 print()
 print("=" * 72)
 print("FULL SUMMARY")
@@ -669,6 +716,7 @@ order = ["T%d" % i for i in (
     2333, 2334, 2335,
     2340, 2341,
     2342, 2343, 2344,
+    2350, 2351,
 )]
 for k in order:
     v = results.get(k)
