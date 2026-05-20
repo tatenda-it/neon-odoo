@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            P7a.M6 cross-competency record rules. Mirrors the M2
+            certification rule shape: training_user scoped to own
+            records via restrictive rule; signoff + admin lifted to
+            unconditional via separate rules (OR-combination across
+            groups; the user-tier restriction does not narrow
+            signoff/admin because they also carry training_user via
+            implied_ids, and rules from groups without restrictions
+            do not constrain further).
+
+            perm_unlink=False on every rule. Belt-and-braces beyond
+            the CSV which sets perm_unlink=0 (H3=A append-only
+            audit discipline).
+        -->
+
+        <record id="cross_competency_rule_user_own_only"
+                model="ir.rule">
+            <field name="name">Cross-Competency: User sees own only</field>
+            <field name="model_id"
+                   ref="model_neon_training_cross_competency"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[
+                (4, ref('neon_training.group_neon_training_user')),
+            ]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="cross_competency_rule_signoff_all"
+                model="ir.rule">
+            <field name="name">Cross-Competency: Sign-Off sees all</field>
+            <field name="model_id"
+                   ref="model_neon_training_cross_competency"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('neon_training.group_neon_training_signoff')),
+            ]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="cross_competency_rule_admin_all"
+                model="ir.rule">
+            <field name="name">Cross-Competency: Admin sees all</field>
+            <field name="model_id"
+                   ref="model_neon_training_cross_competency"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('neon_training.group_neon_training_admin')),
+            ]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

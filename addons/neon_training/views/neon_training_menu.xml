@@ -35,6 +35,16 @@
               sequence="10"
               groups="neon_training.group_neon_training_user"/>
 
+    <!-- P7a.M6: Cross-Competencies menu. Visible to signoff +
+         admin (Lead Tech records these; crew see their own via
+         portal in 7b, not via this backend menu). -->
+    <menuitem id="menu_neon_training_cross_competencies"
+              name="Cross-Competencies"
+              parent="menu_neon_training_root"
+              action="neon_training_cross_competency_action"
+              sequence="20"
+              groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+
     <menuitem id="menu_neon_training_configuration"
               name="Configuration"
               parent="menu_neon_training_root"

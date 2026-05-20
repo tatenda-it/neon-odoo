@@ -8,3 +8,6 @@ access_neon_training_type_admin,neon.training.certification.type admin (R/W/C no
 access_neon_training_certification_user,neon.training.certification user (R/W/C own; ir.rule scopes),model_neon_training_certification,neon_training.group_neon_training_user,1,1,1,0
 access_neon_training_certification_signoff,neon.training.certification signoff (R/W/C all),model_neon_training_certification,neon_training.group_neon_training_signoff,1,1,1,0
 access_neon_training_certification_admin,neon.training.certification admin (R/W/C all no-unlink),model_neon_training_certification,neon_training.group_neon_training_admin,1,1,1,0
+access_neon_training_cross_competency_user,neon.training.cross_competency user (R own via ir.rule),model_neon_training_cross_competency,neon_training.group_neon_training_user,1,0,0,0
+access_neon_training_cross_competency_signoff,neon.training.cross_competency signoff (R/W/C all no-unlink),model_neon_training_cross_competency,neon_training.group_neon_training_signoff,1,1,1,0
+access_neon_training_cross_competency_admin,neon.training.cross_competency admin (R/W/C all no-unlink),model_neon_training_cross_competency,neon_training.group_neon_training_admin,1,1,1,0

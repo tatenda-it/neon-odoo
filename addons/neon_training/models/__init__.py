@@ -11,3 +11,9 @@ from . import neon_training_certification_type
 # reverse on res.users resolves cleanly.
 from . import neon_training_certification
 from . import res_users
+# P7a.M6 -- cross-competency record + commercial.event.job inherit
+# for the post-state='completed' TODO surface. Cross-competency
+# model loads first; the event_job inherit can reference the
+# model when scheduling the TODO summary.
+from . import neon_training_cross_competency
+from . import commercial_event_job

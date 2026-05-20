@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.4.0',
+    'version': '17.0.7.5.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -106,8 +106,31 @@ M5 (17.0.7.4.0): notification dispatch.
   marks any open TODOs on prior records done via
   action_feedback (preserves chatter audit).
 
-Subsequent milestones (M6-M12) layer on cross-competency,
-sign-off authority routing, and event_job assignment gating.
+M6 (17.0.7.5.0): cross-competency model.
+
+* neon.training.cross_competency captures real-world capability
+  demonstrated on an event_job without requiring a formal cert
+  (Robin's A4 'data analytics' angle).
+
+* Sync TODO surface on commercial.event.job state transition
+  to 'completed' (NOT 'closed' -- the operational moment vs
+  the admin reconciliation moment; schema sketch section 4.3
+  text inaccuracy logged as polish).
+
+* Cross-cutting touch on commercial.event.job is surgical per
+  the CLAUDE.md amendment from M4: 0 new fields, 2 new methods
+  (write override + _create_cross_competency_todo helper), 0
+  new buttons, 0 view modifications.
+
+* Constraints: unique (user, type, event); demonstrated_at not
+  in future; observer authority (signoff or admin); event date
+  range (-7d / +90d window).
+
+* Append-only audit (H3=A): perm_unlink=0 on every group.
+
+Subsequent milestones (M7-M12) layer on sign-off authority
+routing, event_job role line extensions, and the three-tier
+assignment gating.
 """,
     'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://neonhiring.com',
@@ -136,6 +159,8 @@ sign-off authority routing, and event_job assignment gating.
         # before domain_force compiles. noupdate=1 in the XML so
         # admin tweaks to a rule survive future upgrades.
         'security/neon_training_certification_rules.xml',
+        # P7a.M6 -- ir.rule on the cross-competency model.
+        'security/neon_training_cross_competency_rules.xml',
         # seed data: categories MUST load before types so the
         # category_id ref="..." lookups resolve.
         'data/neon_training_data.xml',
@@ -151,9 +176,12 @@ sign-off authority routing, and event_job assignment gating.
         # P7a.M2 -- certification record views + res.users tab.
         'views/neon_training_certification_views.xml',
         'views/res_users_views.xml',
-        # menus last so action ref()s resolve. Menu file rewritten
-        # in M2: Certifications added at top; Categories + Types
-        # reparented under a new Configuration submenu.
+        # P7a.M6 -- cross-competency views (load before menu so
+        # the action ref resolves).
+        'views/neon_training_cross_competency_views.xml',
+        # menus last so action ref()s resolve. M2 added the
+        # Configuration submenu; M6 adds Cross-Competencies at
+        # sequence=20 between Certifications and Configuration.
         'views/neon_training_menu.xml',
     ],
     'assets': {
