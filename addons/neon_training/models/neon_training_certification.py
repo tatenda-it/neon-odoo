@@ -200,6 +200,30 @@ class NeonTrainingCertification(models.Model):
         "expires certs map to 'none'. M5 reads this to dispatch "
         "the matching mail.template.",
     )
+    # P7a.M5 -- idempotency tracking for the dispatch cron. Records
+    # the most-urgent tier for which a notification has been sent.
+    # The cron skips records whose current expiry_urgency equals
+    # last_notification_sent_urgency (no re-dispatch on the same
+    # tier). When the urgency tier escalates (warn_90 -> warn_30 ->
+    # warn_7) a new notification fires and this field updates.
+    #
+    # Reset triggers (see write() override): state transition out of
+    # 'active', date_obtained edit, type_id swap (which changes
+    # validity_months and may change date_expires). All three
+    # signal a fresh notification cycle.
+    last_notification_sent_urgency = fields.Selection(
+        [
+            ("warn_90",   "Warning (90 days)"),
+            ("warn_30",   "Warning (30 days)"),
+            ("warn_7",    "Warning (7 days)"),
+        ],
+        string="Last Notification Tier Sent",
+        readonly=True,
+        copy=False,
+        help="Tracks the highest urgency tier already notified. "
+        "Cron compares against expiry_urgency and only dispatches "
+        "when the cert escalates to a more-urgent tier.",
+    )
 
     # ============================================================
     # Sign-off + verification
@@ -474,7 +498,75 @@ class NeonTrainingCertification(models.Model):
                 "use Suspend instead -- it captures a reason in the "
                 "audit trail and stays distinct from time-driven "
                 "expiry."))
+        # P7a.M5 -- reset triggers for last_notification_sent_
+        # urgency. When state transitions out of 'active', or when
+        # date_obtained / type_id changes (validity_months changes
+        # via the type swap), the notification cycle restarts. The
+        # next cron pass evaluates the (possibly new) expiry_
+        # urgency and re-fires if it lands in a warn tier.
+        resets_notification = (
+            ("state" in vals and vals["state"] != "active")
+            or "date_obtained" in vals
+            or "type_id" in vals
+        )
+        if resets_notification and "last_notification_sent_urgency" not in vals:
+            vals = dict(vals, last_notification_sent_urgency=False)
         return super().write(vals)
+
+    # ============================================================
+    # P7a.M5 -- TODO discard on renewal (DP2)
+    # ============================================================
+    @api.model_create_multi
+    def create(self, vals_list):
+        """When a new ACTIVE cert lands for a (user, type) pair
+        that already has stale active TODOs from a prior record,
+        mark those TODOs done via action_feedback (preserves
+        chatter audit; vs unlink which destroys the trail).
+
+        Most M2-style creates start at state='draft' so this hook
+        no-ops -- the discard only fires when a brand-new record
+        is created at state='active' (admin-record-and-verify-in-
+        one-step path from M2). The far more common path is
+        action_verify on an existing record, which doesn't change
+        the (user, type) pair so doesn't trigger discard.
+
+        For action_verify on a SECOND cert (renewal pattern: prior
+        expired/suspended, new one verified), the .write() that
+        transitions to active doesn't change (user, type) either.
+        The polish item M5.b is to add a similar discard hook on
+        action_verify's transition for the renewal case. M5 ships
+        the create-time hook; verify-time hook tracked as polish.
+        """
+        records = super().create(vals_list)
+        for rec in records:
+            if rec.state != "active" or not rec.user_id or not rec.type_id:
+                continue
+            # Find any other ACTIVE cert with open TODOs for same
+            # (user, type) -- the new record supersedes them. The
+            # unique-active constraint elsewhere ensures at most
+            # one OTHER active record exists at write time;
+            # action_feedback runs on its activity_ids.
+            prior = self.sudo().search([
+                ("id", "!=", rec.id),
+                ("user_id", "=", rec.user_id.id),
+                ("type_id", "=", rec.type_id.id),
+                ("state", "=", "active"),
+            ])
+            if not prior:
+                continue
+            for p in prior:
+                if p.activity_ids:
+                    feedback = _(
+                        "Cert renewed by record %(new_id)s "
+                        "(date_obtained %(obt)s). "
+                        "Auto-closing renewal TODO."
+                    ) % {
+                        "new_id": rec.id,
+                        "obt": fields.Date.to_string(rec.date_obtained),
+                    }
+                    p.activity_ids.action_feedback(feedback=feedback)
+                    p.last_notification_sent_urgency = False
+        return records
 
     # ============================================================
     # Onchanges
@@ -699,3 +791,151 @@ class NeonTrainingCertification(models.Model):
             ", ".join(f"{k}={v}" for k, v in sorted(by_category.items())),
         )
         return len(expiring)
+
+    # ============================================================
+    # P7a.M5 -- renewal notification dispatch
+    # ============================================================
+    _TEMPLATE_BY_URGENCY = {
+        "warn_90": "neon_training.template_cert_expiring_90d",
+        "warn_30": "neon_training.template_cert_expiring_30d",
+        "warn_7":  "neon_training.template_cert_expiring_7d",
+    }
+
+    def _resolve_cc_partners(self):
+        """Return the recipient partners that should be CC'd on a
+        renewal notification, derived from the type's sign_off_
+        authority per gate-1 DP1=c.
+
+        Mapping:
+          lead_tech        -> users in neon_jobs.group_neon_jobs_
+                              crew_leader (Ranganai in prod)
+          od_md            -> users in neon_finance.group_neon_
+                              finance_approver (Robin + Munashe)
+          external_trainer -> none (no Odoo party)
+          self_with_peer   -> none (cert holder only)
+
+        Returns res.partner recordset (possibly empty).
+        """
+        self.ensure_one()
+        authority = self.type_id.sign_off_authority
+        if authority == "lead_tech":
+            grp = self.env.ref(
+                "neon_jobs.group_neon_jobs_crew_leader",
+                raise_if_not_found=False)
+            return grp.users.partner_id if grp else self.env["res.partner"]
+        if authority == "od_md":
+            grp = self.env.ref(
+                "neon_finance.group_neon_finance_approver",
+                raise_if_not_found=False)
+            return grp.users.partner_id if grp else self.env["res.partner"]
+        return self.env["res.partner"]
+
+    def _dispatch_renewal_notification(self):
+        """Per-record dispatch: send the mail.template matching the
+        current expiry_urgency + schedule a mail.activity TODO on
+        the cert holder.
+
+        Idempotency contract: caller checks last_notification_sent_
+        urgency != expiry_urgency before invoking. This method
+        always sends + always writes last_notification_sent_urgency.
+
+        Returns True on success, False when no template matches
+        (e.g. urgency='none' or 'expired' -- caller should filter).
+        """
+        self.ensure_one()
+        tpl_xmlid = self._TEMPLATE_BY_URGENCY.get(self.expiry_urgency)
+        if not tpl_xmlid:
+            return False
+        tpl = self.env.ref(tpl_xmlid, raise_if_not_found=False)
+        if not tpl:
+            _logger.warning(
+                "Missing mail.template %s for cert %s (urgency=%s).",
+                tpl_xmlid, self.display_name, self.expiry_urgency)
+            return False
+        # Send email -- mail.template.send_mail handles partner
+        # resolution + queue.
+        cc_partners = self._resolve_cc_partners()
+        partner_ids = [self.user_id.partner_id.id]
+        partner_ids.extend(cc_partners.ids)
+        tpl.sudo().send_mail(
+            self.id,
+            force_send=False,
+            email_values={
+                "recipient_ids": [(6, 0, partner_ids)],
+            },
+        )
+        # Schedule TODO activity on cert holder. Reuses the
+        # activity_schedule helper from mail.activity.mixin per the
+        # Phase 6 pattern (cost_line.py:243).
+        summary = _(
+            "Renew %(type)s certification -- expires %(date)s"
+        ) % {
+            "type": self.type_id.name,
+            "date": fields.Date.to_string(self.date_expires),
+        }
+        self.activity_schedule(
+            "mail.mail_activity_data_todo",
+            user_id=self.user_id.id,
+            summary=summary,
+            date_deadline=self.date_expires,
+        )
+        # Record dispatch tier for idempotency.
+        self.sudo().write({
+            "last_notification_sent_urgency": self.expiry_urgency,
+        })
+        return True
+
+    @api.model
+    def _cron_dispatch_renewal_notifications(self):
+        """Daily dispatch sweep. Picks up active certs whose
+        expiry_urgency has escalated since the last notification
+        and fires the matching mail.template + TODO.
+
+        Idempotency:
+          - last_notification_sent_urgency == current_urgency -> SKIP
+          - last_notification_sent_urgency != current_urgency
+            (escalation tier change OR first-time) -> DISPATCH
+          - state transitions out of 'active' OR validity_months /
+            date_obtained changes -> field reset by write() override
+            (next cycle re-dispatches if still warn_*)
+
+        Search filter excludes 'none' and 'expired'. M4's expiry
+        cron transitions active -> expired separately; the order
+        between the two crons does not affect correctness (M5's
+        filter excludes 'expired' even if M4 has not yet run --
+        the expiry_urgency compute returns 'expired' for past
+        date_expires regardless of state).
+        """
+        active_with_urgency = self.sudo().search([
+            ("state", "=", "active"),
+            ("expiry_urgency", "in", ("warn_90", "warn_30", "warn_7")),
+        ])
+        if not active_with_urgency:
+            _logger.info(
+                "neon.training.certification: no renewal "
+                "notifications to dispatch today.")
+            return 0
+        # Filter to records that haven't been notified on the
+        # current tier yet (idempotency at the field level).
+        to_dispatch = active_with_urgency.filtered(
+            lambda c: c.last_notification_sent_urgency != c.expiry_urgency)
+        if not to_dispatch:
+            _logger.info(
+                "neon.training.certification: %d cert(s) in warn "
+                "tier but all already notified on current tier.",
+                len(active_with_urgency))
+            return 0
+        sent = 0
+        by_tier = {}
+        for rec in to_dispatch:
+            if rec._dispatch_renewal_notification():
+                sent += 1
+                by_tier[rec.expiry_urgency] = (
+                    by_tier.get(rec.expiry_urgency, 0) + 1)
+        _logger.info(
+            "neon.training.certification: dispatched %d renewal "
+            "notification(s). By tier: %s",
+            sent,
+            ", ".join(f"{k}={v}" for k, v in sorted(by_tier.items())),
+        )
+        return sent

@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.3.0',
+    'version': '17.0.7.4.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
-               'skill tracking for Neon Events Elements crew + '
-               'employees. M1: category + type reference models. '
-               'M2: per-person certification records with state '
-               'machine, attachments, and admin verification. '
+               'skill tracking. M1: category + type reference. '
+               'M2: per-person cert records with state machine. '
                'M3: per-category level UX + complete soft-skill '
-               'seeding + Ranganai-knowledge polish.',
+               'seeding. M4: expiry cron + lifecycle compute + '
+               'mail.template stubs. M5: notification dispatch '
+               'cron + final template copy + TODO activities.',
     'description': """
 Neon Training
 =============
@@ -79,9 +79,35 @@ M4 (17.0.7.3.0): expiry tracking + daily cron + lifecycle states.
   today -- forces a new cert record with a fresh date_obtained
   rather than reactivating an aged-out record.
 
-Subsequent milestones (M5-M12) layer on notification dispatch,
-cross-competency, sign-off authority routing, and event_job
-assignment gating.
+M5 (17.0.7.4.0): notification dispatch.
+
+* Daily ir.cron _cron_dispatch_renewal_notifications reads
+  expiry_urgency on active certs and fires the matching
+  mail.template (90 / 30 / 7 day reminder) plus a mail.activity
+  TODO on the cert holder. Channels: email + TODO. WhatsApp
+  deferred to M5.1 / Phase 9.
+
+* last_notification_sent_urgency field tracks the most-urgent
+  tier already notified. Cron skips records whose urgency
+  matches the recorded tier, so each cert lifecycle dispatches
+  exactly 3 notifications (warn_90 then warn_30 then warn_7).
+
+* Reset triggers: state change out of 'active', date_obtained
+  edit, or type_id swap all clear the tracking field so the
+  next cron pass re-evaluates.
+
+* CC routing by sign_off_authority via group membership lookup
+  (DP1=c): lead_tech to neon_jobs.group_neon_jobs_crew_leader,
+  od_md to neon_finance.group_neon_finance_approver,
+  external_trainer + self_with_peer add no CC.
+
+* TODO discard on renewal (DP2): when a new active cert lands
+  for an existing (user, type) pair, the create() override
+  marks any open TODOs on prior records done via
+  action_feedback (preserves chatter audit).
+
+Subsequent milestones (M6-M12) layer on cross-competency,
+sign-off authority routing, and event_job assignment gating.
 """,
     'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://neonhiring.com',

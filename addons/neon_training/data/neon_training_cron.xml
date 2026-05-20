@@ -34,6 +34,44 @@
             <field name="interval_type">days</field>
             <field name="numbercall">-1</field>
             <field name="doall" eval="False"/>
+            <field name="priority">5</field>
+        </record>
+
+        <!--
+            P7a.M5 dispatch sweep.
+
+            Reads expiry_urgency on active certs and fires the
+            matching mail.template (90 / 30 / 7 day reminder) plus
+            a TODO activity on the cert holder. Idempotent via
+            last_notification_sent_urgency: a cert only re-notifies
+            when its urgency tier escalates (warn_90 -> warn_30 ->
+            warn_7), so total notifications per cert lifecycle is
+            exactly 3.
+
+            Priority 10 (lower than the expire sweep at 5) is
+            documentation-only intent. Correctness does NOT depend
+            on ordering between the two crons; M5 search filter
+            excludes 'expired' regardless of state, so a past-
+            expiry cert that has not yet been transitioned by M4
+            will not get a spurious dispatch.
+
+            Channels at M5: email + TODO. WhatsApp deferred to
+            M5.1 / Phase 9 (reads same expiry_urgency).
+        -->
+        <record id="ir_cron_neon_training_dispatch_renewal_notifications"
+                model="ir.cron">
+            <field name="name">Neon Training: Cert Renewal Notifications</field>
+            <field name="model_id"
+                   ref="model_neon_training_certification"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_dispatch_renewal_notifications()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+            <field name="priority">10</field>
         </record>
     </data>
 </odoo>

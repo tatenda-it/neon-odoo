@@ -2,42 +2,52 @@
 <odoo>
     <data noupdate="1">
         <!--
-            P7a.M4 mail template stubs.
+            P7a.M4 + M5 mail templates for cert renewal reminders.
 
-            Minimal placeholder copy per gate-1 DP2 = a. M5 design
-            pause refines the body_html with Robin/Ranganai input
-            and wires the dispatch cron that reads expiry_urgency
-            and calls the matching template.
+            Three urgency tiers (90 / 30 / 7 day windows) with
+            escalating tone. M4 shipped stubs; M5 ships the final
+            copy + wires the dispatch cron (_cron_dispatch_renewal
+            _notifications).
 
-            M4 ships ONLY the records. No automatic send. The
-            templates are renderable for testing via render_email
-            (T7418-T7419 in p7a_m4_smoke).
+            Recipients: send_mail()'s email_values supplies
+            recipient_ids (cert holder + CC partners) resolved by
+            _resolve_cc_partners (sign_off_authority -> group
+            membership lookup per gate-1 DP1=c).
 
-            model: neon.training.certification; variables available
-            in subject + body_html:
-              {{ object.user_id.name }}     (cert holder)
-              {{ object.type_id.name }}     (certification type)
-              {{ object.date_expires }}     (ISO date of expiry)
-              {{ object.days_to_expiry }}   (integer days remaining)
-              {{ object.regulatory_body }}  (safety category bodies)
+            Template variables (object = neon.training.certification):
+              object.user_id.name        (cert holder)
+              object.type_id.name        (certification type)
+              object.type_id.category_id.name
+              object.date_expires        (ISO date)
+              object.days_to_expiry      (integer)
+              object.regulatory_body     (safety category bodies)
+              object.signed_off_by_id.name
         -->
 
         <record id="template_cert_expiring_90d" model="mail.template">
             <field name="name">Neon Training: Certification expiring in 90 days</field>
             <field name="model_id"
                    ref="model_neon_training_certification"/>
-            <field name="subject">Your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
+            <field name="subject">Your {{ object.type_id.name }} certification expires in 90 days, please plan renewal</field>
             <field name="email_from">{{ user.email_formatted or 'training@neonhiring.com' }}</field>
             <field name="email_to">{{ object.user_id.email or '' }}</field>
             <field name="body_html" type="html">
-                <div>
+                <div style="font-family: Arial, sans-serif; font-size: 0.95em; color: #333;">
                     <p>Hi <t t-out="object.user_id.name or ''"/>,</p>
-                    <p>Your <t t-out="object.type_id.name or ''"/> certification expires on
-                        <t t-out="object.date_expires or ''"/>
+                    <p>Your <strong><t t-out="object.type_id.name or ''"/></strong>
+                        certification expires on
+                        <strong><t t-out="object.date_expires or ''"/></strong>
                         (<t t-out="object.days_to_expiry or ''"/> days from now).
                     </p>
-                    <p>Please contact Neon Training to schedule renewal.</p>
-                    <p>Neon Events Elements</p>
+                    <p>Please plan renewal in good time. Contact Ranganai
+                        (Lead Tech) to schedule re-certification. Most
+                        equipment certifications can be re-tested in-house;
+                        safety and driving certifications require an
+                        external trainer booking arranged via the office.
+                    </p>
+                    <p style="margin-top: 16px; color: #7165AC; font-size: 0.9em;">
+                        Neon Events Elements Training
+                    </p>
                 </div>
             </field>
             <field name="auto_delete" eval="False"/>
@@ -47,18 +57,31 @@
             <field name="name">Neon Training: Certification expiring in 30 days</field>
             <field name="model_id"
                    ref="model_neon_training_certification"/>
-            <field name="subject">Action needed: your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
+            <field name="subject">Action needed: Your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
             <field name="email_from">{{ user.email_formatted or 'training@neonhiring.com' }}</field>
             <field name="email_to">{{ object.user_id.email or '' }}</field>
             <field name="body_html" type="html">
-                <div>
+                <div style="font-family: Arial, sans-serif; font-size: 0.95em; color: #333;">
                     <p>Hi <t t-out="object.user_id.name or ''"/>,</p>
-                    <p>Renewal action is needed within 30 days.
-                        Your <t t-out="object.type_id.name or ''"/> certification expires on
-                        <t t-out="object.date_expires or ''"/>.
+                    <p><strong>Renewal action is needed within 30 days.</strong>
+                        Your <strong><t t-out="object.type_id.name or ''"/></strong>
+                        certification expires on
+                        <strong><t t-out="object.date_expires or ''"/></strong>.
                     </p>
-                    <p>Please contact Neon Training to confirm renewal arrangements.</p>
-                    <p>Neon Events Elements</p>
+                    <p>If renewal is not arranged before that date you will
+                        be unable to be assigned to event jobs that require
+                        this qualification (gating takes effect on the
+                        expiry day).
+                    </p>
+                    <p>Please contact Ranganai (Lead Tech) or the office
+                        immediately to confirm renewal arrangements:
+                        equipment certifications retest in-house; safety
+                        and driving certifications need an external trainer
+                        booking.
+                    </p>
+                    <p style="margin-top: 16px; color: #7165AC; font-size: 0.9em;">
+                        Neon Events Elements Training
+                    </p>
                 </div>
             </field>
             <field name="auto_delete" eval="False"/>
@@ -68,20 +91,34 @@
             <field name="name">Neon Training: Certification expiring in 7 days</field>
             <field name="model_id"
                    ref="model_neon_training_certification"/>
-            <field name="subject">Final warning: your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
+            <field name="subject">URGENT: Your {{ object.type_id.name }} certification expires in {{ object.days_to_expiry }} days</field>
             <field name="email_from">{{ user.email_formatted or 'training@neonhiring.com' }}</field>
             <field name="email_to">{{ object.user_id.email or '' }}</field>
             <field name="body_html" type="html">
-                <div>
+                <div style="font-family: Arial, sans-serif; font-size: 0.95em; color: #333;">
                     <p>Hi <t t-out="object.user_id.name or ''"/>,</p>
-                    <p>This is a final reminder: your <t t-out="object.type_id.name or ''"/>
-                        certification expires on <t t-out="object.date_expires or ''"/>
+                    <p><strong style="color: #c0392b;">URGENT, final reminder.</strong>
+                        Your <strong><t t-out="object.type_id.name or ''"/></strong>
+                        certification expires on
+                        <strong><t t-out="object.date_expires or ''"/></strong>
                         (<t t-out="object.days_to_expiry or ''"/> days remaining).
                     </p>
-                    <p>Without renewal you will not be assignable to event jobs that
-                        require this qualification.
+                    <p><strong>If this certification expires before renewal,
+                        you will be blocked from assignments requiring it
+                        on and after <t t-out="object.date_expires or ''"/></strong>
+                        (event_job gating in Phase 7a M9 to M11 enforces
+                        this at assignment, quote-acceptance, and event-
+                        start checkpoints).
                     </p>
-                    <p>Neon Events Elements</p>
+                    <p>Contact Ranganai or the office TODAY to confirm
+                        renewal. If you have already completed the renewal
+                        but the new certificate has not yet been recorded
+                        in the system, send Ranganai the certificate so it
+                        can be added before the deadline.
+                    </p>
+                    <p style="margin-top: 16px; color: #7165AC; font-size: 0.9em;">
+                        Neon Events Elements Training
+                    </p>
                 </div>
             </field>
             <field name="auto_delete" eval="False"/>
