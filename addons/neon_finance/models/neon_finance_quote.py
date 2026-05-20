@@ -442,12 +442,12 @@ class NeonFinanceQuote(models.Model):
         """Pending -> approved. Delegates to the approval record;
         approver-only via group check + ACL.
 
-        Separation-of-duties guard (P6.predeploy): the approver
-        cannot be the same user as the quote's salesperson. In the
-        production matrix, Robin / Munashe / superuser hold both
-        sales AND approver groups so the group check alone permits
-        self-approval -- this method-level check enforces SoD.
-        Approvers may still approve OTHER reps' quotes freely.
+        Self-approval IS permitted (Robin walkthrough 20 May 2026):
+        in Neon's family-business operating model, OD/MD users who
+        hold both sales and approver groups frequently approve
+        their own quotes as confirmation of intent. The earlier
+        e2951ab SoD guard added friction that didn't match the
+        ground-truth workflow; reverted in v17.0.7.9.1.
         """
         if not self.env.user.has_group(
                 "neon_finance.group_neon_finance_approver"):
@@ -460,12 +460,6 @@ class NeonFinanceQuote(models.Model):
                     "Only Pending Approval quotes can be approved "
                     "(%s is %s)."
                 ) % (rec.name, dict(_QUOTE_STATES)[rec.state]))
-            if rec.salesperson_id == self.env.user:
-                raise UserError(_(
-                    "Separation of duties: you cannot approve "
-                    "%(name)s because you are also the quote's "
-                    "salesperson. Another approver must review."
-                ) % {"name": rec.name})
             if not rec.approval_id:
                 raise UserError(_(
                     "Quote %s is in pending_approval state but has "
@@ -489,7 +483,12 @@ class NeonFinanceQuote(models.Model):
 
     def action_reject(self):
         """Pending -> rejected. Approver-only. Requires a
-        ``rejection_reason`` in the context."""
+        ``rejection_reason`` in the context.
+
+        Self-rejection IS permitted (Robin walkthrough 20 May
+        2026): same family-business reasoning as action_approve --
+        the earlier e2951ab SoD guard reverted in v17.0.7.9.1.
+        """
         if not self.env.user.has_group(
                 "neon_finance.group_neon_finance_approver"):
             raise AccessError(_(
@@ -507,12 +506,6 @@ class NeonFinanceQuote(models.Model):
                     "Only Pending Approval quotes can be rejected "
                     "(%s is %s)."
                 ) % (rec.name, dict(_QUOTE_STATES)[rec.state]))
-            if rec.salesperson_id == self.env.user:
-                raise UserError(_(
-                    "Separation of duties: you cannot reject "
-                    "%(name)s because you are also the quote's "
-                    "salesperson. Another approver must review."
-                ) % {"name": rec.name})
             if not rec.approval_id:
                 raise UserError(_(
                     "Quote %s is in pending_approval state but has "

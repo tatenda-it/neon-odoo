@@ -757,26 +757,29 @@ results["T831"] = ok
 
 
 # ============================================================
-# P6 predeploy fix: separation-of-duties guards on approve/reject.
-# In the production matrix, Robin / Munashe / superuser hold both
-# sales AND approver groups -- the group check alone permits
-# self-approval. T832 + T833 regression-guard the method-level
-# salesperson_id != self.env.user check.
+# Phase F walkthrough (Robin 20 May 2026): SoD self-approval guard
+# REVERTED. Neon's family-business model permits OD/MD users with
+# both sales + approver groups to self-approve their own quotes;
+# the earlier e2951ab guard added friction that didn't match the
+# ground-truth workflow. T832 + T833 inverted to confirm the
+# self-approval path now SUCCEEDS instead of raising.
 # ============================================================
 print()
 print("=" * 72)
-print("T832 - self-approval blocked: salesperson cannot approve own quote")
+print("T832 - self-approval permitted: salesperson CAN approve own quote")
 print("=" * 72)
 # Use approver_user as the salesperson so they have BOTH groups
 # (they're already in approver_group from fixture). They submit
-# their own quote, then attempt to approve it -- must raise.
+# their own quote, then approve it -- must succeed and land at
+# state='approved'.
 q_t832 = _new_priced_quote(sp=approver_user)
 q_t832.with_user(approver_user).action_submit_for_approval()
 err, _ = _try(lambda: q_t832.with_user(
     approver_user).action_approve())
-ok = isinstance(err, UserError) and "Separation of duties" in str(err)
+q_t832.invalidate_recordset()
+ok = err is None and q_t832.state == "approved"
 print("  err:", type(err).__name__ if err else "None",
-      "msg:", (str(err)[:80] if err else ""))
+      "state:", q_t832.state)
 print("T832:", "PASS" if ok else "FAIL")
 results["T832"] = ok
 
@@ -784,15 +787,16 @@ results["T832"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T833 - self-rejection blocked: salesperson cannot reject own quote")
+print("T833 - self-rejection permitted: salesperson CAN reject own quote")
 print("=" * 72)
 q_t833 = _new_priced_quote(sp=approver_user)
 q_t833.with_user(approver_user).action_submit_for_approval()
 err, _ = _try(lambda: q_t833.with_user(approver_user).with_context(
     rejection_reason="self test").action_reject())
-ok = isinstance(err, UserError) and "Separation of duties" in str(err)
+q_t833.invalidate_recordset()
+ok = err is None and q_t833.state == "rejected"
 print("  err:", type(err).__name__ if err else "None",
-      "msg:", (str(err)[:80] if err else ""))
+      "state:", q_t833.state)
 print("T833:", "PASS" if ok else "FAIL")
 results["T833"] = ok
 
