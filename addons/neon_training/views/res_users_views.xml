@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P7a.M2 Training tab on the res.users form.
+
+        Visible to any training group (user / signoff / admin).
+        Crew see their own user (via res.users own-record visibility
+        in Odoo) and find their certifications under the new tab.
+        Sign-off and admin viewing another user's record see the
+        same tab with that user's certs.
+
+        Inherits the base res.users form and adds a new <page> at
+        the end of the existing notebook. The page itself is gated
+        on the training_user group via the existing implication
+        chain (admin implies signoff implies user).
+    -->
+
+    <record id="view_users_form_training"
+            model="ir.ui.view">
+        <field name="name">res.users.form.training</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="Training"
+                      name="training"
+                      groups="neon_training.group_neon_training_user">
+                    <group>
+                        <group string="Summary">
+                            <field name="active_certifications_count"
+                                   readonly="1"/>
+                            <field name="expiring_soon_count"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="training_certification_ids"
+                           context="{'default_user_id': id}">
+                        <tree decoration-info="state == 'draft'"
+                              decoration-warning="state == 'pending_verification'"
+                              decoration-success="state == 'active'"
+                              decoration-muted="state in ('expired', 'suspended')">
+                            <field name="type_id"/>
+                            <field name="category_id"/>
+                            <field name="level"/>
+                            <field name="date_obtained"/>
+                            <field name="date_expires"/>
+                            <field name="verified" widget="boolean_toggle"/>
+                            <field name="state" widget="badge"
+                                   decoration-info="state == 'draft'"
+                                   decoration-warning="state == 'pending_verification'"
+                                   decoration-success="state == 'active'"
+                                   decoration-muted="state in ('expired', 'suspended')"/>
+                        </tree>
+                    </field>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+</odoo>

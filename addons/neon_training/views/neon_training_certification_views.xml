@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_training_certification_view_tree"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.tree</field>
+        <field name="model">neon.training.certification</field>
+        <field name="arch" type="xml">
+            <tree string="Certifications"
+                  decoration-info="state == 'draft'"
+                  decoration-warning="state == 'pending_verification'"
+                  decoration-success="state == 'active'"
+                  decoration-muted="state in ('expired', 'suspended')"
+                  decoration-danger="state == 'active' and date_expires and date_expires &lt; current_date">
+                <field name="display_name" string="Certification"/>
+                <field name="user_id"/>
+                <field name="type_id"/>
+                <field name="category_id"/>
+                <field name="level"/>
+                <field name="date_obtained"/>
+                <field name="date_expires"/>
+                <field name="verified" widget="boolean_toggle"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'pending_verification'"
+                       decoration-success="state == 'active'"
+                       decoration-muted="state in ('expired', 'suspended')"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_view_kanban"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.kanban</field>
+        <field name="model">neon.training.certification</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_small_column">
+                <field name="state"/>
+                <field name="user_id"/>
+                <field name="type_id"/>
+                <field name="category_id"/>
+                <field name="level"/>
+                <field name="date_obtained"/>
+                <field name="date_expires"/>
+                <field name="verified"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title">
+                                        <field name="user_id"/>
+                                    </strong>
+                                    <span class="o_kanban_record_subtitle text-muted">
+                                        <field name="type_id"/>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div t-if="record.level.raw_value">
+                                    Level: <field name="level"/>
+                                </div>
+                                <div t-if="record.date_expires.raw_value">
+                                    Expires: <field name="date_expires"/>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="oe_kanban_bottom_left">
+                                    <span t-if="record.verified.raw_value"
+                                          class="badge text-bg-success">
+                                        <i class="fa fa-check"/> Verified
+                                    </span>
+                                    <span t-if="!record.verified.raw_value"
+                                          class="badge text-bg-secondary">
+                                        Unverified
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.form</field>
+        <field name="model">neon.training.certification</field>
+        <field name="arch" type="xml">
+            <form string="Certification">
+                <header>
+                    <button name="action_submit_for_verification"
+                            type="object"
+                            string="Submit for Verification"
+                            class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_verify"
+                            type="object"
+                            string="Verify"
+                            class="oe_highlight"
+                            invisible="state not in ('draft', 'pending_verification')"
+                            groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+                    <button name="action_mark_expired"
+                            type="object"
+                            string="Mark Expired"
+                            invisible="state != 'active'"
+                            groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+                    <button name="action_suspend"
+                            type="object"
+                            string="Suspend"
+                            invisible="state != 'active'"
+                            groups="neon_training.group_neon_training_admin"
+                            context="{'suspension_reason': 'Admin action'}"/>
+                    <button name="action_reactivate"
+                            type="object"
+                            string="Reactivate"
+                            class="oe_highlight"
+                            invisible="state != 'suspended'"
+                            groups="neon_training.group_neon_training_admin"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,pending_verification,active"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="user_id" class="oe_edit_only"/>
+                        <h1>
+                            <field name="display_name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Person and Certification">
+                            <field name="user_id"
+                                   options="{'no_create': True}"/>
+                            <field name="type_id"
+                                   options="{'no_create': True}"/>
+                            <field name="category_id" readonly="1"/>
+                            <field name="effective_skill_level_mode"
+                                   readonly="1"/>
+                            <field name="level"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="date_obtained"/>
+                            <field name="date_expires" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Sign-Off">
+                            <field name="signed_off_by_id"
+                                   options="{'no_create': True}"/>
+                            <field name="external_trainer_name"/>
+                        </group>
+                        <group string="Verification">
+                            <field name="verified" readonly="1"/>
+                            <field name="verified_by_id" readonly="1"/>
+                            <field name="verified_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group invisible="state != 'suspended'">
+                        <field name="suspension_reason"
+                               readonly="1"
+                               nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Attachments" name="attachments">
+                            <field name="certificate_attachment_ids"
+                                   widget="many2many_binary"/>
+                        </page>
+                        <page string="Notes and Compliance" name="notes">
+                            <group>
+                                <field name="regulatory_reference"/>
+                            </group>
+                            <field name="notes" nolabel="1"
+                                   placeholder="Free-form notes."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_view_search"
+            model="ir.ui.view">
+        <field name="name">neon.training.certification.search</field>
+        <field name="model">neon.training.certification</field>
+        <field name="arch" type="xml">
+            <search string="Certifications">
+                <field name="user_id"/>
+                <field name="type_id"/>
+                <field name="category_id"/>
+                <field name="regulatory_reference"/>
+                <separator/>
+                <filter name="state_draft" string="Draft"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="state_pending" string="Pending Verification"
+                        domain="[('state', '=', 'pending_verification')]"/>
+                <filter name="state_active" string="Active"
+                        domain="[('state', '=', 'active')]"/>
+                <filter name="state_expired" string="Expired"
+                        domain="[('state', '=', 'expired')]"/>
+                <filter name="state_suspended" string="Suspended"
+                        domain="[('state', '=', 'suspended')]"/>
+                <separator/>
+                <filter name="expiring_90d" string="Expiring in 90 days"
+                        domain="[('state', '=', 'active'),
+                                  ('date_expires', '!=', False),
+                                  ('date_expires', '&gt;=', context_today().strftime('%Y-%m-%d')),
+                                  ('date_expires', '&lt;=', (context_today() + datetime.timedelta(days=90)).strftime('%Y-%m-%d'))]"/>
+                <filter name="expiring_30d" string="Expiring in 30 days"
+                        domain="[('state', '=', 'active'),
+                                  ('date_expires', '!=', False),
+                                  ('date_expires', '&gt;=', context_today().strftime('%Y-%m-%d')),
+                                  ('date_expires', '&lt;=', (context_today() + datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                <filter name="expiring_7d" string="Expiring in 7 days"
+                        domain="[('state', '=', 'active'),
+                                  ('date_expires', '!=', False),
+                                  ('date_expires', '&gt;=', context_today().strftime('%Y-%m-%d')),
+                                  ('date_expires', '&lt;=', (context_today() + datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                <filter name="overdue" string="Already Expired (still active)"
+                        domain="[('state', '=', 'active'),
+                                  ('date_expires', '!=', False),
+                                  ('date_expires', '&lt;', context_today().strftime('%Y-%m-%d'))]"/>
+                <separator/>
+                <filter name="verified" string="Verified"
+                        domain="[('verified', '=', True)]"/>
+                <filter name="unverified" string="Unverified"
+                        domain="[('verified', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_user" string="User"
+                            context="{'group_by': 'user_id'}"/>
+                    <filter name="group_category" string="Category"
+                            context="{'group_by': 'category_id'}"/>
+                    <filter name="group_type" string="Type"
+                            context="{'group_by': 'type_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_training_certification_action"
+            model="ir.actions.act_window">
+        <field name="name">Certifications</field>
+        <field name="res_model">neon.training.certification</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id"
+               ref="neon_training_certification_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No certifications recorded yet
+            </p>
+            <p>
+                A certification is the record that someone holds a
+                particular qualification -- equipment competency, a
+                safety cert, a role-tier promotion, or a soft-skill
+                acknowledgement. Self-upload by the holder + admin
+                verification gives an audited trail of qualifications.
+            </p>
+        </field>
+    </record>
+
+</odoo>

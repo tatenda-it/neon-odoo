@@ -99,29 +99,33 @@ def main() -> int:
             smoke.screenshot("admin_type_form")
 
         # --------------------------------------------------------------
-        # Scenario 3: training_signoff has read on category (no menu
-        # access -- the parent menu is admin-only). But the signoff
-        # user has CREATE on type at the ACL level. Direct-RPC behavior
-        # is exercised by the Python smoke (T7118); this scenario just
-        # asserts that the menu surface is correctly hidden for the
-        # signoff tier.
+        # Scenario 3: training_signoff sees the Training app root + the
+        # M2 Certifications surface (operational), but NOT the admin-
+        # gated Configuration submenu under which Categories and Types
+        # now live.
+        #
+        # Note: M2 reparented Categories and Types under a new
+        # Configuration submenu and opened the Training root to
+        # training_user. The original M1 negative assertion
+        # ("user/signoff cannot see Training root") is no longer the
+        # right shape -- crew need to reach their own certs via the
+        # root after M2. The reference-data screens stay admin-only.
         # --------------------------------------------------------------
-        with smoke.scenario("p7am1_train_signoff cannot see admin training menu (negative)"):
+        with smoke.scenario("p7am1_train_signoff cannot reach Categories/Types config (negative)"):
             smoke.login("p7am1_train_signoff")
-            smoke.assert_menu_hidden(TRAINING_ROOT_MENU)
+            smoke.assert_menu_visible(TRAINING_ROOT_MENU)
             smoke.assert_menu_hidden(CATEGORIES_MENU)
             smoke.assert_menu_hidden(TYPES_MENU)
             smoke.goto_home()
 
         # --------------------------------------------------------------
-        # Scenario 4: training_user (base read role) sees nothing under
-        # the Training admin menu. Reference data is reachable
-        # programmatically (Python smoke T7116/T7117) but the M1 UI
-        # surfaces don't expose it -- user-facing surfaces land at M2+.
+        # Scenario 4: training_user can reach the Training root but
+        # cannot reach the Categories / Types reference-data screens
+        # under the Configuration submenu.
         # --------------------------------------------------------------
-        with smoke.scenario("p7am1_train_user cannot see admin training menu (negative)"):
+        with smoke.scenario("p7am1_train_user cannot reach Categories/Types config (negative)"):
             smoke.login("p7am1_train_user")
-            smoke.assert_menu_hidden(TRAINING_ROOT_MENU)
+            smoke.assert_menu_visible(TRAINING_ROOT_MENU)
             smoke.assert_menu_hidden(CATEGORIES_MENU)
             smoke.assert_menu_hidden(TYPES_MENU)
             smoke.goto_home()

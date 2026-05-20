@@ -1,46 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        P7a.M1 menu placement.
+        P7a menu placement.
 
-        DECISION marker (build-time): deviating from gate-1 plan
-        H "mount under base.menu_custom (Settings, Technical)".
-        Build verification showed base.menu_custom gates on
-        group_no_one (developer mode) and base.menu_administration
-        gates on group_system; neither is reachable by
-        group_neon_training_admin without granting unrelated Odoo
-        admin scopes. The alternative of extending base.menu_
-        custom.groups_id with our admin group would force
-        training_admin to navigate Odoo's full Technical submenu
-        (irrelevant menu items visible, ACLs block actions).
+        M1 mounted Categories and Types as direct children of the
+        top-level Neon Training menu. M2 introduces the per-person
+        Certifications surface as the primary operational view,
+        and reparents the reference-data screens under a new
+        Configuration submenu so the top of the menu shows the
+        thing admins do every day (manage certifications), not
+        the thing they do once (configure categories/types).
 
-        Cleaner: a top-level "Neon Training" app menu gated
-        entirely on training_admin, so the launcher icon appears
-        for admins only and the contained config surfaces hang
-        directly off it.
+        XMLIDs preserved on Categories and Types so the M1 browser
+        smoke and any cross-module references still resolve.
 
-        The "no top-level Training app yet" constraint from
-        gate-1 was about USER-FACING surfaces. Admin-only
-        configuration needs a reachable parent. User-facing
-        surfaces (My Certifications, Crew Training Status, etc.)
-        still defer to M2+ and will be gated on training_user /
-        training_signoff separately when they land.
+        DECISION marker (build-time): Certifications menu visible
+        to training_user too (not just admin) because crew
+        members log in via Odoo (H2=A) to view their own records.
+        The certification action's ir.rule scopes the data to own
+        records for training_user. The configuration submenu
+        stays admin-only (Categories and Types are admin reference
+        data; crew have no business editing them).
     -->
 
     <menuitem id="menu_neon_training_root"
               name="Neon Training"
               sequence="80"
+              groups="neon_training.group_neon_training_user"/>
+
+    <menuitem id="menu_neon_training_certifications"
+              name="Certifications"
+              parent="menu_neon_training_root"
+              action="neon_training_certification_action"
+              sequence="10"
+              groups="neon_training.group_neon_training_user"/>
+
+    <menuitem id="menu_neon_training_configuration"
+              name="Configuration"
+              parent="menu_neon_training_root"
+              sequence="90"
               groups="neon_training.group_neon_training_admin"/>
 
     <menuitem id="menu_neon_training_categories"
               name="Certification Categories"
-              parent="menu_neon_training_root"
+              parent="menu_neon_training_configuration"
               action="neon_training_certification_category_action"
               sequence="10"/>
 
     <menuitem id="menu_neon_training_types"
               name="Certification Types"
-              parent="menu_neon_training_root"
+              parent="menu_neon_training_configuration"
               action="neon_training_certification_type_action"
               sequence="20"/>
 

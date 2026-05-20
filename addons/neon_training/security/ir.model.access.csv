@@ -5,3 +5,6 @@ access_neon_training_category_admin,neon.training.certification.category admin (
 access_neon_training_type_user,neon.training.certification.type user (read-only),model_neon_training_certification_type,neon_training.group_neon_training_user,1,0,0,0
 access_neon_training_type_signoff,neon.training.certification.type signoff (R/W/C no-unlink),model_neon_training_certification_type,neon_training.group_neon_training_signoff,1,1,1,0
 access_neon_training_type_admin,neon.training.certification.type admin (R/W/C no-unlink),model_neon_training_certification_type,neon_training.group_neon_training_admin,1,1,1,0
+access_neon_training_certification_user,neon.training.certification user (R/W/C own; ir.rule scopes),model_neon_training_certification,neon_training.group_neon_training_user,1,1,1,0
+access_neon_training_certification_signoff,neon.training.certification signoff (R/W/C all),model_neon_training_certification,neon_training.group_neon_training_signoff,1,1,1,0
+access_neon_training_certification_admin,neon.training.certification admin (R/W/C all no-unlink),model_neon_training_certification,neon_training.group_neon_training_admin,1,1,1,0
