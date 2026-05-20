@@ -140,4 +140,28 @@
               sequence="4"
               groups="neon_finance.group_neon_finance_sales,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver,neon_jobs.group_neon_jobs_crew_leader"/>
 
+    <!--
+        Phase F walkthrough V (Robin 20 May 2026), half 1: top-level
+        menu shortcut for OD/MD. Visible only to
+        group_neon_finance_approver (Robin + Munashe). Sits at the
+        web root (no parent attribute) so it renders as a launcher-
+        icon menu, separate from the Invoicing app's Customers
+        branch. Sales + bookkeeper continue to reach the dashboard
+        via the existing Customers > Cash Flow Dashboard entry.
+
+        V half 2 (auto-land for finance roles entering Invoicing
+        app) is handled as a shell op on prod: write
+        res.users.action_id = action_cash_flow_dashboard_server for
+        each user holding bookkeeper or approver group. Per-user
+        write, no code commit. Documented in M12 deploy log section
+        5 + project_phase6_status polish backlog (new finance users
+        need a one-time action_id set; Phase 12 candidate for an
+        auto-hook).
+    -->
+    <menuitem id="menu_neon_finance_dashboard_top"
+              name="Cash Flow"
+              action="action_cash_flow_dashboard_server"
+              sequence="60"
+              groups="neon_finance.group_neon_finance_approver"/>
+
 </odoo>
