@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.7.0',
+    'version': '17.0.7.8.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -12,8 +12,9 @@
                'M6: cross-competency model. M7: sign-off authority '
                'workflow. M8: event_job crew gate inference engine '
                '(inferred requirements + per-crew gate_status + '
-               'event-level roll-up). Data layer only; M9-M11 fire '
-               'the gates.',
+               'event-level roll-up). M9: gating tier 1 -- '
+               'informational toast + assignment_gate_log on crew '
+               'assignment with missing qualifications.',
     'description': """
 Neon Training
 =============
@@ -203,9 +204,49 @@ M8 (17.0.7.7.0): event_job crew gate inference engine.
   computed fields + call _action_check_training_gate to
   enact the three-tier layered gating.
 
-Subsequent milestones (M9-M12) layer on the three-tier
-assignment gating (info / warn / block), Approver override
-UX, and the training compliance dashboard.
+M9 (17.0.7.8.0): gating tier 1 -- assignment-moment info toast.
+
+* neon.training.assignment_gate_log model (NEW; schema sketch
+  section 2.5 deferred from M1, M9 owns creation). 13 fields:
+  event_job_id, crew_id, user_id, gate_tier, severity (computed
+  from gate_tier), gate_status_at_fire, missing_certification
+  _type_ids, softening_cross_competency_ids, override_reason,
+  overridden_by_id, overridden_at, fired_at, triggered_by_id.
+  H3=A perm_unlink=0 on every group; model unlink() raises
+  UserError as belt-and-braces against sudo() bypass.
+
+* commercial.job.crew create + write hooks (DP6 -- both
+  lifecycle paths fire the gate, not just write). When
+  user_id transitions to a truthy new value and the M8
+  gate_status is in (unqualified, needs_cross_competency),
+  one log per (crew, event_job) pair is created (DP7) for
+  every event_job under the parent commercial.job in a
+  non-terminal state. Terminal states (completed, closed,
+  cancelled, released) are skipped -- late re-assignment on
+  a closed event is an admin reconciliation, not an active
+  gate decision.
+
+* bus.bus._sendone toast on the triggering user's
+  partner_id (DP1=a). Single-crew toast carries inline
+  softener detail when there are <=2 softeners (DP4),
+  summary phrasing otherwise. Multi-crew batch fires ONE
+  summary toast (DP3); individual gate_log records still
+  created per crew. Idempotent: a save that doesn't change
+  user_id never re-fires the toast (DP5).
+
+* commercial.event.job assignment_gate_log_ids o2m
+  surfaces the gate-log notebook tab on the form. Tab is
+  read-only (audit only); no edit buttons exposed.
+
+* Tier 1 (M9 info) NEVER populates override_reason /
+  overridden_by_id. Those fields stay nullable for tier-1
+  records; M10 / M11 populate on their tiers.
+
+Subsequent milestones (M10-M12) layer on tier 2 warn at
+quote_accept (with Approver override) and tier 3 block at
+event_start (with override; cross-competency softeners
+downgrade to warn). M12 adds the training compliance
+dashboard.
 """,
     'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://neonhiring.com',
@@ -236,6 +277,9 @@ UX, and the training compliance dashboard.
         'security/neon_training_certification_rules.xml',
         # P7a.M6 -- ir.rule on the cross-competency model.
         'security/neon_training_cross_competency_rules.xml',
+        # P7a.M9 -- ir.rule on the assignment_gate_log model.
+        # Loads after the CSV via the same ordering convention.
+        'security/neon_training_assignment_gate_log_rules.xml',
         # seed data: categories MUST load before types so the
         # category_id ref="..." lookups resolve.
         'data/neon_training_data.xml',
@@ -254,6 +298,9 @@ UX, and the training compliance dashboard.
         # P7a.M6 -- cross-competency views (load before menu so
         # the action ref resolves).
         'views/neon_training_cross_competency_views.xml',
+        # P7a.M9 -- assignment_gate_log views + action. Load
+        # before menu so the menuitem action ref resolves.
+        'views/neon_training_assignment_gate_log_views.xml',
         # P7a.M8 -- crew + event_job view inherits for training
         # gate display. Load before menu (no action refs to
         # resolve, but keeps grouping clean). After cross

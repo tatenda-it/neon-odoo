@@ -25,6 +25,42 @@
         </field>
     </record>
 
+    <record id="commercial_event_job_view_form_neon_training_gate_log" model="ir.ui.view">
+        <field name="name">commercial.event.job.form.neon_training.gate_log</field>
+        <field name="model">commercial.event.job</field>
+        <field name="inherit_id" ref="neon_jobs.commercial_event_job_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Training Gate Log"
+                      name="training_gate_log">
+                    <field name="assignment_gate_log_ids"
+                           readonly="1">
+                        <tree create="false" delete="false"
+                              decoration-info="severity == 'info'"
+                              decoration-warning="severity == 'warn'"
+                              decoration-danger="severity == 'block'">
+                            <field name="fired_at"/>
+                            <field name="user_id"/>
+                            <field name="crew_id"/>
+                            <field name="gate_tier"/>
+                            <field name="severity" widget="badge"
+                                   decoration-info="severity == 'info'"
+                                   decoration-warning="severity == 'warn'"
+                                   decoration-danger="severity == 'block'"/>
+                            <field name="gate_status_at_fire" widget="badge"
+                                   decoration-warning="gate_status_at_fire == 'needs_cross_competency'"
+                                   decoration-danger="gate_status_at_fire == 'unqualified'"/>
+                            <field name="missing_certification_type_ids"
+                                   widget="many2many_tags"/>
+                            <field name="overridden_by_id" optional="hide"/>
+                            <field name="triggered_by_id"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
     <record id="commercial_event_job_view_form_neon_training" model="ir.ui.view">
         <field name="name">commercial.event.job.form.neon_training</field>
         <field name="model">commercial.event.job</field>

@@ -45,6 +45,16 @@
               sequence="20"
               groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
 
+    <!-- P7a.M9: Gate Log menu. Visible to signoff + admin
+         (audit surface; sales reps see their own via ir.rule on
+         the action, but the menu itself isn't user-facing). -->
+    <menuitem id="menu_neon_training_assignment_gate_log"
+              name="Gate Log"
+              parent="menu_neon_training_root"
+              action="assignment_gate_log_action"
+              sequence="30"
+              groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+
     <menuitem id="menu_neon_training_configuration"
               name="Configuration"
               parent="menu_neon_training_root"

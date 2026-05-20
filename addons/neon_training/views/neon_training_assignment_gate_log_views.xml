@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M9 assignment_gate_log views. Audit-record surface: list
+    (sortable, filterable), form (read-only display of all
+    fields), and search (filters by tier / severity / event /
+    user). Menu Gate Log under the Training root, visible to
+    signoff + admin tiers.
+
+    H3=A append-only: views never expose an unlink action. The
+    model's unlink() raises UserError as belt-and-braces; the
+    view-level absence of a delete option keeps casual users
+    from even attempting it.
+-->
+<odoo>
+
+    <record id="assignment_gate_log_view_tree" model="ir.ui.view">
+        <field name="name">neon.training.assignment_gate_log.tree</field>
+        <field name="model">neon.training.assignment_gate_log</field>
+        <field name="arch" type="xml">
+            <tree string="Assignment Gate Log"
+                  create="false"
+                  delete="false"
+                  decoration-info="severity == 'info'"
+                  decoration-warning="severity == 'warn'"
+                  decoration-danger="severity == 'block'">
+                <field name="fired_at"/>
+                <field name="event_job_id"/>
+                <field name="user_id"/>
+                <field name="crew_id" optional="show"/>
+                <field name="gate_tier"/>
+                <field name="severity" widget="badge"
+                       decoration-info="severity == 'info'"
+                       decoration-warning="severity == 'warn'"
+                       decoration-danger="severity == 'block'"/>
+                <field name="gate_status_at_fire" widget="badge"
+                       decoration-success="gate_status_at_fire == 'qualified'"
+                       decoration-info="gate_status_at_fire in ('pending',)"
+                       decoration-warning="gate_status_at_fire == 'needs_cross_competency'"
+                       decoration-danger="gate_status_at_fire == 'unqualified'"/>
+                <field name="missing_certification_type_ids"
+                       widget="many2many_tags"
+                       optional="show"/>
+                <field name="overridden_by_id" optional="hide"/>
+                <field name="triggered_by_id" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="assignment_gate_log_view_form" model="ir.ui.view">
+        <field name="name">neon.training.assignment_gate_log.form</field>
+        <field name="model">neon.training.assignment_gate_log</field>
+        <field name="arch" type="xml">
+            <form string="Assignment Gate Log"
+                  create="false"
+                  delete="false"
+                  edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="gate_tier" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Binding">
+                            <field name="event_job_id" readonly="1"/>
+                            <field name="crew_id" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                        </group>
+                        <group string="Snapshot">
+                            <field name="severity" readonly="1"
+                                   widget="badge"
+                                   decoration-info="severity == 'info'"
+                                   decoration-warning="severity == 'warn'"
+                                   decoration-danger="severity == 'block'"/>
+                            <field name="gate_status_at_fire" readonly="1"
+                                   widget="badge"
+                                   decoration-success="gate_status_at_fire == 'qualified'"
+                                   decoration-warning="gate_status_at_fire == 'needs_cross_competency'"
+                                   decoration-danger="gate_status_at_fire == 'unqualified'"/>
+                            <field name="fired_at" readonly="1"/>
+                            <field name="triggered_by_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Gap detail">
+                        <field name="missing_certification_type_ids"
+                               widget="many2many_tags"
+                               readonly="1"/>
+                        <field name="softening_cross_competency_ids"
+                               widget="many2many_tags"
+                               readonly="1"
+                               invisible="not softening_cross_competency_ids"/>
+                    </group>
+                    <group string="Override (tier 2 / tier 3 only)"
+                           invisible="not overridden_by_id and not override_reason">
+                        <field name="override_reason" readonly="1"/>
+                        <field name="overridden_by_id" readonly="1"/>
+                        <field name="overridden_at" readonly="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="assignment_gate_log_view_search" model="ir.ui.view">
+        <field name="name">neon.training.assignment_gate_log.search</field>
+        <field name="model">neon.training.assignment_gate_log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="event_job_id"/>
+                <field name="user_id"/>
+                <field name="crew_id"/>
+                <field name="triggered_by_id"/>
+                <separator/>
+                <filter string="Tier 1 (Info)"
+                        name="filter_tier1"
+                        domain="[('gate_tier', '=', 'tier_1_assignment')]"/>
+                <filter string="Tier 2 (Warn)"
+                        name="filter_tier2"
+                        domain="[('gate_tier', '=', 'tier_2_quote_accept')]"/>
+                <filter string="Tier 3 (Block)"
+                        name="filter_tier3"
+                        domain="[('gate_tier', '=', 'tier_3_event_start')]"/>
+                <separator/>
+                <filter string="Unqualified"
+                        name="filter_unqualified"
+                        domain="[('gate_status_at_fire', '=', 'unqualified')]"/>
+                <filter string="Needs Cross-Competency"
+                        name="filter_needs_cc"
+                        domain="[('gate_status_at_fire', '=', 'needs_cross_competency')]"/>
+                <separator/>
+                <filter string="Overridden"
+                        name="filter_overridden"
+                        domain="[('overridden_by_id', '!=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Event Job"
+                            name="group_event_job"
+                            context="{'group_by': 'event_job_id'}"/>
+                    <filter string="Tier"
+                            name="group_tier"
+                            context="{'group_by': 'gate_tier'}"/>
+                    <filter string="Status"
+                            name="group_status"
+                            context="{'group_by': 'gate_status_at_fire'}"/>
+                    <filter string="Assignee"
+                            name="group_user"
+                            context="{'group_by': 'user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="assignment_gate_log_action"
+            model="ir.actions.act_window">
+        <field name="name">Gate Log</field>
+        <field name="res_model">neon.training.assignment_gate_log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="assignment_gate_log_view_search"/>
+        <field name="context">{'search_default_filter_tier1': 1}</field>
+    </record>
+
+</odoo>

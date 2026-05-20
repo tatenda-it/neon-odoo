@@ -22,3 +22,8 @@ from . import commercial_event_job
 # after event_job (no hard load-order need but keeps the file grouped
 # with the other cross-cutting inherits).
 from . import commercial_job_crew
+# P7a.M9 -- assignment_gate_log record + tier-1 gate fire hooks on
+# commercial.job.crew. The gate_log model loads BEFORE the crew
+# inherit so the env['neon.training.assignment_gate_log'].create
+# calls in the crew hooks resolve cleanly.
+from . import neon_training_assignment_gate_log

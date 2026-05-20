@@ -38,6 +38,16 @@ class CommercialEventJob(models.Model):
     # ============================================================
     # P7a.M8 -- training gate roll-up
     # ============================================================
+    # P7a.M9 -- reverse o2m to assignment_gate_log records.
+    # Drives the gate-log notebook tab on the event_job form
+    # and lets M10/M11 hooks read prior tier-1 fires when
+    # deciding whether to escalate.
+    assignment_gate_log_ids = fields.One2many(
+        "neon.training.assignment_gate_log",
+        "event_job_id",
+        string="Assignment Gate Log",
+    )
+
     training_gate_status = fields.Selection(
         [
             ("no_crew",                "No Crew Assigned"),
