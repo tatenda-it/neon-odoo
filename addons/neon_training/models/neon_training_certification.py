@@ -119,6 +119,20 @@ class NeonTrainingCertification(models.Model):
         store=True,
         readonly=True,
     )
+    # P7a.M3 -- narrows the level dropdown to the subset valid for
+    # the current type's effective_skill_level_mode. Consumed by the
+    # neon_dynamic_selection JS widget on the form view via
+    # options="{'available_field': 'available_levels'}".
+    # Comma-separated key list (e.g. "pass,fail" or "basic,standard,
+    # expert"). Empty when type_id is unset -- widget falls back to
+    # showing all 9 options so the user can still see the choices
+    # without picking a type first.
+    available_levels = fields.Char(
+        string="Available Levels (widget hint)",
+        compute="_compute_available_levels",
+        help="Internal field consumed by the level dropdown's "
+        "neon_dynamic_selection widget. Not rendered directly.",
+    )
 
     # ============================================================
     # State machine
@@ -243,6 +257,23 @@ class NeonTrainingCertification(models.Model):
                     months=months)
             else:
                 rec.date_expires = False
+
+    @api.depends("type_id.effective_skill_level_mode",
+                 "type_id.category_id.skill_level_mode")
+    def _compute_available_levels(self):
+        """Comma-separated list of level keys valid for the record's
+        current type. Consumed by the neon_dynamic_selection widget
+        on the form view. Empty when type_id is unset (widget then
+        shows all 9 options so users can pick a level before locking
+        a type)."""
+        for rec in self:
+            if not rec.type_id:
+                rec.available_levels = ""
+                continue
+            mode = (rec.type_id.effective_skill_level_mode
+                    or rec.type_id.category_id.skill_level_mode)
+            allowed = sorted(_LEVELS_BY_MODE.get(mode, set()))
+            rec.available_levels = ",".join(allowed)
 
     def _compute_display_name(self):
         """DECISION #2: meaningful display name for chatter, M2O

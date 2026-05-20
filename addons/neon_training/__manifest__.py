@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.1.0',
+    'version': '17.0.7.2.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking for Neon Events Elements crew + '
                'employees. M1: category + type reference models. '
                'M2: per-person certification records with state '
-               'machine, attachments, and admin verification.',
+               'machine, attachments, and admin verification. '
+               'M3: per-category level UX + complete soft-skill '
+               'seeding + Ranganai-knowledge polish.',
     'description': """
 Neon Training
 =============
@@ -39,9 +41,24 @@ Audit discipline (H3=A): perm_unlink=0 for ALL groups (admin
 included) on every model. Corrections via state transitions
 (suspend / re-cert with a new record) -- never via delete.
 
-Subsequent milestones (M3-M12) layer on configurable skill
-levels, expiry cron + reminders, cross-competency, sign-off
-authority routing, and event_job assignment gating.
+M3 (17.0.7.2.0): per-category level UX + seed completion.
+
+* neon_dynamic_selection JS widget narrows the level dropdown on
+  the certification form to only the values valid for the
+  selected type's effective_skill_level_mode (binary /
+  tiered_3 / custom). Backed by a computed available_levels Char
+  on the record.
+
+* Soft-skill seed completion per Robin's 10-category framing:
+  Leadership, Client-Facing Comfort, Photography / Videography,
+  Cash Handling / Financial Responsibility.
+
+* Ranganai-knowledge seed polish: MA2 Console, Truss Climbing
+  -- Prolyte, Class 2 / 3 / 5 Driver Licences, PSV Endorsement.
+
+Subsequent milestones (M4-M12) layer on expiry cron + reminders,
+cross-competency, sign-off authority routing, and event_job
+assignment gating.
 """,
     'author': 'Neon Events Elements Pvt Ltd',
     'website': 'https://neonhiring.com',
@@ -84,6 +101,14 @@ authority routing, and event_job assignment gating.
         # reparented under a new Configuration submenu.
         'views/neon_training_menu.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            # P7a.M3 -- neon_dynamic_selection widget (mirror of
+            # account.dynamic_selection kept local to avoid a
+            # semantic dep on the account module).
+            'neon_training/static/src/js/neon_dynamic_selection.js',
+        ],
+    },
     'installable': True,
     'auto_install': False,
     'application': False,

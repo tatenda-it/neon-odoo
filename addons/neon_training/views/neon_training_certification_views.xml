@@ -138,7 +138,15 @@
                             <field name="category_id" readonly="1"/>
                             <field name="effective_skill_level_mode"
                                    readonly="1"/>
-                            <field name="level"/>
+                            <!-- P7a.M3: available_levels is the
+                                 widget's data source; rendered
+                                 invisibly so the JS reactive layer
+                                 picks up changes when type_id flips.
+                                 -->
+                            <field name="available_levels" invisible="1"/>
+                            <field name="level"
+                                   widget="neon_dynamic_selection"
+                                   options="{'available_field': 'available_levels'}"/>
                         </group>
                         <group string="Dates">
                             <field name="date_obtained"/>

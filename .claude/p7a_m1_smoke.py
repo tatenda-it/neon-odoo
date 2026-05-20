@@ -167,13 +167,64 @@ results["T7104"] = ok
 
 
 # ============================================================
+# T7105-T7109: M1 seed inventory frozen at xmlid level. Total
+# count is growth-tolerant (>=) since future milestones legitimately
+# extend the seed (M3 adds 10; later milestones may add more).
+# Structural assertion (each xmlid resolves) catches "did a seed
+# record disappear" drift cleanly.
+# Pattern locked here per Phase 11 polish item (CLAUDE.md amendment
+# pending): smoke count assertions default to >= + structural codes.
+# ============================================================
+M1_TYPE_XMLIDS = {
+    "equipment": [
+        "neon_training.cert_type_ma3_console",
+        "neon_training.cert_type_digico_q5",
+        "neon_training.cert_type_chamsys_magicq",
+        "neon_training.cert_type_avolites_tiger_touch",
+        "neon_training.cert_type_led_wall_absen",
+        "neon_training.cert_type_truss_climbing_trilite",
+    ],
+    "role": [
+        "neon_training.cert_type_lead_tech",
+        "neon_training.cert_type_tech",
+        "neon_training.cert_type_runner",
+        "neon_training.cert_type_driver",
+    ],
+    "safety": [
+        "neon_training.cert_type_first_aid",
+        "neon_training.cert_type_work_at_heights",
+        "neon_training.cert_type_electrical_live_mains",
+        "neon_training.cert_type_fire_safety_indoor",
+        "neon_training.cert_type_class_4_driver",
+    ],
+    "soft": [
+        "neon_training.cert_type_lang_english",
+        "neon_training.cert_type_lang_shona",
+        "neon_training.cert_type_lang_ndebele",
+        "neon_training.cert_type_mc_presentation",
+        "neon_training.cert_type_computer_literacy",
+        "neon_training.cert_type_heavy_lift",
+        "neon_training.cert_type_venue_knowledge_harare",
+    ],
+}
+M1_TOTAL = sum(len(v) for v in M1_TYPE_XMLIDS.values())  # 22
+
+
 print()
 print("=" * 72)
-print("T7105 - 22 certification types seeded total")
+print("T7105 - >= 22 certification types AND all 22 M1 xmlids resolve")
 print("=" * 72)
 all_types = CertType.search([])
-ok = len(all_types) == 22
-print("  total types:", len(all_types))
+missing_xmlids = []
+for xmlids in M1_TYPE_XMLIDS.values():
+    for xid in xmlids:
+        try:
+            env.ref(xid)
+        except ValueError:
+            missing_xmlids.append(xid)
+ok = len(all_types) >= M1_TOTAL and not missing_xmlids
+print("  total types:", len(all_types), "(M1 baseline:", M1_TOTAL, ")")
+print("  M1 xmlids missing:", missing_xmlids or "(none)")
 print("T7105:", "PASS" if ok else "FAIL")
 results["T7105"] = ok
 
@@ -181,10 +232,15 @@ results["T7105"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7106 - Equipment category: 6 types")
+print("T7106 - Equipment category: >= 6 types AND M1 6 xmlids present")
 print("=" * 72)
-ok = len(cat_equipment.type_ids) == 6
-print("  equipment type count:", len(cat_equipment.type_ids))
+m1_codes = [x.rsplit(".", 1)[1].replace("cert_type_", "")
+            for x in M1_TYPE_XMLIDS["equipment"]]
+present_codes = cat_equipment.type_ids.mapped("code")
+missing = [c for c in m1_codes if c not in present_codes]
+ok = (len(cat_equipment.type_ids) >= 6 and not missing)
+print("  equipment type count:", len(cat_equipment.type_ids),
+      "M1 missing:", missing or "(none)")
 print("T7106:", "PASS" if ok else "FAIL")
 results["T7106"] = ok
 
@@ -192,10 +248,15 @@ results["T7106"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7107 - Role Tier category: 4 types")
+print("T7107 - Role Tier category: >= 4 types AND M1 4 xmlids present")
 print("=" * 72)
-ok = len(cat_role.type_ids) == 4
-print("  role type count:", len(cat_role.type_ids))
+m1_codes = [x.rsplit(".", 1)[1].replace("cert_type_", "")
+            for x in M1_TYPE_XMLIDS["role"]]
+present_codes = cat_role.type_ids.mapped("code")
+missing = [c for c in m1_codes if c not in present_codes]
+ok = (len(cat_role.type_ids) >= 4 and not missing)
+print("  role type count:", len(cat_role.type_ids),
+      "M1 missing:", missing or "(none)")
 print("T7107:", "PASS" if ok else "FAIL")
 results["T7107"] = ok
 
@@ -203,10 +264,15 @@ results["T7107"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7108 - Safety category: 5 types")
+print("T7108 - Safety category: >= 5 types AND M1 5 xmlids present")
 print("=" * 72)
-ok = len(cat_safety.type_ids) == 5
-print("  safety type count:", len(cat_safety.type_ids))
+m1_codes = [x.rsplit(".", 1)[1].replace("cert_type_", "")
+            for x in M1_TYPE_XMLIDS["safety"]]
+present_codes = cat_safety.type_ids.mapped("code")
+missing = [c for c in m1_codes if c not in present_codes]
+ok = (len(cat_safety.type_ids) >= 5 and not missing)
+print("  safety type count:", len(cat_safety.type_ids),
+      "M1 missing:", missing or "(none)")
 print("T7108:", "PASS" if ok else "FAIL")
 results["T7108"] = ok
 
@@ -214,10 +280,15 @@ results["T7108"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7109 - Soft Skill category: 7 types")
+print("T7109 - Soft Skill category: >= 7 types AND M1 7 xmlids present")
 print("=" * 72)
-ok = len(cat_soft.type_ids) == 7
-print("  soft type count:", len(cat_soft.type_ids))
+m1_codes = [x.rsplit(".", 1)[1].replace("cert_type_", "")
+            for x in M1_TYPE_XMLIDS["soft"]]
+present_codes = cat_soft.type_ids.mapped("code")
+missing = [c for c in m1_codes if c not in present_codes]
+ok = (len(cat_soft.type_ids) >= 7 and not missing)
+print("  soft type count:", len(cat_soft.type_ids),
+      "M1 missing:", missing or "(none)")
 print("T7109:", "PASS" if ok else "FAIL")
 results["T7109"] = ok
 

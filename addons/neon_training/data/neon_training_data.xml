@@ -316,5 +316,129 @@
             <field name="description">Operational knowledge of Harare event venues: access routes, load-in points, power, dressing rooms, restrictions.</field>
         </record>
 
+        <!-- ============================================================
+             P7a.M3 soft skill additions (completes Robin B1=D
+             10-category framing): Leadership, Client-Facing,
+             Photography, Cash Handling
+             ============================================================ -->
+
+        <record id="cert_type_leadership_tier"
+                model="neon.training.certification.type">
+            <field name="name">Leadership</field>
+            <field name="code">leadership_tier</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">od_md</field>
+            <field name="description">Leadership readiness: can take charge of a crew, mediate on-site issues, escalate appropriately. Binary at M3; tiered refinement under polish backlog for Robin's review.</field>
+        </record>
+
+        <record id="cert_type_client_facing"
+                model="neon.training.certification.type">
+            <field name="name">Client-Facing Comfort</field>
+            <field name="code">client_facing</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Crew member is comfortable in front of clients and event guests: composure, professionalism, language, dress code. Binary at M3; tiered refinement under polish backlog.</field>
+        </record>
+
+        <record id="cert_type_photography"
+                model="neon.training.certification.type">
+            <field name="name">Photography / Videography</field>
+            <field name="code">photography</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Photo / video coverage competency: composition, exposure, basic editing, fast turnaround for client recap reels.</field>
+        </record>
+
+        <record id="cert_type_cash_handling"
+                model="neon.training.certification.type">
+            <field name="name">Cash Handling / Financial Responsibility</field>
+            <field name="code">cash_handling</field>
+            <field name="category_id" ref="cert_category_soft"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">od_md</field>
+            <field name="description">Trusted with on-site cash floats, supplier payments, and reconciliation. OD/MD sign-off given the financial exposure.</field>
+        </record>
+
+        <!-- ============================================================
+             P7a.M3 equipment additions (Ranganai-knowledge polish
+             from M1 polish backlog)
+             ============================================================ -->
+
+        <record id="cert_type_ma2_console"
+                model="neon.training.certification.type">
+            <field name="name">MA2 Console</field>
+            <field name="code">ma2_console</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">tiered_3</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">MA Lighting grandMA2 console -- predecessor to MA3. Still in inventory pending audit by Ranganai.</field>
+        </record>
+
+        <record id="cert_type_truss_climbing_prolyte"
+                model="neon.training.certification.type">
+            <field name="name">Truss Climbing -- Prolyte</field>
+            <field name="code">truss_climbing_prolyte</field>
+            <field name="category_id" ref="cert_category_equipment"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">lead_tech</field>
+            <field name="description">Prolyte truss climbing competency. Sits alongside the Trilite cert; some venues / hires use Prolyte trussing.</field>
+        </record>
+
+        <!-- ============================================================
+             P7a.M3 safety additions (driver licence classes per
+             M1 polish backlog; Class 4 was the only seeded cert)
+             ============================================================ -->
+
+        <record id="cert_type_class_2_driver"
+                model="neon.training.certification.type">
+            <field name="name">Class 2 Driver Licence</field>
+            <field name="code">class_2_driver</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">60</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">Zimbabwe Traffic Safety Council</field>
+            <field name="description">Class 2 driver licence -- light motor vehicle (sedan / small van).</field>
+        </record>
+
+        <record id="cert_type_class_3_driver"
+                model="neon.training.certification.type">
+            <field name="name">Class 3 Driver Licence</field>
+            <field name="code">class_3_driver</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">60</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">Zimbabwe Traffic Safety Council</field>
+            <field name="description">Class 3 driver licence -- medium goods vehicle.</field>
+        </record>
+
+        <record id="cert_type_class_5_driver"
+                model="neon.training.certification.type">
+            <field name="name">Class 5 Driver Licence</field>
+            <field name="code">class_5_driver</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">60</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">Zimbabwe Traffic Safety Council</field>
+            <field name="description">Class 5 driver licence -- heavy goods vehicle / articulated rig (for full-size equipment trucks).</field>
+        </record>
+
+        <record id="cert_type_psv_endorsement"
+                model="neon.training.certification.type">
+            <field name="name">PSV Endorsement</field>
+            <field name="code">psv_endorsement</field>
+            <field name="category_id" ref="cert_category_safety"/>
+            <field name="validity_months">60</field>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">external_trainer</field>
+            <field name="regulatory_body">Zimbabwe Traffic Safety Council</field>
+            <field name="description">Passenger Service Vehicle endorsement -- required for transporting crew or event guests in dedicated transport.</field>
+        </record>
+
     </data>
 </odoo>
