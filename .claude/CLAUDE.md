@@ -28,6 +28,81 @@ reveals invalid design assumption, schema redesign needed. On hard stop:
 STOP → diagnose → report symptom + root cause + 3 fix options → await 
 direction.
 
+## Within-gate autonomy
+
+The two-gate model defines WHERE Tatenda's approval is required:
+- Gate 1: Design review before code. Required.
+- Gate 2: Build complete report. Required if anything non-routine 
+  surfaced. AUTO-COMMIT if clean.
+
+Between gates, Claude Code operates autonomously. Do not ask 
+"should I proceed" or "ready to commit?" at every checkpoint.
+
+### What "auto-commit" means at Gate 2
+
+When the gate-2 report would say:
+- Build matches gate-1 plan (no scope creep)
+- All planned tests PASS
+- JSON-RPC probe drift unchanged
+- Any new ⚠️ DECISIONS surfaced ARE defensible build-time 
+  adaptations (not architectural pivots)
+- Known-noise regressions unchanged from baseline
+
+Then: commit per gate-1's locked commit message + push + report 
+outcome. No "awaiting commit approval" pause.
+
+### What PAUSES Gate 2 (gate fires, Tatenda must respond)
+
+- Any planned test FAILS
+- A ⚠️ DECISION is genuinely architectural (e.g. data-model 
+  reshape, RBAC change, new dependency)
+- JSON-RPC probe drift surfaces ANY regression
+- LOC budget overshoots gate-1 estimate by >30%
+- Scope creep detected (work done that wasn't in gate-1 plan)
+- Pre-existing test moves from passing to failing
+- Any deploy-blocking finding
+
+When any of these fire, surface and wait. Otherwise: commit + 
+report + move on.
+
+### Within a milestone (between gates 1 and 2)
+
+Routine operational decisions are Claude Code's call:
+- Which file order to write models in
+- Whether to refactor a helper while you're touching it
+- Running additional ad-hoc tests for confidence
+- Picking field types within the gate-1 spec
+- Selector strategies for browser smoke
+- XML namespace ordering
+- Variable naming
+- Whether to use a list or dict comprehension
+
+Do not ask Tatenda for permission on these. Decide and proceed. 
+Surface decisions in the gate-2 report retrospectively.
+
+### Across milestones
+
+When M_N gate-2 closes cleanly with auto-commit, the next 
+milestone's gate-1 prompt is Tatenda's responsibility to draft 
+and send. Claude Code does NOT auto-start M_{N+1}. Each 
+milestone begins with an explicit Tatenda prompt.
+
+This boundary is hard. No "shall I start M2?" — wait for the 
+M2 prompt.
+
+### Process change rationale
+
+Through Phase 6's 11 functional milestones, Tatenda's gate-2 
+response was "approved, commit" 11/11 times when the build was 
+clean. The "may I commit" question added friction without 
+adding signal. Phase 7a forward: trust gate-1 approval, commit 
+autonomously on clean gate-2, only pause when something real 
+surfaces.
+
+Source: Tatenda direction 20 May 2026, after P7a.M1 gate-2 
+showed clean results and the "awaiting commit approval" 
+question added no value.
+
 ## Audit-trail discipline
 
 ALL Phase 6 financial models use append-only ACLs: `perm_unlink = 0` 
