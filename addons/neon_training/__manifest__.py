@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.12.1',
+    'version': '17.0.7.12.3',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -352,6 +352,12 @@ dashboard.
     },
     'installable': True,
     'auto_install': False,
+    # P7a pre-deploy fix #2 (21 May 2026): post-init hook
+    # grants group_neon_training_admin to base.user_admin on
+    # fresh install. Mirror of the post-migrate.py action for
+    # the -u path. See data/neon_training_user_provisioning.xml
+    # comment for full rationale.
+    'post_init_hook': '_post_init_hook',
     # P7a pre-deploy fix (20 May 2026): application=True so the
     # module appears in the Odoo apps switcher. Caught during
     # Chrome smoke session -- module installed at 17.0.7.12.0

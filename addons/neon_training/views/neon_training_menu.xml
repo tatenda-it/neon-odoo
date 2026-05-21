@@ -23,15 +23,20 @@
         data; crew have no business editing them).
     -->
 
-    <!-- P7a.M12: root menu visible to training_user + finance_
-         sales. Sales reps need the Find Qualified User wizard
-         under this root for dispatch staffing; other Training
-         children remain hidden behind their own per-menu group
-         filters. -->
+    <!-- P7a pre-deploy fix (21 May 2026): root menu has NO
+         groups_id. Matches Odoo stdlib pattern (Sales,
+         Inventory, etc.) where the app root is visible to all
+         internal users and per-child menus gate content. Prior
+         groups_id (training_user + finance_sales) blocked the
+         admin user (uid=2) who happens to carry neither group,
+         making the whole app invisible from the apps switcher.
+         Production deploy provisions per-user training groups
+         via Settings -> Users; see project_phase7a_status.md
+         pre-deploy checklist. -->
     <menuitem id="menu_neon_training_root"
               name="Neon Training"
               sequence="80"
-              groups="neon_training.group_neon_training_user,neon_finance.group_neon_finance_sales"/>
+              groups=""/>
 
     <!-- P7a.M12: top-of-menu Dashboard entry. Server-action
          wrapper (NOT direct ir.actions.act_window) so the

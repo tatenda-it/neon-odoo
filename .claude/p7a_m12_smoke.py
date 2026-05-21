@@ -694,9 +694,59 @@ results["T8224"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T8225 - Training app visible to base.user_admin (three-layer assertion)")
+print("=" * 72)
+# Pre-deploy Chrome session 21 May 2026 surfaced the visibility
+# failure path. The fix is two layers:
+#   1. menu_neon_training_root has empty groups_id (the D-path
+#      menu XML change + post-migrate clear on upgrades).
+#   2. data/neon_training_user_provisioning.xml grants
+#      group_neon_training_admin to base.user_admin so at
+#      least one child menu is visible, satisfying Odoo's
+#      _filter_visible_menus rule (user-in-groups OR child
+#      visible).
+# T8225 asserts all three observable consequences:
+#   a) admin is in group_neon_training_admin (data grant landed)
+#   b) root menu groups_id is empty (D menu fix intact)
+#   c) load_web_menus shows root in admin's top-level apps
+#      (the deploy-experience assertion)
+admin_user = env.ref("base.user_admin")
+root_menu = env.ref("neon_training.menu_neon_training_root")
+training_admin_grp = env.ref(
+    "neon_training.group_neon_training_admin")
+
+# (a) Data grant landed.
+admin_in_training_admin = admin_user in training_admin_grp.users
+
+# (b) Root menu groups_id empty.
+root_groups_empty = (len(root_menu.groups_id) == 0)
+
+# (c) Root visible to admin via load_web_menus.
+menus = env["ir.ui.menu"].with_user(admin_user)\
+    .load_web_menus(False)
+root_in_top_level = (root_menu.id in
+                     menus.get("root", {}).get("children", []))
+
+ok = (admin_in_training_admin
+      and root_groups_empty
+      and root_in_top_level)
+print("  (a) admin in group_neon_training_admin:",
+      admin_in_training_admin, " (expected True)")
+print("  (b) root menu groups_id empty:",
+      root_groups_empty,
+      " (current:", root_menu.groups_id.mapped("full_name"), ")")
+print("  (c) root in admin's top-level apps:",
+      root_in_top_level, " (expected True)")
+print("T8225:", "PASS" if ok else "FAIL")
+results["T8225"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
-order = ["T%d" % i for i in range(8200, 8225)]
+order = ["T%d" % i for i in range(8200, 8226)]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")
