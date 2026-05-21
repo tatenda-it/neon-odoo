@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.12.0',
+    'version': '17.0.7.12.1',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -352,5 +352,11 @@ dashboard.
     },
     'installable': True,
     'auto_install': False,
-    'application': False,
+    # P7a pre-deploy fix (20 May 2026): application=True so the
+    # module appears in the Odoo apps switcher. Caught during
+    # Chrome smoke session -- module installed at 17.0.7.12.0
+    # but invisible from the apps grid; direct URL access still
+    # worked but Robin's walkthrough requires switcher discovery.
+    # Matches the precedent set by neon_jobs (Operations app).
+    'application': True,
 }
