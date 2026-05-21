@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.9.0',
+    'version': '17.0.7.10.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -16,7 +16,10 @@
                'informational toast + assignment_gate_log on crew '
                'assignment with missing qualifications. M10: '
                'gating tier 2 -- warn + override-reason wizard at '
-               'quote acceptance.',
+               'quote acceptance. M11: gating tier 3 -- BLOCK + '
+               'override-reason wizard at event_job in_progress '
+               'transition; 24h freshness window suppresses '
+               'wizard re-fire on recent override.',
     'description': """
 Neon Training
 =============
@@ -321,6 +324,8 @@ dashboard.
         # menu entry -- wizard is only ever reached via the
         # ir.actions.act_window return from neon.finance.quote.
         'views/neon_training_quote_gate_override_wizard_views.xml',
+        # P7a.M11 -- event-start (tier 3) BLOCK wizard view.
+        'views/neon_training_event_start_gate_override_wizard_views.xml',
         # menus last so action ref()s resolve. M2 added the
         # Configuration submenu; M6 adds Cross-Competencies at
         # sequence=20 between Certifications and Configuration.

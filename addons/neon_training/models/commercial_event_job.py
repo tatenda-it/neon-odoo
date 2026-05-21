@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-P7a.M6 + P7a.M8 -- commercial.event.job extension.
+P7a.M6 + P7a.M8 + P7a.M11 -- commercial.event.job extension.
 
 M6: cross-competency TODO surface (state='completed' write override).
 M8: training_gate_status roll-up + _action_check_training_gate
 helper for M9-M11 layered gating.
+M11: action_move_to_in_progress BLOCK gate -- pre-check the
+gate; if any role line is unqualified or needs_cross_competency
+AND no recent tier_3 override exists within 24h, return the
+event-start override wizard instead of transitioning.
 
 When an event_job's state transitions to 'completed' (the
 operational "event is over" moment, before admin closeout to
@@ -25,6 +29,7 @@ for the training_gate_status / assignment_gate_log_ids surface;
 M9-M11 wire the actual gating. M6 stays narrow.
 """
 import logging
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 
@@ -183,6 +188,122 @@ class CommercialEventJob(models.Model):
             "pending_crew_ids":       pending.ids,
             "softening_used":         softening_used,
         }
+
+    # ============================================================
+    # P7a.M11 -- tier-3 (BLOCK) gate on action_move_to_in_progress
+    # ============================================================
+    # The set of crew gate_status values that fire the tier-3
+    # block. Pending passes through (DP6: empty slots are not the
+    # block target). Qualified passes trivially.
+    _M11_TIER_3_FIRING_STATUSES = (
+        "unqualified", "needs_cross_competency",
+    )
+
+    # Freshness window for recent tier-3 overrides (DP4). An
+    # override logged within this window suppresses wizard re-fire
+    # on retry. 24h is the locked spec; bumping requires gate-1
+    # re-approval.
+    _M11_OVERRIDE_FRESHNESS_HOURS = 24
+
+    def _m11_has_recent_tier_3_override(self):
+        """Return True if a tier_3 override was logged on this
+        event_job within the last _M11_OVERRIDE_FRESHNESS_HOURS
+        and the operator can therefore skip the wizard. Otherwise
+        False.
+
+        Uses overridden_at (set by the wizard's confirm) rather
+        than fired_at -- the audit semantic is "was the human
+        decision recent", not "was the fire entry recent".
+        """
+        self.ensure_one()
+        cutoff = fields.Datetime.now() - timedelta(
+            hours=self._M11_OVERRIDE_FRESHNESS_HOURS)
+        recent = self.env[
+            "neon.training.assignment_gate_log"].sudo().search([
+            ("event_job_id",   "=", self.id),
+            ("gate_tier",      "=", "tier_3_event_start"),
+            ("overridden_at",  ">=", cutoff),
+        ], limit=1)
+        return bool(recent)
+
+    def _evaluate_event_start_gate(self):
+        """Return the recordset of commercial.job.crew rows on
+        this event_job's parent commercial.job whose gate_status
+        indicates a tier-3 fire. Empty result means the event
+        can start cleanly.
+
+        Pending crew (no user_id) pass through per DP6. M11 does
+        NOT fire on empty slots -- M12 dashboard surfaces those
+        separately.
+
+        Sudo defensively per DP11 (M9 reference doc) -- the gate
+        compute traverses M8's cert-type inference. Crew Leaders
+        carry training_user via implied_ids, but the defensive
+        sudo is robust to ACL drift.
+        """
+        self.ensure_one()
+        Crew = self.env["commercial.job.crew"]
+        if not self.commercial_job_id:
+            return Crew
+        crew = self.commercial_job_id.crew_assignment_ids.sudo()
+        return crew.filtered(
+            lambda c: c.gate_status
+            in self._M11_TIER_3_FIRING_STATUSES)
+
+    def action_move_to_in_progress(self):
+        """Inherited. Tier-3 BLOCK: when a Crew Leader or Manager
+        clicks "Event Started", evaluate the gate. If any role
+        line is unqualified or needs_cross_competency AND no
+        recent (< 24h) tier_3 override exists, return the
+        override wizard instead of transitioning.
+
+        The wizard's confirm path re-calls this method with
+        m11_skip_gate_evaluation=True so the gate check is
+        bypassed on re-entry.
+
+        Discovery confirmed (gate-1, DP2): action_move_to_in
+        _progress is the only user-facing path; the write()
+        override on commercial.event.job (neon_jobs line 2349)
+        locks down direct state writes. Hooking this method
+        catches all real-world transitions.
+
+        DP1 (gate-1): return ir.actions.act_window to open the
+        wizard inline -- same pattern as M10's action_accept.
+        """
+        if self.env.context.get("m11_skip_gate_evaluation"):
+            return super().action_move_to_in_progress()
+
+        for rec in self:
+            # 24h window check first -- cheaper than the gate
+            # evaluation, and if it passes we don't need to read
+            # M8 computes at all.
+            if rec._m11_has_recent_tier_3_override():
+                continue
+            affected = rec._evaluate_event_start_gate()
+            if affected:
+                # Block: return the wizard. Subsequent records
+                # in the batch are NOT processed -- multi-record
+                # in_progress transitions are not a real user
+                # flow (the button operates one event_job at a
+                # time per dashboard UX).
+                return {
+                    "type":      "ir.actions.act_window",
+                    "name": _("Event Start Blocked -- "
+                              "Training Gate Override"),
+                    "res_model": "neon.training."
+                                 "event_start_gate_override_wizard",
+                    "view_mode": "form",
+                    "target":    "new",
+                    "context":   {
+                        "default_event_job_id":   rec.id,
+                        "default_target_state":   "in_progress",
+                        "default_override_reason": "",
+                    },
+                }
+        # No affected crew on any record (or all had recent
+        # overrides) -> delegate to super for the actual
+        # transition.
+        return super().action_move_to_in_progress()
 
     # ============================================================
     # P7a.M6 -- cross-competency TODO on state='completed'
