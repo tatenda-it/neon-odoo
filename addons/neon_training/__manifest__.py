@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.10.0',
+    'version': '17.0.7.11.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -326,6 +326,12 @@ dashboard.
         'views/neon_training_quote_gate_override_wizard_views.xml',
         # P7a.M11 -- event-start (tier 3) BLOCK wizard view.
         'views/neon_training_event_start_gate_override_wizard_views.xml',
+        # P7a.M12 -- find-qualified-user wizard view + server
+        # action (loaded BEFORE menu so the menuitem ref resolves).
+        'views/neon_training_find_qualified_user_wizard_views.xml',
+        # P7a.M12 -- training compliance dashboard form + server
+        # action (loaded BEFORE menu).
+        'views/neon_training_dashboard_views.xml',
         # menus last so action ref()s resolve. M2 added the
         # Configuration submenu; M6 adds Cross-Competencies at
         # sequence=20 between Certifications and Configuration.

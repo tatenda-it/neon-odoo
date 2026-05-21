@@ -23,10 +23,34 @@
         data; crew have no business editing them).
     -->
 
+    <!-- P7a.M12: root menu visible to training_user + finance_
+         sales. Sales reps need the Find Qualified User wizard
+         under this root for dispatch staffing; other Training
+         children remain hidden behind their own per-menu group
+         filters. -->
     <menuitem id="menu_neon_training_root"
               name="Neon Training"
               sequence="80"
+              groups="neon_training.group_neon_training_user,neon_finance.group_neon_finance_sales"/>
+
+    <!-- P7a.M12: top-of-menu Dashboard entry. Server-action
+         wrapper (NOT direct ir.actions.act_window) so the
+         access check fires before the form materialises. -->
+    <menuitem id="menu_neon_training_dashboard"
+              name="Dashboard"
+              parent="menu_neon_training_root"
+              action="neon_training_dashboard_action_server"
+              sequence="5"
               groups="neon_training.group_neon_training_user"/>
+
+    <!-- P7a.M12: Find Qualified User. Visible to training_user
+         + finance_sales (sales reps need staffing search). -->
+    <menuitem id="menu_neon_training_find_qualified_user"
+              name="Find Qualified User"
+              parent="menu_neon_training_root"
+              action="neon_training_find_qualified_user_action_server"
+              sequence="7"
+              groups="neon_training.group_neon_training_user,neon_finance.group_neon_finance_sales"/>
 
     <menuitem id="menu_neon_training_certifications"
               name="Certifications"

@@ -5,3 +5,5 @@
 from . import neon_training_quote_gate_override_wizard
 # P7a.M11 -- event-start (tier 3) BLOCK wizard.
 from . import neon_training_event_start_gate_override_wizard
+# P7a.M12 -- find-qualified-user search wizard.
+from . import neon_training_find_qualified_user_wizard

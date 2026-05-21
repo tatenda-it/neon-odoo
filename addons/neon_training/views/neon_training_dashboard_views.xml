@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M12 training compliance dashboard form view (DP9 form
+    view virtual model approach; NOT OWL).
+
+    Layout: 4 card groups arranged in a 2x2 grid (or stacked on
+    narrow screens via Bootstrap col-* classes):
+      Top-left:  Active Certifications by category (5 counters)
+      Top-right: Expiring Soon (3 horizon buckets)
+      Bot-left:  Workflow Health (pending verification, recent
+                 cross-competency)
+      Bot-right: Gate Fires by Tier (3 tier counters)
+
+    Each counter renders as a styled stat with a clickable button
+    that drills through to the underlying records via the
+    dashboard model's action_open_* methods.
+-->
+<odoo>
+
+    <record id="neon_training_dashboard_view_form" model="ir.ui.view">
+        <field name="name">neon.training.dashboard.form</field>
+        <field name="model">neon.training.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Training Compliance Dashboard"
+                  create="false" delete="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Training Compliance Dashboard</h1>
+                        <p class="text-muted">
+                            Snapshot of active certifications,
+                            expiring forecast, workflow health,
+                            and gating fires over the past 30
+                            days. Counts recompute on every
+                            dashboard open.
+                        </p>
+                    </div>
+
+                    <group>
+                        <group string="Active Certifications by Category"
+                               name="active_certs_group">
+                            <field name="active_certs_total"
+                                   readonly="1"/>
+                            <field name="active_certs_equipment"
+                                   readonly="1"/>
+                            <field name="active_certs_role_tier"
+                                   readonly="1"/>
+                            <field name="active_certs_safety"
+                                   readonly="1"/>
+                            <field name="active_certs_soft_skill"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_open_active_certs"
+                                        type="object"
+                                        string="View Active Certifications"
+                                        class="btn-link"/>
+                            </div>
+                        </group>
+                        <group string="Expiring Soon (cumulative)"
+                               name="expiring_group">
+                            <field name="expiring_30d" readonly="1"/>
+                            <div>
+                                <button name="action_open_expiring_certs"
+                                        type="object"
+                                        string="View Expiring (30d)"
+                                        class="btn-link"
+                                        context="{'dashboard_expiring_days': 30}"/>
+                            </div>
+                            <field name="expiring_60d" readonly="1"/>
+                            <div>
+                                <button name="action_open_expiring_certs"
+                                        type="object"
+                                        string="View Expiring (60d)"
+                                        class="btn-link"
+                                        context="{'dashboard_expiring_days': 60}"/>
+                            </div>
+                            <field name="expiring_90d" readonly="1"/>
+                            <div>
+                                <button name="action_open_expiring_certs"
+                                        type="object"
+                                        string="View Expiring (90d)"
+                                        class="btn-link"
+                                        context="{'dashboard_expiring_days': 90}"/>
+                            </div>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Workflow Health"
+                               name="workflow_group">
+                            <field name="pending_verification_count"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_open_pending_verification"
+                                        type="object"
+                                        string="View Pending Verification"
+                                        class="btn-link"/>
+                            </div>
+                            <field name="recent_cross_competency_count"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_open_recent_cross_competency"
+                                        type="object"
+                                        string="View Cross-Competencies (30d)"
+                                        class="btn-link"/>
+                            </div>
+                        </group>
+                        <group string="Gate Fires by Tier (last 30 days)"
+                               name="gate_fires_group">
+                            <field name="tier_1_fires_30d"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_open_tier_fires"
+                                        type="object"
+                                        string="View Tier 1 Info"
+                                        class="btn-link"
+                                        context="{'dashboard_tier': 'tier_1_assignment'}"/>
+                            </div>
+                            <field name="tier_2_fires_30d"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_open_tier_fires"
+                                        type="object"
+                                        string="View Tier 2 Warn"
+                                        class="btn-link"
+                                        context="{'dashboard_tier': 'tier_2_quote_accept'}"/>
+                            </div>
+                            <field name="tier_3_fires_30d"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_open_tier_fires"
+                                        type="object"
+                                        string="View Tier 3 Block"
+                                        class="btn-link"
+                                        context="{'dashboard_tier': 'tier_3_event_start'}"/>
+                            </div>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!--
+        Server-action wrapper for the menu entry. Matches the
+        precedent from neon_finance.dashboard / neon_jobs.equipment
+        dashboard: the menu invokes a server action whose Python
+        code calls action_open_dashboard() and returns the
+        materialised act_window. Three-layer enforcement (menu
+        groups_id + server-action access check + model-level
+        access check inside _compute_counters).
+    -->
+    <record id="neon_training_dashboard_action_server" model="ir.actions.server">
+        <field name="name">Open Training Compliance Dashboard</field>
+        <field name="model_id" ref="model_neon_training_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = env["neon.training.dashboard"].action_open_dashboard()</field>
+        <field name="groups_id" eval="[(4, ref('neon_training.group_neon_training_user'))]"/>
+    </record>
+
+</odoo>

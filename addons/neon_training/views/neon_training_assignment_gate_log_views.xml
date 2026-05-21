@@ -135,6 +135,17 @@
                 <filter string="Overridden"
                         name="filter_overridden"
                         domain="[('overridden_by_id', '!=', False)]"/>
+                <separator/>
+                <!-- P7a.M12: date-range quick filters. -->
+                <filter string="Fired today"
+                        name="filter_fired_today"
+                        domain="[('fired_at', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="Fired in last 7 days"
+                        name="filter_fired_7d"
+                        domain="[('fired_at', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter string="Fired in last 30 days"
+                        name="filter_fired_30d"
+                        domain="[('fired_at', '&gt;=', (context_today() - relativedelta(days=30)).strftime('%Y-%m-%d 00:00:00'))]"/>
                 <group expand="0" string="Group By">
                     <filter string="Event Job"
                             name="group_event_job"
@@ -153,11 +164,64 @@
         </field>
     </record>
 
+    <!-- P7a.M12: kanban view for quick visual scan by tier. -->
+    <record id="assignment_gate_log_view_kanban" model="ir.ui.view">
+        <field name="name">neon.training.assignment_gate_log.kanban</field>
+        <field name="model">neon.training.assignment_gate_log</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="gate_tier"
+                    class="o_kanban_small_column"
+                    create="false" delete="false">
+                <field name="id"/>
+                <field name="event_job_id"/>
+                <field name="user_id"/>
+                <field name="gate_tier"/>
+                <field name="severity"/>
+                <field name="gate_status_at_fire"/>
+                <field name="overridden_by_id"/>
+                <field name="fired_at"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top">
+                                <strong>
+                                    <field name="user_id"/>
+                                </strong>
+                                <span class="float-end">
+                                    <field name="severity"
+                                           widget="label_selection"
+                                           options="{'classes': {'info': 'default', 'warn': 'warning', 'block': 'danger'}}"/>
+                                </span>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div>
+                                    <field name="event_job_id"/>
+                                </div>
+                                <div class="text-muted">
+                                    <field name="gate_status_at_fire"/>
+                                </div>
+                                <div class="text-muted small">
+                                    Fired <field name="fired_at" widget="relative"/>
+                                </div>
+                                <div t-if="record.overridden_by_id.raw_value">
+                                    <span class="badge text-bg-secondary">
+                                        Overridden by
+                                        <field name="overridden_by_id"/>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="assignment_gate_log_action"
             model="ir.actions.act_window">
         <field name="name">Gate Log</field>
         <field name="res_model">neon.training.assignment_gate_log</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">tree,kanban,form</field>
         <field name="search_view_id"
                ref="assignment_gate_log_view_search"/>
         <field name="context">{'search_default_filter_tier1': 1}</field>

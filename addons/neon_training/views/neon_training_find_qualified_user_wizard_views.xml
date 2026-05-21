@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M12 Find Qualified User wizard form view + server-action
+    + menu entry. Opens as modal (target='new') via the
+    Training top-level menu.
+-->
+<odoo>
+
+    <record id="neon_training_find_qualified_user_wizard_view_form" model="ir.ui.view">
+        <field name="name">neon.training.find_qualified_user_wizard.form</field>
+        <field name="model">neon.training.find_qualified_user_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Find Qualified User">
+                <group>
+                    <group string="Required Criteria">
+                        <field name="cert_type_ids"
+                               widget="many2many_tags"
+                               placeholder="Pick one or more cert types"/>
+                        <field name="required_level"/>
+                    </group>
+                    <group string="Soft Filters">
+                        <field name="include_cross_competency"/>
+                        <field name="include_pending"/>
+                        <field name="include_suspended"/>
+                    </group>
+                </group>
+                <field name="result_summary"
+                       widget="html"
+                       readonly="1"/>
+                <group string="Matched Users"
+                       invisible="not matched_user_ids">
+                    <field name="matched_user_ids"
+                           nolabel="1"
+                           widget="many2many_tags"
+                           readonly="1"
+                           options="{'no_create': True, 'no_open': False}"/>
+                </group>
+                <footer>
+                    <button name="action_search"
+                            type="object"
+                            string="Search"
+                            class="btn-primary"/>
+                    <button name="action_reset"
+                            type="object"
+                            string="Reset"
+                            class="btn-secondary"/>
+                    <button string="Close"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_training_find_qualified_user_action_server"
+            model="ir.actions.server">
+        <field name="name">Find Qualified User</field>
+        <field name="model_id"
+               ref="model_neon_training_find_qualified_user_wizard"/>
+        <field name="state">code</field>
+        <field name="code">action = env["neon.training.find_qualified_user_wizard"].action_open_wizard()</field>
+        <field name="groups_id" eval="[
+            (4, ref('neon_training.group_neon_training_user')),
+            (4, ref('neon_finance.group_neon_finance_sales')),
+        ]"/>
+    </record>
+
+</odoo>

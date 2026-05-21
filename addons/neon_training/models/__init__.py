@@ -32,3 +32,7 @@ from . import neon_training_assignment_gate_log
 # after the crew inherit (which provides the gate_status compute
 # the M10 hook reads).
 from . import neon_finance_quote
+# P7a.M12 -- training compliance dashboard (TransientModel,
+# form-view virtual model per DP9). Loads last so all referenced
+# models (cert / cross_competency / gate_log) are in the registry.
+from . import neon_training_dashboard
