@@ -586,3 +586,91 @@ Phase 7b SHOULD NOT START until items 1-5 complete. The schema sketch in this
 doc is design-stage work that lands on the feat/training-phase-7a branch
 (per Tatenda's instruction; 7a branch is the active workbench).
 ```
+
+---
+
+## 14. Test Data Plan
+
+Per the standing pattern in `docs/_templates/test-data-plan-template.md`. Phase 7b establishes the per-sub-phase Test Data Plan section that every future sub-phase sketch will inherit.
+
+### §A — Seed data (production-flavoured)
+
+| Record set | Model | Count | Source XML file | Variability |
+|---|---|---|---|---|
+| Requirement templates (one per role tier) | `neon.onboarding.requirement.template` | 4 | `data/neon_onboarding_requirement_templates.xml` | medium |
+| Probationary defaults config | `ir.config_parameter` records | 1 (`neon_onboarding.probationary_jobs_target = 3`) | `data/neon_onboarding_config.xml` | low |
+
+**Dependency**: requirement templates' `required_cert_type_ids` reference Phase 7a M3 seed cert types by xmlid (e.g., `neon_training.cert_type_lead_tech`, `neon_training.cert_type_fire_safety_indoor`). `__manifest__.py` declares `neon_training` in `depends`. Cross-module xmlid references resolve cleanly at install time.
+
+**`noupdate=False` rationale**: Robin may revise the requirement matrix at any point (M3 seed itself is variability-high — same standard applies to its consumers). New templates can also land in module upgrades (e.g., Phase 7c adds an `external_trainer` role with its own template). Variability is medium because the four current tiers are stable but the contents of each template will iterate as Phase 7a's cert seed grows.
+
+**Note on probationary_jobs_target**: stored as `ir.config_parameter` (not a model field) so Robin can adjust it via Settings UI without a code change. Default = 3 per gate-1 DP1.
+
+### §B — Test fixtures (per-tier user matrix)
+
+All passwords = `test123`. All logins prefixed `p7b_m1_*` (sub-phase + milestone scope).
+
+| Tier | Fixture login | Groups | Records owned / seen | Smoke ref |
+|---|---|---|---|---|
+| Operations Manager | `p7b_m1_jobs_manager` | `base.group_user` + `neon_jobs.group_neon_jobs_manager` + `neon_training.group_neon_training_admin` (via implied_ids) | Owns 3 candidates (1 per non-active stage: candidate / cert_collection / probationary) | `.claude/p7b_m1_smoke.py` |
+| Training Admin | `p7b_m1_training_admin` | `base.group_user` + `neon_training.group_neon_training_admin` | Sees all candidates (ACL = full read across rows) | `.claude/p7b_m1_smoke.py` |
+| Crew (existing) | `p7b_m1_crew_existing` | `base.group_user` + `neon_jobs.group_neon_jobs_crew` + `neon_training.group_neon_training_user` | Has own candidate record fast-pathed to `active` via Skip Onboarding (simulates the 9 paused tech-crew) | `.claude/p7b_m1_smoke.py` |
+| Crew (new, mid-collection) | `p7b_m1_crew_collecting` | created mid-flow; `base.group_user` + `neon_jobs.group_neon_jobs_crew` + `neon_training.group_neon_training_user` | `candidate.state = 'cert_collection'`, 2 / 5 required certs verified | `.claude/p7b_m1_smoke.py` |
+| Crew (new, probationary) | `p7b_m1_crew_probating` | same groups as above | `candidate.state = 'probationary'`, 1 / 3 jobs completed | `.claude/p7b_m1_smoke.py` |
+
+**Get-or-create discipline**: each fixture is materialised via a `_get_or_create_user(login, name, groups_xmlids)` helper at the top of `p7b_m1_smoke.py`. Search by login first; create only if missing. Idempotent across cycle-1 and cycle-2 regression runs.
+
+**Group-write discipline**: `groups_id: [(6, 0, [...])]` ORM write — never raw SQL — so `implied_ids` propagation lands (per `reference_odoo17_implied_ids_orm_vs_sql.md` from Phase 7a pre-deploy fix #3). The manager fixture gets `training_admin` via the operations-manager implied chain rather than direct assignment, exercising the chain in the smoke.
+
+### §C — Test scenario coverage
+
+| # | Workflow | Scenario | Fixture | Expected outcome |
+|---|---|---|---|---|
+| 1 | Create candidate | Manager creates a new candidate, sets `intended_role='tech'` | `p7b_m1_jobs_manager` | `candidate.state='candidate'`; requirement_template auto-applied on `intended_role` change; `required_cert_ids` populated |
+| 2 | Upload cert via portal | Candidate uploads a required cert through `/my/certs/upload` | `p7b_m1_crew_collecting` | `cert.state='pending_verification'`; sign-off authority TODO scheduled per M7 routing |
+| 3 | Verify cert | Sign-off authority verifies the uploaded cert | `p7b_m1_training_admin` | `cert.state='active'`; candidate's `required_cert_ids` compute reflects |
+| 4 | All certs verified → auto-transition | Last required cert flips to active (write-hook on `neon.training.certification`) | (automatic) | `candidate.state='probationary'`; audit log entry written with `action='promote_probationary'`, `previous_state='cert_collection'` |
+| 5 | Job completion gates promotion | 3 probationary jobs marked `state='completed'` (write-hook on `commercial.event.job`) | (automatic) | `candidate.state='active'`; audit log entry `action='promote_active'` |
+| 6 | Admin override (Skip Onboarding) | Manager opens Skip wizard, supplies `bypass_reason='Existing trained crew per pre-7b onboarding'`, confirms | `p7b_m1_jobs_manager` | `candidate.state='active'`, `bypass_actor_id` + `bypass_reason` populated; audit log entry `action='skip_onboarding'`; `res.users` created if none existed |
+| 7 | Crew sees own portal | Crew logs in via portal route `/my/profile` | `p7b_m1_crew_existing` | Read-only view of own active candidate record + editable contact fields (phone, emergency contact) |
+| 8 | ACL boundary: crew sees own only | Crew tries to read another crew member's candidate record via direct URL | `p7b_m1_crew_existing` | `AccessError` via `ir.rule` scoped to `user_id == env.user.id` |
+| 9 | ACL boundary: signoff doesn't create | Sign-off tier user attempts to create a candidate record | `p7b_m1_training_admin` (no creation rights per ACL CSV) | Wait -- training_admin DOES have create. Re-frame: use a `group_neon_training_signoff`-only fixture and verify `AccessError` on create. **Adjust during M1 build** if the read-only signoff tier needs a distinct fixture. |
+| 10 | 4th gate condition: probationary blocked | Manager tries to start an event_job with `p7b_m1_crew_probating` assigned as Lead Tech (not Runner) | `p7b_m1_jobs_manager` | M11 block-tier gate fires; wizard returns; transition blocked unless override |
+| 11 | Probationary allowed as Runner | Same crew assigned to a Runner role on the same event_job | `p7b_m1_jobs_manager` | No gate fire; transition proceeds |
+| 12 | Empty override_reason rejected | Skip Onboarding wizard confirm with `bypass_reason=' '` (whitespace) | `p7b_m1_jobs_manager` | `UserError`; no state change; no audit log entry |
+| 13 | Audit log is append-only | Admin tries to unlink an audit log record via UI / `sudo()` | `p7b_m1_training_admin` | `UserError` raised by overridden `unlink()` (matches M9 gate_log H3=A pattern) |
+| 14 | Mail.activity TODO routing | Cert uploaded for Lead Tech cert; check authority resolves to crew_leader group | (automatic during scenario 2) | TODO scheduled on first user in `neon_jobs.group_neon_jobs_crew_leader`; dedup verified on retry |
+| 15 | Dashboard counters reflect | Open M12 dashboard after running scenarios | `p7b_m1_training_admin` | `active_candidates_count >= 2` (existing + post-scenario-5 promotion); `probationary_candidates_count >= 1` (mid-flow crew) |
+
+### §D — Cleanup + drift detection
+
+Following the template's standing checks:
+
+| Concern | Mitigation for 7b |
+|---|---|
+| Test fixtures committed to `data/*.xml` | Pre-commit grep for `test123` in `addons/**/data/*.xml` (zero hits required) |
+| Seed data placed in test fixture file | T7B_M1 smoke assertion: `env.ref('neon_training.cert_type_fire_safety_indoor')` resolves (catches a developer who moves the seed cert into a smoke setup script by accident) |
+| Test fixture login collisions | `p7b_*` prefix; collision check at smoke setup via `search([('login', 'like', 'p7b_%')], limit=1).login` |
+| Mid-test commits leaking into regression cycle 2 | Smoke files use `env.cr.savepoint()` per test + trailing `env.cr.rollback()`. Exception: the fixture-create block at the top of `p7b_m1_smoke.py` uses `env.cr.commit()` after `_get_or_create_user` so fixtures persist across cycles -- explicitly labelled and gated by the get-or-create idempotency |
+| Phase 12 dashboard counter drift | Scenarios 4 and 5 assert dashboard counter deltas post-transition; catches a regression where the M11 dashboard extension fails to recompute |
+
+**Phase 7b-specific cleanup decision** -- **the 9 existing tech crew users (the paused onboarding op) will be created in production WITHOUT the test fixture prefix.** They get production-grade names (`arnold.m@neonhiring.co.zw`, `john@neonhiring.co.zw`, etc.) and the Skip Onboarding wizard is applied 9 times during the post-deploy resume operation. **None of the 5 test fixtures in §B ship to prod.**
+
+### §E — Phase 7b-specific notes
+
+- **Test fixtures depend on Phase 7a being installed**: cert types from M3 seed must exist (the requirement templates reference them). Smoke setup checks via `env.ref('neon_training.cert_type_lead_tech', raise_if_not_found=True)`.
+- **Cron-based auto-promotion testing**: probationary → active triggers on event_job state='completed' via write-hook (not cron). Direct ORM trigger in smoke; no cron-related deterministic-mode hack needed.
+- **WhatsApp notification trigger points are stubbed**: Phase 9 territory. M12 of 7b ships the trigger code (chatter post + mail.activity) but the actual WhatsApp send is mocked at `bus.bus._sendone` level in smoke (scenario 14). Phase 9 builds the actual send.
+- **Audit log model mirrors M9 `assignment_gate_log` patterns**: same FK ondelete decisions per `reference_odoo17_gate_log_fk_lifecycle.md`. Smoke scenario 13 validates the H3=A audit immutability.
+- **Portal user fixtures**: `p7b_m1_crew_existing`, `_crew_collecting`, `_crew_probating` are internal-user accounts in smoke (not portal users) -- portal route testing is via browser smoke with a portal-tier fixture (`p7b_m8_portal_user`, added in M8 when the portal stream lands). M1's smoke validates only the internal-user view of candidate records.
+- **The bulk-import sanity check**: a 16th scenario (M1.5 or M7 smoke) walks 9 candidates through Skip Onboarding in batch to confirm the wizard scales (`_check_resume_path_capacity` -- not a real method, but a conceptual coverage point) and produces 9 audit log entries with distinct timestamps + the same `bypass_actor_id`.
+
+### Pre-flight checklist before M1 build starts
+
+- [ ] §A: `data/neon_onboarding_requirement_templates.xml` + `data/neon_onboarding_config.xml` paths declared in `__manifest__.py` data list
+- [ ] §B: 5 fixture logins unique within `p7b_*` prefix; none collide with Phase 7a's `p7am1_*` / `p7am2_*` / `p2m75_*` fixtures
+- [ ] §B: each fixture's groups list matches ACL CSV rows that exist (no fictional groups)
+- [ ] §C: all 4 onboarding states appear in at least one scenario (candidate, cert_collection, probationary, active)
+- [ ] §C: Skip Onboarding override path has a scenario (#6)
+- [ ] §D: pre-commit grep wired in `.claude/run_regression.sh`
+- [ ] §E: portal-tier fixture deferred to M8 (documented)
