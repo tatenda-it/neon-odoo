@@ -694,49 +694,49 @@ results["T8224"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T8225 - Training app visible to base.user_admin (three-layer assertion)")
+print("T8225 - Training app visible to base.user_admin (four-layer assertion)")
 print("=" * 72)
-# Pre-deploy Chrome session 21 May 2026 surfaced the visibility
-# failure path. The fix is two layers:
-#   1. menu_neon_training_root has empty groups_id (the D-path
-#      menu XML change + post-migrate clear on upgrades).
-#   2. data/neon_training_user_provisioning.xml grants
-#      group_neon_training_admin to base.user_admin so at
-#      least one child menu is visible, satisfying Odoo's
-#      _filter_visible_menus rule (user-in-groups OR child
-#      visible).
-# T8225 asserts all three observable consequences:
-#   a) admin is in group_neon_training_admin (data grant landed)
-#   b) root menu groups_id is empty (D menu fix intact)
-#   c) load_web_menus shows root in admin's top-level apps
-#      (the deploy-experience assertion)
+# Pre-deploy Chrome session 21 May 2026 surfaced TWO visibility
+# failures, fixed across findings #2 and #3:
+#   1. menu_neon_training_root.groups_id had three required
+#      groups -- admin had none of them. Fix: clear root
+#      groups_id (D-path) so root visible to all internal
+#      users, per-child groups gate content.
+#   2. Granting training_admin via raw SQL bypassed Odoo's
+#      ORM hook that fires implied_ids propagation, so admin
+#      ended up in training_admin ONLY -- the implied
+#      training_signoff + training_user never landed. Result:
+#      M12 Dashboard, M12 Find Qualified User, M2 Certifications
+#      menus (which require training_user) stayed invisible.
+#      Fix: post-migrate uses ORM (4, id) write to fire the
+#      propagation hook.
+# T8225 asserts all four observable consequences:
+#   (a) admin in group_neon_training_admin (the direct grant)
+#   (b) admin in group_neon_training_signoff (implied)
+#   (c) admin in group_neon_training_user (implied)
+#   (d) root menu visible to admin via load_web_menus
 admin_user = env.ref("base.user_admin")
 root_menu = env.ref("neon_training.menu_neon_training_root")
-training_admin_grp = env.ref(
-    "neon_training.group_neon_training_admin")
+ta = env.ref("neon_training.group_neon_training_admin")
+ts = env.ref("neon_training.group_neon_training_signoff")
+tu = env.ref("neon_training.group_neon_training_user")
 
-# (a) Data grant landed.
-admin_in_training_admin = admin_user in training_admin_grp.users
+a = admin_user in ta.users
+b = admin_user in ts.users
+c = admin_user in tu.users
 
-# (b) Root menu groups_id empty.
-root_groups_empty = (len(root_menu.groups_id) == 0)
-
-# (c) Root visible to admin via load_web_menus.
+# (d) Root visible to admin via load_web_menus.
 menus = env["ir.ui.menu"].with_user(admin_user)\
     .load_web_menus(False)
-root_in_top_level = (root_menu.id in
-                     menus.get("root", {}).get("children", []))
+d = (root_menu.id in menus.get("root", {}).get("children", []))
 
-ok = (admin_in_training_admin
-      and root_groups_empty
-      and root_in_top_level)
-print("  (a) admin in group_neon_training_admin:",
-      admin_in_training_admin, " (expected True)")
-print("  (b) root menu groups_id empty:",
-      root_groups_empty,
-      " (current:", root_menu.groups_id.mapped("full_name"), ")")
-print("  (c) root in admin's top-level apps:",
-      root_in_top_level, " (expected True)")
+ok = (a and b and c and d)
+print("  (a) admin in training_admin:        ", a, " (expected True)")
+print("  (b) admin in training_signoff:      ", b,
+      " (expected True via implied_ids)")
+print("  (c) admin in training_user:         ", c,
+      " (expected True via implied_ids)")
+print("  (d) root in admin's top-level apps: ", d, " (expected True)")
 print("T8225:", "PASS" if ok else "FAIL")
 results["T8225"] = ok
 
