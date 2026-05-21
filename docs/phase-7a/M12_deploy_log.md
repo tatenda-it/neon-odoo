@@ -222,3 +222,120 @@ Two viable patterns -- pick one for Phase 11:
 Lean: **option 2** (meta-group). Cleaner integration with implied_ids chains; one grant per module install touches a known set; survives admin rotations.
 
 Track as Phase 11 CLAUDE.md amendment candidate #6 (joining the 5 already queued from pre-deploy session #1).
+
+---
+
+## Post-Deploy Asset Regeneration (21 May 2026, ~17:30 UTC)
+
+Chrome verification surfaced `AssetsLoadingError` on `/web/assets/54e3003/web_editor.backend_assets_wysiwyg.min.js`, causing an OWL component cascade failure that manifested as the Training menu bar rendering only "Find Qualified User" (1 of 7 expected items). Prior diagnostic confirmed server-side ACL state was correct (all 7 menu children appeared in Robin's `load_web_menus` response). Root cause: the `-i neon_training` install invalidated asset bundles but the regenerated bundles weren't persisted as `ir.attachment` records -- the browser was requesting a bundle hash that no longer existed on the server.
+
+### Operation
+
+**Pre-fix attachment count**: 15 records, 11 MB total.
+
+**Step 1 -- Cleared all `/web/assets/%` attachments via ORM:**
+
+```python
+attachments = env["ir.attachment"].search(
+    [("url", "=like", "/web/assets/%")])
+attachments.sudo().unlink()
+env.cr.commit()
+# 15 deleted, 0 remaining
+```
+
+**Step 2 -- Restarted container** to flush the in-memory bundle cache:
+
+```
+docker compose restart odoo
+HTTP service up at d229d6e2ccee:8069
+Registry loaded in 0.684s
+```
+
+Clean restart. No errors.
+
+**Step 3 -- Warmed assets via `/web/login` HTTP GET** (HTTP 200, time_total=52s first request, 18s second). However, post-warm verification showed **0 attachments persisted** -- the login page only triggers `web.assets_frontend` compilation, not the backend bundles. Login-page-only warming was insufficient.
+
+**Step 4 -- Forced backend bundle compilation via `ir.qweb._get_asset_bundle()` inside the shell, WITH explicit commit:**
+
+```python
+IrQweb = env["ir.qweb"]
+for bundle_name in [
+    "web.assets_backend",
+    "web_editor.backend_assets_wysiwyg",
+    "web.assets_web_dark",
+    "web.assets_web",
+    "web.assets_common",
+    "web.assets_frontend",
+]:
+    bundle = IrQweb._get_asset_bundle(bundle_name)
+    bundle.js()
+    bundle.css()
+env.cr.commit()
+```
+
+**Step 5 -- Post-fix verification:**
+
+```
+Asset attachments after compile + commit: 12
+
+/web/assets/c38f01f/web.assets_frontend.min.css                510 KB
+/web/assets/2f43454/web.assets_frontend.min.js                1.6 MB
+/web/assets/cf83e13/web.assets_common.min.css                   0 bytes (empty bundle)
+/web/assets/cf83e13/web.assets_common.min.js                    0 bytes (empty bundle)
+/web/assets/ae67fbd/web.assets_web.min.css                    938 KB
+/web/assets/d86ffb2/web.assets_web.min.js                     4.2 MB
+/web/assets/101ae64/web.assets_web_dark.min.css               945 KB
+/web/assets/d86ffb2/web.assets_web_dark.min.js                4.2 MB
+/web/assets/e2203b9/web_editor.backend_assets_wysiwyg.min.css 200 KB
+/web/assets/54e3003/web_editor.backend_assets_wysiwyg.min.js  690 KB  ← the previously-failing bundle
+/web/assets/ae67fbd/web.assets_backend.min.css                938 KB
+/web/assets/291811e/web.assets_backend.min.js                 4.2 MB
+```
+
+The bundle hash `54e3003` matches the one in the original `AssetsLoadingError` exactly -- Odoo's bundle hashing is content-deterministic, so the regenerated URL is identical to the one the browser was requesting.
+
+**HTTP serve verification:**
+
+```
+GET /web/assets/54e3003/web_editor.backend_assets_wysiwyg.min.js
+→ HTTP/1.1 200 OK; Content-Length: 690061; Content-Type: application/javascript
+
+GET /web/assets/291811e/web.assets_backend.min.js
+→ HTTP/1.1 200 OK; Content-Length: 4228602
+```
+
+Both bundles serve cleanly through the nginx + Odoo stack.
+
+### Lesson learned: asset-warming via login page is insufficient
+
+`/web/login` triggers `web.assets_frontend` only. Backend bundles (`web.assets_backend`, `web_editor.backend_assets_wysiwyg`, etc.) only compile on authenticated `/web` access. For unattended asset regeneration after a destructive `ir.attachment` clear, the reliable path is the ORM `_get_asset_bundle().js() + .css()` invocation INSIDE odoo shell, with an explicit `env.cr.commit()` so the compiled bundles persist as `ir.attachment` records (otherwise they roll back on shell exit).
+
+This applies to every future Phase deploy where asset state needs to be reset -- the `clear + restart + curl login` pattern is incomplete; the `force compile via shell with commit` pattern is the canonical fix.
+
+### Phase 11 amendment candidate #7
+
+Add to module install/upgrade post-init: a one-line forced compile of the critical bundles immediately after the data load, with explicit commit. Prevents the "install regenerates assets but doesn't persist them" gap from being a manual cleanup step per deploy.
+
+Suggested hook code:
+
+```python
+def _post_init_hook(env):
+    # ... existing grants ...
+
+    # Pre-warm backend bundles so first authenticated client
+    # request doesn't hit a missing ir.attachment.
+    IrQweb = env["ir.qweb"]
+    for bundle_name in (
+        "web.assets_backend",
+        "web_editor.backend_assets_wysiwyg",
+    ):
+        try:
+            bundle = IrQweb._get_asset_bundle(bundle_name)
+            bundle.js()
+            bundle.css()
+        except Exception:
+            # Non-fatal -- bundles will compile lazily on first request
+            pass
+```
+
+Track as Phase 11 CLAUDE.md amendment candidate #7 (now 7 total).
