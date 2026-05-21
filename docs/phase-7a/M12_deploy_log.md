@@ -173,3 +173,52 @@ Rollback path not invoked — deploy clean.
 | Deploy log committed | (this commit) |
 
 Total deploy time: ~3 minutes (excluding deploy-log authoring).
+
+---
+
+## Post-Deploy Manual Grant (21 May 2026, ~14:50 UTC)
+
+Chrome verification surfaced that the `_post_init_hook` targets `base.user_admin` by xmlid only -- which on **prod resolves to a system superuser account** (`superuser@neonhiring.com`, uid=2), NOT Robin's actual login. Robin's prod account is a separate user record (`robin@neonhiring.co.zw`, uid=21), as is Munashe's (`munashe@neonhiring.co.zw`, uid=7). Neither received the auto-grant.
+
+This mismatch was masked on local dev because Tatenda's dev DB has `base.user_admin` configured with login `robin@neonhiring.co.zw` (same xmlid, different login text) -- so dev verification appeared correct while prod was silently missing the grants.
+
+**Manual grant via ORM (with implied_ids propagation):**
+
+```python
+training_admin = env.ref("neon_training.group_neon_training_admin")
+robin = env["res.users"].search([("login", "=", "robin@neonhiring.co.zw")])
+munashe = env["res.users"].search([("login", "=", "munashe@neonhiring.co.zw")])
+training_admin.sudo().write({"users": [(4, robin.id), (4, munashe.id)]})
+env.cr.commit()
+```
+
+**Verification after grant -- three-group cascade per user:**
+
+```
+robin@neonhiring.co.zw   (uid=21):  admin: ✓  signoff: ✓ (implied)  user: ✓ (implied)
+munashe@neonhiring.co.zw (uid=7):   admin: ✓  signoff: ✓ (implied)  user: ✓ (implied)
+```
+
+Final training group membership on prod:
+
+```
+training_admin   (3): munashe / robin / superuser
+training_signoff (3): same 3 via implied_ids
+training_user    (3): same 3 via implied_ids
+```
+
+**Note on execution sequence**: pre-flight at ~14:48 UTC showed both Robin + Munashe with zero training groups. The subsequent grant script at ~14:50 UTC found them ALREADY in `training_admin` -- between the two runs, the grants landed (likely via UI Settings -> Users, applied concurrently by Tatenda during Chrome inspection). End state regardless is the intended one: all three training-tier users in place, implied chain propagated, surfaces visible.
+
+## Phase 11 amendment candidate
+
+The base.user_admin-only auto-grant approach is fragile for multi-tenant or "admin is not user-named-Robin" scenarios. Future Neon module deploys should auto-grant superuser tier (Robin + Munashe + any future MD/OD additions) by **login lookup**, not by base.user_admin xmlid alone.
+
+Two viable patterns -- pick one for Phase 11:
+
+1. **Config-parameter-driven**: `ir.config_parameter` key `neon.superuser_logins` = `'robin@neonhiring.co.zw,munashe@neonhiring.co.zw'`. `_post_init_hook` reads it and grants to every matching user via ORM.
+
+2. **Meta-group**: define `neon_core.group_neon_superuser`. Robin + Munashe are added once during deploy bootstrap. Subsequent module installs grant their tier-admin group to any member of `group_neon_superuser`. This is the cleaner long-term solution -- adds a deterministic "who are our superusers" handle.
+
+Lean: **option 2** (meta-group). Cleaner integration with implied_ids chains; one grant per module install touches a known set; survives admin rotations.
+
+Track as Phase 11 CLAUDE.md amendment candidate #6 (joining the 5 already queued from pre-deploy session #1).
