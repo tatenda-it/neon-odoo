@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M12.1 Cross-Competency Log report.
+
+    Lists documented cross-competency observations grouped by
+    crew member. Each entry shows the cert type the user
+    demonstrated, the event_job context, the observer, and
+    whether the observation was later promoted to a formal cert
+    (M7 promotion workflow).
+-->
+<odoo>
+
+    <record id="neon_training_cross_competency_report_action" model="ir.actions.report">
+        <field name="name">Cross-Competency Log Report</field>
+        <field name="model">neon.training.cross_competency</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">neon_training.report_cross_competency_document</field>
+        <field name="report_file">neon_training.report_cross_competency_document</field>
+        <field name="binding_model_id"
+               ref="model_neon_training_cross_competency"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_cross_competency_document">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2>Cross-Competency Observation Log</h2>
+                    <p>
+                        Documented out-of-cert capabilities
+                        demonstrated on real events. Generated
+                        <span t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/>.
+                    </p>
+
+                    <t t-set="rows" t-value="docs.sorted(lambda c: (c.user_id.name or '', -c.id))"/>
+
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Crew Member</th>
+                                <th>Capability</th>
+                                <th>Demonstrated On</th>
+                                <th>Event</th>
+                                <th>Observer</th>
+                                <th>Promoted to Cert</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="rows" t-as="r">
+                                <td t-out="r.user_id.name"/>
+                                <td t-out="r.certification_type_id.name"/>
+                                <td t-out="r.demonstrated_at"/>
+                                <td t-out="r.demonstrated_through_event_id.display_name"/>
+                                <td t-out="r.observed_by_id.name"/>
+                                <td>
+                                    <t t-if="r.is_promoted">
+                                        Yes
+                                    </t>
+                                    <t t-else="">
+                                        --
+                                    </t>
+                                </td>
+                            </tr>
+                            <tr t-if="not rows">
+                                <td colspan="6">
+                                    <em>No cross-competency
+                                    observations recorded.</em>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p class="text-muted small">
+                        Total observations: <span t-out="len(rows)"/>.
+                        Run this report quarterly to inform
+                        formal training plans (Robin's data-
+                        analytics framing).
+                    </p>
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

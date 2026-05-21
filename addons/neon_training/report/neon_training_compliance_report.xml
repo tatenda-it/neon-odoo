@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M12.1 Compliance Roster report.
+
+    Lists active Safety-category certifications grouped by
+    regulatory body. For ZIMRA / NSSA / other regulator
+    compliance requests. Admin + signoff only (DP8 says sales
+    tier does NOT see this report).
+-->
+<odoo>
+
+    <record id="neon_training_compliance_report_action" model="ir.actions.report">
+        <field name="name">Compliance Roster Report</field>
+        <field name="model">neon.training.certification</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">neon_training.report_compliance_document</field>
+        <field name="report_file">neon_training.report_compliance_document</field>
+        <field name="binding_type">report</field>
+        <field name="groups_id" eval="[
+            (4, ref('neon_training.group_neon_training_signoff')),
+            (4, ref('neon_training.group_neon_training_admin')),
+        ]"/>
+    </record>
+
+    <template id="report_compliance_document">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2>Safety Compliance Roster</h2>
+                    <p>
+                        Active certifications in the Safety
+                        category, grouped by regulatory body.
+                        Generated
+                        <span t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/>.
+                    </p>
+
+                    <t t-set="cat_safety" t-value="env.ref('neon_training.cert_category_safety', raise_if_not_found=False)"/>
+                    <t t-set="rows" t-value="docs.filtered(lambda c: c.state == 'active' and cat_safety and c.type_id.category_id == cat_safety).sorted(lambda c: (c.type_id.regulatory_body or 'zzz', c.user_id.name or ''))"/>
+
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Regulatory Body</th>
+                                <th>Holder</th>
+                                <th>Certification</th>
+                                <th>Obtained</th>
+                                <th>Expires</th>
+                                <th>Verified by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="rows" t-as="r">
+                                <td t-out="r.type_id.regulatory_body or '(unspecified)'"/>
+                                <td t-out="r.user_id.name"/>
+                                <td t-out="r.type_id.name"/>
+                                <td t-out="r.date_obtained"/>
+                                <td t-out="r.date_expires or 'no expiry'"/>
+                                <td t-out="r.verified_by_id.name or '(self)'"/>
+                            </tr>
+                            <tr t-if="not rows">
+                                <td colspan="6">
+                                    <em>No active safety
+                                    certifications.</em>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p class="text-muted small">
+                        Total rows: <span t-out="len(rows)"/>.
+                        Use this report for ZIMRA / NSSA / other
+                        compliance evidence. Sales tier does not
+                        have access to this report (training
+                        signoff + admin only).
+                    </p>
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

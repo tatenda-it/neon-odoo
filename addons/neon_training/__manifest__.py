@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.11.0',
+    'version': '17.0.7.12.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -332,6 +332,11 @@ dashboard.
         # P7a.M12 -- training compliance dashboard form + server
         # action (loaded BEFORE menu).
         'views/neon_training_dashboard_views.xml',
+        # P7a.M12.1 -- three QWeb reports. Load BEFORE menu so
+        # the report action xmlids resolve.
+        'report/neon_training_expiring_report.xml',
+        'report/neon_training_compliance_report.xml',
+        'report/neon_training_cross_competency_report.xml',
         # menus last so action ref()s resolve. M2 added the
         # Configuration submenu; M6 adds Cross-Competencies at
         # sequence=20 between Certifications and Configuration.

@@ -79,6 +79,37 @@
               sequence="30"
               groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
 
+    <!-- P7a.M12.1: Reports submenu (signoff + admin tiers only;
+         sales does not see ZIMRA/NSSA compliance reports per
+         DP8). Three child menu items invoke the M12.1 ir.actions
+         .report records inline. -->
+    <menuitem id="menu_neon_training_reports"
+              name="Reports"
+              parent="menu_neon_training_root"
+              sequence="40"
+              groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_neon_training_report_expiring"
+              name="Expiring Soon"
+              parent="menu_neon_training_reports"
+              action="neon_training_expiring_report_action"
+              sequence="10"
+              groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_neon_training_report_compliance"
+              name="Compliance Roster"
+              parent="menu_neon_training_reports"
+              action="neon_training_compliance_report_action"
+              sequence="20"
+              groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_neon_training_report_cross_competency"
+              name="Cross-Competency Log"
+              parent="menu_neon_training_reports"
+              action="neon_training_cross_competency_report_action"
+              sequence="30"
+              groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+
     <menuitem id="menu_neon_training_configuration"
               name="Configuration"
               parent="menu_neon_training_root"

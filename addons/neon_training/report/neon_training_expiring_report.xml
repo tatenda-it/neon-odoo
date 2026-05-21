@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M12.1 Expiring Soon report.
+
+    Lists active certifications whose date_expires falls within
+    the next 90 days, sorted by proximity. Useful for proactive
+    renewal planning.
+
+    Triggered from Training > Reports > Expiring Soon.
+-->
+<odoo>
+
+    <record id="neon_training_expiring_report_action" model="ir.actions.report">
+        <field name="name">Expiring Soon Report</field>
+        <field name="model">neon.training.certification</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">neon_training.report_expiring_document</field>
+        <field name="report_file">neon_training.report_expiring_document</field>
+        <field name="binding_model_id"
+               ref="model_neon_training_certification"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_expiring_document">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2>Expiring Certifications -- 90 Day Forecast</h2>
+                    <p>
+                        Generated <span t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/>
+                        for active certifications with
+                        <code>date_expires</code> within the next
+                        90 days. Suspended and expired records
+                        excluded.
+                    </p>
+
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Holder</th>
+                                <th>Certification</th>
+                                <th>Category</th>
+                                <th>Level</th>
+                                <th>Obtained</th>
+                                <th>Expires</th>
+                                <th>Days Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="today" t-value="datetime.date.today()"/>
+                            <t t-set="cutoff" t-value="today + datetime.timedelta(days=90)"/>
+                            <t t-set="rows" t-value="docs.filtered(lambda c: c.state == 'active' and c.date_expires and today &lt;= c.date_expires &lt;= cutoff).sorted(lambda c: c.date_expires)"/>
+                            <tr t-foreach="rows" t-as="r">
+                                <td t-out="r.user_id.name"/>
+                                <td t-out="r.type_id.name"/>
+                                <td t-out="r.type_id.category_id.name"/>
+                                <td t-out="r.level or '--'"/>
+                                <td t-out="r.date_obtained"/>
+                                <td t-out="r.date_expires"/>
+                                <td t-out="(r.date_expires - today).days"/>
+                            </tr>
+                            <tr t-if="not rows">
+                                <td colspan="7">
+                                    <em>No certifications expiring within 90 days.</em>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p class="text-muted small">
+                        Total rows: <span t-out="len(rows)"/>.
+                        Run regularly to plan renewals; certs
+                        within 30 days of expiry should be
+                        re-trained immediately.
+                    </p>
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>
