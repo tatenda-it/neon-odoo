@@ -54,6 +54,17 @@ class NeonTrainingDashboard(models.TransientModel):
     _name = "neon.training.dashboard"
     _description = "Training Compliance Dashboard"
 
+    # P7a pre-deploy fix #4 (21 May 2026): override display_name
+    # so the breadcrumb reads "Training Compliance Dashboard"
+    # instead of the default Odoo fallback "neon.training
+    # .dashboard,<id>". The TransientModel materialises a fresh
+    # record per dashboard open, so the id varies (29/37/41/etc.)
+    # -- making the default fallback look like debug noise.
+    # Constant display_name masks the ephemeral id.
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = _("Training Compliance Dashboard")
+
     # ============================================================
     # Counter fields (computed, non-stored)
     # ============================================================
