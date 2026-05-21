@@ -27,3 +27,8 @@ from . import commercial_job_crew
 # inherit so the env['neon.training.assignment_gate_log'].create
 # calls in the crew hooks resolve cleanly.
 from . import neon_training_assignment_gate_log
+# P7a.M10 -- neon.finance.quote inherit for tier-2 (warn) gating.
+# Loads after the gate_log model (which the wizard writes to) and
+# after the crew inherit (which provides the gate_status compute
+# the M10 hook reads).
+from . import neon_finance_quote

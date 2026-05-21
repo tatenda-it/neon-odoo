@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.7.8.0',
+    'version': '17.0.7.9.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -14,7 +14,9 @@
                '(inferred requirements + per-crew gate_status + '
                'event-level roll-up). M9: gating tier 1 -- '
                'informational toast + assignment_gate_log on crew '
-               'assignment with missing qualifications.',
+               'assignment with missing qualifications. M10: '
+               'gating tier 2 -- warn + override-reason wizard at '
+               'quote acceptance.',
     'description': """
 Neon Training
 =============
@@ -264,6 +266,12 @@ dashboard.
         # certification grants; declared now to avoid manifest
         # churn on the next install.
         'neon_crm_extensions',
+        # P7a.M10 -- neon_finance dependency for the
+        # neon.finance.quote inherit (action_accept hook).
+        # No circular dep risk: neon_finance does not depend on
+        # neon_training. Verified at install time during M10
+        # gate-1 discovery.
+        'neon_finance',
     ],
     'data': [
         # security loads first so groups exist before the CSV
@@ -308,6 +316,11 @@ dashboard.
         # deterministic.
         'views/commercial_job_crew_views.xml',
         'views/commercial_event_job_views.xml',
+        # P7a.M10 -- quote-accept override wizard view (transient
+        # model; opened by the M10 hook on action_accept). No
+        # menu entry -- wizard is only ever reached via the
+        # ir.actions.act_window return from neon.finance.quote.
+        'views/neon_training_quote_gate_override_wizard_views.xml',
         # menus last so action ref()s resolve. M2 added the
         # Configuration submenu; M6 adds Cross-Competencies at
         # sequence=20 between Certifications and Configuration.

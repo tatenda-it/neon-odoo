@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7a.M10 quote-accept training gate override wizard view.
+    Single form view, opened as a modal via target='new' from
+    the inherited action_accept on neon.finance.quote.
+
+    Read-only header summary (HTML) + required override_reason
+    textarea + Confirm / Cancel footer buttons.
+-->
+<odoo>
+
+    <record id="neon_training_quote_gate_override_wizard_view_form" model="ir.ui.view">
+        <field name="name">neon.training.quote_gate_override_wizard.form</field>
+        <field name="model">neon.training.quote_gate_override_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Training Gate Override">
+                <group>
+                    <field name="quote_id" readonly="1"/>
+                </group>
+                <field name="affected_summary_html"
+                       widget="html"
+                       readonly="1"/>
+                <group>
+                    <field name="override_reason"
+                           placeholder="Briefly explain why this quote should proceed despite training gaps. This text is recorded against every affected role line and visible to finance approvers."
+                           required="1"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_override"
+                            type="object"
+                            string="Confirm Override + Accept Quote"
+                            class="btn-primary"/>
+                    <button name="action_cancel"
+                            type="object"
+                            string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>
