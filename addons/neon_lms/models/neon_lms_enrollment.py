@@ -12,7 +12,11 @@ slide_partner stays as the Odoo eLearning surface but doesn't
 drive Neon progression. Sync verification between the two is
 deferred to M14 smoke.
 """
-from odoo import api, fields, models, _
+import logging
+
+from odoo import api, fields, models, SUPERUSER_ID, _
+
+_logger = logging.getLogger(__name__)
 
 
 _NEON_ENROLLMENT_STATES = [
@@ -103,6 +107,79 @@ class NeonLMSEnrollment(models.Model):
                     / rec.neon_modules_total)
             else:
                 rec.neon_overall_progress = 0.0
+
+    # ============================================================
+    # M8 workflow -- capstone check + cert issuance
+    # ============================================================
+    def _check_and_advance_to_certified(self):
+        """Called from track.completion._issue_sub_cert.
+        When all 7 track_completion records reach 'certified'
+        state, issue the capstone cert + transition this
+        enrollment to neon_state='certified'.
+
+        Defensive against M9: if channel.neon_capstone_cert_
+        type_id is unset (M9 seeds it), enrollment stays at
+        'completed' until M9 lands.
+        """
+        self.ensure_one()
+        if self.neon_capstone_cert_id:
+            return self.neon_capstone_cert_id
+        track_comps = self.neon_track_completion_ids
+        total_tracks = self.channel_id.neon_total_tracks
+        certified_count = len(track_comps.filtered(
+            lambda tc: tc.state == "certified"))
+        if certified_count < total_tracks:
+            # Not all certified yet -- mark in_progress or
+            # completed depending on coverage.
+            if certified_count == 0:
+                new_state = "enrolled"
+            elif certified_count < total_tracks:
+                new_state = "in_progress"
+            else:
+                new_state = "completed"
+            if self.neon_state != new_state:
+                self.sudo().write({"neon_state": new_state})
+            return False
+        # All certified. Try capstone cert issuance.
+        if not self.channel_id.neon_capstone_cert_type_id:
+            _logger.info(
+                "neon_lms M8: capstone cert_type not set on "
+                "channel %s (M9 seeds). Marking enrollment "
+                "%d as completed; capstone deferred.",
+                self.channel_id.name, self.id)
+            self.sudo().write({
+                "neon_state": "completed",
+                "neon_completion_date": fields.Datetime.now(),
+            })
+            return False
+        learner = self.env["res.users"].sudo().search([
+            ("partner_id", "=", self.partner_id.id),
+        ], limit=1)
+        if not learner:
+            _logger.warning(
+                "neon_lms M8: no res.users for partner %s "
+                "on enrollment %s; capstone not issued.",
+                self.partner_id.id, self.id)
+            return False
+        Cert = self.env["neon.training.certification"]
+        capstone = Cert.sudo().create({
+            "user_id": learner.id,
+            "type_id": (
+                self.channel_id.neon_capstone_cert_type_id.id),
+            "state": "active",
+            "date_obtained": fields.Date.context_today(self),
+            "verified_by_id": SUPERUSER_ID,
+            "verified_at": fields.Datetime.now(),
+        })
+        self.sudo().write({
+            "neon_capstone_cert_id": capstone.id,
+            "neon_state": "certified",
+            "neon_completion_date": fields.Datetime.now(),
+        })
+        _logger.info(
+            "neon_lms M8: capstone %d issued for learner %s.",
+            capstone.id, learner.login)
+        return capstone
 
     @api.depends("neon_track_completion_ids.state",
                  "neon_track_completion_ids."

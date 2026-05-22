@@ -5,7 +5,11 @@ Per schema sketch section 5.11. M8 workflow advances through
 not_started -> in_progress -> completed based on quiz_score
 + scenario completion criteria.
 """
+import logging
+
 from odoo import api, fields, models, _
+
+_logger = logging.getLogger(__name__)
 
 
 _MODULE_COMPLETION_STATES = [
@@ -102,7 +106,7 @@ class NeonLMSModuleCompletion(models.Model):
                 rec.module_id.practical_scenario_ids)
 
     # ============================================================
-    # M8 will wire workflow; M7 ships the transition check.
+    # M7 transition check helper (M8 wires workflow below).
     # ============================================================
     def _can_transition_to_completed(self):
         """True when quiz_score >= module.min_quiz_score AND
@@ -115,3 +119,43 @@ class NeonLMSModuleCompletion(models.Model):
         if self.scenarios_total == 0:
             return True
         return self.scenarios_completed >= self.scenarios_total
+
+    # ============================================================
+    # M8 workflow -- module -> track rollup
+    # ============================================================
+    def _check_and_advance_to_completed(self):
+        """Called on quiz_score write or scenario completion.
+        If criteria met + state != 'completed', advance.
+        Then call track-level rollup.
+        """
+        self.ensure_one()
+        if self.state == "completed":
+            return False
+        if not self._can_transition_to_completed():
+            return False
+        self.sudo().write({
+            "state": "completed",
+            "last_activity": fields.Datetime.now(),
+        })
+        # Track rollup: find this enrollment's track.completion
+        # for the track this module belongs to.
+        TrackComp = self.env["neon.lms.track.completion"]
+        track_comp = TrackComp.sudo().search([
+            ("enrollment_id", "=", self.enrollment_id.id),
+            ("track_id", "=", self.module_id.track_id.id),
+        ], limit=1)
+        if track_comp:
+            track_comp._check_and_advance_to_completed()
+        return True
+
+    def write(self, vals):
+        """Workflow trigger: when quiz_score is written, fire
+        the advance check. Cross-model triggers from M5
+        scenario completion are wired in M8 via a write hook
+        on neon.lms.scenario.completion.
+        """
+        res = super().write(vals)
+        if "quiz_score" in vals:
+            for rec in self:
+                rec._check_and_advance_to_completed()
+        return res

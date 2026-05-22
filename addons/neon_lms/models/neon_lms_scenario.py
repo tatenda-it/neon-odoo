@@ -144,3 +144,41 @@ class NeonLMSScenarioCompletion(models.Model):
          "A learner can have at most one completion record "
          "per scenario."),
     ]
+
+    def write(self, vals):
+        """M8 workflow trigger: when passed flips True, find
+        the learner's module.completion for the scenario's
+        module and fire _check_and_advance_to_completed.
+
+        sudo() on every cross-model read: signoff authorities
+        (lead_tech, training_admin) writing the completion
+        don't necessarily have ACL on neon.lms.module or
+        slide.channel.partner. The hook is workflow logic;
+        run with elevated ACL throughout.
+        """
+        res = super().write(vals)
+        if vals.get("passed"):
+            ModuleComp = self.env.get(
+                "neon.lms.module.completion")
+            if ModuleComp is None:
+                return res
+            for rec in self.filtered(lambda c: c.passed):
+                rec_su = rec.sudo()
+                partner = rec_su.learner_id.partner_id
+                Enrollment = self.env[
+                    "slide.channel.partner"]
+                enrollment = Enrollment.sudo().search([
+                    ("partner_id", "=", partner.id),
+                    ("channel_id", "=",
+                     rec_su.scenario_id.module_id.channel_id.id),
+                ], limit=1)
+                if not enrollment:
+                    continue
+                mc = ModuleComp.sudo().search([
+                    ("enrollment_id", "=", enrollment.id),
+                    ("module_id", "=",
+                     rec_su.scenario_id.module_id.id),
+                ], limit=1)
+                if mc:
+                    mc._check_and_advance_to_completed()
+        return res

@@ -5,7 +5,11 @@ Per schema sketch section 5.10. M8 workflow advances this
 through not_started -> in_progress -> completed -> certified
 based on module completions + sub-cert issuance.
 """
-from odoo import api, fields, models, _
+import logging
+
+from odoo import api, fields, models, SUPERUSER_ID, _
+
+_logger = logging.getLogger(__name__)
 
 
 _TRACK_COMPLETION_STATES = [
@@ -146,3 +150,73 @@ class NeonLMSTrackCompletion(models.Model):
         self.ensure_one()
         return (self.state == "completed"
                 and bool(self.sub_cert_id))
+
+    # ============================================================
+    # M8 workflow -- track rollup + sub-cert issuance + capstone
+    # ============================================================
+    def _check_and_advance_to_completed(self):
+        """If all modules in this track are completed,
+        advance track.completion to 'completed' + try cert
+        issuance.
+        """
+        self.ensure_one()
+        if self.state in ("completed", "certified"):
+            if self.state == "completed":
+                # Retry cert issuance (M9 may have caught up).
+                self._issue_sub_cert()
+            return False
+        self.invalidate_recordset(["modules_completed"])
+        if not self._can_transition_to_completed():
+            return False
+        self.sudo().write({
+            "state": "completed",
+            "completion_date": fields.Datetime.now(),
+        })
+        self._issue_sub_cert()
+        return True
+
+    def _issue_sub_cert(self):
+        """Create the neon.training.certification record for
+        this track. Defensive against M9 not installed --
+        skips when sub_cert_type_id unset.
+        """
+        self.ensure_one()
+        if self.sub_cert_id:
+            return self.sub_cert_id
+        if not self.track_id.sub_cert_type_id:
+            _logger.info(
+                "neon_lms M8: track %s has no sub_cert_type"
+                "_id (M9 seeds). Track stays at 'completed' "
+                "until M9 lands.",
+                self.track_id.code)
+            return False
+        partner = self.enrollment_id.partner_id
+        learner = self.env["res.users"].sudo().search([
+            ("partner_id", "=", partner.id),
+        ], limit=1)
+        if not learner:
+            _logger.warning(
+                "neon_lms M8: no res.users for partner %s "
+                "on enrollment %s; cert not issued.",
+                partner.id, self.enrollment_id.id)
+            return False
+        Cert = self.env["neon.training.certification"]
+        cert = Cert.sudo().create({
+            "user_id": learner.id,
+            "type_id": self.track_id.sub_cert_type_id.id,
+            "state": "active",
+            "date_obtained": fields.Date.context_today(self),
+            "verified_by_id": SUPERUSER_ID,
+            "verified_at": fields.Datetime.now(),
+        })
+        self.sudo().write({
+            "sub_cert_id": cert.id,
+            "state": "certified",
+            "certification_date": fields.Datetime.now(),
+        })
+        _logger.info(
+            "neon_lms M8: sub-cert %d issued for learner %s "
+            "on track %s.",
+            cert.id, learner.login, self.track_id.code)
+        self.enrollment_id._check_and_advance_to_certified()
+        return cert
