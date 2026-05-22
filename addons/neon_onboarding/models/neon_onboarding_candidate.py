@@ -95,6 +95,36 @@ class NeonOnboardingCandidate(models.Model):
     )
 
     # ============================================================
+    # Requirement template (M2 -- auto-populated from
+    # intended_role; manual override permitted via the form)
+    # ============================================================
+    requirement_template_id = fields.Many2one(
+        "neon.onboarding.requirement.template",
+        string="Requirement Template",
+        compute="_compute_requirement_template",
+        store=True,
+        readonly=False,
+        tracking=True,
+        help="Auto-populated from intended_role when an active "
+             "template exists. Can be overridden manually per-"
+             "candidate (readonly=False makes the compute a "
+             "default, not a lock).",
+    )
+
+    @api.depends("intended_role")
+    def _compute_requirement_template(self):
+        Template = self.env["neon.onboarding.requirement.template"]
+        for rec in self:
+            if not rec.intended_role:
+                rec.requirement_template_id = False
+                continue
+            template = Template.sudo().search([
+                ("intended_role", "=", rec.intended_role),
+                ("active", "=", True),
+            ], limit=1)
+            rec.requirement_template_id = template
+
+    # ============================================================
     # User linkage (set on activation)
     # ============================================================
     user_id = fields.Many2one(

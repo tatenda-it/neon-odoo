@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Onboarding",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "Phase 7b -- crew onboarding state machine. "
                "M1 ships the neon.onboarding.candidate model, "
                "4-state machine (candidate / cert_collection / "
@@ -52,6 +52,15 @@ M1 scope:
         # action_neon_onboarding_skip_wizard via %()d lookup.
         "views/neon_onboarding_skip_wizard_views.xml",
         "views/neon_onboarding_candidate_views.xml",
+        # M2 -- requirement template views (load after candidate
+        # views so the parent menu menu_neon_onboarding_root is
+        # in the registry when Configuration submenu attaches).
+        "views/neon_onboarding_requirement_template_views.xml",
+        # M2 seed templates: load AFTER views so any admin
+        # exploration of the model has a UI ready. Templates
+        # reference neon_training cert type xmlids -- those are
+        # loaded earlier via the depends order.
+        "data/neon_onboarding_templates.xml",
     ],
     "installable": True,
     "application": True,

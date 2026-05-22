@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Phase 7b M2 seed templates. One per intended_role.
+
+        noupdate omitted (default 0): seed cert lists evolve as
+        Robin clarifies requirements. Admin tweaks survive via
+        the partial-unique-by-(role,active) constraint (archive
+        + re-create flow).
+
+        Cert type xmlids verified against neon_training M3 seed
+        (preflight 2026-05-22). Substitution:
+        cert_type_fire_safety_outdoor -> cert_type_fire_safety_
+        indoor (outdoor xmlid does not exist in M3 seed; indoor
+        is the only fire-safety variant currently). Update when
+        Robin authorises an outdoor cert type.
+    -->
+
+    <record id="template_driver"
+            model="neon.onboarding.requirement.template">
+        <field name="name">Driver Requirements</field>
+        <field name="intended_role">driver</field>
+        <field name="description">Drivers transport equipment and crew between venues. Minimum requirements: any class of Driver Licence (Class 2 baseline), plus Fire Safety awareness. Class 4 / 5 / PSV are tracked separately and admin can swap the required cert for those roles if needed.</field>
+        <field name="required_cert_type_ids" eval="[(6, 0, [
+            ref('neon_training.cert_type_class_2_driver'),
+            ref('neon_training.cert_type_fire_safety_indoor'),
+        ])]"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="template_lead_tech"
+            model="neon.onboarding.requirement.template">
+        <field name="name">Lead Tech Requirements</field>
+        <field name="intended_role">lead_tech</field>
+        <field name="description">Lead Techs run technical operations on events. Requires Lead Tech role-tier cert, Electrical Live Mains safety, and Fire Safety awareness. Equipment competencies (MA2 / MA3 / Tiger Touch / MagicQ / Digico) are tracked separately; M4 will surface the "any 2 of these" requirement on the candidate form.</field>
+        <field name="required_cert_type_ids" eval="[(6, 0, [
+            ref('neon_training.cert_type_lead_tech'),
+            ref('neon_training.cert_type_electrical_live_mains'),
+            ref('neon_training.cert_type_fire_safety_indoor'),
+        ])]"/>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="template_tech"
+            model="neon.onboarding.requirement.template">
+        <field name="name">Tech Requirements</field>
+        <field name="intended_role">tech</field>
+        <field name="description">Techs operate equipment under Lead Tech supervision. Requires Tech role-tier cert plus Fire Safety awareness. Equipment competencies tracked separately; M4 surfaces the "any 1 of console certs" requirement.</field>
+        <field name="required_cert_type_ids" eval="[(6, 0, [
+            ref('neon_training.cert_type_tech'),
+            ref('neon_training.cert_type_fire_safety_indoor'),
+        ])]"/>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="template_runner"
+            model="neon.onboarding.requirement.template">
+        <field name="name">Runner Requirements</field>
+        <field name="intended_role">runner</field>
+        <field name="description">Runners support load-in / load-out and on-site coordination. Lightest requirement set: Runner role-tier cert plus Fire Safety awareness. Promotion path to Tech via additional equipment certs later.</field>
+        <field name="required_cert_type_ids" eval="[(6, 0, [
+            ref('neon_training.cert_type_runner'),
+            ref('neon_training.cert_type_fire_safety_indoor'),
+        ])]"/>
+        <field name="sequence">40</field>
+    </record>
+</odoo>

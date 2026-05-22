@@ -8,3 +8,6 @@ access_audit_log_training_admin,Audit Log - Training Admin,model_neon_onboarding
 access_audit_log_training_signoff,Audit Log - Training Signoff,model_neon_onboarding_audit_log,neon_training.group_neon_training_signoff,1,0,0,0
 access_audit_log_training_user,Audit Log - Training User,model_neon_onboarding_audit_log,neon_training.group_neon_training_user,1,0,0,0
 access_skip_wizard_superuser,Skip Wizard - Superuser,model_neon_onboarding_skip_wizard,neon_core.group_neon_superuser,1,1,1,1
+access_template_superuser,Requirement Template - Superuser,model_neon_onboarding_requirement_template,neon_core.group_neon_superuser,1,1,1,0
+access_template_training_admin,Requirement Template - Training Admin,model_neon_onboarding_requirement_template,neon_training.group_neon_training_admin,1,1,1,0
+access_template_all_users,Requirement Template - All Internal Users (read only),model_neon_onboarding_requirement_template,base.group_user,1,0,0,0

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_template_tree" model="ir.ui.view">
+        <field name="name">neon.onboarding.requirement.template.tree</field>
+        <field name="model">neon.onboarding.requirement.template</field>
+        <field name="arch" type="xml">
+            <tree string="Requirement Templates"
+                  decoration-muted="not active">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="intended_role"/>
+                <field name="required_cert_count" string="Certs"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_template_form" model="ir.ui.view">
+        <field name="name">neon.onboarding.requirement.template.form</field>
+        <field name="model">neon.onboarding.requirement.template</field>
+        <field name="arch" type="xml">
+            <form string="Requirement Template">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="toggle_active" type="object"
+                                class="oe_stat_button"
+                                icon="fa-archive">
+                            <field name="active" widget="boolean_button"
+                                   options='{"terminology": "archive"}'/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Driver Requirements"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="intended_role"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="required_cert_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <separator string="Description"/>
+                    <field name="description" nolabel="1"
+                           placeholder="Notes about this template -- surfaced on the candidate form when this template is applied."/>
+                    <separator string="Required Certifications"/>
+                    <field name="required_cert_type_ids" widget="many2many_tags"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_onboarding_template"
+            model="ir.actions.act_window">
+        <field name="name">Requirement Templates</field>
+        <field name="res_model">neon.onboarding.requirement.template</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'active_test': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No templates yet. Use one of the seeded templates
+                (Driver / Lead Tech / Tech / Runner) or create
+                your own.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_neon_onboarding_config"
+              name="Configuration"
+              parent="menu_neon_onboarding_root"
+              sequence="90"
+              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_neon_onboarding_templates"
+              name="Requirement Templates"
+              parent="menu_neon_onboarding_config"
+              action="action_neon_onboarding_template"
+              sequence="10"/>
+</odoo>
