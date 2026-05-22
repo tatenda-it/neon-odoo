@@ -182,6 +182,18 @@ class NeonTrainingAssignmentGateLog(models.Model):
         "M9 hooks populate explicitly so the timestamp matches "
         "the assignment moment.",
     )
+    fire_reason = fields.Char(
+        string="Fire Reason",
+        help="Discriminator for non-standard gate fires. M9 / "
+             "M10 / M11 leave this null (the gate_status_at_"
+             "fire + gate_tier combination is enough). Phase "
+             "7b M5 uses 'probationary_role_restriction' to "
+             "tag entries fired because an onboarding "
+             "candidate in probationary state was assigned to "
+             "a non-runner role. Future fire-reason values "
+             "extend this enum-by-convention without schema "
+             "changes.",
+    )
     triggered_by_id = fields.Many2one(
         "res.users",
         string="Triggered By",

@@ -535,6 +535,74 @@ class CommercialJobCrew(models.Model):
             "sticky":  False,
         }
 
+    # ============================================================
+    # Phase 7b M5 -- probationary role restriction hook.
+    #
+    # When a crew row's user_id matches an onboarding candidate
+    # in probationary state, the crew row's role must be 'runner'
+    # (or null). Non-runner assignments fire a tier_3 (block)
+    # gate_log entry with fire_reason='probationary_role_
+    # restriction'. The block surfaces via the existing M11
+    # event-start gate; M5 doesn't add a separate UI surface.
+    #
+    # Defensive env.get() pattern: neon_onboarding may not be
+    # installed (the M5 hook degrades to no-op in that case).
+    # ============================================================
+    def _m5_probationary_violation_for_user(self, user_id, role):
+        """Return a violation dict if the user is in
+        probationary onboarding and role is non-runner;
+        otherwise None.
+
+        Safe to call when neon_onboarding is not installed --
+        env.get returns None and we exit cleanly.
+        """
+        if not user_id:
+            return None
+        Candidate = self.env.get(
+            "neon.onboarding.candidate")
+        if Candidate is None:
+            return None
+        candidate = self.env["neon.onboarding.candidate"].sudo().search([
+            ("user_id", "=", user_id),
+            ("state", "=", "probationary"),
+        ], limit=1)
+        if not candidate:
+            return None
+        if role == "runner" or not role:
+            return None
+        return {
+            "candidate_id": candidate.id,
+            "candidate_name": candidate.display_name,
+            "role": role,
+        }
+
+    def _m5_create_probationary_gate_log(self, violation):
+        """Write a tier_3 gate_log entry for the M5 probationary
+        block. fire_reason='probationary_role_restriction' so
+        downstream filtering distinguishes M5 fires from M9/
+        M10/M11 fires.
+        """
+        self.ensure_one()
+        GateLog = self.env["neon.training.assignment_gate_log"]
+        event_jobs = self._m9_eligible_event_jobs()
+        if not event_jobs:
+            return GateLog
+        triggering_user = self.env.user
+        now = fields.Datetime.now()
+        log_vals_list = []
+        for ej in event_jobs:
+            log_vals_list.append({
+                "event_job_id": ej.id,
+                "crew_id": self.id,
+                "user_id": self.user_id.id,
+                "gate_tier": "tier_3_event_start",
+                "gate_status_at_fire": "unqualified",
+                "fire_reason": "probationary_role_restriction",
+                "fired_at": now,
+                "triggered_by_id": triggering_user.id,
+            })
+        return GateLog.sudo().create(log_vals_list)
+
     @api.model_create_multi
     def create(self, vals_list):
         """DP6: create() is the dominant assignment moment. A
@@ -562,6 +630,15 @@ class CommercialJobCrew(models.Model):
                     "unqualified", "needs_cross_competency"):
                 rec_su._create_tier_1_gate_log_and_toast(
                     evaluation, buffer)
+            # P7b M5 -- probationary role check fires alongside
+            # the M9 cert check. Independent gate_log entry per
+            # event_job; no toast (M5 doesn't replicate M9's UI
+            # surface -- the M11 block flow already covers
+            # crew-on-event UX).
+            violation = rec._m5_probationary_violation_for_user(
+                rec.user_id.id, rec.role)
+            if violation:
+                rec_su._m5_create_probationary_gate_log(violation)
         if buffer:
             # Capture the real user partner BEFORE sudo so the
             # toast lands on the sales rep, not SUPERUSER.
@@ -604,6 +681,11 @@ class CommercialJobCrew(models.Model):
                     "unqualified", "needs_cross_competency"):
                 rec_su._create_tier_1_gate_log_and_toast(
                     evaluation, buffer)
+            # P7b M5 -- probationary check on re-assignment.
+            violation = rec._m5_probationary_violation_for_user(
+                rec.user_id.id, rec.role)
+            if violation:
+                rec_su._m5_create_probationary_gate_log(violation)
         if buffer:
             self.sudo()._m9_emit_aggregated_toast(
                 buffer, self.env.user.partner_id)
