@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        17 modules grouped under their tracks per schema
+        sketch section 7. Module codes (M01-M17) are stable;
+        slide content (M12 migration) and quizzes (M4) link
+        in via the codes.
+    -->
+
+    <!-- Track 1: Foundations and Safety (M01, M08) -->
+    <record id="module_m01" model="neon.lms.module">
+        <field name="code">M01</field>
+        <field name="name">Foundations of Workshop Safety</field>
+        <field name="track_id" ref="track_foundations_safety"/>
+        <field name="sequence_in_track">10</field>
+    </record>
+    <record id="module_m08" model="neon.lms.module">
+        <field name="code">M08</field>
+        <field name="name">Power and Electrical Discipline</field>
+        <field name="track_id" ref="track_foundations_safety"/>
+        <field name="sequence_in_track">20</field>
+    </record>
+
+    <!-- Track 2: Audio (M02, M03, M15) -->
+    <record id="module_m02" model="neon.lms.module">
+        <field name="code">M02</field>
+        <field name="name">Audio Basics</field>
+        <field name="track_id" ref="track_audio"/>
+        <field name="sequence_in_track">10</field>
+    </record>
+    <record id="module_m03" model="neon.lms.module">
+        <field name="code">M03</field>
+        <field name="name">Audio Advanced</field>
+        <field name="track_id" ref="track_audio"/>
+        <field name="sequence_in_track">20</field>
+    </record>
+    <record id="module_m15" model="neon.lms.module">
+        <field name="code">M15</field>
+        <field name="name">Allen and Heath SQ6</field>
+        <field name="track_id" ref="track_audio"/>
+        <field name="sequence_in_track">30</field>
+    </record>
+
+    <!-- Track 3: Lighting (M04, M05, M14) -->
+    <record id="module_m04" model="neon.lms.module">
+        <field name="code">M04</field>
+        <field name="name">Lighting Basics</field>
+        <field name="track_id" ref="track_lighting"/>
+        <field name="sequence_in_track">10</field>
+    </record>
+    <record id="module_m05" model="neon.lms.module">
+        <field name="code">M05</field>
+        <field name="name">Lighting Advanced</field>
+        <field name="track_id" ref="track_lighting"/>
+        <field name="sequence_in_track">20</field>
+    </record>
+    <record id="module_m14" model="neon.lms.module">
+        <field name="code">M14</field>
+        <field name="name">Avolites Titan Mobile</field>
+        <field name="track_id" ref="track_lighting"/>
+        <field name="sequence_in_track">30</field>
+    </record>
+
+    <!-- Track 4: Video & LED (M06, M07, M16) -->
+    <record id="module_m06" model="neon.lms.module">
+        <field name="code">M06</field>
+        <field name="name">LED and Video Basics</field>
+        <field name="track_id" ref="track_video_led"/>
+        <field name="sequence_in_track">10</field>
+    </record>
+    <record id="module_m07" model="neon.lms.module">
+        <field name="code">M07</field>
+        <field name="name">LED and Video Advanced</field>
+        <field name="track_id" ref="track_video_led"/>
+        <field name="sequence_in_track">20</field>
+    </record>
+    <record id="module_m16" model="neon.lms.module">
+        <field name="code">M16</field>
+        <field name="name">Kommander Media Server</field>
+        <field name="track_id" ref="track_video_led"/>
+        <field name="sequence_in_track">30</field>
+    </record>
+
+    <!-- Track 5: Workflow & Ops (M09, M10, M11) -->
+    <record id="module_m09" model="neon.lms.module">
+        <field name="code">M09</field>
+        <field name="name">Event Setup Workflow</field>
+        <field name="track_id" ref="track_workflow_ops"/>
+        <field name="sequence_in_track">10</field>
+    </record>
+    <record id="module_m10" model="neon.lms.module">
+        <field name="code">M10</field>
+        <field name="name">Fault Finding and Troubleshooting</field>
+        <field name="track_id" ref="track_workflow_ops"/>
+        <field name="sequence_in_track">20</field>
+    </record>
+    <record id="module_m11" model="neon.lms.module">
+        <field name="code">M11</field>
+        <field name="name">Warehouse and Equipment Care</field>
+        <field name="track_id" ref="track_workflow_ops"/>
+        <field name="sequence_in_track">30</field>
+    </record>
+
+    <!-- Track 6: Soft Skills (M12, M13) -->
+    <record id="module_m12" model="neon.lms.module">
+        <field name="code">M12</field>
+        <field name="name">Professional Communication and Team Discipline</field>
+        <field name="track_id" ref="track_soft_skills"/>
+        <field name="sequence_in_track">10</field>
+    </record>
+    <record id="module_m13" model="neon.lms.module">
+        <field name="code">M13</field>
+        <field name="name">Leadership, Responsibility and Team Standards</field>
+        <field name="track_id" ref="track_soft_skills"/>
+        <field name="sequence_in_track">20</field>
+    </record>
+
+    <!-- Track 7: Rigging (M17) -->
+    <record id="module_m17" model="neon.lms.module">
+        <field name="code">M17</field>
+        <field name="name">Truss Systems and Rigging Discipline</field>
+        <field name="track_id" ref="track_rigging"/>
+        <field name="sequence_in_track">10</field>
+    </record>
+</odoo>

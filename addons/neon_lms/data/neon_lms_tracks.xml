@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        The 7 tracks. Per schema sketch section 7:
+        * Foundations and Safety = the strict gate
+          (is_foundation_gate=True, no prereqs)
+        * 6 other tracks = prereq Foundations
+        sub_cert_type_id + operating_authority_ids populated
+        by M2 + M9 seeds. M1 leaves them empty.
+    -->
+
+    <record id="track_foundations_safety"
+            model="neon.lms.track">
+        <field name="code">TRK_FOUND_SAFETY</field>
+        <field name="name">Foundations and Safety</field>
+        <field name="description">The foundation track. Workshop safety fundamentals plus power and electrical discipline. Must be completed before any other track unlocks. Grants stop-work and electrical operating authority on completion.</field>
+        <field name="channel_id" ref="program_channel"/>
+        <field name="sequence">10</field>
+        <field name="is_foundation_gate" eval="True"/>
+    </record>
+
+    <record id="track_audio" model="neon.lms.track">
+        <field name="code">TRK_AUDIO</field>
+        <field name="name">Audio Technical</field>
+        <field name="description">Audio fundamentals through advanced operations on Allen and Heath SQ6 consoles.</field>
+        <field name="channel_id" ref="program_channel"/>
+        <field name="sequence">20</field>
+        <field name="prerequisite_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+
+    <record id="track_lighting" model="neon.lms.track">
+        <field name="code">TRK_LIGHTING</field>
+        <field name="name">Lighting Technical</field>
+        <field name="description">Lighting fundamentals through advanced operations on Avolites Titan Mobile.</field>
+        <field name="channel_id" ref="program_channel"/>
+        <field name="sequence">30</field>
+        <field name="prerequisite_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+
+    <record id="track_video_led" model="neon.lms.track">
+        <field name="code">TRK_VIDEO_LED</field>
+        <field name="name">Video and LED Technical</field>
+        <field name="description">LED video fundamentals through advanced media server operations on Kommander.</field>
+        <field name="channel_id" ref="program_channel"/>
+        <field name="sequence">40</field>
+        <field name="prerequisite_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+
+    <record id="track_workflow_ops" model="neon.lms.track">
+        <field name="code">TRK_WORKFLOW_OPS</field>
+        <field name="name">Workflow and Operations</field>
+        <field name="description">Event setup workflow, fault finding and troubleshooting, warehouse and equipment care. Combines with Foundations to grant generator and outdoor_public operating authority.</field>
+        <field name="channel_id" ref="program_channel"/>
+        <field name="sequence">50</field>
+        <field name="prerequisite_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+
+    <record id="track_soft_skills" model="neon.lms.track">
+        <field name="code">TRK_SOFT_SKILLS</field>
+        <field name="name">Soft Skills</field>
+        <field name="description">Professional communication, team discipline, leadership, and team standards. Issues the Client-Ready sub-cert.</field>
+        <field name="channel_id" ref="program_channel"/>
+        <field name="sequence">60</field>
+        <field name="prerequisite_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+
+    <record id="track_rigging" model="neon.lms.track">
+        <field name="code">TRK_RIGGING</field>
+        <field name="name">Rigging</field>
+        <field name="description">Truss systems and rigging discipline. Combines with Foundations to grant rigging and working_at_height (with practical signoff) operating authority.</field>
+        <field name="channel_id" ref="program_channel"/>
+        <field name="sequence">70</field>
+        <field name="prerequisite_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+</odoo>

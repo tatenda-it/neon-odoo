@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        The single slide.channel for the Neon Workshop
+        Training Program. All 7 tracks + 17 modules belong
+        to this channel. M1 ships state=draft; admin promotes
+        to active once M7 enrollment + content (M12) is
+        ready.
+    -->
+    <record id="program_channel" model="slide.channel">
+        <field name="name">Neon Workshop Training Program</field>
+        <field name="description">The Neon Workshop training program. Seven sub-courses (Foundations and Safety, Audio, Lighting, Video and LED, Workflow and Operations, Soft Skills, Rigging) plus a capstone. Foundations is the strict prerequisite gate.</field>
+        <field name="enroll">invite</field>
+        <field name="channel_type">training</field>
+        <field name="neon_program_state">draft</field>
+    </record>
+</odoo>
