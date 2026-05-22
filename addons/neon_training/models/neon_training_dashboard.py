@@ -135,6 +135,28 @@ class NeonTrainingDashboard(models.TransientModel):
     )
 
     # ============================================================
+    # Phase 7b M11 -- onboarding counters
+    #
+    # Two non-stored computed Integers. Read from neon.onboarding.
+    # candidate via defensive env.get pattern so this Phase 7a
+    # model stays installable when neon_onboarding is not present.
+    # ============================================================
+    candidates_in_cert_collection = fields.Integer(
+        string="In Cert Collection",
+        compute="_compute_onboarding_counters",
+        store=False,
+        help="Candidates currently in cert_collection state. "
+             "Returns 0 if neon_onboarding is not installed.",
+    )
+    candidates_in_probationary = fields.Integer(
+        string="Probationary",
+        compute="_compute_onboarding_counters",
+        store=False,
+        help="Candidates currently in probationary state. "
+             "Returns 0 if neon_onboarding is not installed.",
+    )
+
+    # ============================================================
     # Access check + compute
     # ============================================================
     def _check_dashboard_access(self):
@@ -327,6 +349,54 @@ class NeonTrainingDashboard(models.TransientModel):
                 ("fired_at", ">=", cutoff),
             ],
             name=tier_label_map.get(tier, _("Gate Fires (30 days)")))
+
+    # ============================================================
+    # Phase 7b M11 -- onboarding compute + drill-through.
+    # ============================================================
+    def _compute_onboarding_counters(self):
+        """Defensive lookup: neon.onboarding.candidate may not
+        exist on this DB if neon_onboarding isn't installed.
+        env.get returns None in that case; counters return 0
+        so the dashboard renders cleanly either way.
+        """
+        Candidate = self.env.get("neon.onboarding.candidate")
+        for rec in self:
+            if Candidate is None:
+                rec.candidates_in_cert_collection = 0
+                rec.candidates_in_probationary = 0
+                continue
+            rec.candidates_in_cert_collection = (
+                Candidate.sudo().search_count([
+                    ("state", "=", "cert_collection"),
+                ]))
+            rec.candidates_in_probationary = (
+                Candidate.sudo().search_count([
+                    ("state", "=", "probationary"),
+                ]))
+
+    def action_view_candidates_cert_collection(self):
+        """Drill-through to candidates filtered by state=
+        cert_collection. Returns False if neon_onboarding is
+        not installed (button stays inert).
+        """
+        self.ensure_one()
+        Candidate = self.env.get("neon.onboarding.candidate")
+        if Candidate is None:
+            return False
+        return self._drill(
+            "neon_onboarding.action_neon_onboarding_candidate",
+            domain=[("state", "=", "cert_collection")],
+            name=_("Candidates in Cert Collection"))
+
+    def action_view_candidates_probationary(self):
+        self.ensure_one()
+        Candidate = self.env.get("neon.onboarding.candidate")
+        if Candidate is None:
+            return False
+        return self._drill(
+            "neon_onboarding.action_neon_onboarding_candidate",
+            domain=[("state", "=", "probationary")],
+            name=_("Candidates in Probationary"))
 
     def _drill(self, action_xmlid, domain, name):
         """Resolve the named action, overlay the drill domain,

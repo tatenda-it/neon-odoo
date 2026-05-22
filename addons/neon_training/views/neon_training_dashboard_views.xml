@@ -134,6 +134,25 @@
                                         context="{'dashboard_tier': 'tier_3_event_start'}"/>
                             </div>
                         </group>
+                        <group string="Onboarding"
+                               name="onboarding_group">
+                            <field name="candidates_in_cert_collection"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_candidates_cert_collection"
+                                        type="object"
+                                        string="View Candidates (Cert Collection)"
+                                        class="btn-link"/>
+                            </div>
+                            <field name="candidates_in_probationary"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_candidates_probationary"
+                                        type="object"
+                                        string="View Candidates (Probationary)"
+                                        class="btn-link"/>
+                            </div>
+                        </group>
                     </group>
                 </sheet>
             </form>
