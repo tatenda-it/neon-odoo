@@ -8,3 +8,7 @@ access_lms_module_crew,LMS Module - Crew (read),model_neon_lms_module,neon_jobs.
 access_lms_authority_admin,LMS Authority - Training Admin,model_neon_lms_operating_authority,neon_training.group_neon_training_admin,1,1,1,0
 access_lms_authority_manager,LMS Authority - Jobs Manager,model_neon_lms_operating_authority,neon_jobs.group_neon_jobs_manager,1,0,0,0
 access_lms_authority_crew,LMS Authority - Crew (read),model_neon_lms_operating_authority,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_lms_question_admin,LMS Question - Training Admin,model_neon_lms_quiz_question,neon_training.group_neon_training_admin,1,1,1,0
+access_lms_question_crew,LMS Question - Crew (read; attempt-scoped via rule in M8),model_neon_lms_quiz_question,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_lms_option_admin,LMS Option - Training Admin,model_neon_lms_quiz_option,neon_training.group_neon_training_admin,1,1,1,1
+access_lms_option_crew,LMS Option - Crew (read),model_neon_lms_quiz_option,neon_jobs.group_neon_jobs_crew,1,0,0,0
