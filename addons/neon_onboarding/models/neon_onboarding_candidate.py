@@ -173,11 +173,58 @@ class NeonOnboardingCandidate(models.Model):
     )
     probationary_jobs_completed = fields.Integer(
         string="Probationary Jobs Completed",
-        default=0,
+        compute="_compute_probationary_jobs_completed",
+        store=True,
         copy=False,
-        help="M1 stub -- plain Integer. M5 converts to computed "
-             "from commercial.job.crew + job.state='completed'.",
+        help="Count of completed event_jobs the candidate has "
+             "worked since their promote_probationary audit "
+             "log entry (or since date_started if no audit "
+             "entry exists). Recomputes on user_id or state "
+             "changes; full recompute triggered manually when "
+             "event_job state changes -- a daily cron in M11 "
+             "polish handles the refresh-on-event-completion "
+             "case.",
     )
+
+    @api.depends("user_id", "state", "audit_log_ids")
+    def _compute_probationary_jobs_completed(self):
+        """Count completed event_jobs the candidate's user_id
+        has been crew on, since the promote_probationary audit
+        log timestamp (or date_started fallback).
+
+        Defensive against missing neon_jobs via env.get pattern,
+        though in practice neon_jobs is always installed when
+        neon_onboarding is (manifest depends).
+        """
+        Crew = self.env.get("commercial.job.crew")
+        for rec in self:
+            if (not rec.user_id
+                    or rec.state not in (
+                        "probationary", "active")
+                    or Crew is None):
+                rec.probationary_jobs_completed = 0
+                continue
+            # Find the promote_probationary audit entry to
+            # establish the counting cutoff.
+            promote_log = rec.audit_log_ids.filtered(
+                lambda a: a.action == "promote_probationary"
+            ).sorted("timestamp")[:1]
+            since = (promote_log.timestamp
+                     if promote_log
+                     else rec.date_started)
+            # Crew rows the candidate's user is on; map to
+            # event_jobs; filter completed + within window.
+            crew_rows = Crew.sudo().search([
+                ("user_id", "=", rec.user_id.id),
+            ])
+            event_jobs = crew_rows.mapped("job_id.event_job_ids")
+            rec.probationary_jobs_completed = len(
+                event_jobs.filtered(
+                    lambda ej: ej.state == "completed"
+                    and ej.event_date
+                    and ej.event_date >= (
+                        since.date() if since else ej.event_date)
+                ))
 
     # ============================================================
     # Override metadata
