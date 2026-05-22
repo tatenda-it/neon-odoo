@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_neon_onboarding_promote_wizard_form"
+            model="ir.ui.view">
+        <field name="name">neon.onboarding.promote.wizard.form</field>
+        <field name="model">neon.onboarding.promote.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Promote Candidate to Active">
+                <p>
+                    Promote this candidate from
+                    <strong>Probationary</strong> to
+                    <strong>Active</strong>. Once active, the
+                    candidate can be assigned to their
+                    intended role on event jobs (no longer
+                    restricted to runner).
+                </p>
+                <p class="text-muted">
+                    If the candidate has no user account, one
+                    will be created automatically using
+                    contact_email as the login. The new user
+                    receives Crew + Training User groups.
+                </p>
+                <group>
+                    <field name="candidate_id" readonly="1"/>
+                    <field name="candidate_state" readonly="1"/>
+                    <field name="jobs_completed" readonly="1"/>
+                    <field name="jobs_target" readonly="1"/>
+                    <field name="candidate_user_id" readonly="1"/>
+                </group>
+                <separator string="User Account"/>
+                <group>
+                    <field name="create_user"/>
+                    <field name="proposed_login"
+                           invisible="not create_user"
+                           required="create_user"/>
+                </group>
+                <separator string="Promotion Notes (optional)"/>
+                <field name="notes"
+                       nolabel="1"
+                       placeholder="e.g. Completed 5 of 3 probationary jobs ahead of schedule; promote early."/>
+                <footer>
+                    <button name="action_promote" type="object"
+                            string="Promote to Active"
+                            class="oe_highlight"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_onboarding_promote_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Promote to Active</field>
+        <field name="res_model">neon.onboarding.promote.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="groups_id"
+               eval="[(4, ref('neon_core.group_neon_superuser')),
+                      (4, ref('neon_training.group_neon_training_admin'))]"/>
+    </record>
+</odoo>

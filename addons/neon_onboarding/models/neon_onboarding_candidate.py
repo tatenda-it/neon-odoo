@@ -186,6 +186,52 @@ class NeonOnboardingCandidate(models.Model):
              "case.",
     )
 
+    # ============================================================
+    # M6 -- ready-for-promotion visual cue + wizard launcher
+    # ============================================================
+    ready_for_promotion = fields.Boolean(
+        compute="_compute_ready_for_promotion",
+        store=False,
+        string="Ready for Promotion",
+        help="Visual cue only. True when state='probationary' "
+             "AND probationary_jobs_completed >= "
+             "probationary_jobs_target. No auto-action: "
+             "Robin / Munashe decide each promotion manually "
+             "via the Promote to Active wizard.",
+    )
+
+    @api.depends("state",
+                 "probationary_jobs_completed",
+                 "probationary_jobs_target")
+    def _compute_ready_for_promotion(self):
+        for rec in self:
+            rec.ready_for_promotion = (
+                rec.state == "probationary"
+                and rec.probationary_jobs_completed
+                >= rec.probationary_jobs_target
+            )
+
+    def action_open_promote_wizard(self):
+        """Launch the Promote to Active wizard for this
+        candidate. Visibility on the candidate form is gated
+        by groups + state attrs; this method is defensive
+        belt-and-braces: if a non-eligible candidate's record
+        URL is hit, the wizard's own action_promote check
+        raises a useful UserError.
+        """
+        self.ensure_one()
+        return {
+            "name": _("Promote %s to Active") % self.name,
+            "type": "ir.actions.act_window",
+            "res_model": "neon.onboarding.promote.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_candidate_id": self.id,
+                "default_create_user": not bool(self.user_id),
+            },
+        }
+
     @api.depends("user_id", "state", "audit_log_ids")
     def _compute_probationary_jobs_completed(self):
         """Count completed event_jobs the candidate's user_id

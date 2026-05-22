@@ -98,6 +98,12 @@
         <field name="arch" type="xml">
             <form string="Onboarding Candidate">
                 <header>
+                    <button name="action_open_promote_wizard"
+                            type="object"
+                            string="Promote to Active"
+                            class="btn-primary"
+                            groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"
+                            invisible="state != 'probationary'"/>
                     <button name="%(action_neon_onboarding_skip_wizard)d"
                             type="action"
                             string="Skip Onboarding (Admin)"
@@ -118,6 +124,16 @@
                         <h3 class="text-muted">
                             <field name="intended_role"/>
                         </h3>
+                        <field name="ready_for_promotion" invisible="1"/>
+                        <span class="badge text-bg-success ms-2"
+                              invisible="not ready_for_promotion">
+                            Ready for Promotion
+                            (<field name="probationary_jobs_completed"
+                                    readonly="1" nolabel="1"
+                                    class="ms-1"/>/<field
+                                name="probationary_jobs_target"
+                                readonly="1" nolabel="1"/> jobs)
+                        </span>
                     </div>
                     <group>
                         <group string="Person &amp; Contact">

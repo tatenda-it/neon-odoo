@@ -11,3 +11,5 @@ access_skip_wizard_superuser,Skip Wizard - Superuser,model_neon_onboarding_skip_
 access_template_superuser,Requirement Template - Superuser,model_neon_onboarding_requirement_template,neon_core.group_neon_superuser,1,1,1,0
 access_template_training_admin,Requirement Template - Training Admin,model_neon_onboarding_requirement_template,neon_training.group_neon_training_admin,1,1,1,0
 access_template_all_users,Requirement Template - All Internal Users (read only),model_neon_onboarding_requirement_template,base.group_user,1,0,0,0
+access_promote_wizard_superuser,Promote Wizard - Superuser,model_neon_onboarding_promote_wizard,neon_core.group_neon_superuser,1,1,1,1
+access_promote_wizard_training_admin,Promote Wizard - Training Admin,model_neon_onboarding_promote_wizard,neon_training.group_neon_training_admin,1,1,1,1

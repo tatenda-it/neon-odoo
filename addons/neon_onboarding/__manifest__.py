@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Onboarding",
-    "version": "17.0.1.4.0",
+    "version": "17.0.1.5.0",
     "summary": "Phase 7b -- crew onboarding state machine. "
                "M1 ships the neon.onboarding.candidate model, "
                "4-state machine (candidate / cert_collection / "
@@ -51,6 +51,13 @@ M1 scope:
         # candidate form's Skip Onboarding button references
         # action_neon_onboarding_skip_wizard via %()d lookup.
         "views/neon_onboarding_skip_wizard_views.xml",
+        # M6 -- promote wizard views (load BEFORE candidate
+        # views since the candidate form's Promote button
+        # uses the wizard's action via the object-method
+        # path, NOT via %()d action xmlid -- so technically
+        # load order doesn't matter for that button. Kept
+        # here for consistency with the skip wizard pattern.
+        "views/neon_onboarding_promote_wizard_views.xml",
         "views/neon_onboarding_candidate_views.xml",
         "views/neon_onboarding_requirement_template_views.xml",
         # M3 -- menus consolidated into one file. Must load
