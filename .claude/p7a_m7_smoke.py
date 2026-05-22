@@ -76,6 +76,25 @@ assert (u_subject and u_signoff and u_admin and u_user
         and lead_tech_user and finance_approver_user), (
     "Missing fixture users")
 
+# Phase 11 cert-verification routing override: TODOs always
+# route to managerial superusers (Robin + Munashe). The cert
+# type's sign_off_authority field is documentation only;
+# routing no longer consults it. Spec contract under test for
+# T7700-T7702/T7704/T7718: recipient IN CERT_VERIFIER_LOGINS,
+# both verifiers subscribed as followers.
+CERT_VERIFIER_LOGINS = (
+    "robin@neonhiring.co.zw",
+    "munashe@neonhiring.co.zw",
+)
+verifier_users = Users.sudo().search([
+    ("login", "in", list(CERT_VERIFIER_LOGINS)),
+    ("active", "=", True),
+])
+assert len(verifier_users) == 2, (
+    "Cert verifier override expects both Robin + Munashe to "
+    "exist on this DB; found %d" % len(verifier_users))
+verifier_partners = verifier_users.mapped("partner_id")
+
 # Cleanup prior fixture certs from p7am2_subject so the unique-
 # active-per-(user, type) constraint doesn't trip.
 env.cr.execute(
@@ -153,22 +172,21 @@ todos = Activity.sudo().search([
     ("res_id", "=", c_t7700.id),
     ("summary", "=ilike", "Verify%"),
 ])
-# P11/neon_core: assert TODO recipient is IN the lead_tech
-# authority group (the spec), not equal to a specific fixture
-# user (the implementation detail of "first by id"). With
-# neon_core's superuser meta-group cascading crew_leader to
-# Robin/Munashe/Tatenda, lower-uid superusers now win the
-# first-by-id pick; that's a routing-implication noted in
-# Phase 11 polish backlog, but the test contract is satisfied.
-lt_grp = env.ref("neon_jobs.group_neon_jobs_crew_leader")
+# Phase 11 override: cert routing ignores sign_off_authority
+# field. Always routes to managerial superusers. Spec contract:
+# recipient in CERT_VERIFIER_LOGINS, both verifiers followed.
+followers_t7700 = c_t7700.message_partner_ids
 ok = (len(todos) == 1
-      and todos[0].user_id in lt_grp.users
+      and todos[0].user_id in verifier_users
       and "MA3 Console" in todos[0].summary
-      and "p7am2_subject" in todos[0].summary)
+      and "p7am2_subject" in todos[0].summary
+      and all(p in followers_t7700 for p in verifier_partners))
 print("  TODO count:", len(todos),
       " user:", todos[0].user_id.login if todos else None,
-      " in lead_tech group:",
-      todos[0].user_id in lt_grp.users if todos else None,
+      " in verifier list:",
+      todos[0].user_id in verifier_users if todos else None,
+      " both followed:",
+      all(p in followers_t7700 for p in verifier_partners),
       " summary:", todos[0].summary if todos else None)
 print("T7700:", "PASS" if ok else "FAIL")
 results["T7700"] = ok
@@ -191,17 +209,19 @@ todos = Activity.sudo().search([
     ("res_id", "=", c_t7701.id),
     ("summary", "=ilike", "Verify%"),
 ])
-# P11/neon_core: same brittleness fix as T7700. Assert TODO
-# recipient is in the finance_approver group (spec); the
-# deterministic-first-by-id shifted to Robin/Munashe/Tatenda
-# when superuser meta-group started cascading the approver
-# group to them.
-fa_grp = env.ref("neon_finance.group_neon_finance_approver")
-ok = (len(todos) == 1 and todos[0].user_id in fa_grp.users)
+# Phase 11 override: same contract as T7700. od_md authority
+# on cert type is documentation only; routing goes to
+# managerial superusers.
+followers_t7701 = c_t7701.message_partner_ids
+ok = (len(todos) == 1
+      and todos[0].user_id in verifier_users
+      and all(p in followers_t7701 for p in verifier_partners))
 print("  TODO count:", len(todos),
       " user:", todos[0].user_id.login if todos else None,
-      " in finance_approver group:",
-      todos[0].user_id in fa_grp.users if todos else None)
+      " in verifier list:",
+      todos[0].user_id in verifier_users if todos else None,
+      " both followed:",
+      all(p in followers_t7701 for p in verifier_partners))
 print("T7701:", "PASS" if ok else "FAIL")
 results["T7701"] = ok
 
@@ -223,14 +243,19 @@ todos = Activity.sudo().search([
     ("res_id", "=", c_t7702.id),
     ("summary", "=ilike", "Verify%"),
 ])
-# external_trainer routes to admin tier; first user in
-# group_neon_training_admin (sorted by id).
-admin_group = env.ref("neon_training.group_neon_training_admin")
-expected_user = admin_group.users.sorted("id")[0]
-ok = (len(todos) == 1 and todos[0].user_id == expected_user)
+# Phase 11 override: external_trainer authority no longer
+# routes to admin tier. All authorities route to managerial
+# superusers under the override.
+followers_t7702 = c_t7702.message_partner_ids
+ok = (len(todos) == 1
+      and todos[0].user_id in verifier_users
+      and all(p in followers_t7702 for p in verifier_partners))
 print("  TODO count:", len(todos),
       " user:", todos[0].user_id.login if todos else None,
-      " expected:", expected_user.login)
+      " in verifier list:",
+      todos[0].user_id in verifier_users if todos else None,
+      " both followed:",
+      all(p in followers_t7702 for p in verifier_partners))
 print("T7702:", "PASS" if ok else "FAIL")
 results["T7702"] = ok
 
@@ -263,47 +288,39 @@ results["T7703"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7704 - TODO fallback to admin when authority group empty")
+print("T7704 - Deploy-gap chatter when both verifiers absent")
 print("=" * 72)
-# Simulate empty group by removing all users from group_neon_jobs_
-# crew_leader transiently (within smoke savepoint). Easier: monkey-
-# patch _resolve_verify_authority_partners to return the fallback
-# path. Cleanest: create a cert with lead_tech authority, drop
-# crew_leader memberships temporarily, fire submit, assert
-# fallback applied.
-crew_leader_grp = env.ref("neon_jobs.group_neon_jobs_crew_leader")
-crew_users_backup = crew_leader_grp.users
-crew_leader_grp.sudo().write(
-    {"users": [(5, 0, 0)]})  # clear all members transiently
-# Verify the group is empty now.
-crew_leader_grp.invalidate_recordset()
-assert not crew_leader_grp.users, (
-    "fallback test prep: crew_leader group still has members")
+# Phase 11 override: no group-based fallback semantics. The
+# only way to land in the no-recipient branch is for both
+# managerial verifiers to be missing from the DB. Simulate by
+# deactivating Robin + Munashe transiently within smoke
+# savepoint, fire submit, assert no TODO + deploy-gap chatter
+# posted, then re-activate. Cert created BEFORE deactivation
+# so create() side-effects don't trip on active==False
+# verifiers.
 c_t7704 = Cert.sudo().create({
     "user_id": u_subject.id,
     "type_id": env.ref(
-        "neon_training.cert_type_chamsys_magicq").id,  # also lead_tech
+        "neon_training.cert_type_chamsys_magicq").id,
     "date_obtained": date.today() - timedelta(days=1),
 })
-c_t7704.with_user(u_subject).action_submit_for_verification()
-todos = Activity.sudo().search([
-    ("res_model", "=", "neon.training.certification"),
-    ("res_id", "=", c_t7704.id),
-])
-# Should have fallen back to admin tier.
-ok_routing = (
-    len(todos) == 1
-    and todos[0].user_id == expected_user)  # admin tier first user
-# Check chatter recorded the fallback.
-fallback_msg = c_t7704.message_ids.filtered(
-    lambda m: "Authority routing fallback" in (m.body or "")
-              or "Authority routing fallback" in (m.subject or ""))
-ok = ok_routing and bool(fallback_msg)
-print("  TODO routed to admin:", ok_routing,
-      " fallback chatter present:", bool(fallback_msg))
-# Restore crew_leader membership for downstream tests.
-crew_leader_grp.sudo().write(
-    {"users": [(6, 0, crew_users_backup.ids)]})
+verifier_users.sudo().write({"active": False})
+try:
+    c_t7704.with_user(u_subject).action_submit_for_verification()
+    todos = Activity.sudo().search([
+        ("res_model", "=", "neon.training.certification"),
+        ("res_id", "=", c_t7704.id),
+    ])
+    gap_msg = c_t7704.message_ids.filtered(
+        lambda m: "Verifier routing gap" in (m.subject or "")
+                  or "Verifier routing gap" in (m.body or "")
+                  or "managerial superusers" in (m.body or ""))
+    ok = (len(todos) == 0 and bool(gap_msg))
+    print("  TODO count (expected 0):", len(todos),
+          " gap chatter present:", bool(gap_msg))
+finally:
+    # Restore for downstream tests.
+    verifier_users.sudo().write({"active": True})
 print("T7704:", "PASS" if ok else "FAIL")
 results["T7704"] = ok
 
@@ -535,17 +552,22 @@ results["T7717"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7718 - Fallback chatter contains group xmlid")
+print("T7718 - Deploy-gap chatter names expected verifier logins")
 print("=" * 72)
-fallback_msg = c_t7704.message_ids.filtered(
-    lambda m: "Authority routing fallback" in (m.body or "")
-              or "Authority routing fallback" in (m.subject or ""))
-ok = (bool(fallback_msg)
-      and "group_neon_jobs_crew_leader" in (fallback_msg[0].body or ""))
-print("  fallback msg present:", bool(fallback_msg),
-      " group_xmlid in body:",
-      "group_neon_jobs_crew_leader" in (fallback_msg[0].body or "")
-      if fallback_msg else False)
+# Phase 11 override: gap chatter under the override lists the
+# expected logins so deploy-gap detection can pinpoint which
+# users to provision.
+gap_msg = c_t7704.message_ids.filtered(
+    lambda m: "Verifier routing gap" in (m.subject or "")
+              or "managerial superusers" in (m.body or ""))
+ok = (bool(gap_msg)
+      and "robin@neonhiring.co.zw" in (gap_msg[0].body or "")
+      and "munashe@neonhiring.co.zw" in (gap_msg[0].body or ""))
+print("  gap msg present:", bool(gap_msg),
+      " names both verifiers:",
+      ("robin@neonhiring.co.zw" in (gap_msg[0].body or "")
+       and "munashe@neonhiring.co.zw" in (gap_msg[0].body or ""))
+      if gap_msg else False)
 print("T7718:", "PASS" if ok else "FAIL")
 results["T7718"] = ok
 

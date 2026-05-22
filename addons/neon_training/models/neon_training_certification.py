@@ -88,6 +88,23 @@ _SIGN_OFF_AUTHORITY_GROUP = {
     "self_with_peer":   "neon_training.group_neon_training_admin",
 }
 
+# Phase 11 routing narrowing (post-neon_core landing):
+# Cert verification ALWAYS routes to managerial superusers
+# regardless of cert type's sign_off_authority field. The
+# field stays on cert type as documentation (what kind of
+# cert this is) but the verification step is universally
+# managerial -- either Robin or Munashe can sign. Tatenda
+# is explicitly excluded from this list (developer-superuser,
+# not managerial). Action_verify's authority gate still
+# consumes _SIGN_OFF_AUTHORITY_GROUP, as does M5's renewal
+# CC broadcast via _resolve_cc_partners.
+#
+# Reference: .claude/reference_neon_cert_verification_routing.md
+_CERT_VERIFIER_LOGINS = (
+    "robin@neonhiring.co.zw",
+    "munashe@neonhiring.co.zw",
+)
+
 
 class NeonTrainingCertification(models.Model):
     _name = "neon.training.certification"
@@ -750,6 +767,18 @@ class NeonTrainingCertification(models.Model):
                 "available for %s (authority=%s, group=%s); TODO "
                 "skipped.", self.display_name,
                 self.type_id.sign_off_authority, group_xmlid)
+            # Deploy-gap chatter: under the Phase 11 override the
+            # only way to land here is for both managerial
+            # superusers (Robin + Munashe) to be missing from the
+            # DB. Post a chatter note so the gap is detectable.
+            self.sudo().message_post(
+                subject=_("Verifier routing gap"),
+                body=_(
+                    "No managerial superusers available to verify "
+                    "this certification. Expected one of: %s. "
+                    "Provision Robin or Munashe and re-submit "
+                    "for verification."
+                ) % ", ".join(_CERT_VERIFIER_LOGINS))
             return False
 
         from datetime import timedelta
@@ -775,20 +804,18 @@ class NeonTrainingCertification(models.Model):
             date_deadline=deadline,
         )
 
-        if fallback_applied:
-            self.sudo().message_post(
-                subject=_("Authority routing fallback"),
-                body=_(
-                    "Authority routing fallback: sign_off_authority="
-                    "'%(authority)s' requires group '%(group)s' but "
-                    "no users hold this group. Verification TODO "
-                    "routed to admin tier as fallback. Production "
-                    "deploy may need to provision the appropriate "
-                    "user."
-                ) % {
-                    "authority": self.type_id.sign_off_authority,
-                    "group": group_xmlid,
-                })
+        # Phase 11: subscribe ALL managerial verifiers as
+        # followers so both Robin and Munashe see the cert in
+        # their followed records / receive chatter notifications.
+        # Either can complete action_verify; dual signoff not
+        # required.
+        all_verifiers = self.env["res.users"].sudo().search([
+            ("login", "in", list(_CERT_VERIFIER_LOGINS)),
+            ("active", "=", True),
+        ])
+        if all_verifiers:
+            self.sudo().message_subscribe(
+                partner_ids=all_verifiers.partner_id.ids)
         return True
 
     def action_verify(self):
@@ -1021,45 +1048,40 @@ class NeonTrainingCertification(models.Model):
         return grp.users.partner_id if grp else self.env["res.partner"]
 
     def _resolve_verify_authority_partners(self):
-        """P7a.M7 -- resolve the user who should receive the
-        verification TODO when a cert hits pending_verification.
+        """Phase 11 override (post-neon_core): cert verification
+        ALWAYS routes to managerial superusers regardless of cert
+        type's sign_off_authority. Either verifier can sign; dual
+        signoff is NOT required.
 
-        Routing per _SIGN_OFF_AUTHORITY_GROUP constant. DP1=a:
-        single user (first in group, sorted by id) -- deterministic;
-        non-targeted group members can still verify per the model-
-        level authority gate in action_verify, they just don't get
-        the TODO.
+        Picks the first verifier alphabetically by login as the
+        deterministic TODO assignee. Caller (_create_verification_
+        todo) subscribes BOTH verifiers as followers so both
+        receive chatter notifications.
 
-        DP4 fallback: if the routed group has zero users, fall back
-        to neon_training.group_neon_training_admin tier so the TODO
-        doesn't orphan. Caller posts a chatter note recording the
-        fallback for production deploy-gap detection.
-
-        Returns (target_user, fallback_applied, group_xmlid):
-          target_user      -- res.users (single) or empty recordset
-                              if even admin is empty (rare; pure
-                              fresh install)
-          fallback_applied -- True when admin was used because
-                              authority group was empty
-          group_xmlid      -- the resolved group's xmlid (for
-                              chatter log)
+        Returns (target_user, fallback_applied, group_xmlid),
+        signature preserved for caller compatibility:
+          target_user      -- first verifier in _CERT_VERIFIER_
+                              LOGINS by login order, empty
+                              recordset if neither exists on
+                              this DB
+          fallback_applied -- always False under the override
+                              (no group-based fallback semantics;
+                              verifiers are explicit logins)
+          group_xmlid      -- sentinel "cert_verifier_managerial"
+                              (not a real group xmlid; used in
+                              chatter when verifiers are absent
+                              so deploy-gap detection still works)
         """
         self.ensure_one()
-        authority = self.type_id.sign_off_authority
-        group_xmlid = _SIGN_OFF_AUTHORITY_GROUP.get(authority)
+        verifiers = self.env["res.users"].sudo().search([
+            ("login", "in", list(_CERT_VERIFIER_LOGINS)),
+            ("active", "=", True),
+        ])
         empty_user = self.env["res.users"]
-        if not group_xmlid:
-            return empty_user, False, ""
-        grp = self.env.ref(group_xmlid, raise_if_not_found=False)
-        if grp and grp.users:
-            return grp.users.sorted("id")[0], False, group_xmlid
-        # Fallback to admin per DP4.
-        admin_grp = self.env.ref(
-            "neon_training.group_neon_training_admin",
-            raise_if_not_found=False)
-        if admin_grp and admin_grp.users:
-            return (admin_grp.users.sorted("id")[0], True, group_xmlid)
-        return empty_user, True, group_xmlid
+        if not verifiers:
+            return empty_user, False, "cert_verifier_managerial"
+        return (verifiers.sorted("login")[0], False,
+                "cert_verifier_managerial")
 
     def _dispatch_renewal_notification(self):
         """Per-record dispatch: send the mail.template matching the

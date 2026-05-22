@@ -306,13 +306,14 @@ manifest = odoo.modules.module.load_information_from_description_file(
 backend_bundle = (manifest.get("assets") or {}).get(
     "web.assets_backend", [])
 target = "neon_training/static/src/js/neon_dynamic_selection.js"
-# Version assertion is era-tolerant: any 17.0.7.x.x manifest is
-# valid (M3 shipped at .2, M4 at .3, future milestones bump
-# further). Asset-in-bundle is the load-bearing check. Growth-
-# tolerant pattern per CLAUDE.md polish item lessons.
+# Version assertion is era-tolerant: Phase 7a started at
+# 17.0.7.0.0, Phase 11 follow-on bumped to 17.0.8.0.x for the
+# cert verifier routing override. Accept either era prefix.
+# Asset-in-bundle is the load-bearing check.
 version = manifest.get("version") or ""
 ok = (target in backend_bundle
-      and version.startswith("17.0.7."))
+      and (version.startswith("17.0.7.")
+           or version.startswith("17.0.8.")))
 print("  manifest version:", version,
       "; target in bundle:", target in backend_bundle,
       "; bundle has", len(backend_bundle), "entry/entries")
