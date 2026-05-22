@@ -31,6 +31,10 @@ _AUDIT_ACTIONS = [
     # promote_active / skip_onboarding so the audit trail
     # shows the moment of group elevation.
     ("portal_user_upgraded", "Portal User Upgraded to Backend"),
+    # M9 -- candidate self-uploaded a cert via the portal
+    # upload wizard. Distinct from admin-uploaded certs so
+    # the audit captures the upload source.
+    ("cert_uploaded", "Cert Self-Uploaded via Portal"),
 ]
 
 

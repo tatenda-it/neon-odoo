@@ -37,6 +37,22 @@
             <t t-call="portal.portal_searchbar">
                 <t t-set="title">My Onboarding Profile</t>
             </t>
+            <div t-if="upload_success"
+                 class="alert alert-success mt16">
+                Certificate uploaded successfully. Robin or
+                Munashe will verify and you'll see the status
+                update in the Collected Certifications section
+                below.
+            </div>
+            <div t-if="candidate.state == 'cert_collection'"
+                 class="row mt16">
+                <div class="col-12">
+                    <a href="/my/onboarding/upload"
+                       class="btn btn-primary">
+                        Upload Certificate
+                    </a>
+                </div>
+            </div>
             <div class="row mt16">
                 <div class="col-md-6">
                     <h3>Profile</h3>
@@ -129,6 +145,125 @@
                 No onboarding profile found for this account.
                 If you believe this is an error, contact your
                 administrator.
+            </div>
+        </t>
+    </template>
+
+    <!--
+        M9 upload templates. portal_upload_list shows the
+        available cert types as clickable cards. portal_upload_
+        form is the per-type submission form.
+    -->
+    <template id="portal_upload_list" name="Upload Cert List">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Upload Certificate</t>
+            </t>
+            <p class="mt16">
+                Select a certification type to upload. Only
+                the certifications your role requires are
+                listed. Already-submitted certs are not
+                shown.
+            </p>
+            <div t-if="available_types" class="row mt16">
+                <div class="col-md-6 mb-3"
+                     t-foreach="available_types" t-as="ct">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <span t-field="ct.name"/>
+                            </h5>
+                            <p class="card-text text-muted small">
+                                <span t-field="ct.description"/>
+                            </p>
+                            <a t-attf-href="/my/onboarding/upload/#{ct.id}"
+                               class="btn btn-primary btn-sm">
+                                Upload This Cert
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div t-if="not available_types"
+                 class="alert alert-info mt16">
+                All required certs have been submitted. Wait
+                for Robin or Munashe to verify, then your
+                onboarding will advance automatically.
+            </div>
+            <div class="mt16">
+                <a href="/my/onboarding" class="btn btn-link">
+                    Back to my onboarding profile
+                </a>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_upload_form" name="Upload Cert Form">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Upload Certificate</t>
+            </t>
+            <div class="mt16">
+                <h3>
+                    Upload: <span t-field="cert_type.name"/>
+                </h3>
+                <p t-if="cert_type.description"
+                   class="text-muted">
+                    <span t-field="cert_type.description"/>
+                </p>
+                <div t-if="error"
+                     class="alert alert-danger">
+                    <span t-esc="error"/>
+                </div>
+                <form action="" method="POST"
+                      enctype="multipart/form-data"
+                      class="mt16">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+                    <div class="mb-3">
+                        <label class="form-label"
+                               for="cert_file">
+                            Certificate File (PDF / JPG /
+                            PNG, max 10 MB)
+                        </label>
+                        <input type="file" name="cert_file"
+                               id="cert_file"
+                               class="form-control"
+                               accept=".pdf,.jpg,.jpeg,.png"
+                               required="required"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"
+                               for="date_obtained">
+                            Date Obtained
+                        </label>
+                        <input type="date"
+                               name="date_obtained"
+                               id="date_obtained"
+                               class="form-control"
+                               required="required"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"
+                               for="date_expires">
+                            Date Expires (optional)
+                        </label>
+                        <input type="date"
+                               name="date_expires"
+                               id="date_expires"
+                               class="form-control"/>
+                    </div>
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Submit
+                    </button>
+                    <a href="/my/onboarding/upload"
+                       class="btn btn-link">
+                        Cancel
+                    </a>
+                </form>
             </div>
         </t>
     </template>
