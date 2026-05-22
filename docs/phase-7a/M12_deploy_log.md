@@ -464,3 +464,89 @@ docker compose restart odoo
 ### Total deploy time
 
 ~10 minutes including the push-gap detection + dev-side push detour.
+
+---
+
+## neon_core 17.0.1.0.1 -- Settings access fix (22 May 2026, ~08:46 UTC)
+
+**Deployer:** Tatenda via Claude Code SSH
+**Trigger:** Post-deploy Chrome verification showed Robin seeing 11 apps after the initial `neon_core` deploy but Settings missing. `base.group_no_one` (Technical Features / developer mode) is not the same as `base.group_system` (Administration / Settings menu access).
+
+### Pre-flight
+
+| Check | Result |
+|---|---|
+| SSH | ✅ |
+| Prod HEAD before deploy | `2af1167` |
+| Working tree | ✅ clean (only pre-existing config backup untracked) |
+| Push detour | Dev-side `8a77df9` pushed first (`e27cc70..8a77df9`) |
+
+### Backup
+
+- **File:** `/root/backups/neon_crm_pre_neoncore_settings_20260522_104521.dump`
+- **Size:** 5.5 MB
+
+### Code pull
+
+`2af1167..8a77df9` fast-forward. 4 files changed, 191 insertions: `__manifest__.py` (version bump), `data/neon_core_groups.xml` (2 new implied_ids on superuser), `migrations/17.0.1.0.1/post-migrate.py` (new), `docs/phase-7a/M12_deploy_log.md` (combined deploy entry from 08:17 session).
+
+### Upgrade
+
+```
+docker compose exec odoo odoo -c /etc/odoo/odoo.conf -d neon_crm \
+    -u neon_core --stop-after-init --no-http
+```
+
+Key log lines:
+
+```
+Module neon_core loaded (74/74)
+loading neon_core/data/neon_core_groups.xml
+Running migration [17.0.1.0.1>] post-migrate
+neon_core 17.0.1.0.1: base.group_system already in group_neon_superuser.implied_ids; no-op.
+neon_core 17.0.1.0.1: base.group_erp_manager already in group_neon_superuser.implied_ids; no-op.
+Module neon_core loaded in 0.33s, 175 queries
+Registry loaded in 3.316s
+```
+
+Both "no-op" lines confirm the XML data file's `(6, 0, [...])` REPLACE handled the actual state change; migration's `(4, id)` add was defensive belt-and-braces. No ERROR / CRITICAL.
+
+### Restart + asset regen
+
+`docker compose restart odoo` clean. Asset regen:
+
+```
+Clearing 9 attachments
+  compiled web.assets_backend
+  compiled web.assets_web
+  compiled web_editor.backend_assets_wysiwyg
+  compiled web.assets_frontend
+Attachments before regen: 9
+Attachments after regen:  8
+```
+
+### Verification (8/8 PASS)
+
+| user | tier | `group_system` | `group_erp_manager` |
+|---|---|---|---|
+| robin@neonhiring.co.zw | superuser | YES | YES |
+| munashe@neonhiring.co.zw | superuser | YES | YES |
+| tatenda@neonhiring.co.zw | superuser | YES | YES |
+| admin@neonhiring.co.zw (Kudzi) | bookkeeper | no | no |
+| lisar@neonhiring.co.zw | sales_rep | no | no |
+| evrill@neonhiring.co.zw | sales_rep | no | no |
+| ranganai@neonhiring.co.zw | lead_tech | no | no |
+
+Module state: `neon_core` 17.0.1.0.1 installed.
+
+### Tag
+
+`v17.0.1.0.1-neoncore-settings` -> `8a77df9`. Pushed to origin.
+
+### Outcome
+
+Settings + Access Rights menus now appear for the 3 managerial superusers (Robin / Munashe / Tatenda). All 4 other-tier users (Kudzi / Lisa / Evrill / Ranganai) stay scoped -- Settings access remains restricted as intended.
+
+### Total deploy time
+
+~8 minutes.
