@@ -137,15 +137,13 @@
                     <group string="Requirements" col="2">
                         <field name="requirement_template_id"
                                options="{'no_create': True}"/>
-                        <div colspan="2"
-                             invisible="not requirement_template_id"
-                             class="text-muted small">
-                            Click the template to view required
-                            cert types. Inline list of certs
-                            with held / pending / missing
-                            indicators lands in M4 alongside
-                            cert collection integration.
-                        </div>
+                        <field name="all_required_certs_satisfied"
+                               readonly="1" widget="boolean_toggle"/>
+                        <field name="required_cert_type_ids"
+                               widget="many2many_tags"
+                               readonly="1"
+                               invisible="not required_cert_type_ids"
+                               colspan="2"/>
                     </group>
                     <group string="Sign-Off (Admin Override)"
                            invisible="not bypass_actor_id">
@@ -153,6 +151,19 @@
                         <field name="bypass_reason" readonly="1"/>
                     </group>
                     <notebook>
+                        <page string="Collected Certifications">
+                            <field name="collected_cert_ids"
+                                   readonly="1">
+                                <tree decoration-success="state == 'active'"
+                                      decoration-warning="state == 'pending_verification'"
+                                      decoration-muted="state in ('expired', 'suspended')">
+                                    <field name="type_id"/>
+                                    <field name="state"/>
+                                    <field name="date_obtained"/>
+                                    <field name="date_expires"/>
+                                </tree>
+                            </field>
+                        </page>
                         <page string="Probationary"
                               invisible="state not in ('probationary', 'active')">
                             <group>

@@ -5,11 +5,19 @@ Phase 7b M1 scope. State machine: candidate -> cert_collection
 -> probationary -> active. Skip Onboarding wizard provides the
 admin override jump straight to active.
 
+M4 extension: collected_cert_ids o2m (reverse of cert.
+candidate_id), required_cert_type_ids related-like compute
+from template, all_required_certs_satisfied derived from
+matching active certs against required types, auto-transition
+cert_collection -> probationary when the satisfaction flag
+flips True (fired from the cert-side constrains hook in
+neon_training).
+
 Reference: docs/phase-7b/schema-sketch.md section 4.1.
 """
 import logging
 
-from odoo import api, fields, models, _
+from odoo import api, fields, models, SUPERUSER_ID, _
 from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -197,6 +205,91 @@ class NeonOnboardingCandidate(models.Model):
         string="Audit Log",
         readonly=True,
     )
+
+    # ============================================================
+    # M4 -- cert satisfaction + auto-transition logic
+    # ============================================================
+    collected_cert_ids = fields.One2many(
+        "neon.training.certification",
+        "candidate_id",
+        string="Collected Certifications",
+        help="Certifications uploaded for this candidate. "
+             "Reverse of neon.training.certification."
+             "candidate_id (added in neon_training 17.0.8.1.0).",
+    )
+    required_cert_type_ids = fields.Many2many(
+        "neon.training.certification.type",
+        compute="_compute_required_cert_type_ids",
+        store=True,
+        string="Required Cert Types",
+        help="Mirrors requirement_template_id.required_cert_"
+             "type_ids; recomputed on template change. Stored "
+             "for kanban + form display.",
+    )
+    all_required_certs_satisfied = fields.Boolean(
+        compute="_compute_all_required_certs_satisfied",
+        store=True,
+        string="All Required Certs Verified",
+        help="True when every required cert type has at "
+             "least one collected cert in state='active'. "
+             "Drives the cert_collection -> probationary "
+             "auto-transition via the cert-side constrains "
+             "hook in neon_training.",
+    )
+
+    @api.depends("requirement_template_id",
+                 "requirement_template_id.required_cert_type_ids")
+    def _compute_required_cert_type_ids(self):
+        for rec in self:
+            tmpl = rec.requirement_template_id
+            rec.required_cert_type_ids = (
+                tmpl.required_cert_type_ids if tmpl else False)
+
+    @api.depends("required_cert_type_ids",
+                 "collected_cert_ids",
+                 "collected_cert_ids.state",
+                 "collected_cert_ids.type_id")
+    def _compute_all_required_certs_satisfied(self):
+        for rec in self:
+            if not rec.required_cert_type_ids:
+                rec.all_required_certs_satisfied = False
+                continue
+            verified_types = rec.collected_cert_ids.filtered(
+                lambda c: c.state == "active"
+            ).mapped("type_id")
+            rec.all_required_certs_satisfied = all(
+                req in verified_types
+                for req in rec.required_cert_type_ids
+            )
+
+    def _transition_to_probationary(self):
+        """Automatic transition cert_collection -> probationary.
+        Fired by the cert-side constrains hook (in
+        neon_training) when the last required cert is verified.
+        Writes an audit log entry with action='promote_
+        probationary' and actor=SUPERUSER (the transition is
+        system-driven, not user-driven).
+        """
+        self.ensure_one()
+        if self.state != "cert_collection":
+            return
+        prev = self.state
+        self.sudo().write({"state": "probationary"})
+        self.env["neon.onboarding.audit.log"].sudo().create({
+            "candidate_id": self.id,
+            "action": "promote_probationary",
+            "actor_id": SUPERUSER_ID,
+            "reason": "Auto: all required certs verified.",
+            "previous_state": prev,
+            "new_state": "probationary",
+        })
+        self.sudo().message_post(body=_(
+            "Auto-transitioned to Probationary: all required "
+            "certifications verified."))
+        _logger.info(
+            "neon_onboarding M4: candidate %s auto-advanced "
+            "to probationary (all required certs verified).",
+            self.display_name)
 
     # ============================================================
     # SQL + Python constraints

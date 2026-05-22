@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Onboarding",
-    "version": "17.0.1.2.0",
+    "version": "17.0.1.3.0",
     "summary": "Phase 7b -- crew onboarding state machine. "
                "M1 ships the neon.onboarding.candidate model, "
                "4-state machine (candidate / cert_collection / "
