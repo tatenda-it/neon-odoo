@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Five Neon tier meta-groups.
+
+        Each group cascades its implied_ids to all the right
+        stdlib + Neon groups so that picking the tier in
+        Settings -> Users is the single source of truth.
+
+        H3=A audit discipline applies: perm_unlink omitted
+        here because these groups OWN no models; they're
+        pure cascade points. The implied targets enforce
+        their own perm_unlink.
+
+        Stdlib xmlid notes (verified via preflight 2026-05-21):
+        * Sales groups live under sales_team.* (not sale.*)
+          per Odoo 17 module layout. sale_management depends
+          on sales_team which declares the actual groups.
+        * crm has no group_use_crm in Odoo 17; CRM access
+          is implied by base.group_user when crm is installed.
+          We do NOT add any crm group; lead/opportunity menus
+          appear automatically for internal users.
+        * neon_workshop does NOT exist as a module in this
+          repo; workshop functionality is inside neon_jobs
+          via the group_neon_jobs_workshop_* groups (if any).
+          The crew_leader role already covers workshop sign-off
+          via M11 wiring.
+    -->
+
+    <!--
+        ============================================
+        Tier 1: Superuser  (Robin, Munashe, Tatenda)
+        ============================================
+        Full Neon access across every operational + finance
+        + training surface. Includes the four "dev-mode-ish"
+        implied_ids that we strip from base.group_user in
+        the migration, restoring them ONLY for superusers:
+        * base.group_no_one     -> developer mode
+        * base.group_multi_currency -> currency switcher
+        * product.group_product_pricelist -> pricing visibility
+        * mail.group_mail_template_editor -> template editor
+        Plus export rights, partner management, sales mgmt,
+        full accounting, every Neon admin/manager role.
+    -->
+    <record id="group_neon_superuser" model="res.groups">
+        <field name="name">Neon Superuser</field>
+        <field name="category_id" ref="module_category_neon_core"/>
+        <field name="comment">
+            Full stack access including developer mode + every
+            Neon admin/manager role + full accounting + sales
+            management. Reserved for owners + lead developer.
+        </field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('base.group_partner_manager'),
+            ref('base.group_no_one'),
+            ref('base.group_multi_currency'),
+            ref('base.group_allow_export'),
+            ref('product.group_product_pricelist'),
+            ref('mail.group_mail_template_editor'),
+            ref('sales_team.group_sale_manager'),
+            ref('account.group_account_manager'),
+            ref('account.group_account_user'),
+            ref('neon_training.group_neon_training_admin'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ref('neon_finance.group_neon_finance_approver'),
+        ])]"/>
+    </record>
+
+    <!--
+        ============================================
+        Tier 2: Bookkeeper  (Kudzaiishe)
+        ============================================
+        Full accounting authority + every sales record
+        visibility (read-all leads). NO finance approval
+        power; quote/cost approval is SUPERUSER-ONLY
+        (Robin / Munashe / Tatenda). Bookkeeper sees finance
+        figures via account.group_account_manager +
+        account.group_account_user; cannot approve quotes,
+        costs, or recoveries. NO developer mode. NO template
+        editor. NO pricelist visibility (Bookkeeper sees
+        already-quoted figures, not raw pricing rules).
+        Training: user tier only (must take own certs, can't
+        sign off).
+    -->
+    <record id="group_neon_bookkeeper" model="res.groups">
+        <field name="name">Neon Bookkeeper</field>
+        <field name="category_id" ref="module_category_neon_core"/>
+        <field name="comment">
+            Accounting manager + sales read-all + Neon
+            Finance bookkeeper. NO finance approver (that's
+            superuser-only). No developer mode, no template
+            editor. Cannot sign off training (own certs
+            only).
+        </field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('base.group_partner_manager'),
+            ref('base.group_multi_currency'),
+            ref('base.group_allow_export'),
+            ref('account.group_account_manager'),
+            ref('account.group_account_user'),
+            ref('account.group_account_invoice'),
+            ref('sales_team.group_sale_salesman_all_leads'),
+            ref('neon_finance.group_neon_finance_bookkeeper'),
+            ref('neon_training.group_neon_training_user'),
+            ref('neon_jobs.group_neon_jobs_user'),
+        ])]"/>
+    </record>
+
+    <!--
+        ============================================
+        Tier 3: Sales Rep  (Lisa, Evrill)
+        ============================================
+        CRM + own quotes + pricing visibility (need to see
+        pricelist to quote correctly). NO accounting access
+        (cannot post invoices). NO developer mode. Training
+        user tier only.
+    -->
+    <record id="group_neon_sales_rep" model="res.groups">
+        <field name="name">Neon Sales Rep</field>
+        <field name="category_id" ref="module_category_neon_core"/>
+        <field name="comment">
+            CRM + own quotes/leads + pricing visibility. No
+            accounting, no developer mode. Sign-off limited
+            to own training records.
+        </field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('base.group_partner_manager'),
+            ref('base.group_multi_currency'),
+            ref('product.group_product_pricelist'),
+            ref('sales_team.group_sale_salesman'),
+            ref('neon_finance.group_neon_finance_sales'),
+            ref('neon_training.group_neon_training_user'),
+            ref('neon_jobs.group_neon_jobs_user'),
+        ])]"/>
+    </record>
+
+    <!--
+        ============================================
+        Tier 4: Lead Tech  (Ranganai etc, future hires)
+        ============================================
+        Crew leader; can run jobs + sign off team's
+        training. NO sales, NO accounting, NO CRM access.
+        Operational-floor role with sign-off authority.
+    -->
+    <record id="group_neon_lead_tech" model="res.groups">
+        <field name="name">Neon Lead Tech</field>
+        <field name="category_id" ref="module_category_neon_core"/>
+        <field name="comment">
+            Crew leader on operational jobs + training
+            sign-off authority. No sales, finance, or CRM.
+        </field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+            ref('neon_training.group_neon_training_signoff'),
+        ])]"/>
+    </record>
+
+    <!--
+        ============================================
+        Tier 5: Crew  (9 paused users + future hires)
+        ============================================
+        Internal user only; jobs participant + training
+        user. No sales, no finance, no CRM, no developer
+        mode. Smallest footprint tier.
+    -->
+    <record id="group_neon_crew" model="res.groups">
+        <field name="name">Neon Crew</field>
+        <field name="category_id" ref="module_category_neon_core"/>
+        <field name="comment">
+            Operational crew member -- assigned to jobs +
+            can complete training. Read-only for everything
+            else.
+        </field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('neon_jobs.group_neon_jobs_crew'),
+            ref('neon_training.group_neon_training_user'),
+        ])]"/>
+    </record>
+
+</odoo>

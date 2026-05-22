@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Security category for the 5 Neon tier meta-groups.
+        Listing them all under one category in Settings -> Users
+        keeps the per-user tier choice in one place.
+
+        sequence=5 puts the category near the top of the user
+        form (Odoo standard stdlib categories use 1, 10, 20, etc;
+        5 sits above operations + finance for visibility).
+    -->
+    <record id="module_category_neon_core" model="ir.module.category">
+        <field name="name">Neon Tier</field>
+        <field name="description">
+            Canonical Neon role tiers. Pick exactly one per user.
+            Each tier's implied_ids cascade the right Odoo + Neon
+            groups automatically.
+        </field>
+        <field name="sequence">5</field>
+    </record>
+</odoo>
