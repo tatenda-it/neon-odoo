@@ -1,4 +1,5 @@
-"""P7b.M6 smoke -- activation flow + Promote wizard (10 tests).
+"""P7b.M6 smoke -- activation flow + Promote wizard
+(13 tests including M6 amendment).
 
 T7b600  candidate in 'candidate' state -> UserError on promote
 T7b601  candidate in 'cert_collection' state -> UserError
@@ -17,7 +18,17 @@ T7b608  ready_for_promotion=False after state=active
 T7b609  sales_rep cannot launch promote wizard (group_id on
         the action filters it out -- assert via _get_view
         groups behaviour OR direct call raises AccessError)
+
+M6 amendment (22 May 2026):
+T7b610  event_job state -> 'completed' refreshes candidate.
+        probationary_jobs_completed in real-time (no cron)
+T7b611  Promote wizard with jobs_completed < jobs_target ->
+        audit log reason contains 'OVERRIDE'
+T7b612  Promote wizard with jobs_completed >= jobs_target ->
+        audit log reason does NOT contain 'OVERRIDE'
 """
+from datetime import timedelta
+
 from odoo import fields, SUPERUSER_ID
 from odoo.exceptions import AccessError, UserError, ValidationError
 
@@ -317,12 +328,150 @@ results["T7b609"] = ok
 
 
 # ============================================================
+# M6 amendment tests (22 May 2026)
+# ============================================================
+print()
+print("=" * 72)
+print("T7b610 - event_job complete -> jobs_completed refresh")
+print("=" * 72)
+# Test the inherit hook in neon_onboarding/models/commercial_
+# event_job.py. The hook fires on ORM write where vals
+# contains state='completed' and triggers a recompute of
+# probationary_jobs_completed on candidates whose user is on
+# the crew. Use Phase 7a's _allow_state_write context flag
+# (per the state-transition-only guard) to perform the write
+# without walking every action_move_to_* method.
+u_610 = _get_or_create_user(
+    "p7b_m6_amend_610", "P7b M6 Amend 610",
+    ["neon_jobs.group_neon_jobs_crew"])
+cand_610 = Candidate.sudo().create({
+    "name": "T7b610 Real-Time Counter",
+    "intended_role": "runner",
+    "contact_phone": "+263771000610",
+    "state": "probationary",
+    "user_id": u_610.id,
+})
+AuditLog.sudo().create({
+    "candidate_id": cand_610.id,
+    "action": "promote_probationary",
+    "actor_id": SUPERUSER_ID,
+    "reason": "T7b610 fixture",
+    "previous_state": "cert_collection",
+    "new_state": "probationary",
+})
+Job = env["commercial.job"]
+EventJob = env["commercial.event.job"]
+Crew = env["commercial.job.crew"]
+sample_job = Job.sudo().search([], limit=1)
+job_610 = Job.sudo().create({
+    "name": "T7b610 Test Job",
+    "partner_id": sample_job.partner_id.id,
+    "venue_id": sample_job.venue_id.id,
+    "currency_id": sample_job.currency_id.id,
+    "event_date": fields.Date.today() + timedelta(days=7),
+})
+crew_610 = Crew.sudo().create({
+    "job_id": job_610.id,
+    "user_id": u_610.id,
+    "role": "runner",
+})
+ej_610 = EventJob.sudo().create({
+    "commercial_job_id": job_610.id,
+    "name": "T7b610 Event",
+    "event_date": fields.Date.today() + timedelta(days=7),
+    "state": "planning",
+})
+cand_610.invalidate_recordset()
+prior_count = cand_610.probationary_jobs_completed
+# Bypass the state-write guard via the documented context
+# flag _allow_state_write=True. This invokes the FULL write
+# chain including the neon_onboarding inherit hook.
+ej_610.sudo().with_context(_allow_state_write=True).write({
+    "state": "completed",
+})
+cand_610.invalidate_recordset()
+new_count = cand_610.probationary_jobs_completed
+ok = (new_count == prior_count + 1)
+print(f"  prior_count={prior_count} new_count={new_count}")
+print("T7b610:", "PASS" if ok else "FAIL")
+results["T7b610"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T7b611 - early promote -> OVERRIDE in audit reason")
+print("=" * 72)
+cand_611 = Candidate.sudo().create({
+    "name": "T7b611 Early Promote",
+    "intended_role": "runner",
+    "contact_phone": "+263771000611",
+    "contact_email": "t7b611@example.com",
+    "state": "probationary",
+    "probationary_jobs_target": 3,
+})
+# jobs_completed defaults to 0 from compute (no completed
+# event_jobs). 0 < 3 -> OVERRIDE expected.
+wiz_611 = Wizard.with_user(u_super).create({
+    "candidate_id": cand_611.id,
+    "create_user": True,
+    "proposed_login": "t7b611@example.com",
+})
+wiz_611.action_promote()
+audit_611 = AuditLog.sudo().search([
+    ("candidate_id", "=", cand_611.id),
+    ("action", "=", "promote_active"),
+])
+ok = (len(audit_611) == 1
+      and "OVERRIDE" in (audit_611.reason or ""))
+print(f"  audit count={len(audit_611)}")
+print(f"  reason: {(audit_611.reason or '')[:120]}")
+print("T7b611:", "PASS" if ok else "FAIL")
+results["T7b611"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
+print("T7b612 - target met -> no OVERRIDE in audit reason")
+print("=" * 72)
+u_612 = _get_or_create_user(
+    "p7b_m6_amend_612", "P7b M6 Amend 612",
+    ["neon_jobs.group_neon_jobs_crew"])
+cand_612 = Candidate.sudo().create({
+    "name": "T7b612 Target Met",
+    "intended_role": "runner",
+    "contact_phone": "+263771000612",
+    "state": "probationary",
+    "probationary_jobs_target": 0,
+    "user_id": u_612.id,
+})
+# target=0; jobs_completed=0; 0 >= 0 -> not OVERRIDE.
+wiz_612 = Wizard.with_user(u_super).create({
+    "candidate_id": cand_612.id,
+    "create_user": False,
+})
+wiz_612.action_promote()
+audit_612 = AuditLog.sudo().search([
+    ("candidate_id", "=", cand_612.id),
+    ("action", "=", "promote_active"),
+])
+ok = (len(audit_612) == 1
+      and "OVERRIDE" not in (audit_612.reason or ""))
+print(f"  audit count={len(audit_612)}")
+print(f"  reason: {(audit_612.reason or '')[:120]}")
+print("T7b612:", "PASS" if ok else "FAIL")
+results["T7b612"] = ok
+
+
+# ============================================================
 print()
 print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
 order = ["T7b600", "T7b601", "T7b602", "T7b603", "T7b604",
-        "T7b605", "T7b606", "T7b607", "T7b608", "T7b609"]
+        "T7b605", "T7b606", "T7b607", "T7b608", "T7b609",
+        "T7b610", "T7b611", "T7b612"]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")

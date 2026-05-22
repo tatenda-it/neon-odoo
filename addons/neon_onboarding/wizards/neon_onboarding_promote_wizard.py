@@ -159,15 +159,27 @@ class NeonOnboardingPromoteWizard(models.TransientModel):
         })
 
         # Step 3: audit log.
+        # M6 amendment (22 May 2026): capture OVERRIDE marker
+        # when promoted before target met. Distinguishes
+        # completed-runway promotions from early promotes in
+        # future audit / reporting.
+        is_override = (cand.probationary_jobs_completed
+                       < cand.probationary_jobs_target)
         reason = self.notes
         if not reason:
-            reason = (
+            base_reason = (
                 "Manual promotion by %s; jobs_completed=%d/%d"
             ) % (
                 self.env.user.login,
                 cand.probationary_jobs_completed,
                 cand.probationary_jobs_target,
             )
+            if is_override:
+                reason = (base_reason
+                          + " -- OVERRIDE (promoted before "
+                            "target met)")
+            else:
+                reason = base_reason
         self.env["neon.onboarding.audit.log"].sudo().create({
             "candidate_id": cand.id,
             "action": "promote_active",
