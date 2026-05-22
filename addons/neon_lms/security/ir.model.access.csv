@@ -18,3 +18,5 @@ access_lms_scenario_crew,LMS Scenario - Crew (read),model_neon_lms_practical_sce
 access_lms_scenario_completion_admin,LMS Completion - Training Admin,model_neon_lms_scenario_completion,neon_training.group_neon_training_admin,1,1,1,0
 access_lms_scenario_completion_lead_tech,LMS Completion - Lead Tech (signoff),model_neon_lms_scenario_completion,neon_core.group_neon_lead_tech,1,1,1,0
 access_lms_scenario_completion_crew,LMS Completion - Crew (own only via rule),model_neon_lms_scenario_completion,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_lms_sop_admin,LMS SOP - Training Admin,model_neon_lms_sop,neon_training.group_neon_training_admin,1,1,1,0
+access_lms_sop_all_users,LMS SOP - All Internal Users (read),model_neon_lms_sop,base.group_user,1,0,0,0

@@ -51,6 +51,19 @@ class NeonLMSModule(models.Model):
              "completed before this one. Empty for first "
              "module in a track.",
     )
+    # M6 -- reference SOPs attached to this module. Inverse
+    # of neon.lms.sop.module_ids. M6 ships the M2M; SOPs
+    # don't gate progression.
+    sop_ids = fields.Many2many(
+        "neon.lms.sop",
+        "neon_lms_sop_module_rel",
+        "module_id",
+        "sop_id",
+        string="Reference SOPs",
+        help="Standard Operating Procedures linked to this "
+             "module for learner reference. Read-only -- "
+             "SOPs don't block module completion.",
+    )
     min_quiz_score = fields.Float(
         string="Minimum Quiz Score",
         default=0.8,
