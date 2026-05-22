@@ -178,3 +178,96 @@ Expected post-deploy verifications:
 ## Total deploy time estimate
 
 ~10-15 minutes (matches the pattern of v17.0.8.0.0-phase7a-live + v17.0.1.0.1-neoncore-settings deploys).
+
+---
+
+## Production Deploy: Phase 7b live (22 May 2026, ~13:51 UTC)
+
+**Deployer:** Tatenda via Claude Code SSH
+**Tag:** `v17.0.8.4.0-phase7b-live` -> `212e9ec`
+**Branch:** `feat/onboarding-phase-7b`
+
+### Pre-flight
+
+| Check | Result |
+|---|---|
+| SSH | OK |
+| Prod HEAD before | `8a77df9` (v17.0.1.0.1-neoncore-settings) |
+| Branch before | `feat/training-phase-7a` |
+| Working tree | clean (only pre-existing `config/odoo.conf.pre-phase1-backup`) |
+
+### Backup
+
+- **File:** `/root/backups/neon_crm_pre_p7b_20260522_155023.dump`
+- **Size:** 5.6 MB (pg_dump -Fc compressed)
+
+### Code pull
+
+`git checkout feat/onboarding-phase-7b && git pull` -> HEAD = `212e9ec`. Fast-forward; no merge conflicts.
+
+### Install + upgrade
+
+```
+docker compose exec odoo odoo -c /etc/odoo/odoo.conf -d neon_crm \
+    -i neon_onboarding -u neon_training --stop-after-init --no-http
+```
+
+Migration log excerpts (all 4 neon_training migrations fired):
+
+```
+neon_training 17.0.8.1.0: candidate_id Many2one added (M4)
+neon_training 17.0.8.2.0: fire_reason Char added + M5 hook
+neon_training 17.0.8.3.0: 2 onboarding counters on dashboard
+neon_training 17.0.8.4.0: notify hooks wired (M12)
+```
+
+neon_onboarding `_post_init_hook`:
+```
+neon_onboarding M1 installed -- candidate model + audit log + skip wizard ready.
+Requirement templates deferred to M2; required-cert integration to M4.
+```
+
+Module count: 82 (was 75 pre-deploy). 6 extra modules pulled in by the `portal + website` dependency chain on `neon_onboarding`: social_media, website, website_crm, website_mail, website_sms, website_crm_sms, website_payment. These were pre-installed in dependency graph but newly registered to neon_onboarding.
+
+Registry loaded in 13.0s. No ERROR / CRITICAL.
+
+### Restart + asset regen
+
+`docker compose restart odoo` clean.
+
+Asset regen:
+```
+Clearing 11 attachments
+  compiled web.assets_backend
+  compiled web.assets_web
+  compiled web_editor.backend_assets_wysiwyg
+  compiled web.assets_frontend
+Attachments before regen: 11
+Attachments after regen:  8
+```
+
+### Verification (5/5 PASS)
+
+1. **Module versions**:
+   - `neon_training`: 17.0.8.4.0 (state=installed)
+   - `neon_onboarding`: 17.0.1.10.0 (state=installed)
+2. **Onboarding menu visible to Robin**: TRUE (root menu id=354 in `load_web_menus`)
+3. **Requirement templates seeded**: 4/4 (template_driver / template_lead_tech / template_tech / template_runner all resolved)
+4. **Dashboard counters live**: `candidates_in_cert_collection=0`, `candidates_in_probationary=0` (no candidates yet -- expected)
+5. **Cert verifier routing unchanged**: `_CERT_VERIFIER_LOGINS=('robin@neonhiring.co.zw', 'munashe@neonhiring.co.zw')` + `base.group_user.implied_ids count=0` (prior deploy invariants preserved)
+
+### Tag
+
+`v17.0.8.4.0-phase7b-live` -> `212e9ec`. Pushed to origin.
+
+### Outcome
+
+Phase 7b live on production. Full onboarding workflow available:
+- Neon Onboarding app menu visible to superuser + training_admin + training_signoff
+- /my/onboarding portal route registered (auth='user')
+- Notification stubs ready for Phase 9 dispatch wiring
+- Phase 7a + neon_core invariants intact (Robin/Munashe in cert verifier list; base.group_user has zero leaks)
+
+### Total deploy time
+
+~10 minutes (pre-flight + backup + pull + upgrade + restart + asset regen + verify + tag).
