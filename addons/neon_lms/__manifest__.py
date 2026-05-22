@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
-    "version": "17.0.1.3.0",
+    "version": "17.0.1.4.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -35,6 +35,9 @@ Subsequent milestones:
     ],
     "data": [
         "security/ir.model.access.csv",
+        # M5 -- scenario completion record rule (learner
+        # scoped to own records).
+        "security/neon_lms_scenario_rules.xml",
         "data/neon_lms_program.xml",
         "data/neon_lms_tracks.xml",
         "data/neon_lms_modules.xml",
