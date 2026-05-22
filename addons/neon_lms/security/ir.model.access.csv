@@ -20,3 +20,9 @@ access_lms_scenario_completion_lead_tech,LMS Completion - Lead Tech (signoff),mo
 access_lms_scenario_completion_crew,LMS Completion - Crew (own only via rule),model_neon_lms_scenario_completion,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_lms_sop_admin,LMS SOP - Training Admin,model_neon_lms_sop,neon_training.group_neon_training_admin,1,1,1,0
 access_lms_sop_all_users,LMS SOP - All Internal Users (read),model_neon_lms_sop,base.group_user,1,0,0,0
+access_lms_track_completion_admin,LMS Track Completion - Training Admin,model_neon_lms_track_completion,neon_training.group_neon_training_admin,1,1,1,0
+access_lms_track_completion_manager,LMS Track Completion - Jobs Manager,model_neon_lms_track_completion,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_lms_track_completion_crew,LMS Track Completion - Crew (own via rule),model_neon_lms_track_completion,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_lms_module_completion_admin,LMS Module Completion - Training Admin,model_neon_lms_module_completion,neon_training.group_neon_training_admin,1,1,1,0
+access_lms_module_completion_manager,LMS Module Completion - Jobs Manager,model_neon_lms_module_completion,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_lms_module_completion_crew,LMS Module Completion - Crew (own via rule),model_neon_lms_module_completion,neon_jobs.group_neon_jobs_crew,1,0,0,0

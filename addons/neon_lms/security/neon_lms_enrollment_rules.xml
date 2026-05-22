@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        M7 record rules: "own row" pattern (4th instance in
+        the codebase; pattern documented in
+        .claude/reference_odoo17_own_row_record_rule.md).
+
+        Learner sees only enrollment + completion records
+        belonging to their partner_id. Higher tiers (admin,
+        manager) see all via ACL CSV (no record rule).
+    -->
+    <record id="rule_enrollment_learner_own" model="ir.rule">
+        <field name="name">Learner sees own enrollment</field>
+        <field name="model_id" ref="model_slide_channel_partner"/>
+        <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_track_completion_learner_own"
+            model="ir.rule">
+        <field name="name">Learner sees own track completion</field>
+        <field name="model_id" ref="model_neon_lms_track_completion"/>
+        <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+        <field name="domain_force">[('enrollment_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_module_completion_learner_own"
+            model="ir.rule">
+        <field name="name">Learner sees own module completion</field>
+        <field name="model_id" ref="model_neon_lms_module_completion"/>
+        <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+        <field name="domain_force">[('enrollment_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+</odoo>

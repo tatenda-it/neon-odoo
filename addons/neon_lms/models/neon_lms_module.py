@@ -64,6 +64,20 @@ class NeonLMSModule(models.Model):
              "module for learner reference. Read-only -- "
              "SOPs don't block module completion.",
     )
+    # M7 -- reverse o2m fields (forward M2O lives on
+    # quiz/scenario models from M4/M5). Surfaced here so M7
+    # completion computes can traverse module ->
+    # practical_scenario_ids and module -> quiz_question_ids.
+    quiz_question_ids = fields.One2many(
+        "neon.lms.quiz.question",
+        "module_id",
+        string="Quiz Questions",
+    )
+    practical_scenario_ids = fields.One2many(
+        "neon.lms.practical.scenario",
+        "module_id",
+        string="Practical Scenarios",
+    )
     min_quiz_score = fields.Float(
         string="Minimum Quiz Score",
         default=0.8,
