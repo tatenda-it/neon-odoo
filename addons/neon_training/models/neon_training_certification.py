@@ -125,6 +125,26 @@ class NeonTrainingCertification(models.Model):
         help="The certified person. Org-wide per A2=B -- crew, "
         "office staff, freelancers all eligible.",
     )
+    # Phase 7b M4: links cert to onboarding candidate so the
+    # candidate.collected_cert_ids o2m + cert satisfaction
+    # logic can drive the candidate state machine forward.
+    # Cross-module field; loaded after neon_onboarding via the
+    # candidate model registry (forward-string reference --
+    # neon_training does NOT depend on neon_onboarding).
+    candidate_id = fields.Many2one(
+        "neon.onboarding.candidate",
+        string="Onboarding Candidate",
+        ondelete="set null",
+        index=True,
+        tracking=True,
+        help="Optional link to an onboarding candidate. "
+             "Populated during cert collection (Phase 7b "
+             "M4+); used by the candidate state machine to "
+             "compute required-cert satisfaction. Cert can "
+             "outlive the candidate (e.g., crew member re-"
+             "onboards), so ondelete=set null preserves "
+             "training history.",
+    )
     type_id = fields.Many2one(
         "neon.training.certification.type",
         string="Certification Type",
@@ -559,6 +579,48 @@ class NeonTrainingCertification(models.Model):
                         "cert_type": rec.type_id.name,
                         "src_type": src.certification_type_id.name,
                     })
+
+    # ============================================================
+    # Phase 7b M4 -- candidate state advancement hook.
+    #
+    # When a cert linked to an onboarding candidate transitions
+    # to 'active' (verified), inspect the candidate. If it's in
+    # cert_collection AND all required certs are now verified,
+    # transition it to probationary. The candidate's stored
+    # computed all_required_certs_satisfied recomputes
+    # automatically via Odoo's dependency tracking before this
+    # constrains fires.
+    #
+    # Note on @api.constrains for side-effects: typically
+    # constrains is for validation that raises. We use it here
+    # because (a) it fires after the write completes, (b) the
+    # alternative write() override would have to differentiate
+    # legitimate state writes from internal ones, (c) Odoo
+    # compute chains bypass write() so we can't put the logic
+    # in candidate.write(). The constrains doesn't raise on
+    # valid state -- it just triggers a side effect on a
+    # related record. Safe per Odoo idiom for cross-model
+    # state propagation.
+    # ============================================================
+    @api.constrains("state", "candidate_id")
+    def _check_candidate_state_advancement(self):
+        for cert in self:
+            if not cert.candidate_id:
+                continue
+            if cert.state != "active":
+                continue
+            candidate = cert.candidate_id.sudo()
+            if candidate.state != "cert_collection":
+                continue
+            # Force recompute of the stored computed field so
+            # the just-verified cert is included in the
+            # satisfaction calculation. Odoo's dependency
+            # tracking SHOULD have flushed by now, but be
+            # defensive: invalidate the computed field cache.
+            candidate.invalidate_recordset(
+                ["all_required_certs_satisfied"])
+            if candidate.all_required_certs_satisfied:
+                candidate._transition_to_probationary()
 
     # ============================================================
     # P7a.M4 -- state='expired' is automatic-only.
