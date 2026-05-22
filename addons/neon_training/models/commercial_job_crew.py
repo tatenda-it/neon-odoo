@@ -581,6 +581,11 @@ class CommercialJobCrew(models.Model):
         block. fire_reason='probationary_role_restriction' so
         downstream filtering distinguishes M5 fires from M9/
         M10/M11 fires.
+
+        M12 extension: after creating gate_log entries, fire
+        the candidate's _notify_probationary_gate_block hook
+        (defensive -- only when neon_onboarding installed AND
+        the candidate has the method, i.e. 17.0.1.10.0+).
         """
         self.ensure_one()
         GateLog = self.env["neon.training.assignment_gate_log"]
@@ -601,7 +606,20 @@ class CommercialJobCrew(models.Model):
                 "fired_at": now,
                 "triggered_by_id": triggering_user.id,
             })
-        return GateLog.sudo().create(log_vals_list)
+        logs = GateLog.sudo().create(log_vals_list)
+        # M12 notification stub. Defensive: neon_onboarding
+        # may not be installed; candidate may not exist or
+        # the method may be from an older version.
+        Candidate = self.env.get("neon.onboarding.candidate")
+        if Candidate is not None and violation.get("candidate_id"):
+            candidate = Candidate.sudo().browse(
+                violation["candidate_id"])
+            if candidate.exists() and hasattr(
+                    candidate, "_notify_probationary_gate_block"):
+                for ej in event_jobs:
+                    candidate.sudo()._notify_probationary_gate_block(
+                        ej, violation.get("role") or "non-runner")
+        return logs
 
     @api.model_create_multi
     def create(self, vals_list):

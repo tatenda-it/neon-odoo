@@ -610,6 +610,13 @@ class NeonTrainingCertification(models.Model):
             if cert.state != "active":
                 continue
             candidate = cert.candidate_id.sudo()
+            # M12 notification stub -- fire whenever a cert
+            # linked to a candidate is verified, regardless of
+            # candidate state. Defensive: only call if the
+            # method exists (neon_onboarding 17.0.1.10.0+).
+            # sudo() ensures message_post author has email.
+            if hasattr(candidate, "_notify_cert_verified"):
+                candidate.sudo()._notify_cert_verified(cert)
             if candidate.state != "cert_collection":
                 continue
             # Force recompute of the stored computed field so
