@@ -33,11 +33,29 @@ _M9_SELF_UPLOADED_TRAINER_MARKER = (
     "Self-uploaded; pending verification")
 
 
+# M10 filter -> commercial.event.job.state buckets.
+# Schema reality from neon_jobs (verified 2026-05-22):
+#   draft, planning, prep, ready_for_dispatch (pre-execution)
+#   dispatched, in_progress, strike              (active)
+#   returned, completed, closed                  (post-exec)
+#   cancelled, released                          (terminal)
+# 'cancelled' and 'released' aren't surfaced in any filter
+# (admin-only states; crew shouldn't be looking at them).
+_M10_STATE_FILTERS = {
+    "upcoming": (
+        "draft", "planning", "prep", "ready_for_dispatch"),
+    "in_progress": (
+        "dispatched", "in_progress", "strike"),
+    "completed": (
+        "returned", "completed", "closed"),
+}
+
+
 class NeonOnboardingPortal(CustomerPortal):
 
     def _prepare_home_portal_values(self, counters):
-        """Surface an onboarding counter on /my so portal
-        users see a card linking to their profile.
+        """Surface counters on /my so portal users see cards
+        linking to their onboarding profile + jobs view.
         """
         values = super()._prepare_home_portal_values(counters)
         if "onboarding_count" in counters:
@@ -48,6 +66,16 @@ class NeonOnboardingPortal(CustomerPortal):
             ], limit=1)
             values["onboarding_count"] = (
                 1 if candidate else 0)
+        # M10 -- jobs counter for portal home card. Counts
+        # commercial.job rows the candidate is on (parent
+        # jobs, not individual event_jobs). 0 hides the card.
+        if "onboarding_jobs_count" in counters:
+            crew_count = request.env[
+                "commercial.job.crew"
+            ].sudo().search_count([
+                ("user_id", "=", request.env.user.id),
+            ])
+            values["onboarding_jobs_count"] = crew_count
         return values
 
     @http.route(
@@ -213,6 +241,121 @@ class NeonOnboardingPortal(CustomerPortal):
         return self._m9_create_cert_record(
             candidate, cert_type, uploaded_file,
             date_obtained, date_expires)
+
+    # ============================================================
+    # M10 -- portal jobs view
+    # ============================================================
+    def _m10_get_candidate_for_jobs(self):
+        """Locate candidate for jobs view. Returns (candidate,
+        None) when state is probationary or active;
+        (None, redirect) otherwise. cert_collection and
+        candidate states redirect because no jobs exist yet.
+        """
+        user = request.env.user
+        candidate = request.env[
+            "neon.onboarding.candidate"
+        ].sudo().search([
+            ("user_id", "=", user.id),
+        ], limit=1)
+        if not candidate:
+            return None, request.redirect("/my/onboarding")
+        if candidate.state not in ("probationary", "active"):
+            return None, request.redirect("/my/onboarding")
+        return candidate, None
+
+    @http.route(
+        ["/my/onboarding/jobs"],
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def portal_onboarding_jobs(self, filter_state="all", **kw):
+        """List event_jobs the candidate is crew on. Filter
+        chips narrow by execution phase. cert_collection +
+        candidate states redirect to profile page.
+        """
+        candidate, redir = self._m10_get_candidate_for_jobs()
+        if redir:
+            return redir
+
+        user = request.env.user
+        crew_assignments = request.env[
+            "commercial.job.crew"
+        ].sudo().search([
+            ("user_id", "=", user.id),
+        ])
+        parent_jobs = crew_assignments.mapped("job_id")
+
+        domain = [("commercial_job_id", "in", parent_jobs.ids)]
+        state_bucket = _M10_STATE_FILTERS.get(filter_state)
+        if state_bucket:
+            domain.append(("state", "in", list(state_bucket)))
+
+        EventJob = request.env["commercial.event.job"]
+        event_jobs = EventJob.sudo().search(
+            domain, order="event_date desc")
+
+        # Build per-row context with role lookup.
+        jobs_data = []
+        for ej in event_jobs:
+            crew_row = crew_assignments.filtered(
+                lambda c, ej=ej: c.job_id == ej.commercial_job_id
+            )[:1]
+            jobs_data.append({
+                "event_job": ej,
+                "role": (crew_row.role
+                         if crew_row else "other"),
+            })
+
+        values = {
+            "candidate": candidate,
+            "jobs_data": jobs_data,
+            "filter_state": filter_state,
+            "page_name": "onboarding_jobs",
+        }
+        return request.render(
+            "neon_onboarding.portal_jobs", values)
+
+    @http.route(
+        ["/my/onboarding/jobs/<int:event_job_id>"],
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def portal_onboarding_job_detail(self, event_job_id, **kw):
+        """Read-only single-event-job detail page. Auth
+        boundary: user must be in the parent job's crew or
+        the route redirects back to the list.
+        """
+        candidate, redir = self._m10_get_candidate_for_jobs()
+        if redir:
+            return redir
+
+        EventJob = request.env["commercial.event.job"]
+        event_job = EventJob.sudo().browse(event_job_id)
+        if not event_job.exists():
+            return request.redirect("/my/onboarding/jobs")
+
+        user = request.env.user
+        crew_match = request.env[
+            "commercial.job.crew"
+        ].sudo().search([
+            ("job_id", "=", event_job.commercial_job_id.id),
+            ("user_id", "=", user.id),
+        ], limit=1)
+        if not crew_match:
+            # User not on this event_job's parent crew --
+            # bounce back to list.
+            return request.redirect("/my/onboarding/jobs")
+
+        values = {
+            "candidate": candidate,
+            "event_job": event_job,
+            "crew_assignment": crew_match,
+            "page_name": "onboarding_jobs",
+        }
+        return request.render(
+            "neon_onboarding.portal_job_detail", values)
 
     def _m9_create_cert_record(
             self, candidate, cert_type, uploaded_file,

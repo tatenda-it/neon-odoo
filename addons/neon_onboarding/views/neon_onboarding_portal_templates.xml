@@ -28,6 +28,13 @@
                     <t t-set="placeholder_count" t-value="'onboarding_count'"/>
                 </t>
             </t>
+            <t t-if="onboarding_jobs_count">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">My Jobs</t>
+                    <t t-set="url">/my/onboarding/jobs</t>
+                    <t t-set="placeholder_count" t-value="'onboarding_jobs_count'"/>
+                </t>
+            </t>
         </xpath>
     </template>
 
@@ -50,6 +57,15 @@
                     <a href="/my/onboarding/upload"
                        class="btn btn-primary">
                         Upload Certificate
+                    </a>
+                </div>
+            </div>
+            <div t-if="candidate.state in ('probationary', 'active')"
+                 class="row mt16">
+                <div class="col-12">
+                    <a href="/my/onboarding/jobs"
+                       class="btn btn-secondary">
+                        My Jobs
                     </a>
                 </div>
             </div>
@@ -194,6 +210,131 @@
             <div class="mt16">
                 <a href="/my/onboarding" class="btn btn-link">
                     Back to my onboarding profile
+                </a>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        M10 jobs templates. portal_jobs is the table view +
+        filter chips; portal_job_detail is the read-only
+        single-event-job page.
+    -->
+    <template id="portal_jobs" name="My Jobs">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">My Jobs</t>
+            </t>
+            <div class="mt16 mb-3">
+                <a href="/my/onboarding/jobs?filter_state=all"
+                   t-attf-class="btn btn-sm #{'btn-primary' if filter_state == 'all' else 'btn-outline-secondary'}">
+                    All
+                </a>
+                <a href="/my/onboarding/jobs?filter_state=upcoming"
+                   t-attf-class="btn btn-sm #{'btn-primary' if filter_state == 'upcoming' else 'btn-outline-secondary'} ms-1">
+                    Upcoming
+                </a>
+                <a href="/my/onboarding/jobs?filter_state=in_progress"
+                   t-attf-class="btn btn-sm #{'btn-primary' if filter_state == 'in_progress' else 'btn-outline-secondary'} ms-1">
+                    In Progress
+                </a>
+                <a href="/my/onboarding/jobs?filter_state=completed"
+                   t-attf-class="btn btn-sm #{'btn-primary' if filter_state == 'completed' else 'btn-outline-secondary'} ms-1">
+                    Completed
+                </a>
+            </div>
+            <table class="table" t-if="jobs_data">
+                <thead>
+                    <tr>
+                        <th>Event Date</th>
+                        <th>Job</th>
+                        <th>Venue</th>
+                        <th>Role</th>
+                        <th>State</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="jobs_data" t-as="row">
+                        <td>
+                            <span t-field="row['event_job'].event_date"/>
+                        </td>
+                        <td>
+                            <a t-attf-href="/my/onboarding/jobs/#{row['event_job'].id}">
+                                <span t-field="row['event_job'].name"/>
+                            </a>
+                        </td>
+                        <td>
+                            <span t-field="row['event_job'].commercial_job_id.venue_id"/>
+                        </td>
+                        <td>
+                            <span t-esc="row['role']"/>
+                        </td>
+                        <td>
+                            <span class="badge text-bg-info">
+                                <span t-field="row['event_job'].state"/>
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div t-if="not jobs_data"
+                 class="alert alert-info">
+                No jobs match this filter. Try the All chip
+                to see every assigned job, or wait for your
+                next scheduling.
+            </div>
+            <div class="mt16">
+                <a href="/my/onboarding" class="btn btn-link">
+                    Back to onboarding profile
+                </a>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_job_detail" name="Job Detail">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Job Detail</t>
+            </t>
+            <div class="mt16">
+                <h3>
+                    <span t-field="event_job.name"/>
+                </h3>
+                <dl class="row mt16">
+                    <dt class="col-sm-3">Event Date</dt>
+                    <dd class="col-sm-9">
+                        <span t-field="event_job.event_date"/>
+                    </dd>
+                    <dt class="col-sm-3">End Date</dt>
+                    <dd class="col-sm-9">
+                        <span t-field="event_job.event_end_date"/>
+                    </dd>
+                    <dt class="col-sm-3">Venue</dt>
+                    <dd class="col-sm-9">
+                        <span t-field="event_job.commercial_job_id.venue_id"/>
+                    </dd>
+                    <dt class="col-sm-3">Client</dt>
+                    <dd class="col-sm-9">
+                        <span t-field="event_job.commercial_job_id.partner_id"/>
+                    </dd>
+                    <dt class="col-sm-3">State</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge text-bg-info">
+                            <span t-field="event_job.state"/>
+                        </span>
+                    </dd>
+                    <dt class="col-sm-3">Your Role</dt>
+                    <dd class="col-sm-9">
+                        <span t-field="crew_assignment.role"/>
+                    </dd>
+                </dl>
+            </div>
+            <div class="mt16">
+                <a href="/my/onboarding/jobs"
+                   class="btn btn-link">
+                    Back to my jobs
                 </a>
             </div>
         </t>
