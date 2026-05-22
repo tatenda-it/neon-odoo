@@ -22,8 +22,21 @@
                 </p>
                 <group>
                     <field name="candidate_id" readonly="1"/>
+                    <field name="candidate_state" readonly="1"/>
+                    <field name="candidate_user_id" readonly="1"/>
                     <field name="reason" placeholder="e.g., Existing crew from pre-Phase-7b deploy, added 22 May 2026"/>
                 </group>
+                <separator string="User Account"/>
+                <group>
+                    <field name="create_user"/>
+                    <field name="proposed_login"
+                           invisible="not create_user"
+                           required="create_user"/>
+                </group>
+                <separator string="Skip Notes (optional)"/>
+                <field name="notes"
+                       nolabel="1"
+                       placeholder="Additional context appended to the audit log. e.g. 'Existing crew from pre-deploy 21 May 2026'."/>
                 <footer>
                     <button name="action_skip" type="object"
                             string="Skip Onboarding"
