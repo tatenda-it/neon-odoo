@@ -241,6 +241,12 @@ class NeonOnboardingPromoteWizard(models.TransientModel):
                 % new_user.login if new_user else ""),
         })
 
+        # M12 notification stub. sudo() so env.user becomes
+        # SUPERUSER (has email); test fixtures used as the
+        # triggering user often lack a mail config, which
+        # message_post requires.
+        cand.sudo()._notify_promoted_active()
+
         _logger.info(
             "neon_onboarding M6: candidate %s promoted to "
             "active by %s (user_created=%s).",

@@ -427,6 +427,10 @@ class NeonOnboardingCandidate(models.Model):
             "previous_state": self.state,
             "new_state": self.state,
         })
+        # M12 notification stub. sudo() ensures message_post
+        # author has a usable email regardless of who
+        # triggered the cert_collection transition.
+        self.sudo()._notify_portal_user_created()
         return new_user
 
     def write(self, vals):
@@ -467,6 +471,141 @@ class NeonOnboardingCandidate(models.Model):
                     "provisioned. Add contact_email and "
                     "re-trigger via the candidate form."))
         return res
+
+    # ============================================================
+    # M12 -- notification stub dispatchers.
+    #
+    # All 6 methods follow the same shape: build a body marker
+    # noting the event + channels + recipient hint, then post
+    # to chatter via message_post. Phase 9 will override these
+    # methods to wire actual WhatsApp + email sends without
+    # restructuring callers. The stub body is intentionally
+    # noisy so QA can confirm trigger points fired during the
+    # walkthrough.
+    # ============================================================
+    def _notify_send(self, event, channels, subject, body):
+        """Stub dispatcher. Phase 9 overrides to send actual
+        WhatsApp + email via the dispatch engine. M12 logs
+        intent to chatter so the trigger point + intended
+        recipient list is captured on the candidate record.
+        """
+        self.ensure_one()
+        channel_str = ", ".join(channels)
+        full_body = (
+            "<p><strong>[Notification stub - Phase 9 will "
+            "send]</strong></p>"
+            "<p><b>Event:</b> %s</p>"
+            "<p><b>Channels:</b> %s</p>"
+            "<p><b>To:</b> %s / %s</p>"
+            "<hr/>%s"
+        ) % (
+            event,
+            channel_str,
+            self.contact_email or "(no email)",
+            self.contact_phone or "(no phone)",
+            body,
+        )
+        self.message_post(
+            subject=subject,
+            body=full_body,
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+        )
+
+    def _notify_portal_user_created(self):
+        self.ensure_one()
+        self._notify_send(
+            event="portal_user_created",
+            channels=["email"],
+            subject=_("Welcome to Neon Crew Portal - %s") % self.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>Your portal access is ready. Log in at "
+                "crm.neonhiring.com with your email and the "
+                "temporary password provided separately. "
+                "Please change your password on first login.</p>"
+                "<p>Next step: upload your required "
+                "certifications via /my/onboarding.</p>"
+            ) % {"name": self.name})
+
+    def _notify_cert_uploaded(self, cert_type):
+        self.ensure_one()
+        self._notify_send(
+            event="cert_uploaded",
+            channels=["email", "whatsapp"],
+            subject=_("Cert uploaded - %s") % cert_type.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>Your %(cert)s certification has been "
+                "received and is awaiting verification by "
+                "Robin or Munashe. You'll be notified once "
+                "it's reviewed.</p>"
+            ) % {
+                "name": self.name,
+                "cert": cert_type.name,
+            })
+
+    def _notify_cert_verified(self, cert):
+        self.ensure_one()
+        self._notify_send(
+            event="cert_verified",
+            channels=["email", "whatsapp"],
+            subject=_("Cert verified - %s") % cert.type_id.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>Your %(cert)s certification is now active. "
+                "Track progress at /my/onboarding.</p>"
+            ) % {
+                "name": self.name,
+                "cert": cert.type_id.name,
+            })
+
+    def _notify_promoted_active(self):
+        self.ensure_one()
+        self._notify_send(
+            event="promoted_active",
+            channels=["email", "whatsapp"],
+            subject=_("Welcome to active crew - %s") % self.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>Congratulations -- you've been promoted "
+                "to active crew. Your full backend access is "
+                "now enabled. Welcome aboard.</p>"
+            ) % {"name": self.name})
+
+    def _notify_skipped(self, reason):
+        self.ensure_one()
+        self._notify_send(
+            event="skipped",
+            channels=["email"],
+            subject=_("Onboarding bypass - %s") % self.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>Your onboarding has been completed via "
+                "admin override (reason: %(reason)s). Your "
+                "access is enabled.</p>"
+            ) % {
+                "name": self.name,
+                "reason": reason,
+            })
+
+    def _notify_probationary_gate_block(self, event_job, role):
+        self.ensure_one()
+        self._notify_send(
+            event="probationary_gate_block",
+            channels=["email"],
+            subject=_("Probationary restriction - %s") % self.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>You were proposed for a %(role)s role on "
+                "%(job)s, but probationary candidates are "
+                "restricted to runner roles. A manager will "
+                "reassign you.</p>"
+            ) % {
+                "name": self.name,
+                "role": role,
+                "job": event_job.display_name,
+            })
 
     def _transition_to_probationary(self):
         """Automatic transition cert_collection -> probationary.

@@ -436,6 +436,10 @@ class NeonOnboardingPortal(CustomerPortal):
             "previous_state": candidate.state,
             "new_state": candidate.state,
         })
+        # M12 notification stub. sudo() so the portal user's
+        # ACL on neon.onboarding.candidate (read-only) doesn't
+        # block the message_post side-effect.
+        candidate.sudo()._notify_cert_uploaded(cert_type)
         _logger.info(
             "neon_onboarding M9: cert %d (%s) self-uploaded "
             "for candidate %s.",

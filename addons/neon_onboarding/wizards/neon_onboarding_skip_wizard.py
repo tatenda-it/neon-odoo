@@ -237,6 +237,11 @@ class NeonOnboardingSkipWizard(models.TransientModel):
                     % new_user.login if new_user else ""),
             })
 
+        # M12 notification stub. sudo() so the message_post
+        # author lookup uses SUPERUSER (which has an email);
+        # test-fixture triggering users may not.
+        candidate.sudo()._notify_skipped(self.reason)
+
         _logger.info(
             "neon_onboarding M7: skip override on %s by %s "
             "(reason=%s, prev_state=%s, user_created=%s).",
