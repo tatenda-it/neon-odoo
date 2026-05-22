@@ -13,7 +13,7 @@ SMOKES=(
   p5m1 p5m1_subtask_a p5m2 p5m3 p5m4 p5m5 p5m6 p5m7 p5m8 p5m9 p5m10
   p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11
   p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1
-  p7b_m1 p7b_m2 p7b_m3 p7b_m4 p7b_m5 p7b_m6 p7b_m7 p7b_m8 p7b_m9 p7b_m10
+  p7b_m1 p7b_m2 p7b_m3 p7b_m4 p7b_m5 p7b_m6 p7b_m7 p7b_m8 p7b_m9 p7b_m10 p7b_m11
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0
