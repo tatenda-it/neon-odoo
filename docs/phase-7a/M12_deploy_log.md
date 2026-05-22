@@ -339,3 +339,128 @@ def _post_init_hook(env):
 ```
 
 Track as Phase 11 CLAUDE.md amendment candidate #7 (now 7 total).
+
+---
+
+## Combined deploy: `neon_core` + cert routing override (22 May 2026, ~08:17 UTC)
+
+**Deployer:** Tatenda via Claude Code SSH
+**Trigger:** Two structural fixes from Phase 7a pre-deploy + post-deploy sessions.
+
+- `neon_core` (`1464bee`) -- 5 RBAC tier meta-groups + base.group_user implied_ids hygiene + canonical user assignment by login (replacing the fragile base.user_admin xmlid path).
+- `neon_training` cert verification routing override (`2af1167`) -- always route TODOs to managerial superusers (Robin + Munashe) regardless of cert type's sign_off_authority. Override added because neon_core's superuser cascade put Robin into every authority group, collapsing the first-by-id pick.
+
+### Pre-flight (post-fix)
+
+| Check | Result |
+|---|---|
+| SSH connectivity | ✅ |
+| Prod HEAD before deploy | `33461cd` (Phase 7a baseline) + manual ACL grants from 21 May session |
+| Prod working tree | ✅ Clean (only `config/odoo.conf.pre-phase1-backup` untracked, pre-existing) |
+| Push gap | Initial fetch showed origin at `a122f19`; pushed `1464bee` + `2af1167` from dev before re-pulling on prod |
+
+### Backup
+
+- **File:** `/root/backups/neon_crm_pre_neoncore_20260522_101431.dump`
+- **Size:** 5.7 MB (pg_dump -Fc)
+- **Rollback path:** `pg_restore --clean --if-exists -d neon_crm /root/backups/neon_crm_pre_neoncore_20260522_101431.dump`
+
+### Code pull
+
+After pushing dev branch, prod `git pull origin feat/training-phase-7a` advanced `a122f19 .. 2af1167`. HEAD on prod = `2af1167`.
+
+### Install + upgrade
+
+```
+docker compose exec odoo odoo -c /etc/odoo/odoo.conf -d neon_crm \
+    -i neon_core -u neon_training --stop-after-init --no-http
+```
+
+Key log lines captured:
+
+```
+neon_core: stripped implied_id base.group_no_one (Developer mode) from base.group_user.
+neon_core: stripped implied_id base.group_multi_currency (Multi-currency picker) from base.group_user.
+neon_core: stripped implied_id product.group_product_pricelist (Pricelist visibility) from base.group_user.
+neon_core: stripped implied_id mail.group_mail_template_editor (Mail template editor) from base.group_user.
+neon_core cleanup summary -- removed=4, skipped=0.
+
+neon_core: assigned robin@neonhiring.co.zw to neon_core.group_neon_superuser
+neon_core: assigned munashe@neonhiring.co.zw to neon_core.group_neon_superuser
+neon_core: assigned tatenda@neonhiring.co.zw to neon_core.group_neon_superuser
+neon_core: assigned admin@neonhiring.co.zw to neon_core.group_neon_bookkeeper
+neon_core: assigned lisar@neonhiring.co.zw to neon_core.group_neon_sales_rep
+neon_core: assigned evrill@neonhiring.co.zw to neon_core.group_neon_sales_rep
+neon_core: assigned ranganai@neonhiring.co.zw to neon_core.group_neon_lead_tech
+
+neon_core reconcile: stripped base.group_no_one from 3 tier user(s).
+neon_core reconcile: stripped base.group_multi_currency from 1 tier user(s).
+neon_core reconcile: stripped product.group_product_pricelist from 2 tier user(s).
+neon_core reconcile: stripped mail.group_mail_template_editor from 4 tier user(s).
+
+Module neon_core loaded in 0.98s, 952 queries
+Module neon_training loaded in 0.87s, 878 queries
+Registry loaded in 4.980s
+```
+
+No ERROR / CRITICAL. The reStructuredText warning `<string>:22: (ERROR/3) Unexpected indentation.` is benign noise from the manifest description docstring.
+
+**Note vs dev:** on prod the lead_tech assignment landed (Ranganai exists at uid=13); on dev that step was skipped because the user record was missing. The login-based lookup gracefully handled both paths.
+
+### Restart + asset regen
+
+`docker compose restart odoo` -- HTTP back online within 15s.
+
+Asset regen via `_get_asset_bundle` (preempting the bundle-stale issue from the Phase 7a deploy):
+
+```
+Clearing 15 attachments
+  compiled web.assets_backend
+  compiled web.assets_web
+  compiled web_editor.backend_assets_wysiwyg
+  compiled web.assets_frontend
+Attachments before regen: 15
+Attachments after regen:  8
+```
+
+### Verification (6/6 PASS)
+
+1. **Tier assignments** -- 7 canonical users mapped to 4 of 5 meta-groups:
+   - Superuser (3): Robin (uid=21), Munashe (uid=7), Tatenda (uid=6)
+   - Bookkeeper (1): Kudzaiishe via admin@ (uid=10)
+   - Sales Rep (2): Lisa (uid=8), Evrill (uid=9)
+   - Lead Tech (1): Ranganai (uid=13)
+   - Crew (0): unpopulated; Phase 7b onboarding will assign
+2. **base.group_user.implied_ids:** 0 (was 4 before deploy). Clean.
+3. **Superuser cascade verified on Robin:** in group_no_one, mail_template_editor, multi_currency, pricelist (all True via meta-group implication chain). Stripping from base.group_user did not affect superuser-tier members.
+4. **`_CERT_VERIFIER_LOGINS`** present in `neon_training_certification` module: `('robin@neonhiring.co.zw', 'munashe@neonhiring.co.zw')`.
+5. **Routing helper** returns Munashe (alphabetically first) as target on prod when invoked.
+6. **Module versions:**
+   - `neon_training` 17.0.8.0.1 (state=installed)
+   - `neon_core` 17.0.1.0.0 (state=installed)
+
+### Tag
+
+`v17.0.8.0.1-neon-core-cert-routing` -> `2af1167`. Pushed to origin.
+
+### Combined deploy outcome
+
+Both structural fixes live. Phase 11 amendment candidates #6 (meta-group RBAC pattern) and #7-partial (canonical user assignment by login) now in production. The base.group_user leak that granted developer mode + template editor + pricing visibility to every internal user is closed. Cert verification TODOs route to managerial superusers regardless of cert type.
+
+Robin + Munashe both subscribed as followers on any new cert submitted for verification; either can complete `action_verify`. Tatenda excluded from verifier pool per direction.
+
+### Rollback (not invoked)
+
+If a regression had surfaced:
+```
+docker compose stop odoo
+docker exec neon-odoo-db dropdb -U odoo neon_crm
+docker exec neon-odoo-db createdb -U odoo neon_crm
+docker exec -i neon-odoo-db pg_restore -U odoo -d neon_crm < /root/backups/neon_crm_pre_neoncore_20260522_101431.dump
+cd /opt/neon-odoo && git checkout v17.0.8.0.0-phase7a-live
+docker compose restart odoo
+```
+
+### Total deploy time
+
+~10 minutes including the push-gap detection + dev-side push detour.
