@@ -5,3 +5,6 @@ access_lms_track_crew,LMS Track - Crew (read),model_neon_lms_track,neon_jobs.gro
 access_lms_module_admin,LMS Module - Training Admin,model_neon_lms_module,neon_training.group_neon_training_admin,1,1,1,0
 access_lms_module_manager,LMS Module - Jobs Manager,model_neon_lms_module,neon_jobs.group_neon_jobs_manager,1,0,0,0
 access_lms_module_crew,LMS Module - Crew (read),model_neon_lms_module,neon_jobs.group_neon_jobs_crew,1,0,0,0
+access_lms_authority_admin,LMS Authority - Training Admin,model_neon_lms_operating_authority,neon_training.group_neon_training_admin,1,1,1,0
+access_lms_authority_manager,LMS Authority - Jobs Manager,model_neon_lms_operating_authority,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_lms_authority_crew,LMS Authority - Crew (read),model_neon_lms_operating_authority,neon_jobs.group_neon_jobs_crew,1,0,0,0

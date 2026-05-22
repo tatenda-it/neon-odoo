@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Track -> Authority reverse mapping (M2M
+        operating_authority_ids on each track). Lists which
+        authorities each track contributes to.
+
+        Foundations: stop_work + electrical (granted alone) +
+                     generator + outdoor_public (with
+                     workflow_ops) + rigging +
+                     working_at_height (with rigging)
+        Workflow_Ops: generator + outdoor_public
+        Rigging: rigging + working_at_height
+
+        The other 3 tracks (audio, lighting, video_led,
+        soft_skills) don't contribute to any authority;
+        they're skill tracks, not safety/operations.
+    -->
+
+    <record id="track_foundations_safety"
+            model="neon.lms.track">
+        <field name="operating_authority_ids" eval="[(6, 0, [
+            ref('authority_stop_work'),
+            ref('authority_electrical'),
+            ref('authority_generator'),
+            ref('authority_outdoor_public'),
+            ref('authority_rigging'),
+            ref('authority_working_at_height'),
+        ])]"/>
+    </record>
+
+    <record id="track_workflow_ops" model="neon.lms.track">
+        <field name="operating_authority_ids" eval="[(6, 0, [
+            ref('authority_generator'),
+            ref('authority_outdoor_public'),
+        ])]"/>
+    </record>
+
+    <record id="track_rigging" model="neon.lms.track">
+        <field name="operating_authority_ids" eval="[(6, 0, [
+            ref('authority_rigging'),
+            ref('authority_working_at_height'),
+        ])]"/>
+    </record>
+</odoo>

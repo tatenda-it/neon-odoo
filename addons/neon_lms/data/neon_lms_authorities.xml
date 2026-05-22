@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        6 operating authority records per schema sketch
+        section 5.9 + 7. Each authority specifies which
+        tracks (combined) grant it.
+
+        stop_work + electrical: Foundations alone (every
+            trained crew member gets these)
+        generator + outdoor_public: Foundations + Workflow_Ops
+        rigging: Foundations + Rigging
+        working_at_height: Foundations + Rigging, plus
+            requires_practical_signoff
+    -->
+
+    <record id="authority_stop_work"
+            model="neon.lms.operating.authority">
+        <field name="code">stop_work</field>
+        <field name="name">Stop-Work Authority</field>
+        <field name="description">Authority to halt operations when safety-critical risk is observed. Granted to every learner on completion of the Foundations track. No practical signoff required.</field>
+        <field name="requires_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+
+    <record id="authority_electrical"
+            model="neon.lms.operating.authority">
+        <field name="code">electrical</field>
+        <field name="name">Electrical Operating Authority</field>
+        <field name="description">Authority to handle high-voltage cabling, distros, and power feeds. Foundations track covers M01 + M08 (power and electrical discipline) which is sufficient.</field>
+        <field name="requires_track_ids"
+               eval="[(4, ref('track_foundations_safety'))]"/>
+    </record>
+
+    <record id="authority_generator"
+            model="neon.lms.operating.authority">
+        <field name="code">generator</field>
+        <field name="name">Generator Setup Authority</field>
+        <field name="description">Authority to set up and operate generators for outdoor events. Requires Foundations plus Workflow and Operations.</field>
+        <field name="requires_track_ids"
+               eval="[(4, ref('track_foundations_safety')),
+                      (4, ref('track_workflow_ops'))]"/>
+    </record>
+
+    <record id="authority_outdoor_public"
+            model="neon.lms.operating.authority">
+        <field name="code">outdoor_public</field>
+        <field name="name">Outdoor Public-Event Authority</field>
+        <field name="description">Authority to operate as crew on outdoor public-facing events. Requires Foundations plus Workflow and Operations.</field>
+        <field name="requires_track_ids"
+               eval="[(4, ref('track_foundations_safety')),
+                      (4, ref('track_workflow_ops'))]"/>
+    </record>
+
+    <record id="authority_rigging"
+            model="neon.lms.operating.authority">
+        <field name="code">rigging</field>
+        <field name="name">Rigging Authority</field>
+        <field name="description">Authority for truss assembly, motor setup, and ground-level rigging operations. Requires Foundations plus Rigging.</field>
+        <field name="requires_track_ids"
+               eval="[(4, ref('track_foundations_safety')),
+                      (4, ref('track_rigging'))]"/>
+    </record>
+
+    <record id="authority_working_at_height"
+            model="neon.lms.operating.authority">
+        <field name="code">working_at_height</field>
+        <field name="name">Working-At-Height Authority</field>
+        <field name="description">Authority for working at height (climbing trusses, ladder work above 3m). Requires Foundations plus Rigging plus practical signoff.</field>
+        <field name="requires_track_ids"
+               eval="[(4, ref('track_foundations_safety')),
+                      (4, ref('track_rigging'))]"/>
+        <field name="requires_practical_signoff" eval="True"/>
+    </record>
+</odoo>

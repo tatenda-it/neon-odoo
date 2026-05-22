@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -38,6 +38,10 @@ Subsequent milestones:
         "data/neon_lms_program.xml",
         "data/neon_lms_tracks.xml",
         "data/neon_lms_modules.xml",
+        # M2 -- authority + reverse mapping. Load AFTER
+        # tracks so the M2M references resolve.
+        "data/neon_lms_authorities.xml",
+        "data/neon_lms_authority_mapping.xml",
     ],
     "installable": True,
     "application": False,
