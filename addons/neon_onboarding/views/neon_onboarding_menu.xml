@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Neon Onboarding app menu structure. M3 consolidation:
+        all menus live here so view-vs-menu changes are
+        decoupled. Loads after all view files in the manifest
+        so action_id refs resolve.
+
+        Visibility:
+        * Root: superuser + training_admin + training_signoff
+          (signoff sees onboarding to coordinate with cert
+          collection M4 work)
+        * Candidates: same as root
+        * Configuration: superuser + training_admin only
+          (templates are edit-critical; signoff should not
+          mutate the requirement catalog)
+        * Requirement Templates: same as Configuration
+    -->
+
+    <menuitem id="menu_neon_onboarding_root"
+              name="Neon Onboarding"
+              web_icon="neon_onboarding,static/description/icon.png"
+              sequence="55"
+              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin,neon_training.group_neon_training_signoff"/>
+
+    <menuitem id="menu_neon_onboarding_candidates"
+              name="Candidates"
+              parent="menu_neon_onboarding_root"
+              action="action_neon_onboarding_candidate"
+              sequence="10"/>
+
+    <menuitem id="menu_neon_onboarding_configuration"
+              name="Configuration"
+              parent="menu_neon_onboarding_root"
+              sequence="90"
+              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_neon_onboarding_templates"
+              name="Requirement Templates"
+              parent="menu_neon_onboarding_configuration"
+              action="action_neon_onboarding_template"
+              sequence="10"/>
+</odoo>

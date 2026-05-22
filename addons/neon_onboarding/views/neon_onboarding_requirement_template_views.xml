@@ -67,15 +67,10 @@
         </field>
     </record>
 
-    <menuitem id="menu_neon_onboarding_config"
-              name="Configuration"
-              parent="menu_neon_onboarding_root"
-              sequence="90"
-              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"/>
-
-    <menuitem id="menu_neon_onboarding_templates"
-              name="Requirement Templates"
-              parent="menu_neon_onboarding_config"
-              action="action_neon_onboarding_template"
-              sequence="10"/>
+    <!--
+        Menus moved to neon_onboarding_menu.xml in M3. That
+        file is now the single source of truth for the app menu
+        structure. This file now contains only views + action
+        for the template model.
+    -->
 </odoo>

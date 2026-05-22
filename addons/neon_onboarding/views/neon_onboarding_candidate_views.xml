@@ -1,11 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        M1 basic views. Full kanban + portal views land in M3
-        per the milestone breakdown. M1 ships tree + form so
-        smoke tests can drive the model via UI-equivalent
-        records and Tatenda can sanity-check via the backend.
+        M3 view set: kanban (manager-facing primary view) +
+        tree + polished form. Menus + actions live in
+        neon_onboarding_menu.xml so view-vs-menu changes are
+        decoupled going forward.
     -->
+
+    <record id="view_neon_onboarding_candidate_kanban"
+            model="ir.ui.view">
+        <field name="name">neon.onboarding.candidate.kanban</field>
+        <field name="model">neon.onboarding.candidate</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_small_column"
+                    quick_create="false">
+                <field name="id"/>
+                <field name="name"/>
+                <field name="intended_role"/>
+                <field name="state"/>
+                <field name="date_started"/>
+                <field name="photo"/>
+                <field name="requirement_template_id"/>
+                <field name="bypass_actor_id"/>
+                <field name="user_id"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_image">
+                                    <img t-if="record.photo.raw_value"
+                                         t-att-src="kanban_image('neon.onboarding.candidate', 'photo', record.id.raw_value)"
+                                         alt="Photo"
+                                         class="o_kanban_avatar"
+                                         style="width:48px;height:48px;border-radius:50%;object-fit:cover;"/>
+                                    <div t-else=""
+                                         class="o_kanban_avatar bg-secondary text-white d-flex align-items-center justify-content-center"
+                                         style="width:48px;height:48px;border-radius:50%;font-weight:bold;">
+                                        <span t-esc="record.name.raw_value ? record.name.raw_value[0].toUpperCase() : '?'"/>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_headings ms-2">
+                                    <strong class="o_kanban_record_title">
+                                        <field name="name"/>
+                                    </strong>
+                                    <div class="text-muted small">
+                                        <field name="intended_role"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body small text-muted mt-2">
+                                <div t-if="record.requirement_template_id.raw_value">
+                                    Template: <field name="requirement_template_id"/>
+                                </div>
+                                <div>
+                                    Started: <field name="date_started" widget="date"/>
+                                </div>
+                                <div t-if="record.bypass_actor_id.raw_value"
+                                     class="text-warning">
+                                    <i class="fa fa-shield"/> Admin override applied
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
 
     <record id="view_neon_onboarding_candidate_tree" model="ir.ui.view">
         <field name="name">neon.onboarding.candidate.tree</field>
@@ -17,8 +78,13 @@
                   decoration-success="state == 'active'">
                 <field name="name"/>
                 <field name="intended_role"/>
-                <field name="contact_phone"/>
-                <field name="state"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'candidate'"
+                       decoration-warning="state == 'cert_collection'"
+                       decoration-muted="state == 'probationary'"
+                       decoration-success="state == 'active'"/>
+                <field name="requirement_template_id" optional="show"/>
+                <field name="contact_phone" optional="hide"/>
                 <field name="date_started"/>
                 <field name="user_id" optional="show"/>
                 <field name="bypass_actor_id" optional="hide"/>
@@ -34,7 +100,7 @@
                 <header>
                     <button name="%(action_neon_onboarding_skip_wizard)d"
                             type="action"
-                            string="Skip Onboarding"
+                            string="Skip Onboarding (Admin)"
                             class="oe_highlight"
                             groups="neon_core.group_neon_superuser"
                             context="{'default_candidate_id': active_id}"
@@ -49,20 +115,42 @@
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="Full Name"/></h1>
+                        <h3 class="text-muted">
+                            <field name="intended_role"/>
+                        </h3>
                     </div>
                     <group>
-                        <group string="Role &amp; Contact">
-                            <field name="intended_role"/>
+                        <group string="Person &amp; Contact">
                             <field name="contact_phone"/>
                             <field name="contact_email"/>
-                            <field name="user_id" readonly="state != 'active'"/>
-                        </group>
-                        <group string="Emergency &amp; Dates">
                             <field name="emergency_contact_name"/>
                             <field name="emergency_contact_phone"/>
+                        </group>
+                        <group string="Linkage &amp; Dates">
+                            <field name="user_id"
+                                   readonly="state != 'active'"
+                                   options="{'no_create': True}"/>
                             <field name="date_started"/>
                             <field name="date_activated" readonly="1"/>
                         </group>
+                    </group>
+                    <group string="Requirements" col="2">
+                        <field name="requirement_template_id"
+                               options="{'no_create': True}"/>
+                        <div colspan="2"
+                             invisible="not requirement_template_id"
+                             class="text-muted small">
+                            Click the template to view required
+                            cert types. Inline list of certs
+                            with held / pending / missing
+                            indicators lands in M4 alongside
+                            cert collection integration.
+                        </div>
+                    </group>
+                    <group string="Sign-Off (Admin Override)"
+                           invisible="not bypass_actor_id">
+                        <field name="bypass_actor_id" readonly="1"/>
+                        <field name="bypass_reason" readonly="1"/>
                     </group>
                     <notebook>
                         <page string="Probationary"
@@ -71,19 +159,15 @@
                                 <field name="probationary_jobs_target"/>
                                 <field name="probationary_jobs_completed" readonly="1"/>
                             </group>
-                        </page>
-                        <page string="Override Metadata"
-                              invisible="not bypass_actor_id"
-                              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin">
-                            <group>
-                                <field name="bypass_actor_id" readonly="1"/>
-                                <field name="bypass_reason" readonly="1"/>
-                            </group>
+                            <div class="text-muted small">
+                                Full job-counting compute lands in M5.
+                                M3 ships the field surface only.
+                            </div>
                         </page>
                         <page string="Audit Log"
                               groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin,neon_training.group_neon_training_signoff">
                             <field name="audit_log_ids" readonly="1">
-                                <tree>
+                                <tree decoration-warning="action == 'skip_onboarding'">
                                     <field name="timestamp"/>
                                     <field name="action"/>
                                     <field name="actor_id"/>
@@ -112,6 +196,7 @@
                 <field name="name"/>
                 <field name="intended_role"/>
                 <field name="user_id"/>
+                <field name="requirement_template_id"/>
                 <separator/>
                 <filter name="filter_candidate" string="New Candidates"
                         domain="[('state', '=', 'candidate')]"/>
@@ -129,6 +214,8 @@
                             context="{'group_by': 'state'}"/>
                     <filter name="group_role" string="Intended Role"
                             context="{'group_by': 'intended_role'}"/>
+                    <filter name="group_template" string="Requirement Template"
+                            context="{'group_by': 'requirement_template_id'}"/>
                 </group>
             </search>
         </field>
@@ -137,9 +224,9 @@
     <record id="action_neon_onboarding_candidate" model="ir.actions.act_window">
         <field name="name">Onboarding Candidates</field>
         <field name="res_model">neon.onboarding.candidate</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">kanban,tree,form</field>
         <field name="search_view_id" ref="view_neon_onboarding_candidate_search"/>
-        <field name="context">{'search_default_filter_candidate': 1}</field>
+        <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create the first onboarding candidate.
@@ -152,16 +239,4 @@
             </p>
         </field>
     </record>
-
-    <menuitem id="menu_neon_onboarding_root"
-              name="Onboarding"
-              sequence="50"
-              web_icon="neon_onboarding,static/description/icon.png"
-              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin,neon_training.group_neon_training_signoff"/>
-
-    <menuitem id="menu_neon_onboarding_candidates"
-              name="Candidates"
-              parent="menu_neon_onboarding_root"
-              action="action_neon_onboarding_candidate"
-              sequence="10"/>
 </odoo>
