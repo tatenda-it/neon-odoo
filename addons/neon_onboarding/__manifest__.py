@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Onboarding",
-    "version": "17.0.1.6.0",
+    "version": "17.0.1.7.0",
     "summary": "Phase 7b -- crew onboarding state machine. "
                "M1 ships the neon.onboarding.candidate model, "
                "4-state machine (candidate / cert_collection / "
@@ -40,6 +40,9 @@ M1 scope:
     "depends": [
         "base",
         "mail",
+        # M8 -- /my/onboarding portal route + templates.
+        "portal",
+        "website",
         "neon_core",
         "neon_jobs",
         "neon_training",
@@ -64,6 +67,10 @@ M1 scope:
         # LAST so all action xmlids referenced by parent +
         # child menuitems exist in the registry.
         "views/neon_onboarding_menu.xml",
+        # M8 -- portal templates (load after candidate views
+        # so any T-call references to inherited templates
+        # resolve cleanly).
+        "views/neon_onboarding_portal_templates.xml",
         # Seed data loads after views so admin can explore
         # the templates UI immediately.
         "data/neon_onboarding_templates.xml",

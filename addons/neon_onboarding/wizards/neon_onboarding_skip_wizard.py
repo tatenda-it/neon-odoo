@@ -111,8 +111,14 @@ class NeonOnboardingSkipWizard(models.TransientModel):
 
         previous_state = candidate.state
 
-        # M7 step 1: create user if requested + null user_id.
+        # M7 step 1: create OR upgrade user.
+        # M8 added the portal-user-at-cert_collection pattern;
+        # candidate.user_id may already point at a portal-only
+        # user even though state is 'cert_collection'. In that
+        # case the skip wizard UPGRADES groups (strips portal,
+        # adds backend) instead of creating fresh.
         new_user = self.env["res.users"]
+        upgraded_user = self.env["res.users"]
         if self.create_user and not candidate.user_id:
             login = (self.proposed_login or "").strip()
             if not login:
@@ -153,6 +159,42 @@ class NeonOnboardingSkipWizard(models.TransientModel):
                 ])],
             })
             candidate.sudo().write({"user_id": new_user.id})
+        elif self.create_user and candidate.user_id:
+            # M8 upgrade path: portal user -> backend user.
+            portal_grp = self.env.ref(
+                "base.group_portal",
+                raise_if_not_found=False)
+            existing_user = candidate.user_id
+            if portal_grp and portal_grp in existing_user.groups_id:
+                existing_user.sudo().write({
+                    "groups_id": [
+                        (3, portal_grp.id),
+                        (4, self.env.ref(
+                            "base.group_user").id),
+                        (4, self.env.ref(
+                            "neon_jobs.group_neon_jobs_crew"
+                        ).id),
+                        (4, self.env.ref(
+                            "neon_training."
+                            "group_neon_training_user"
+                        ).id),
+                    ],
+                })
+                upgraded_user = existing_user
+                # Audit log for the upgrade -- separate from
+                # the skip_onboarding entry so the audit
+                # trail captures both moments.
+                self.env["neon.onboarding.audit.log"].sudo().create({
+                    "candidate_id": candidate.id,
+                    "action": "portal_user_upgraded",
+                    "actor_id": self.env.user.id,
+                    "reason": (
+                        "Portal user upgraded to backend "
+                        "during Skip Onboarding: " +
+                        existing_user.login),
+                    "previous_state": previous_state,
+                    "new_state": previous_state,
+                })
 
         # M7 step 2: candidate state transition.
         candidate.sudo().write({

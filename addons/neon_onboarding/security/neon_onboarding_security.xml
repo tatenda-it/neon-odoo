@@ -49,4 +49,33 @@
         <field name="perm_create" eval="False"/>
         <field name="perm_unlink" eval="False"/>
     </record>
+
+    <!--
+        M8 portal access rules. Portal users (base.group_portal)
+        see ONLY their own candidate + audit entries on that
+        candidate. Same shape as the crew rules; different
+        group target.
+    -->
+    <record id="rule_candidate_portal_own" model="ir.rule">
+        <field name="name">Portal sees own candidate only</field>
+        <field name="model_id" ref="model_neon_onboarding_candidate"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_audit_log_portal_own_candidate"
+            model="ir.rule">
+        <field name="name">Portal sees audit on own candidate</field>
+        <field name="model_id" ref="model_neon_onboarding_audit_log"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('candidate_id.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
 </odoo>

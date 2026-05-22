@@ -5,6 +5,7 @@ import logging
 
 from . import models
 from . import wizards
+from . import controllers
 
 _logger = logging.getLogger(__name__)
 

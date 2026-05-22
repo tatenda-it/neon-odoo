@@ -21,6 +21,16 @@ _AUDIT_ACTIONS = [
     ("promote_probationary", "Promoted to Probationary"),
     ("promote_active", "Promoted to Active"),
     ("template_change", "Requirement Template Changed"),
+    # M8 -- portal user provisioning on cert_collection entry.
+    # Not a state transition (previous_state == new_state);
+    # the audit value here is "this was the moment Robin /
+    # admin gave the crew member portal access".
+    ("portal_user_created", "Portal User Created"),
+    # M8 -- portal user upgraded to backend user during
+    # promote / skip flow. Captured separately from
+    # promote_active / skip_onboarding so the audit trail
+    # shows the moment of group elevation.
+    ("portal_user_upgraded", "Portal User Upgraded to Backend"),
 ]
 
 

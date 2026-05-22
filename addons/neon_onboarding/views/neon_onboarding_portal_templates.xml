@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        M8 portal templates.
+
+        portal_my_home_onboarding extends the /my dashboard
+        with a card linking to /my/onboarding.
+
+        portal_my_onboarding is the actual profile page.
+
+        portal_no_candidate is the fallback when the
+        requesting user has no candidate record (e.g., a
+        portal user provisioned outside the onboarding flow,
+        or a candidate record deleted while the user
+        persists).
+    -->
+
+    <template id="portal_my_home_onboarding"
+              name="Portal Home Onboarding Card"
+              inherit_id="portal.portal_my_home"
+              priority="40">
+        <xpath expr="//div[hasclass('o_portal_docs')]"
+               position="inside">
+            <t t-if="onboarding_count">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">My Onboarding</t>
+                    <t t-set="url">/my/onboarding</t>
+                    <t t-set="placeholder_count" t-value="'onboarding_count'"/>
+                </t>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_my_onboarding" name="My Onboarding">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">My Onboarding Profile</t>
+            </t>
+            <div class="row mt16">
+                <div class="col-md-6">
+                    <h3>Profile</h3>
+                    <dl class="row">
+                        <dt class="col-sm-4">Name</dt>
+                        <dd class="col-sm-8">
+                            <span t-field="candidate.name"/>
+                        </dd>
+                        <dt class="col-sm-4">Intended Role</dt>
+                        <dd class="col-sm-8">
+                            <span t-field="candidate.intended_role"/>
+                        </dd>
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge text-bg-info">
+                                <span t-field="candidate.state"/>
+                            </span>
+                        </dd>
+                        <dt class="col-sm-4">Started</dt>
+                        <dd class="col-sm-8">
+                            <span t-field="candidate.date_started"/>
+                        </dd>
+                        <dt class="col-sm-4">Contact Phone</dt>
+                        <dd class="col-sm-8">
+                            <span t-field="candidate.contact_phone"/>
+                        </dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <h3>Required Certifications</h3>
+                    <ul t-if="required_certs">
+                        <li t-foreach="required_certs" t-as="cert">
+                            <span t-esc="cert.name"/>
+                        </li>
+                    </ul>
+                    <p t-if="not required_certs"
+                       class="text-muted">
+                        No requirements yet. Your manager
+                        will assign a requirement template
+                        once your intended role is confirmed.
+                    </p>
+                </div>
+            </div>
+            <div class="row mt16">
+                <div class="col-12">
+                    <h3>Collected Certifications</h3>
+                    <table class="table" t-if="collected_certs">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>State</th>
+                                <th>Date Obtained</th>
+                                <th>Expires</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="collected_certs"
+                                t-as="c">
+                                <td>
+                                    <span t-field="c.type_id"/>
+                                </td>
+                                <td>
+                                    <span t-field="c.state"/>
+                                </td>
+                                <td>
+                                    <span t-field="c.date_obtained"/>
+                                </td>
+                                <td>
+                                    <span t-field="c.date_expires"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p t-if="not collected_certs"
+                       class="text-muted">
+                        No certifications uploaded yet. The
+                        self-upload feature arrives in M9.
+                        For now, send certificate scans /
+                        photos to your manager and they will
+                        upload on your behalf.
+                    </p>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_no_candidate" name="No Candidate">
+        <t t-call="portal.portal_layout">
+            <div class="alert alert-info mt16">
+                No onboarding profile found for this account.
+                If you believe this is an error, contact your
+                administrator.
+            </div>
+        </t>
+    </template>
+</odoo>

@@ -18,7 +18,7 @@ Reference: docs/phase-7b/schema-sketch.md section 4.1.
 import logging
 
 from odoo import api, fields, models, SUPERUSER_ID, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -354,6 +354,119 @@ class NeonOnboardingCandidate(models.Model):
                 req in verified_types
                 for req in rec.required_cert_type_ids
             )
+
+    # ============================================================
+    # M8 -- portal user provisioning on cert_collection entry
+    # ============================================================
+    def _create_portal_user(self):
+        """Create portal-only res.users on cert_collection
+        entry. Portal access only (base.group_portal); the
+        user CANNOT log into backend until the M6 Promote or
+        M7 Skip wizard upgrades them to backend groups.
+
+        Path A architectural decision (Tatenda 22 May 2026):
+        cert.user_id is required on neon.training.certification;
+        rather than relaxing the Phase 7a constraint, we
+        provision a portal user at cert_collection so cert
+        records uploaded during onboarding can set
+        cert.user_id = candidate.user_id legitimately.
+
+        Idempotent: returns existing user_id if already set,
+        skips create.
+        """
+        self.ensure_one()
+        if self.user_id:
+            return self.user_id
+        if not (self.contact_email and self.contact_email.strip()):
+            raise UserError(_(
+                "Cannot create portal user without "
+                "contact_email. Set the candidate's contact "
+                "email before transitioning to Cert "
+                "Collection, or use the Skip Onboarding "
+                "wizard if the candidate is bypassing "
+                "onboarding altogether."))
+
+        login = self.contact_email.strip()
+        existing = self.env["res.users"].sudo().search([
+            ("login", "=", login),
+        ], limit=1)
+        if existing:
+            raise UserError(_(
+                "A user with login '%(login)s' already "
+                "exists (id=%(uid)d, name=%(name)s). Link "
+                "the candidate to that user manually before "
+                "entering Cert Collection."
+            ) % {
+                "login": login,
+                "uid": existing.id,
+                "name": existing.name,
+            })
+
+        new_user = self.env["res.users"].sudo().create({
+            "name": self.name,
+            "login": login,
+            "email": login,
+            "password": "NeonPortal2026!",
+            "groups_id": [(6, 0, [
+                self.env.ref("base.group_portal").id,
+            ])],
+        })
+        self.sudo().write({"user_id": new_user.id})
+
+        # Audit log -- previous_state == new_state because
+        # this isn't a state transition, just a side-effect
+        # of entering cert_collection. The action enum
+        # discriminator carries the audit semantic.
+        self.env["neon.onboarding.audit.log"].sudo().create({
+            "candidate_id": self.id,
+            "action": "portal_user_created",
+            "actor_id": self.env.user.id or SUPERUSER_ID,
+            "reason": (
+                "Portal user provisioned on cert_collection "
+                "entry: " + login),
+            "previous_state": self.state,
+            "new_state": self.state,
+        })
+        return new_user
+
+    def write(self, vals):
+        """M8 hook: when state transitions to cert_collection,
+        provision a portal user for candidates with no
+        user_id. Fires AFTER super().write() so the state is
+        committed before the hook reads it.
+
+        Captures the pre-write state per record so we know
+        which records are transitioning (versus already at
+        cert_collection from a prior write).
+        """
+        # Capture pre-write state for cert_collection
+        # transition detection.
+        if vals.get("state") == "cert_collection":
+            transitioning = self.filtered(
+                lambda c: c.state != "cert_collection"
+                and not c.user_id
+            )
+        else:
+            transitioning = self.browse()
+
+        res = super().write(vals)
+
+        # Fire portal user creation for the subset that just
+        # transitioned. Each one is processed individually so
+        # one failure doesn't abort the rest (though the
+        # underlying write has already committed).
+        for rec in transitioning:
+            if rec.contact_email:
+                rec._create_portal_user()
+            else:
+                # No email -> we can't provision. Log a
+                # chatter note so the admin can fix it.
+                rec.sudo().message_post(body=_(
+                    "Entered Cert Collection without a "
+                    "contact email. Portal user NOT "
+                    "provisioned. Add contact_email and "
+                    "re-trigger via the candidate form."))
+        return res
 
     def _transition_to_probationary(self):
         """Automatic transition cert_collection -> probationary.
