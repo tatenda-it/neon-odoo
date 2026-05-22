@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        M1 basic views. Full kanban + portal views land in M3
+        per the milestone breakdown. M1 ships tree + form so
+        smoke tests can drive the model via UI-equivalent
+        records and Tatenda can sanity-check via the backend.
+    -->
+
+    <record id="view_neon_onboarding_candidate_tree" model="ir.ui.view">
+        <field name="name">neon.onboarding.candidate.tree</field>
+        <field name="model">neon.onboarding.candidate</field>
+        <field name="arch" type="xml">
+            <tree string="Onboarding Candidates"
+                  decoration-info="state == 'candidate'"
+                  decoration-warning="state == 'cert_collection'"
+                  decoration-success="state == 'active'">
+                <field name="name"/>
+                <field name="intended_role"/>
+                <field name="contact_phone"/>
+                <field name="state"/>
+                <field name="date_started"/>
+                <field name="user_id" optional="show"/>
+                <field name="bypass_actor_id" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_onboarding_candidate_form" model="ir.ui.view">
+        <field name="name">neon.onboarding.candidate.form</field>
+        <field name="model">neon.onboarding.candidate</field>
+        <field name="arch" type="xml">
+            <form string="Onboarding Candidate">
+                <header>
+                    <button name="%(action_neon_onboarding_skip_wizard)d"
+                            type="action"
+                            string="Skip Onboarding"
+                            class="oe_highlight"
+                            groups="neon_core.group_neon_superuser"
+                            context="{'default_candidate_id': active_id}"
+                            invisible="state == 'active'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="candidate,cert_collection,probationary,active"/>
+                </header>
+                <sheet>
+                    <field name="photo" widget="image"
+                           class="oe_avatar"
+                           options="{'preview_image': 'photo'}"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Full Name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Role &amp; Contact">
+                            <field name="intended_role"/>
+                            <field name="contact_phone"/>
+                            <field name="contact_email"/>
+                            <field name="user_id" readonly="state != 'active'"/>
+                        </group>
+                        <group string="Emergency &amp; Dates">
+                            <field name="emergency_contact_name"/>
+                            <field name="emergency_contact_phone"/>
+                            <field name="date_started"/>
+                            <field name="date_activated" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Probationary"
+                              invisible="state not in ('probationary', 'active')">
+                            <group>
+                                <field name="probationary_jobs_target"/>
+                                <field name="probationary_jobs_completed" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Override Metadata"
+                              invisible="not bypass_actor_id"
+                              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin">
+                            <group>
+                                <field name="bypass_actor_id" readonly="1"/>
+                                <field name="bypass_reason" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Audit Log"
+                              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin,neon_training.group_neon_training_signoff">
+                            <field name="audit_log_ids" readonly="1">
+                                <tree>
+                                    <field name="timestamp"/>
+                                    <field name="action"/>
+                                    <field name="actor_id"/>
+                                    <field name="previous_state"/>
+                                    <field name="new_state"/>
+                                    <field name="reason"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_neon_onboarding_candidate_search" model="ir.ui.view">
+        <field name="name">neon.onboarding.candidate.search</field>
+        <field name="model">neon.onboarding.candidate</field>
+        <field name="arch" type="xml">
+            <search string="Search Candidates">
+                <field name="name"/>
+                <field name="intended_role"/>
+                <field name="user_id"/>
+                <separator/>
+                <filter name="filter_candidate" string="New Candidates"
+                        domain="[('state', '=', 'candidate')]"/>
+                <filter name="filter_cert_collection" string="Cert Collection"
+                        domain="[('state', '=', 'cert_collection')]"/>
+                <filter name="filter_probationary" string="Probationary"
+                        domain="[('state', '=', 'probationary')]"/>
+                <filter name="filter_active" string="Active"
+                        domain="[('state', '=', 'active')]"/>
+                <separator/>
+                <filter name="filter_bypassed" string="Admin Override Applied"
+                        domain="[('bypass_actor_id', '!=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_role" string="Intended Role"
+                            context="{'group_by': 'intended_role'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_onboarding_candidate" model="ir.actions.act_window">
+        <field name="name">Onboarding Candidates</field>
+        <field name="res_model">neon.onboarding.candidate</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_neon_onboarding_candidate_search"/>
+        <field name="context">{'search_default_filter_candidate': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create the first onboarding candidate.
+            </p>
+            <p>
+                Track new crew through Candidate -> Cert
+                Collection -> Probationary -> Active. Use the
+                Skip Onboarding button (admin only) for
+                existing crew bulk-imports.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_neon_onboarding_root"
+              name="Onboarding"
+              sequence="50"
+              web_icon="neon_onboarding,static/description/icon.png"
+              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin,neon_training.group_neon_training_signoff"/>
+
+    <menuitem id="menu_neon_onboarding_candidates"
+              name="Candidates"
+              parent="menu_neon_onboarding_root"
+              action="action_neon_onboarding_candidate"
+              sequence="10"/>
+</odoo>
