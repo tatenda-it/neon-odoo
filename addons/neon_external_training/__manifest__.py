@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon External Training",
-    "version": "17.0.1.4.0",
+    "version": "17.0.1.5.0",
     "summary": "External (off-site) training bookings -- "
                "manufacturer / regulator courses crew attend "
                "outside the internal LMS.",
@@ -36,6 +36,11 @@ neon.training.certification).
         # sequence is available to any data that might use
         # it (none in M2; M3+ may).
         "data/neon_external_training_sequences.xml",
+        # M7 -- 3-day reminder cron. Load BEFORE the vendor
+        # seeds so the cron record's model_id ref resolves
+        # against the registry that already has the booking
+        # model from M2.
+        "data/neon_external_training_cron.xml",
         "data/neon_external_training_vendors.xml",
         "views/neon_external_training_vendor_views.xml",
         # M2 -- booking form + tree + action.

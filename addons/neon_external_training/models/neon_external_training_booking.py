@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """neon.external.training.booking -- booking record + state
-machine.
+machine + notification dispatcher.
 
 Phase 7c M2. State machine + reference auto-gen + cost field
 with admin-only group visibility. M3 layers the approval
@@ -19,10 +19,14 @@ Transitions are enforced by the action_* methods (Odoo
 @api.constrains can't see prior state, so transition
 checks live where the user invokes them).
 """
-from datetime import date
+import logging
+from datetime import date, timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+
+
+_logger = logging.getLogger(__name__)
 
 
 _STATE_SELECTION = [
@@ -432,6 +436,8 @@ neon_training_certification import (
         self.sudo().message_post(body=_(
             "Approved by %s."
         ) % approver_name)
+        # M7 -- notify crew the booking is confirmed.
+        self._notify_booking_confirmed()
 
     def action_reject(self, reason=None):
         """Reject a pending booking. Reason is required;
@@ -473,6 +479,8 @@ neon_training_certification import (
         self._transition_to("attended", {
             "date_attended": fields.Date.today(),
         })
+        # M7 -- notify crew attendance was recorded.
+        self._notify_attendance_recorded()
 
     def action_mark_completed(self):
         self.ensure_one()
@@ -568,6 +576,8 @@ neon_training_certification import (
             "cert_name": cert.display_name,
             "vendor": self.vendor_id.name,
         })
+        # M7 -- notify crew the cert is now active.
+        self._notify_cert_issued()
         return True
 
     def action_view_issued_cert(self):
@@ -595,3 +605,162 @@ neon_training_certification import (
     def action_mark_no_show(self):
         self.ensure_one()
         self._transition_to("no_show")
+
+    # ==================================================================
+    # M7 -- notification dispatcher + 4 event hooks + 3d cron
+    #
+    # Pattern follows reference_neon_notification_stub_pattern.md
+    # (Phase 7b M12 + Phase 7e M12 precedent). _notify_send is the
+    # single override point Phase 9 swaps when wiring actual
+    # WhatsApp + email dispatch. The event-specific hooks
+    # (_notify_booking_confirmed etc.) stay stable -- their
+    # channels=[...] list + body shape are the API contract.
+    #
+    # Stub marker [Notification stub - Phase 9 will send] uses
+    # hyphen-minus per the reference doc; Phase 9's regression
+    # smoke greps for that exact substring to confirm the
+    # fallback path didn't fire.
+    # ==================================================================
+    def _notify_send(self, event, channels, subject, body):
+        """Stub dispatcher. Phase 9 overrides to send actual
+        WhatsApp + email via the dispatch engine.
+        """
+        self.ensure_one()
+        crew_partner = (
+            self.crew_user_id.partner_id
+            if self.crew_user_id else False)
+        crew_email = (crew_partner.email
+                      if crew_partner else "(no email)")
+        crew_phone = (crew_partner.phone
+                      if crew_partner else "(no phone)")
+        channel_str = ", ".join(channels)
+        full_body = (
+            "<p><strong>[Notification stub - Phase 9 will "
+            "send]</strong></p>"
+            "<p><b>Event:</b> %s</p>"
+            "<p><b>Channels:</b> %s</p>"
+            "<p><b>To:</b> %s / %s</p>"
+            "<hr/>%s"
+        ) % (event, channel_str,
+             crew_email or "(no email)",
+             crew_phone or "(no phone)",
+             body)
+        # sudo() to bypass per-user ACL on message_post --
+        # cron + crew transitions both fire notifications and
+        # the sender identity is the booking, not env.user.
+        self.sudo().message_post(
+            subject=subject,
+            body=full_body,
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+        )
+
+    def _notify_booking_confirmed(self):
+        """Fires when state -> booked (approval succeeded)."""
+        self.ensure_one()
+        self._notify_send(
+            event="external_booking_confirmed",
+            channels=["email", "whatsapp"],
+            subject=_(
+                "Training booked - %s"
+            ) % (self.course_name or ""),
+            body=_(
+                "<p>Hi %(crew)s,</p>"
+                "<p>Your booking for %(course)s with "
+                "%(vendor)s is confirmed for %(date)s.</p>"
+            ) % {
+                "crew": self.crew_user_id.name,
+                "course": self.course_name,
+                "vendor": self.vendor_id.name,
+                "date": self.scheduled_date,
+            },
+        )
+
+    def _notify_reminder_3d(self):
+        """Fires 3 days before scheduled_date via the
+        ir.cron in data/neon_external_training_cron.xml."""
+        self.ensure_one()
+        self._notify_send(
+            event="external_booking_reminder_3d",
+            channels=["whatsapp"],
+            subject=_(
+                "Reminder: %s in 3 days"
+            ) % (self.course_name or ""),
+            body=_(
+                "<p>Hi %(crew)s,</p>"
+                "<p>Reminder: %(course)s with %(vendor)s "
+                "is in 3 days (%(date)s). Location: "
+                "%(loc)s.</p>"
+            ) % {
+                "crew": self.crew_user_id.name,
+                "course": self.course_name,
+                "vendor": self.vendor_id.name,
+                "date": self.scheduled_date,
+                "loc": self.location or "TBD",
+            },
+        )
+
+    def _notify_attendance_recorded(self):
+        """Fires when state -> attended."""
+        self.ensure_one()
+        self._notify_send(
+            event="external_booking_attended",
+            channels=["email"],
+            subject=_(
+                "Attendance recorded - %s"
+            ) % (self.course_name or ""),
+            body=_(
+                "<p>Hi %(crew)s,</p>"
+                "<p>Your attendance at %(course)s has been "
+                "recorded. Complete the training + submit "
+                "your cert document to finalize.</p>"
+            ) % {
+                "crew": self.crew_user_id.name,
+                "course": self.course_name,
+            },
+        )
+
+    def _notify_cert_issued(self):
+        """Fires when state -> cert_issued (cert created)."""
+        self.ensure_one()
+        cert_name = (
+            self.issued_cert_id.display_name
+            if self.issued_cert_id
+            else _("your certification"))
+        self._notify_send(
+            event="external_booking_cert_issued",
+            channels=["email", "whatsapp"],
+            subject=_("Cert issued - %s") % cert_name,
+            body=_(
+                "<p>Hi %(crew)s,</p>"
+                "<p>Your %(cert)s from %(vendor)s is now "
+                "active in the system. Visible in "
+                "/my/training.</p>"
+            ) % {
+                "crew": self.crew_user_id.name,
+                "cert": cert_name,
+                "vendor": self.vendor_id.name,
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # M7 cron entry: find bookings exactly 3 days out + fire
+    # the reminder notification. Stub mode posts to chatter;
+    # Phase 9's _notify_send override will route to actual
+    # channels.
+    # ------------------------------------------------------------------
+    @api.model
+    def _cron_send_3d_reminders(self):
+        three_days_out = fields.Date.today() + timedelta(
+            days=3)
+        bookings = self.search([
+            ("state", "=", "booked"),
+            ("scheduled_date", "=", three_days_out),
+        ])
+        for booking in bookings:
+            booking._notify_reminder_3d()
+        _logger.info(
+            "3d-reminder cron: notified %d booking(s) for "
+            "scheduled_date %s",
+            len(bookings), three_days_out)
+        return True
