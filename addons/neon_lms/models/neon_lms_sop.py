@@ -47,6 +47,20 @@ class NeonLMSSOP(models.Model):
         help="SOPs can attach to multiple modules. Reference "
              "material is reusable across the program.",
     )
+    # Phase 7d M5: reverse pointer from the KB article M2M.
+    # Same join table as the forward field on neon.kb.article;
+    # join table created on the KB side. Forward-string
+    # reference -- neon_lms does NOT depend on neon_kb (KB
+    # depends on LMS for the cross-link).
+    kb_article_ids = fields.Many2many(
+        "neon.kb.article",
+        "neon_kb_article_sop_rel",
+        "sop_id",
+        "article_id",
+        string="KB Articles",
+        help="Knowledge base articles that reference this "
+             "SOP. Phase 7d M5 reverse pointer.",
+    )
     active = fields.Boolean(default=True)
 
     def _get_attachment_url(self):
