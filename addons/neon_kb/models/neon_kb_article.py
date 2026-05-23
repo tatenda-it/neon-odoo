@@ -143,6 +143,35 @@ class NeonKBArticle(models.Model):
         help="ir.attachment records pointing at this "
              "article (res_model + res_id linkage).",
     )
+    # ------------------------------------------------------------------
+    # M5 -- cross-link M2M fields. Forward-string references
+    # to Phase 7a + Phase 7e models. The join tables are
+    # created idempotently by the M5 post-migrate (per
+    # reference_odoo17_forward_string_m2o_fk.md applied to
+    # M2M).
+    # ------------------------------------------------------------------
+    related_cert_type_ids = fields.Many2many(
+        "neon.training.certification.type",
+        "neon_kb_article_cert_type_rel",
+        "article_id", "cert_type_id",
+        string="Related Certifications",
+        help="Cert types this article relates to. Cross-"
+             "link for users browsing their certs.",
+    )
+    related_sop_ids = fields.Many2many(
+        "neon.lms.sop",
+        "neon_kb_article_sop_rel",
+        "article_id", "sop_id",
+        string="Related SOPs",
+        help="LMS SOPs this article extends or references.",
+    )
+    related_module_ids = fields.Many2many(
+        "neon.lms.module",
+        "neon_kb_article_module_rel",
+        "article_id", "module_id",
+        string="Related LMS Modules",
+        help="Training modules this article supports.",
+    )
     active = fields.Boolean(default=True, tracking=True)
 
     _sql_constraints = [

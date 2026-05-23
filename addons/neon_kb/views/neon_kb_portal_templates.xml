@@ -186,11 +186,41 @@
                     <t t-out="article.body"/>
                 </div>
 
-                <!-- M5 will fill a cross-link section here
-                     once the related_* M2M fields land on
-                     the article model. M4 ships the
-                     placeholder slot only. -->
-                <!-- p7d_m5_related_placeholder -->
+                <!-- M5 cross-link section (display-only).
+                     Phase 11 can wire actual links to
+                     /my/training etc. if portal routes
+                     exist for those targets. -->
+                <section class="kb-article-related mt-5"
+                         t-if="article.related_cert_type_ids or article.related_sop_ids or article.related_module_ids">
+                    <h4>Related</h4>
+                    <div t-if="article.related_cert_type_ids"
+                         class="mb-2">
+                        <strong>Certifications:</strong>
+                        <t t-foreach="article.related_cert_type_ids"
+                           t-as="ct">
+                            <span class="badge bg-success me-1"
+                                  t-field="ct.name"/>
+                        </t>
+                    </div>
+                    <div t-if="article.related_sop_ids"
+                         class="mb-2">
+                        <strong>SOPs:</strong>
+                        <t t-foreach="article.related_sop_ids"
+                           t-as="sop">
+                            <span class="badge bg-warning text-dark me-1"
+                                  t-field="sop.name"/>
+                        </t>
+                    </div>
+                    <div t-if="article.related_module_ids"
+                         class="mb-2">
+                        <strong>Training Modules:</strong>
+                        <t t-foreach="article.related_module_ids"
+                           t-as="mod">
+                            <span class="badge bg-primary me-1"
+                                  t-field="mod.name"/>
+                        </t>
+                    </div>
+                </section>
 
 
                 <section class="kb-article-attachments mt-4"

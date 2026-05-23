@@ -113,6 +113,37 @@
                                 </tree>
                             </field>
                         </page>
+                        <page string="Related"
+                              name="related"
+                              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin">
+                            <group string="Related Certifications">
+                                <field name="related_cert_type_ids"
+                                       widget="many2many_tags"
+                                       nolabel="1"
+                                       options="{'no_create': True}"/>
+                            </group>
+                            <group string="Related SOPs">
+                                <field name="related_sop_ids"
+                                       nolabel="1"
+                                       options="{'no_create': True}">
+                                    <tree>
+                                        <field name="name"/>
+                                        <field name="equipment_or_procedure"/>
+                                    </tree>
+                                </field>
+                            </group>
+                            <group string="Related LMS Modules">
+                                <field name="related_module_ids"
+                                       nolabel="1"
+                                       options="{'no_create': True}">
+                                    <tree>
+                                        <field name="code"/>
+                                        <field name="name"/>
+                                        <field name="track_id"/>
+                                    </tree>
+                                </field>
+                            </group>
+                        </page>
                     </notebook>
                 </sheet>
                 <div class="oe_chatter">

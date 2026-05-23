@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Knowledge Base",
-    "version": "17.0.1.3.0",
+    "version": "17.0.1.4.0",
     "summary": "Custom knowledge base -- searchable "
                "SOPs / procedures / troubleshooting. Phase "
                "7d. Generalises neon_lms's SOP model into a "
@@ -29,6 +29,16 @@ cross-links to LMS.
         "mail",
         "portal",
         "neon_core",
+        # M5 cross-links: related_cert_type_ids M2M targets
+        # neon.training.certification.type (neon_training);
+        # related_sop_ids + related_module_ids target
+        # neon.lms.sop + neon.lms.module (neon_lms).
+        # Declared as hard depends so the form-view tree
+        # widget can reference those models cleanly + the
+        # join-table fixup migration can rely on the
+        # comodel tables existing.
+        "neon_training",
+        "neon_lms",
     ],
     "data": [
         "security/neon_kb_security.xml",
