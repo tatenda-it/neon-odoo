@@ -16,6 +16,7 @@ SMOKES=(
   p7b_m1 p7b_m2 p7b_m3 p7b_m4 p7b_m5 p7b_m6 p7b_m7 p7b_m8 p7b_m9 p7b_m10 p7b_m11 p7b_m12
   p7b_integration
   p7e_m1 p7e_m2 p7e_m3 p7e_m4 p7e_m5 p7e_m6 p7e_m7 p7e_m8 p7e_m9 p7e_m10 p7e_m11 p7e_m12 p7e_m13
+  p7e_integration
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0
