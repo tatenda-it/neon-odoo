@@ -198,3 +198,175 @@ PHP content import + python-docx install + actual import run are a separate admi
 - Architectural pivots: 0 (every decision was a defensible build-time adaptation within gate-1 scope)
 
 Phase 7e closes.
+
+---
+
+## 13. Phase 7e Production Deploy (23 May 2026, 05:42–05:46 UTC)
+
+**Deploy operator**: Tatenda Loyd (via Claude Code session)
+**Backup**: `/root/backups/neon_crm_pre_p7e_20260523_054120.dump` (6.0 MB)
+**Pre-deploy HEAD on prod**: `212e9ec` (Phase 7b sub-phase close commit; the `f994ec0` deploy-log commit was authored locally after the Phase 7b deploy and was never on prod — that's expected, docs ride along on the next deploy)
+**Post-deploy HEAD on prod**: `e40cf1e` (Phase 7e M14 close)
+**Tag**: `v17.0.8.7.0-phase7e-live` → `e40cf1e`
+**Deploy duration**: ~4 minutes (pull + install + restart + asset regen + verify)
+
+### Pre-deploy module state
+
+```
+neon_finance    | 17.0.7.9.1
+neon_core       | 17.0.1.0.1
+neon_jobs       | 17.0.4.0.15
+neon_training   | 17.0.8.4.0
+neon_onboarding | 17.0.1.10.0
+(neon_lms — not installed)
+```
+
+### Install + upgrade log excerpts
+
+```
+2026-05-23 05:42:11 Loading module website_partner (65/90)
+2026-05-23 05:42:12 Module website_partner loaded in 0.25s
+2026-05-23 05:42:12 Loading module website_profile (72/90)
+2026-05-23 05:42:12 Module website_profile loaded in 0.44s
+2026-05-23 05:42:12 Loading module website_slides (81/90)
+2026-05-23 05:42:14 Module website_slides loaded in 1.75s
+2026-05-23 05:42:14 Loading module gamification_sale_crm (82/90)
+2026-05-23 05:42:14 Module gamification_sale_crm loaded in 0.29s
+2026-05-23 05:42:14 Loading module neon_lms (89/90)
+2026-05-23 05:42:15   loading neon_lms/security/ir.model.access.csv
+2026-05-23 05:42:15   loading neon_lms/security/neon_lms_scenario_rules.xml
+2026-05-23 05:42:15   loading neon_lms/security/neon_lms_enrollment_rules.xml
+2026-05-23 05:42:15   loading neon_lms/data/neon_lms_program.xml
+2026-05-23 05:42:15   loading neon_lms/data/neon_lms_tracks.xml
+2026-05-23 05:42:15   loading neon_lms/data/neon_lms_modules.xml
+2026-05-23 05:42:15   loading neon_lms/data/neon_lms_authorities.xml
+2026-05-23 05:42:15   loading neon_lms/data/neon_lms_authority_mapping.xml
+2026-05-23 05:42:15   loading neon_lms/data/neon_lms_cert_type_wiring.xml
+2026-05-23 05:42:15 Module neon_lms loaded in 0.73s, 734 queries
+2026-05-23 05:42:15 90 modules loaded in 5.62s, 5519 queries
+2026-05-23 05:42:16 Registry loaded in 10.570s
+2026-05-23 05:42:16 Initiating shutdown
+```
+
+No `ERROR` / `CRITICAL` lines. Three `WARNING` lines about `tracking` parameter on `neon_state` / `track.completion.state` / `module.completion.state` — cosmetic and identical to dev (Odoo doesn't recognise `tracking=True` on these field types but the field still tracks via mail.thread inheritance).
+
+The 3 `neon_training` post-migrate scripts (17.0.8.5.0 / 17.0.8.6.0 / 17.0.8.7.0) are log-only no-ops — they don't surface their own log lines because the migration framework only logs when there are operations to perform. The version progression is confirmed via the final `installed_version` query.
+
+### Restart + asset regen
+
+```
+2026-05-23 05:43:XX docker compose restart odoo   -> Started
+                    odoo HTTP ready
+2026-05-23 05:44:08 deleted 11 stale /web/assets/* attachments
+2026-05-23 05:44:10 Generating /web/assets/93b75ac/web.assets_backend.min.js (id:910)
+2026-05-23 05:44:10 Generating /web/assets/03124c9/web.assets_backend.min.css (id:911)
+2026-05-23 05:44:12 Generating /web/assets/40c70e3/web.assets_web.min.js (id:912)
+2026-05-23 05:44:12 Generating /web/assets/03124c9/web.assets_web.min.css (id:913)
+2026-05-23 05:44:13 Generating /web/assets/a26ae87/web_editor.backend_assets_wysiwyg.min.js (id:914)
+2026-05-23 05:44:13 Generating /web/assets/4117c4e/web_editor.backend_assets_wysiwyg.min.css (id:915)
+2026-05-23 05:44:13 Generating /web/assets/336fa63/web.assets_frontend.min.js (id:916)
+2026-05-23 05:44:14 Generating /web/assets/bb65093/web.assets_frontend.min.css (id:917)
+4/4 bundles compiled. Final /web/assets/* attachment count: 8.
+```
+
+### Verification outputs (all 6 PASS)
+
+**1. Module versions**
+```
+neon_training: installed_version=17.0.8.7.0 state=installed
+neon_lms:      installed_version=17.0.1.10.0 state=installed
+```
+
+**2. Seed data counts**
+```
+slide.channel:                 1   (expected >= 1)
+neon.lms.track:                7   (expected 7)
+neon.lms.module:               17  (expected 17)
+neon.lms.operating.authority:  6   (expected 6)
+```
+
+**3. 8 new LMS cert types seeded** (all with `sign_off_authority='system'`)
+```
+cert_type_neon_foundations_safety  OK (id=33)
+cert_type_neon_audio               OK (id=34)
+cert_type_neon_lighting            OK (id=35)
+cert_type_neon_video_led           OK (id=36)
+cert_type_neon_workflow_ops        OK (id=37)
+cert_type_neon_client_ready        OK (id=38)
+cert_type_neon_rigging             OK (id=39)
+cert_type_neon_technical           OK (id=40)
+```
+
+**4. Dashboard LMS counters live for Robin**
+```
+robin: uid=21
+lms_active_enrollments:        0
+lms_pending_capstone:          0
+lms_authorities_granted_30d:   0
+lms_track_cert_distribution:   "Foundations and Safety: 0, Audio Technical: 0,
+                                Lighting Technical: 0, Video and LED Technical: 0,
+                                Workflow and Operations: 0, Soft Skills: 0,
+                                Rigging: 0"
+```
+
+All four counters return real values (not errors); zero counts reflect the fresh-install state with no learner activity yet.
+
+**5. eLearning menu visible to Robin**
+```
+eLearning menu root id: 366
+visible: True
+```
+
+**6. Cert verifier list unchanged (prior invariant)**
+```
+_CERT_VERIFIER_LOGINS: ('robin@neonhiring.co.zw', 'munashe@neonhiring.co.zw')
+```
+
+### Module count growth
+
+- Pre-Phase-7e on prod: 81 installed modules (post-Phase-7b state)
+- Post-Phase-7e on prod: 90 installed modules
+- Delta: +9 (`neon_lms` + `website_slides` + 7 transitive deps: `website_partner`, `website_profile`, `portal_rating`, `gamification`, `gamification_sale_crm`, plus stdlib eLearning deps)
+
+### Tag push
+
+```
+git tag v17.0.8.7.0-phase7e-live e40cf1e
+git push origin v17.0.8.7.0-phase7e-live
+* [new tag]  v17.0.8.7.0-phase7e-live -> v17.0.8.7.0-phase7e-live
+```
+
+### Deploy status: SUCCESS
+
+Phase 7e live on `crm.neonhiring.com` at `v17.0.8.7.0-phase7e-live`. All 6 verifications passed. Empty LMS structure deployed (1 channel + 7 tracks + 17 modules + 6 authorities + 8 cert types). Workflow + completion engine + gate engine 5th condition + dashboard LMS counters + notification stubs all live.
+
+### Deferred admin operation: PHP content import
+
+The migration script `addons/neon_lms/scripts/migrate_php_content.py` shipped with this deploy but is NOT yet run on prod. Tatenda runs it manually when the docx is uploaded to a container-readable path and `python-docx` is installed in the prod container:
+
+```bash
+# On Hetzner, inside container:
+pip install python-docx
+
+# Upload docx to /home/odoo/tmp/ (or override DEFAULT_DOCX_PATH)
+
+# Run from host:
+docker compose exec -T odoo odoo shell -d neon_crm --no-http \
+    < addons/neon_lms/scripts/migrate_php_content.py
+```
+
+Pre-flight check refuses to run if any precondition is missing. Per-section atomic transactions; idempotent re-runs.
+
+### Rollback target (in case of issue)
+
+```
+docker compose stop odoo
+docker compose exec -T db pg_restore -U odoo -d neon_crm \
+    --clean --if-exists /root/backups/neon_crm_pre_p7e_20260523_054120.dump
+cd /opt/neon-odoo
+git checkout v17.0.8.4.0-phase7b-live
+docker compose start odoo
+```
+
+Phase 7e deploy complete.
+
