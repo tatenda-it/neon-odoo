@@ -1,9 +1,111 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!--
-        Phase 7d security baseline. M1 ships category + tag
-        only; record rules on the article model land in M2.
-    -->
+    <data noupdate="0">
+
+        <!--
+            M2 article record rules. Pattern follows the
+            tier-rule convention from Phase 7c M2:
+
+            * Two rules on base.group_user (OR-merged): one
+              shows published articles; the other shows the
+              author's own articles regardless of state.
+            * Permissive rules on training_admin + superuser
+              open the entire dataset for those tiers.
+            * Portal rule shows published only.
+
+            Result: internal users see published + own drafts;
+            admins see everything; portal sees published only.
+        -->
+
+        <record id="rule_kb_article_published_for_users"
+                model="ir.rule">
+            <field name="name">
+                KB Article: published for internal users
+            </field>
+            <field name="model_id"
+                   ref="model_neon_kb_article"/>
+            <field name="domain_force">
+                [('state', '=', 'published'),
+                 ('active', '=', True)]
+            </field>
+            <field name="groups"
+                   eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_kb_article_author_own"
+                model="ir.rule">
+            <field name="name">
+                KB Article: author sees own (any state)
+            </field>
+            <field name="model_id"
+                   ref="model_neon_kb_article"/>
+            <field name="domain_force">
+                [('author_id', '=', user.id)]
+            </field>
+            <field name="groups"
+                   eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_kb_article_admin_all"
+                model="ir.rule">
+            <field name="name">
+                KB Article: training_admin sees all
+            </field>
+            <field name="model_id"
+                   ref="model_neon_kb_article"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups"
+                   eval="[(4, ref('neon_training.group_neon_training_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_kb_article_superuser_all"
+                model="ir.rule">
+            <field name="name">
+                KB Article: superuser sees all
+            </field>
+            <field name="model_id"
+                   ref="model_neon_kb_article"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups"
+                   eval="[(4, ref('neon_core.group_neon_superuser'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_kb_article_portal_published"
+                model="ir.rule">
+            <field name="name">
+                KB Article: portal sees published
+            </field>
+            <field name="model_id"
+                   ref="model_neon_kb_article"/>
+            <field name="domain_force">
+                [('state', '=', 'published'),
+                 ('active', '=', True)]
+            </field>
+            <field name="groups"
+                   eval="[(4, ref('base.group_portal'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
 
 </odoo>

@@ -7,3 +7,7 @@ access_kb_tag_superuser,KB Tag - Neon Superuser,model_neon_kb_tag,neon_core.grou
 access_kb_tag_training_admin,KB Tag - Training Admin,model_neon_kb_tag,neon_training.group_neon_training_admin,1,1,1,1
 access_kb_tag_user,KB Tag - Internal User (read),model_neon_kb_tag,base.group_user,1,0,0,0
 access_kb_tag_portal,KB Tag - Portal (read),model_neon_kb_tag,base.group_portal,1,0,0,0
+access_kb_article_superuser,KB Article - Neon Superuser,model_neon_kb_article,neon_core.group_neon_superuser,1,1,1,1
+access_kb_article_training_admin,KB Article - Training Admin,model_neon_kb_article,neon_training.group_neon_training_admin,1,1,1,1
+access_kb_article_user,KB Article - Internal User (read+create+write),model_neon_kb_article,base.group_user,1,1,1,0
+access_kb_article_portal,KB Article - Portal (read),model_neon_kb_article,base.group_portal,1,0,0,0

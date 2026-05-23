@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        M2 ships basic tree + form views for the article
+        model. M3 layers on kanban + search filters +
+        polished form.
+    -->
+
+    <record id="view_kb_article_tree" model="ir.ui.view">
+        <field name="name">neon.kb.article.tree</field>
+        <field name="model">neon.kb.article</field>
+        <field name="arch" type="xml">
+            <tree string="KB Articles"
+                  decoration-muted="state == 'archived'"
+                  decoration-info="state == 'draft'"
+                  decoration-success="state == 'published'">
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="author_id"/>
+                <field name="state" widget="badge"/>
+                <field name="last_updated"/>
+                <field name="view_count" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_kb_article_form" model="ir.ui.view">
+        <field name="name">neon.kb.article.form</field>
+        <field name="model">neon.kb.article</field>
+        <field name="arch" type="xml">
+            <form string="KB Article">
+                <header>
+                    <button name="action_publish"
+                            string="Publish"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_archive_article"
+                            string="Archive"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state != 'published'"/>
+                    <button name="action_republish"
+                            string="Republish"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'archived'"
+                            groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"/>
+                    <button name="action_back_to_draft"
+                            string="Back to Draft"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state != 'published'"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="draft,published,archived"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"
+                                   placeholder="Article title"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="General">
+                            <field name="category_id"
+                                   options="{'no_create': True}"/>
+                            <field name="code"/>
+                            <field name="tag_ids"
+                                   widget="many2many_tags"
+                                   options="{'color_field': 'color'}"/>
+                        </group>
+                        <group string="Metadata">
+                            <field name="author_id"
+                                   readonly="state != 'draft'"/>
+                            <field name="published_by_id"
+                                   readonly="1"/>
+                            <field name="date_published"
+                                   readonly="1"/>
+                            <field name="last_updated"
+                                   readonly="1"/>
+                            <field name="view_count"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Summary">
+                        <field name="summary" nolabel="1"
+                               colspan="2"
+                               placeholder="1-line description for list view + portal card (max 280 chars)."/>
+                    </group>
+                    <group string="Search Keywords">
+                        <field name="keywords" nolabel="1"
+                               colspan="2"
+                               placeholder="Comma-separated keywords."/>
+                    </group>
+                    <notebook>
+                        <page string="Content" name="content">
+                            <field name="body"
+                                   widget="html"
+                                   options="{'resizable': true}"/>
+                        </page>
+                        <page string="Attachments"
+                              name="attachments">
+                            <field name="attachment_ids"
+                                   nolabel="1"
+                                   readonly="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="create_date"/>
+                                    <field name="create_uid"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_kb_article"
+            model="ir.actions.act_window">
+        <field name="name">KB Articles</field>
+        <field name="res_model">neon.kb.article</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

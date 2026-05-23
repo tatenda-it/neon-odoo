@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Knowledge Base",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "Custom knowledge base -- searchable "
                "SOPs / procedures / troubleshooting. Phase "
                "7d. Generalises neon_lms's SOP model into a "
@@ -36,6 +36,12 @@ cross-links to LMS.
         "data/neon_kb_categories.xml",
         "views/neon_kb_category_views.xml",
         "views/neon_kb_tag_views.xml",
+        # M2 -- article model + record rules. Loads after
+        # category/tag so the article views can reference
+        # those models cleanly.
+        "views/neon_kb_article_views.xml",
+        # Menu loads LAST -- targets the article action that
+        # views/neon_kb_article_views.xml defines.
         "views/neon_kb_menu.xml",
     ],
     "installable": True,

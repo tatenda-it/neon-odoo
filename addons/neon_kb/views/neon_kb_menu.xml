@@ -17,6 +17,13 @@
               sequence="83"
               groups=""/>
 
+    <menuitem id="menu_kb_articles"
+              name="Articles"
+              parent="menu_kb_root"
+              action="action_kb_article"
+              sequence="10"
+              groups="base.group_user"/>
+
     <menuitem id="menu_kb_configuration"
               name="Configuration"
               parent="menu_kb_root"
