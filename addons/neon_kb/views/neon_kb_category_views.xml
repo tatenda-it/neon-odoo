@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_kb_category_tree" model="ir.ui.view">
+        <field name="name">neon.kb.category.tree</field>
+        <field name="model">neon.kb.category</field>
+        <field name="arch" type="xml">
+            <tree string="KB Categories">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="icon"/>
+                <field name="article_count"/>
+                <field name="active" widget="boolean_toggle"
+                       optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_kb_category_form" model="ir.ui.view">
+        <field name="name">neon.kb.category.form</field>
+        <field name="model">neon.kb.category</field>
+        <field name="arch" type="xml">
+            <form string="KB Category">
+                <sheet>
+                    <widget name="web_ribbon"
+                            title="Archived"
+                            bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"
+                                   placeholder="Category name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"
+                                   placeholder="slug-friendly"/>
+                            <field name="sequence"/>
+                            <field name="icon"
+                                   placeholder="fa-volume-up"/>
+                        </group>
+                        <group>
+                            <field name="article_count"
+                                   readonly="1"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"
+                               colspan="2"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_kb_category"
+            model="ir.actions.act_window">
+        <field name="name">KB Categories</field>
+        <field name="res_model">neon.kb.category</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

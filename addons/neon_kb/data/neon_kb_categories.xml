@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+
+    <!--
+        5 capability-cluster seed categories. noupdate=0 so
+        admin edits to description/icon flow through on -u
+        (per Phase 7c M1 lesson; flip to noupdate=1 in
+        Phase 11 once content stabilises).
+    -->
+
+    <record id="category_audio" model="neon.kb.category">
+        <field name="name">Audio</field>
+        <field name="code">audio</field>
+        <field name="sequence">10</field>
+        <field name="icon">fa-volume-up</field>
+        <field name="description">Audio equipment, signal flow, mixing consoles, microphones, monitors.</field>
+    </record>
+
+    <record id="category_lighting" model="neon.kb.category">
+        <field name="name">Lighting</field>
+        <field name="code">lighting</field>
+        <field name="sequence">20</field>
+        <field name="icon">fa-lightbulb</field>
+        <field name="description">Lighting consoles, fixtures, dimming, atmospheric effects.</field>
+    </record>
+
+    <record id="category_video" model="neon.kb.category">
+        <field name="name">Video</field>
+        <field name="code">video</field>
+        <field name="sequence">30</field>
+        <field name="icon">fa-video</field>
+        <field name="description">LED walls, projectors, video switching, media servers.</field>
+    </record>
+
+    <record id="category_safety" model="neon.kb.category">
+        <field name="name">Safety</field>
+        <field name="code">safety</field>
+        <field name="sequence">40</field>
+        <field name="icon">fa-shield-alt</field>
+        <field name="description">Electrical safety, working at height, fire safety, rigging safety.</field>
+    </record>
+
+    <record id="category_admin" model="neon.kb.category">
+        <field name="name">Admin</field>
+        <field name="code">admin</field>
+        <field name="sequence">50</field>
+        <field name="icon">fa-briefcase</field>
+        <field name="description">Operational procedures, paperwork, financial processes, HR.</field>
+    </record>
+
+</odoo>

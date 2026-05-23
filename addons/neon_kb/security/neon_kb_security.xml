@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Phase 7d security baseline. M1 ships category + tag
+        only; record rules on the article model land in M2.
+    -->
+
+</odoo>

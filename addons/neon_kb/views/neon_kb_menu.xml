@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Phase 7d KB menu. Sequence 83 places it after
+        External Training (82). Empty groups on the root
+        so the visibility filter falls through to child
+        action / visible-child resolution
+        (reference_odoo17_menu_visibility_filter.md).
+
+        M1 ships Configuration -> Categories/Tags only.
+        M2 wires the Articles menuitem once the action
+        exists in views/neon_kb_article_views.xml.
+    -->
+    <menuitem id="menu_kb_root"
+              name="Knowledge Base"
+              sequence="83"
+              groups=""/>
+
+    <menuitem id="menu_kb_configuration"
+              name="Configuration"
+              parent="menu_kb_root"
+              sequence="90"
+              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_kb_categories"
+              name="Categories"
+              parent="menu_kb_configuration"
+              action="action_kb_category"
+              sequence="10"
+              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_kb_tags"
+              name="Tags"
+              parent="menu_kb_configuration"
+              action="action_kb_tag"
+              sequence="20"
+              groups="neon_core.group_neon_superuser,neon_training.group_neon_training_admin"/>
+
+</odoo>
