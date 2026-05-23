@@ -428,4 +428,94 @@ Drop the orphan `ir.config_parameter website.homepage_url` at the same time.
 
 Future deploys touching website / settings: verify behaviour via the actual HTTP surface (curl), not just by setting the config parameter and assuming.
 
+---
+
+## 15. Login Chrome Bypass (23 May 2026, ~09:43 UTC)
+
+### Issue
+
+Phase 7e's `website_slides` dep transitively pulled in the `website` module. The stock `website.login_layout` view (priority 20) inherits `web.login_layout` and `xpath="t" position="replace"`s the body with `<t t-call="website.layout">`, wrapping `/web/login` in the public-website chrome — `YourLogo` placeholder, `About us` footer, top nav. Pre-Phase-7e the login rendered bare against `web.login_layout` (Neon company logo, no chrome).
+
+### Discovery
+
+`odoo shell` introspection (commit `a1be998`, prod `e40cf1e`) found:
+
+| View key | id | inherit_id | role |
+|---|---|---|---|
+| `web.login` | 185 | (root) | login form template |
+| `web.login_layout` | 184 | (root) | bare login chrome → `t-call="web.frontend_layout"` |
+| `auth_signup.login` | 421 | `web.login` | adds signup bits |
+| `neon_channels.neon_login_footer` | 1046 | `web.login_layout` | hides default footer (pre-existing Neon override) |
+| `website.login_layout` | 1300 | `web.login_layout` | **culprit:** `<xpath expr="t" position="replace"><t t-call="website.layout">…` |
+
+Plus `website.Website.web_login` adds `@http.route(website=True, …)` which populates `request.website` — but the visual wrapping comes from the view inheritance, not the controller.
+
+### Fix
+
+New module `addons/neon_login_bypass/` (manifest `17.0.1.0.0`, depends `[web, website]`) deactivates `website.login_layout`:
+
+```xml
+<record id="website.login_layout" model="ir.ui.view">
+    <field name="active" eval="False"/>
+</record>
+```
+
+With that one inheritance removed, `web.login_layout` renders bare (still respecting `neon_channels.neon_login_footer`). Portal (`/my/*`) is unaffected — portal uses `portal.frontend_layout`, not `web.login_layout`.
+
+⚠️ DECISION: chose the deactivation route over a `t-if`-conditional on `website.layout`. The latter modifies `website.layout` globally; setting `t-if="False"` removes `wrapwrap` and leaves an empty shell. Deactivating the bridge view is surgical and reversible.
+
+### Local verification
+
+- `docker compose exec odoo odoo … -i neon_login_bypass --stop-after-init` — registered cleanly, no XML errors (26 queries, 0.37s)
+- Smoke `.claude/p_login_bypass_smoke.py` — **4/4 PASS** (`T_LB100` website.login_layout deactivated, `T_LB101` portal.frontend_layout still active, `T_LB102` web.login_layout + auth_signup.login still active, `T_LB103` combined arch has no `oe_website_login_container` and no `t-call="website.layout"`)
+- `curl http://localhost:8069/web/login` — `YourLogo:0`, `oe_website_login_container:0`, `o_database_list:1`, `company_logo:1`, `About us:0`
+
+### Prod deploy
+
+| Step | Result |
+|---|---|
+| SSH preflight | OK; prod HEAD `e40cf1e`; clean working tree |
+| Backup | `/root/backups/neon_crm_pre_login_bypass_20260523_094318.dump` (6.6 MB pg_dump -Fc) |
+| Branch | `git checkout feat/login-bypass && git pull` → HEAD `a1be998` |
+| Install | `docker compose exec odoo odoo -i neon_login_bypass --stop-after-init --no-http` — registry loaded in 3.186s; no ERROR / CRITICAL |
+| Restart | `docker compose restart odoo` — clean |
+| HTTP up | curl `/web/login` → 200 after 1 retry |
+| Verify | `YourLogo:0`, `oe_website_login_container:0`, `About us:0`, `About Us:0`, `o_database_list:1`, `company_logo:1` |
+
+### Tag
+
+```
+git tag v17.0.1.0.0-login-bypass a1be998
+git push origin v17.0.1.0.0-login-bypass
+ * [new tag]  v17.0.1.0.0-login-bypass -> v17.0.1.0.0-login-bypass
+```
+
+### Status: SUCCESS
+
+`/web/login` on `crm.neonhiring.com` now renders bare Neon-branded login. Module count: 91 → 92. Asset regen skipped (single XML view active-flag change does not touch any compiled JS/SCSS bundles).
+
+### Rollback (if needed)
+
+```
+docker compose stop odoo
+docker compose exec -T db pg_restore -U odoo -d neon_crm \
+    --clean --if-exists /root/backups/neon_crm_pre_login_bypass_20260523_094318.dump
+cd /opt/neon-odoo
+git checkout v17.0.8.7.0-phase7e-live
+docker compose start odoo
+```
+
+Or to leave Phase 7e in place but disable the bypass:
+
+```
+docker compose exec odoo odoo -d neon_crm \
+    --uninstall=neon_login_bypass --stop-after-init --no-http
+docker compose exec odoo odoo shell -d neon_crm --no-http <<'PY'
+env.ref("website.login_layout").active = True
+env.cr.commit()
+PY
+docker compose restart odoo
+```
+
+(Uninstalling neon_login_bypass alone does NOT re-activate `website.login_layout` — Odoo's data-record ownership tracks the original module, so our XML's `active=False` write persists. The shell command above is required to restore the pre-bypass chrome.)
 
