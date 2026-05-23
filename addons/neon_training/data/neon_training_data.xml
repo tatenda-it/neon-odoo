@@ -54,7 +54,7 @@
             <field name="requires_external_trainer" eval="True"/>
             <field name="skill_level_mode">binary</field>
             <field name="expiry_required" eval="True"/>
-            <field name="default_validity_months">24</field>
+            <field name="validity_months">24</field>
             <field name="icon">fa-shield</field>
         </record>
 
@@ -438,6 +438,103 @@
             <field name="sign_off_authority">external_trainer</field>
             <field name="regulatory_body">Zimbabwe Traffic Safety Council</field>
             <field name="description">Passenger Service Vehicle endorsement -- required for transporting crew or event guests in dedicated transport.</field>
+        </record>
+
+        <!-- ============================================================
+             Phase 7e M9: 8 LMS-issued cert types (7 sub-certs +
+             1 capstone). All system-authority (auto-issued by LMS
+             workflow). All binary (pass/fail) per audit.
+             Default validity 24 months per Robin's interim guidance;
+             admin can refine per type via UI without re-deploy
+             (noupdate=1 preserves admin edits).
+             ============================================================ -->
+
+        <record id="cert_type_neon_foundations_safety"
+                model="neon.training.certification.type">
+            <field name="name">Neon Foundations and Safety</field>
+            <field name="code">neon_foundations_safety</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Sub-cert awarded on completion of the Foundations and Safety track in the Neon Workshop Training Program. Covers M01 (workshop safety) + M08 (power and electrical discipline). LMS-issued.</field>
+        </record>
+
+        <record id="cert_type_neon_audio"
+                model="neon.training.certification.type">
+            <field name="name">Neon Audio Technical</field>
+            <field name="code">neon_audio</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Sub-cert for Audio Technical track (M02 + M03 + M15). LMS-issued.</field>
+        </record>
+
+        <record id="cert_type_neon_lighting"
+                model="neon.training.certification.type">
+            <field name="name">Neon Lighting Technical</field>
+            <field name="code">neon_lighting</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Sub-cert for Lighting Technical track (M04 + M05 + M14). LMS-issued.</field>
+        </record>
+
+        <record id="cert_type_neon_video_led"
+                model="neon.training.certification.type">
+            <field name="name">Neon Video and LED Technical</field>
+            <field name="code">neon_video_led</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Sub-cert for Video and LED Technical track (M06 + M07 + M16). LMS-issued.</field>
+        </record>
+
+        <record id="cert_type_neon_workflow_ops"
+                model="neon.training.certification.type">
+            <field name="name">Neon Workflow and Operations</field>
+            <field name="code">neon_workflow_ops</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Sub-cert for Workflow and Operations track (M09 + M10 + M11). Combined with Foundations grants generator + outdoor_public operating authority. LMS-issued.</field>
+        </record>
+
+        <record id="cert_type_neon_client_ready"
+                model="neon.training.certification.type">
+            <field name="name">Neon Client-Ready Skills</field>
+            <field name="code">neon_client_ready</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Sub-cert for Soft Skills track (M12 + M13). LMS-issued.</field>
+        </record>
+
+        <record id="cert_type_neon_rigging"
+                model="neon.training.certification.type">
+            <field name="name">Neon Rigging Technical</field>
+            <field name="code">neon_rigging</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Sub-cert for Rigging track (M17). Combined with Foundations grants rigging and (with practical signoff) working_at_height operating authority. LMS-issued.</field>
+        </record>
+
+        <record id="cert_type_neon_technical"
+                model="neon.training.certification.type">
+            <field name="name">Neon Technical (Capstone)</field>
+            <field name="code">neon_technical</field>
+            <field name="category_id" ref="cert_category_role"/>
+            <field name="skill_level_mode">binary</field>
+            <field name="sign_off_authority">system</field>
+            <field name="validity_months">24</field>
+            <field name="description">Capstone cert. Awarded on completion of all 7 sub-tracks (Foundations + Audio + Lighting + Video and LED + Workflow and Ops + Soft Skills + Rigging). Marks the learner as fully trained across all Neon technical domains. LMS-issued.</field>
         </record>
 
     </data>

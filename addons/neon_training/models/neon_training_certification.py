@@ -1142,11 +1142,19 @@ class NeonTrainingCertification(models.Model):
                               so deploy-gap detection still works)
         """
         self.ensure_one()
+        empty_user = self.env["res.users"]
+        # Phase 7e M9: 'system' authority -> LMS auto-issued
+        # certs. No human verifier; LMS workflow uses sudo to
+        # create with state='active' directly. Short-circuit
+        # so action_submit_for_verification (if ever called)
+        # returns a no-op routing decision and skips the TODO
+        # creation.
+        if self.type_id.sign_off_authority == "system":
+            return empty_user, False, "system_lms_issued"
         verifiers = self.env["res.users"].sudo().search([
             ("login", "in", list(_CERT_VERIFIER_LOGINS)),
             ("active", "=", True),
         ])
-        empty_user = self.env["res.users"]
         if not verifiers:
             return empty_user, False, "cert_verifier_managerial"
         return (verifiers.sorted("login")[0], False,

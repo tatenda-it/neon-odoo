@@ -130,10 +130,13 @@ results["T7303"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T7304 - total seeded type count = 32 (22 M1 + 10 M3)")
+print("T7304 - total seeded type count = 40 (22 M1 + 10 M3 + 8 P7e M9)")
 print("=" * 72)
+# P7e M9 (2026-05-23) added 8 LMS-issued cert types:
+# neon_foundations_safety + audio + lighting + video_led +
+# workflow_ops + client_ready + rigging + technical (capstone).
 n = CertType.search_count([])
-ok = n == 32
+ok = n == 40
 print("  total types:", n)
 print("T7304:", "PASS" if ok else "FAIL")
 results["T7304"] = ok

@@ -27,6 +27,10 @@ _SIGN_OFF_AUTHORITIES = [
     ("lead_tech",         "Lead Tech"),
     ("od_md",             "OD / MD"),
     ("external_trainer",  "External Trainer"),
+    # Phase 7e M9: auto-issued by the LMS workflow without
+    # human verification. _resolve_verify_authority_partners
+    # returns empty for this authority (no TODO routing).
+    ("system",            "System (LMS Auto-Issued)"),
 ]
 
 _CODE_REGEX = re.compile(r"^[a-z0-9_]+$")
