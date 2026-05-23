@@ -12,10 +12,14 @@ Record rules:
 * Portal users see published only.
 * Admins / superuser see everything via permissive rules.
 """
+import logging
 import re
 
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
+
+
+_logger = logging.getLogger(__name__)
 
 
 _STATE_SELECTION = [
@@ -304,10 +308,17 @@ class NeonKBArticle(models.Model):
             raise UserError(_(
                 "Article body cannot be empty when "
                 "publishing."))
+        prior_state = self.state
         self._transition_to("published", {
             "published_by_id": self.env.user.id,
             "date_published": fields.Datetime.now(),
         })
+        # M7 -- pick the right notification based on which
+        # transition we just made (draft->published is
+        # "published"; archived->published goes through
+        # action_republish which fires a different event).
+        if prior_state == "draft":
+            self._notify_article_published()
 
     def action_archive_article(self):
         """Named action_archive_article (not action_archive)
@@ -316,6 +327,8 @@ class NeonKBArticle(models.Model):
         self.ensure_one()
         self._assert_author_or_admin()
         self._transition_to("archived")
+        # M7 -- notify author the article is archived.
+        self._notify_article_archived()
 
     def action_republish(self):
         self.ensure_one()
@@ -341,11 +354,15 @@ class NeonKBArticle(models.Model):
             "published_by_id": self.env.user.id,
             "date_published": fields.Datetime.now(),
         })
+        # M7 -- notify author the article is republished.
+        self._notify_article_republished()
 
     def action_back_to_draft(self):
         self.ensure_one()
         self._assert_author_or_admin()
         self._transition_to("draft")
+        # M7 -- notify author the article is back to draft.
+        self._notify_article_back_to_draft()
 
     # ==================================================================
     # M4 -- view_count helper. Called by the portal article
@@ -386,3 +403,126 @@ class NeonKBArticle(models.Model):
         return super()._name_search(
             name=name, domain=domain, operator=operator,
             limit=limit, order=order)
+
+    # ==================================================================
+    # M7 -- notification dispatcher + 4 event hooks.
+    #
+    # Pattern follows reference_neon_notification_stub_
+    # pattern.md (Phase 7b M12 / Phase 7e M12 / Phase 7c M7
+    # precedent). _notify_send is the single override point
+    # Phase 9 swaps for actual dispatch. The 4 event hooks
+    # stay stable -- their channels=[...] + body shape are
+    # the API contract.
+    #
+    # Stub marker [Notification stub - Phase 9 will send]
+    # uses ASCII hyphen per the reference doc; Phase 9's
+    # regression smoke greps for the exact substring.
+    # ==================================================================
+    def _notify_send(self, event, channels, subject, body):
+        """Stub dispatcher. Phase 9 overrides to send actual
+        WhatsApp / email via the dispatch engine."""
+        self.ensure_one()
+        author_partner = (
+            self.author_id.partner_id
+            if self.author_id else False)
+        author_email = (author_partner.email
+                        if author_partner else "(no email)")
+        author_phone = (author_partner.phone
+                        if author_partner else "(no phone)")
+        channel_str = ", ".join(channels)
+        full_body = (
+            "<p><strong>[Notification stub - Phase 9 will "
+            "send]</strong></p>"
+            "<p><b>Event:</b> %s</p>"
+            "<p><b>Channels:</b> %s</p>"
+            "<p><b>To:</b> %s / %s</p>"
+            "<hr/>%s"
+        ) % (event, channel_str,
+             author_email or "(no email)",
+             author_phone or "(no phone)",
+             body)
+        self.sudo().message_post(
+            subject=subject,
+            body=full_body,
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+        )
+
+    def _notify_article_published(self):
+        """Fires on state -> published from draft."""
+        self.ensure_one()
+        self._notify_send(
+            event="kb_article_published",
+            channels=["email"],
+            subject=_(
+                "Article published - %s") % self.name,
+            body=_(
+                "<p>Hi %(author)s,</p>"
+                "<p>Your article '%(name)s' has been "
+                "published in the %(category)s category. "
+                "View it at /my/kb/article/%(code)s.</p>"
+            ) % {
+                "author": self.author_id.name,
+                "name": self.name,
+                "category": self.category_id.name,
+                "code": self.code,
+            },
+        )
+
+    def _notify_article_archived(self):
+        """Fires on state -> archived."""
+        self.ensure_one()
+        self._notify_send(
+            event="kb_article_archived",
+            channels=["email"],
+            subject=_(
+                "Article archived - %s") % self.name,
+            body=_(
+                "<p>Hi %(author)s,</p>"
+                "<p>Your article '%(name)s' has been "
+                "archived. It is no longer visible to "
+                "portal users. Contact an admin to "
+                "re-publish if needed.</p>"
+            ) % {
+                "author": self.author_id.name,
+                "name": self.name,
+            },
+        )
+
+    def _notify_article_back_to_draft(self):
+        """Fires on state -> draft (from published)."""
+        self.ensure_one()
+        self._notify_send(
+            event="kb_article_back_to_draft",
+            channels=["email"],
+            subject=_(
+                "Article moved to draft - %s") % self.name,
+            body=_(
+                "<p>Hi %(author)s,</p>"
+                "<p>Your article '%(name)s' has been moved "
+                "back to draft for editing. Republish when "
+                "ready.</p>"
+            ) % {
+                "author": self.author_id.name,
+                "name": self.name,
+            },
+        )
+
+    def _notify_article_republished(self):
+        """Fires on state -> published from archived."""
+        self.ensure_one()
+        self._notify_send(
+            event="kb_article_republished",
+            channels=["email"],
+            subject=_(
+                "Article republished - %s") % self.name,
+            body=_(
+                "<p>Hi %(author)s,</p>"
+                "<p>Your article '%(name)s' has been "
+                "republished and is again visible to portal "
+                "users.</p>"
+            ) % {
+                "author": self.author_id.name,
+                "name": self.name,
+            },
+        )
