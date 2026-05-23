@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
-    "version": "17.0.1.11.0",
+    "version": "17.0.1.12.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -56,6 +56,11 @@ Subsequent milestones:
         # LMS admin menu root + Tools submenu.
         "views/neon_lms_quiz_import_wizard_views.xml",
         "views/neon_lms_menu.xml",
+        # LMS Admin Polish M2 -- module form/tree + 4-tab
+        # notebook + inline quiz/scenario editing + Modules
+        # menuitem. Loads AFTER neon_lms_menu.xml so the
+        # menuitem can target menu_neon_lms_root.
+        "views/neon_lms_module_views.xml",
     ],
     "installable": True,
     "application": False,

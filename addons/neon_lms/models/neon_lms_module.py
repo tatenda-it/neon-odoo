@@ -90,3 +90,115 @@ class NeonLMSModule(models.Model):
          "UNIQUE(code)",
          "Module code must be unique."),
     ]
+
+    # ------------------------------------------------------------------
+    # LMS Admin Polish M2 -- quick-create helpers (also reused
+    # by M4 server-action templates). Each helper creates a
+    # placeholder record on this module and returns an
+    # ir.actions.act_window pointing at it so the admin lands
+    # directly in the edit form.
+    # ------------------------------------------------------------------
+    def _quick_create_pref_points(self):
+        """Read user-scoped default_points preference (M4).
+        Falls back to 1. Stored as an ir.config_parameter
+        keyed per-user."""
+        self.ensure_one()
+        ICP = self.env["ir.config_parameter"].sudo()
+        raw = ICP.get_param(
+            "neon_lms.default_points.uid_%d" % self.env.uid,
+            default="1")
+        try:
+            return max(1, int(raw))
+        except (TypeError, ValueError):
+            return 1
+
+    def action_quick_create_mc(self):
+        self.ensure_one()
+        points = self._quick_create_pref_points()
+        question = self.env["neon.lms.quiz.question"].create({
+            "module_id": self.id,
+            "question_text": _("New multiple-choice question"),
+            "question_type": "multiple_choice",
+            "points": points,
+            "option_ids": [
+                (0, 0, {"option_text": _("Option A"),
+                        "is_correct": True,
+                        "sequence": 10}),
+                (0, 0, {"option_text": _("Option B"),
+                        "is_correct": False,
+                        "sequence": 20}),
+                (0, 0, {"option_text": _("Option C"),
+                        "is_correct": False,
+                        "sequence": 30}),
+                (0, 0, {"option_text": _("Option D"),
+                        "is_correct": False,
+                        "sequence": 40}),
+            ],
+        })
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "neon.lms.quiz.question",
+            "res_id": question.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_quick_create_tf(self):
+        self.ensure_one()
+        points = self._quick_create_pref_points()
+        question = self.env["neon.lms.quiz.question"].create({
+            "module_id": self.id,
+            "question_text": _("New true/false question"),
+            "question_type": "true_false",
+            "points": points,
+            "option_ids": [
+                (0, 0, {"option_text": _("True"),
+                        "is_correct": True,
+                        "sequence": 10}),
+                (0, 0, {"option_text": _("False"),
+                        "is_correct": False,
+                        "sequence": 20}),
+            ],
+        })
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "neon.lms.quiz.question",
+            "res_id": question.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_quick_create_sa(self):
+        self.ensure_one()
+        points = self._quick_create_pref_points()
+        question = self.env["neon.lms.quiz.question"].create({
+            "module_id": self.id,
+            "question_text": _("New short-answer question"),
+            "question_type": "short_answer",
+            "points": points,
+            "correct_answer": _("(fill in expected answer)"),
+        })
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "neon.lms.quiz.question",
+            "res_id": question.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_quick_create_scenario(self):
+        self.ensure_one()
+        scenario = self.env["neon.lms.practical.scenario"].create({
+            "module_id": self.id,
+            "title": _("New practical scenario"),
+            "description": _("(scenario setup -- what the "
+                             "learner is asked to do)"),
+            "signoff_authority": "superuser",
+        })
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "neon.lms.practical.scenario",
+            "res_id": scenario.id,
+            "view_mode": "form",
+            "target": "current",
+        }
