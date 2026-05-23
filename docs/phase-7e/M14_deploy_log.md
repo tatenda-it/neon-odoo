@@ -370,3 +370,62 @@ docker compose start odoo
 
 Phase 7e deploy complete.
 
+---
+
+## 14. Post-Deploy Redirect Fix (23 May 2026, 05:56 UTC)
+
+### Issue
+
+Phase 7b's `neon_onboarding` manifest `depends` list included `website` (only `portal` was actually needed). That dependency pulled in 6 stdlib `website_*` modules, installing Odoo's public-facing marketing site. The website module's controller intercepts `/` and serves the public homepage, forcing users to take an extra navigation hop before reaching the backend at `/web/login`.
+
+Functional impact: low (login still works after the extra hop). UX impact: poor (cosmetic mismatch + extra click).
+
+### Fix attempt 1 — `ir.config_parameter` (did NOT work)
+
+Per the original fix plan, set:
+
+```python
+env["ir.config_parameter"].sudo().set_param(
+    "website.homepage_url", "/web")
+```
+
+Result after restart: `curl -sI https://crm.neonhiring.com/` returned `HTTP/1.1 200 OK` with the website homepage HTML body. No redirect.
+
+**Why it didn't work**: Odoo 17's `website` model carries its own `homepage_url` field on the `website` record. The HTTP-level redirect at `/` reads `request.website.homepage_url` (the model field), not `ir.config_parameter.website.homepage_url` (the system parameter). The two are independent in this version; setting only the config parameter has no effect on the controller.
+
+### Fix attempt 2 — set field on website record (worked)
+
+```python
+website = env["website"].sudo().search([], limit=1)
+website.write({"homepage_url": "/web"})
+env.cr.commit()
+docker compose restart odoo
+```
+
+Verification:
+
+```
+$ curl -sI https://crm.neonhiring.com/
+HTTP/1.1 303 SEE OTHER
+Location: https://crm.neonhiring.com/web/login
+```
+
+Root URL now redirects directly to the backend login. UX is one fewer hop; cosmetic mismatch resolved.
+
+### State left behind
+
+The `ir.config_parameter website.homepage_url = '/web'` set in fix attempt 1 was left in place — it's harmless (the website controller ignores it) and removing it now is more risk than reward (some future minor-version upgrade may start reading it as a fallback). If a Phase 11 cleanup pass touches this area, drop the orphan config parameter alongside the manifest-deps cleanup.
+
+### Phase 11 cleanup candidate
+
+Remove `website` from `addons/neon_onboarding/__manifest__.py` `depends` list. Verify portal-only build still serves the onboarding portal routes correctly (likely `portal` alone is sufficient — Phase 7b's actual usage is just `/my/onboarding` which lives on portal, not website).
+
+Drop the orphan `ir.config_parameter website.homepage_url` at the same time.
+
+### Lesson learned
+
+`ir.config_parameter` and same-named fields on a Settings-backed model are **not** the same thing in Odoo 17. The model field is read at runtime; the config parameter is only read when Settings reload OR when explicit code does `get_param`. For HTTP controllers, the model field is authoritative.
+
+Future deploys touching website / settings: verify behaviour via the actual HTTP surface (curl), not just by setting the config parameter and assuming.
+
+
