@@ -428,4 +428,92 @@ Drop the orphan `ir.config_parameter website.homepage_url` at the same time.
 
 Future deploys touching website / settings: verify behaviour via the actual HTTP surface (curl), not just by setting the config parameter and assuming.
 
+---
+
+## LMS Admin Polish Deploy (23 May 2026, ~09:00 UTC)
+
+### Batch scope
+
+4-milestone admin-UX polish on top of Phase 7e. Single tag, single deploy.
+
+| M | Commit | Scope |
+|---|---|---|
+| M1 | `102837b` | Bulk Quiz Import wizard (CSV paste or file upload → preview → atomic per-row import). New `neon.lms.quiz.import.wizard` TransientModel + Tools → Bulk Quiz Import menuitem + LMS admin menu root. |
+| M2 | `03cf3ca` | Native `neon.lms.module` form (notebook: Content / Quiz Questions / Scenarios / SOPs) + inline editable quiz/scenario trees + quick-create helper methods (`action_quick_create_mc` / `_tf` / `_sa` / `_scenario`) on the module model. |
+| M3 | `39f999e` | `slide.slide` form inherit adding explicit `widget="html"` on description + Neon LMS badge + autosave-indicator span; lightweight `FormController` subclass mirrors stdlib auto-save lifecycle into the indicator. JS lands in `web.assets_backend`. |
+| M4 | `6646bb6` | Standalone `neon.lms.quiz.question` form + tree views with header-button templates (Quick MC / T/F / SA) that delegate to M2 helpers, plus `Set as Default Points` button that writes `ir.config_parameter neon_lms.default_points.uid_<id>` (read by `_quick_create_pref_points`). |
+
+Cross-module touches: **0** (no `neon_jobs` / `neon_core` / `neon_training` / `neon_onboarding` / `neon_finance` edits). All four milestones live in `addons/neon_lms/` only.
+
+### Pre-deploy regression
+
+`.claude/run_regression.sh neon_crm` → **1247/1249**. Exactly matches the brief's projected baseline (1224 Phase 7e close + 23 new). All 5 baseline-known-noise suites unchanged: `p2m2`, `p2m4`, `p2m5`, `p2m7_7` (6/8), `p6m3` (calendar collision). All 4 new lms-polish suites pass (8 + 6 + 5 + 4 = 23). Browser smokes not re-run; the new milestones don't ship browser-smoke surfaces and existing browser smokes weren't touched.
+
+### Deploy steps
+
+| Stage | Result |
+|---|---|
+| Pre-flight HEAD | `a1be998` on `feat/login-bypass` (post-login-bypass deploy state) |
+| Backup | `/root/backups/neon_crm_pre_lms_polish_20260523_105954.dump` (6.7 MB pg_dump -Fc) |
+| Branch switch | `git checkout feat/lms-admin-polish && git pull` → HEAD `6646bb6` |
+| Upgrade | `docker compose exec odoo odoo -c /etc/odoo/odoo.conf -d neon_crm -u neon_lms --stop-after-init --no-http` — clean, registry loaded in 5.4s, no ERROR / CRITICAL |
+| Upgrade warning | One non-blocking: `Error-prone use of @class in view slide.slide.form.neon_lms — use hasclass(*classes)` (M3 xpath uses `//div[@class='oe_title pe-xl-0']`; works but Phase 11 cleanup candidate) |
+| Restart | `docker compose restart odoo` — clean |
+| HTTP wait | `https://crm.neonhiring.com/web/login` → 200 first poll |
+| Asset regen | 18 stale `/web/assets/*` cleared → 4 backend + 4 frontend bundles regenerated → 8 attachments persisted via `env.cr.commit()` |
+| Verify M3 JS bundled | M3 marker `neon_lms_autosave_indicator` found in `/web/assets/7d7ef0a/web.assets_backend.min.js` ✓ |
+
+### Five deploy verifications
+
+| V | Check | Result |
+|---|---|---|
+| V1 | `neon_lms.installed_version` | `17.0.1.14.0` ✓ |
+| V2 | `neon.lms.quiz.import.wizard` registered | True ✓ |
+| V3 | `neon_lms.view_neon_lms_module_form` view | id 2184 ✓ |
+| V4 | `slide.slide` form inherits | 1: `neon_lms.view_slide_slide_form_neon_lms` (id 2185) ✓ |
+| V5 | `/web/assets/%backend%` attachments | 4 (js + css for `web.assets_backend` + `web_editor.backend_assets_wysiwyg`). Brief projected 2 — discrepancy is the LIKE pattern matching both bundles; the actual delivery is correct. |
+
+### Login-bypass surface check (sanity)
+
+Post-deploy curl on `/web/login` against `https://crm.neonhiring.com/`:
+
+```
+YourLogo: 0
+oe_website_login_container: 0
+o_database_list: 1
+company_logo: 1
+```
+
+`v17.0.1.0.0-login-bypass` state preserved through the upgrade — neon_login_bypass's `website.login_layout` deactivation is durable.
+
+### Tag
+
+```
+git tag v17.0.1.14.0-lms-admin-polish 6646bb6
+git push origin v17.0.1.14.0-lms-admin-polish
+ * [new tag]  v17.0.1.14.0-lms-admin-polish -> v17.0.1.14.0-lms-admin-polish
+```
+
+### Phase 11 amendment candidates (filed from this batch)
+
+1. **`fields_view_get → get_view` rename (Odoo 17)**: M2's smoke initially called `Module.fields_view_get(...)` (Odoo 15 API). Odoo 17 renamed to `get_view`. Audit other smokes for residual `fields_view_get` calls — at least p2/p3-era smokes may have them.
+2. **`recordset.filtered() truthy-but-not-True` smoke convention**: M2's `ok = ... and rec.option_ids.filtered("is_correct")` produced a recordset, not a bool. The summary check `if results.get(k) is True` then misclassifies as FAIL. Wrap all such terminal-expression `ok` chains in `bool(...)` — propose as a smoke-template lint or a coding-convention line in CLAUDE.md.
+3. **M3 view inherit warning**: `xpath expr="//div[@class='oe_title pe-xl-0']"` triggers Odoo's `Error-prone use of @class` warning. Migrate to `//div[hasclass('oe_title')]` (loses the `pe-xl-0` constraint but matches the stable class). Pre-existing `neon_*` view inherits may have the same pattern.
+
+### Rollback (if needed)
+
+```
+docker compose stop odoo
+docker compose exec -T db pg_restore -U odoo -d neon_crm \
+    --clean --if-exists /root/backups/neon_crm_pre_lms_polish_20260523_105954.dump
+cd /opt/neon-odoo
+git checkout v17.0.1.0.0-login-bypass
+docker compose start odoo
+```
+
+(Pre-deploy state: prod was at `a1be998` on `feat/login-bypass`, which is the same commit as tag `v17.0.1.0.0-login-bypass`. Restoring to that tag + restoring DB rolls back the entire batch atomically.)
+
+### Status: SUCCESS
+
+LMS Admin Polish 4-batch live on `crm.neonhiring.com` at `v17.0.1.14.0-lms-admin-polish`. Module version `neon_lms 17.0.1.14.0`. M3 JS bundled. M2 module form reachable via Neon LMS → Modules; M4 quiz form via Neon LMS → Quiz Questions; M1 wizard via Neon LMS → Tools → Bulk Quiz Import.
 
