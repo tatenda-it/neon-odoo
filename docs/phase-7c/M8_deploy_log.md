@@ -224,3 +224,141 @@ Expected post-deploy verifications:
 ## 12. Status: ready for deploy
 
 Phase 7c functionally complete. All 8 milestones land on `feat/external-training-phase-7c`; integration smoke 10/10 stages; no regression hits on the canonical baseline.
+
+---
+
+## 13. Production Deploy: Phase 7c live (23 May 2026, ~11:57 UTC)
+
+**Deployer:** Tatenda via Claude Code SSH
+**Tag:** `v17.0.8.9.0-phase7c-live` -> `dec36bb`
+**Branch:** `feat/external-training-phase-7c`
+
+### Pre-flight
+
+| Check | Result |
+|---|---|
+| SSH | OK |
+| Prod HEAD before | `6646bb6` (v17.0.1.14.0-lms-admin-polish) |
+| Branch before | `feat/lms-admin-polish` |
+| Working tree | clean (only pre-existing untracked `config/odoo.conf.pre-phase1-backup`) |
+
+### Backup
+
+- **File:** `/root/backups/neon_crm_pre_p7c_20260523_135617.dump`
+- **Size:** 6.7 MB (pg_dump -Fc compressed)
+
+### Code pull
+
+`git checkout feat/external-training-phase-7c && git pull` → HEAD = `dec36bb`. Fast-forward; no merge conflicts.
+
+### Combined install + upgrade
+
+```
+docker compose exec odoo odoo -c /etc/odoo/odoo.conf -d neon_crm \
+    -i neon_external_training -u neon_training \
+    --stop-after-init --no-http
+```
+
+Migration log excerpts:
+
+```
+WARNING Field neon.training.certification.external_booking_id
+  with unknown comodel_name 'neon.external.training.booking'
+INFO module neon_training: Running migration [17.0.8.8.0>] post-migrate
+INFO neon_training 17.0.8.8.0: external_booking_id field added
+  to neon.training.certification for Phase 7c M4 auto-cert issuance.
+INFO module neon_training: Running migration [17.0.8.9.0>] post-migrate
+INFO neon_training 17.0.8.9.0: 2 external-training counters
+  (upcoming 30d / pending completion 7d) + drill-through actions
+  added to neon.training.dashboard.
+INFO Module neon_training loaded in 0.93s, 942 queries
+INFO Loading module neon_external_training (90/92)
+INFO module neon_external_training: creating or updating database tables
+INFO loading neon_external_training/security/neon_external_training_security.xml
+INFO loading neon_external_training/security/ir.model.access.csv
+INFO loading neon_external_training/data/neon_external_training_sequences.xml
+INFO loading neon_external_training/data/neon_external_training_cron.xml
+INFO loading neon_external_training/data/neon_external_training_vendors.xml
+INFO loading neon_external_training/views/...  (4 view XMLs + reject wizard view + menu)
+INFO Module neon_external_training loaded in 0.54s, 318 queries
+INFO Modules loaded.
+INFO Registry loaded in 6.511s
+```
+
+Registry loaded clean. No ERROR / CRITICAL. The `unknown comodel_name` warning is the same forward-string-reference symptom from M4 — harmless here because the combined `-i + -u` install loaded both modules into the registry before the table-init pass that creates FK constraints. The FK was created correctly without needing the M4 idempotent fixup migration to fire (see § 13.6 below).
+
+### Restart + asset regen
+
+`docker compose restart odoo` clean. `curl /web/login` → 200 first poll.
+
+Asset regen via odoo shell:
+
+| Stage | Count |
+|---|---|
+| Stale `/web/assets/*` cleared | 15 |
+| Bundles compiled | 4 (assets_backend, assets_web, backend_assets_wysiwyg, assets_frontend) |
+| Final `/web/assets/*` attachments | 8 |
+| `/web/assets/%backend%` attachments | 4 (js + css × 2 backend bundles) |
+
+### 7 deploy verifications
+
+| V | Check | Result |
+|---|---|---|
+| V1 | `neon_training.installed_version` | **17.0.8.9.0** ✓ |
+| V1 | `neon_external_training.installed_version` | **17.0.1.5.0** ✓ |
+| V2 | 5 vendor seeds (`vendor_vid`, `vendor_red_cross_zim`, `vendor_allen_heath`, `vendor_avolites`, `vendor_yamaha_pro`) | All 5 resolved ✓ |
+| V3 | FK constraint `neon_training_certification_external_booking_id_fkey` | **Present** (false-negative in initial Python smoke due to multi-line SQL string concat ambiguity; confirmed via direct `psql` + the idempotent fixup script logging "FK already present; no-op.") ✓ |
+| V4 | Dashboard external counters render for Robin | `upcoming=0` `pending_completion=0` ✓ (no bookings yet) |
+| V5 | Booking reference sequence | Present, prefix `BKG-%(year)s-`, padding 3 ✓ |
+| V6 | 3d reminder cron `cron_external_training_reminder_3d` | Present, active=True, 1-day interval ✓ |
+| V7 | `website.login_layout.active` | `False` ✓ (login bypass holds) |
+
+### V3 false-negative — note
+
+The initial verification used a multi-line Python SQL string that relied on SQL's adjacent-string concatenation rule (`'foo'\n'bar'` → `'foobar'`). The constraint name didn't resolve as expected and V3 reported FK absent. Direct `psql` query against the same `pg_constraint` row showed the FK was in fact created cleanly during the combined install. The idempotent fixup script (`p7c_prod_fk_fixup.py`) then ran and confirmed "FK already present; no-op."
+
+Phase 11 candidate filed: prefer single-line literal SQL strings in verification scripts; don't rely on cross-line concatenation.
+
+### Module count growth
+
+- Pre-Phase-7c on prod: 91 installed modules (post-LMS-polish state)
+- Post-Phase-7c on prod: 92 installed modules
+- Delta: +1 (`neon_external_training`)
+
+(The M8 deploy log earlier estimated 92→93 based on a stale baseline. Actual pre-deploy count was 91, so the +1 lands at 92.)
+
+### Tag push
+
+```
+git tag v17.0.8.9.0-phase7c-live dec36bb
+git push origin v17.0.8.9.0-phase7c-live
+* [new tag]  v17.0.8.9.0-phase7c-live -> v17.0.8.9.0-phase7c-live
+```
+
+### Deploy status: SUCCESS
+
+Phase 7c live on `crm.neonhiring.com` at `v17.0.8.9.0-phase7c-live`. All 7 verifications green. Booking workflow + auto-cert + dashboard counters + 3d cron + notifications stub all live.
+
+### Rollback target (in case of issue)
+
+```
+docker compose stop odoo
+docker compose exec -T db pg_restore -U odoo -d neon_crm \
+    --clean --if-exists \
+    /root/backups/neon_crm_pre_p7c_20260523_135617.dump
+cd /opt/neon-odoo
+git checkout v17.0.1.14.0-lms-admin-polish
+docker compose start odoo
+```
+
+Phase 7c deploy complete.
+
+---
+
+## 14. Lessons captured (post-deploy)
+
+1. **Forward-string M2O FK creates correctly on combined `-i + -u` install.** The M4 fixup migration covers the staged-upgrade case (upstream `-u` alone, then downstream `-u` later). Fresh install via `-i` of the dependent alongside `-u` of the upstream in the SAME pass loads both into the registry before the table-init pass, and Odoo's FK creator finds the comodel. Both paths now confirmed.
+
+2. **Multi-line SQL string literal concatenation in verification scripts is unreliable.** Use a single-line string or explicit Python string concatenation. Phase 11 candidate filed.
+
+3. **The "unknown comodel_name" warning at registry-init is informational, not a deploy-blocker** — but only when followed by the dependent module loading in the same pass. Standalone upstream upgrade still needs the fixup migration.
