@@ -179,7 +179,120 @@ class NeonLMSEnrollment(models.Model):
         _logger.info(
             "neon_lms M8: capstone %d issued for learner %s.",
             capstone.id, learner.login)
+        # M12 notification stub.
+        if hasattr(self, "_notify_capstone_certified"):
+            self._notify_capstone_certified()
         return capstone
+
+    # ============================================================
+    # M12 -- LMS notification stub methods.
+    #
+    # Same dispatcher pattern as Phase 7b M12 (per
+    # .claude/reference_neon_notification_stub_pattern.md).
+    # Phase 9 overrides _notify_send to wire actual channels;
+    # 4 event hooks stay frozen as the API contract.
+    # ============================================================
+    def _notify_send(self, event, channels, subject, body):
+        """Stub dispatcher. Phase 9 overrides to send actual
+        WhatsApp + email. M12 logs intent to chatter.
+
+        sudo() wrap inside message_post so the writer's ACL
+        on slide.channel.partner doesn't block the stub log
+        (matches Phase 7b M12 lesson).
+        """
+        self.ensure_one()
+        channel_str = ", ".join(channels)
+        partner = self.partner_id
+        email = partner.email or "(no email)"
+        phone = partner.phone or partner.mobile or "(no phone)"
+        full_body = (
+            "<p><strong>[Notification stub - Phase 9 will "
+            "send]</strong></p>"
+            "<p><b>Event:</b> %s</p>"
+            "<p><b>Channels:</b> %s</p>"
+            "<p><b>To:</b> %s / %s</p>"
+            "<hr/>%s"
+        ) % (event, channel_str, email, phone, body)
+        # slide.channel.partner doesn't inherit mail.thread,
+        # so we can't message_post on the enrollment itself.
+        # Post to the learner's partner_id (res.partner DOES
+        # have mail.thread) -- semantically correct anyway:
+        # the notification IS for the partner. Phase 9 will
+        # consume the same partner_id for actual sends.
+        partner.sudo().message_post(
+            subject=subject,
+            body=full_body,
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+        )
+
+    def _notify_track_certified(self, track):
+        self.ensure_one()
+        self._notify_send(
+            event="track_certified",
+            channels=["email", "whatsapp"],
+            subject=_("Track certified - %s") % track.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>You've earned the %(track)s sub-cert. "
+                "Keep going -- the capstone unlocks when "
+                "all 7 tracks are certified.</p>"
+            ) % {
+                "name": self.partner_id.name,
+                "track": track.name,
+            })
+
+    def _notify_capstone_certified(self):
+        self.ensure_one()
+        self._notify_send(
+            event="capstone_certified",
+            channels=["email", "whatsapp"],
+            subject=_("Capstone earned - Neon Technical"),
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>You've completed the full Neon Workshop "
+                "Training Program. Capstone cert issued. "
+                "Welcome to the trained-across-all-domains "
+                "tier.</p>"
+            ) % {"name": self.partner_id.name})
+
+    def _notify_authority_granted(self, authority):
+        self.ensure_one()
+        self._notify_send(
+            event="authority_granted",
+            channels=["email", "whatsapp"],
+            subject=_(
+                "Operating authority granted - %s"
+            ) % authority.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>You've been granted the %(auth)s "
+                "operating authority. You can now work "
+                "events requiring this credential.</p>"
+            ) % {
+                "name": self.partner_id.name,
+                "auth": authority.name,
+            })
+
+    def _notify_quiz_failed_max_attempts(self, module):
+        """Placeholder for M13/M14 quiz attempt model.
+        Method exists so future callers can wire without
+        further changes.
+        """
+        self.ensure_one()
+        self._notify_send(
+            event="quiz_failed_max_attempts",
+            channels=["email"],
+            subject=_("Quiz locked - %s") % module.name,
+            body=_(
+                "<p>Hi %(name)s,</p>"
+                "<p>You've reached the maximum quiz attempts "
+                "for %(module)s. Contact your training admin "
+                "to unlock and continue.</p>"
+            ) % {
+                "name": self.partner_id.name,
+                "module": module.name,
+            })
 
     @api.depends("neon_track_completion_ids.state",
                  "neon_track_completion_ids."

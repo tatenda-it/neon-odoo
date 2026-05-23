@@ -218,5 +218,15 @@ class NeonLMSTrackCompletion(models.Model):
             "neon_lms M8: sub-cert %d issued for learner %s "
             "on track %s.",
             cert.id, learner.login, self.track_id.code)
+        # M12 notification stubs. Fire track_certified always;
+        # fire authority_granted per granted authority (track
+        # may grant 0..n authorities).
+        if hasattr(self.enrollment_id,
+                   "_notify_track_certified"):
+            self.enrollment_id._notify_track_certified(
+                self.track_id)
+            for authority in self.track_id.operating_authority_ids:
+                self.enrollment_id._notify_authority_granted(
+                    authority)
         self.enrollment_id._check_and_advance_to_certified()
         return cert
