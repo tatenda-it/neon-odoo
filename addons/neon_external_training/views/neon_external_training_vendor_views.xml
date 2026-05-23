@@ -28,6 +28,16 @@
                             title="Archived"
                             bg_color="text-bg-danger"
                             invisible="active"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_bookings"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-calendar-check-o">
+                            <field name="booking_count"
+                                   widget="statinfo"
+                                   string="Bookings"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <h1>
                             <field name="name"
@@ -50,8 +60,6 @@
                         </group>
                     </group>
                     <group>
-                        <field name="booking_count"
-                               readonly="1"/>
                         <field name="active"/>
                     </group>
                     <group string="Notes">

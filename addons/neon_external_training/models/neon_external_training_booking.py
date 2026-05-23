@@ -232,6 +232,34 @@ class NeonExternalTrainingBooking(models.Model):
     # ==================================================================
     # Validation
     # ==================================================================
+    # ==================================================================
+    # M5 -- kanban drag-drop routes state writes through the
+    # transition guard
+    # ==================================================================
+    def write(self, vals):
+        """When a write changes the state field, route it
+        through the _transition_to guard so invalid jumps
+        raise UserError. _transition_to sets a context flag
+        so its own write() lands cleanly without re-entry.
+        """
+        if (
+            "state" in vals
+            and not self.env.context.get(
+                "neon_p7c_internal_transition")
+        ):
+            new_state = vals["state"]
+            for rec in self:
+                if rec.state != new_state:
+                    # _transition_to handles its own write
+                    # of state + any extra_vals; we strip
+                    # state from this batch write below.
+                    rec._transition_to(new_state)
+            vals = {k: v for k, v in vals.items()
+                    if k != "state"}
+            if not vals:
+                return True
+        return super().write(vals)
+
     @api.constrains("cost_amount")
     def _check_cost_non_negative(self):
         for rec in self:
@@ -271,7 +299,13 @@ class NeonExternalTrainingBooking(models.Model):
         # _m3_assert_superuser gates approve/reject; the
         # submit path is open to any user who can read the
         # booking (i.e., owns it via record rule).
-        self.sudo().write(vals)
+        #
+        # Context flag prevents the M5 write() override from
+        # re-entering the state-machine guard for a write we
+        # just authorized.
+        self.sudo().with_context(
+            neon_p7c_internal_transition=True
+        ).write(vals)
 
     # ------------------------------------------------------------------
     # Public action methods (M2 ships stubs; M3 enriches

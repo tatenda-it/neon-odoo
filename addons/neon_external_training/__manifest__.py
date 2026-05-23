@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon External Training",
-    "version": "17.0.1.3.1",
+    "version": "17.0.1.4.0",
     "summary": "External (off-site) training bookings -- "
                "manufacturer / regulator courses crew attend "
                "outside the internal LMS.",

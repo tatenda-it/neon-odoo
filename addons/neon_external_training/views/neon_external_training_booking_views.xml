@@ -148,11 +148,153 @@
         </field>
     </record>
 
+    <!--
+        LMS Admin Polish M5 kanban grouped by state.
+        State drag-drop routes through write() override
+        which re-enters _transition_to, so invalid jumps
+        (e.g., draft -> completed) raise UserError + the
+        kanban bounces the card back to its origin
+        column.
+    -->
+    <record id="view_external_training_booking_kanban"
+            model="ir.ui.view">
+        <field name="name">neon.external.training.booking.kanban</field>
+        <field name="model">neon.external.training.booking</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    quick_create="false"
+                    sample="1">
+                <field name="reference"/>
+                <field name="course_name"/>
+                <field name="vendor_id"/>
+                <field name="crew_user_id"/>
+                <field name="scheduled_date"/>
+                <field name="duration_days"/>
+                <field name="cost_amount"/>
+                <field name="currency_id"/>
+                <field name="state"/>
+                <field name="issued_cert_id"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top mb-2">
+                                <div class="o_kanban_record_headings">
+                                    <strong>
+                                        <field name="reference"/>
+                                    </strong>
+                                    <br/>
+                                    <span class="text-muted">
+                                        <field name="course_name"/>
+                                    </span>
+                                </div>
+                                <div class="o_kanban_record_top_right">
+                                    <span class="badge text-bg-secondary">
+                                        <field name="vendor_id"/>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body mt-2">
+                                <div>
+                                    <i class="fa fa-user me-1"
+                                       role="img"
+                                       aria-label="Crew"
+                                       title="Crew"/>
+                                    <field name="crew_user_id"/>
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    <i class="fa fa-calendar me-1"
+                                       role="img"
+                                       aria-label="Date"
+                                       title="Scheduled date"/>
+                                    <field name="scheduled_date"/>
+                                    <span class="ms-2">
+                                        <field name="duration_days"/> day(s)
+                                    </span>
+                                </div>
+                                <div class="mt-1 small text-muted"
+                                     t-if="record.cost_amount.raw_value">
+                                    <i class="fa fa-money me-1"
+                                       role="img"
+                                       aria-label="Cost"
+                                       title="Cost"/>
+                                    <field name="cost_amount"
+                                           widget="monetary"/>
+                                </div>
+                                <div class="mt-1"
+                                     t-if="record.issued_cert_id.raw_value">
+                                    <span class="badge text-bg-success">
+                                        <i class="fa fa-certificate me-1"
+                                           role="img"
+                                           aria-label="Issued"
+                                           title="Cert issued"/>
+                                        cert issued
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!--
+        M5 search view with filter chips + group-by
+        options.
+    -->
+    <record id="view_external_training_booking_search"
+            model="ir.ui.view">
+        <field name="name">neon.external.training.booking.search</field>
+        <field name="model">neon.external.training.booking</field>
+        <field name="arch" type="xml">
+            <search string="External Training Bookings">
+                <field name="reference"/>
+                <field name="course_name"/>
+                <field name="vendor_id"/>
+                <field name="crew_user_id"/>
+                <filter name="filter_upcoming"
+                        string="Upcoming"
+                        domain="[('scheduled_date', '&gt;=', context_today().strftime('%Y-%m-%d')),
+                                 ('state', 'in', ['pending_approval', 'booked'])]"/>
+                <filter name="filter_this_month"
+                        string="This Month"
+                        domain="[('scheduled_date', '&gt;=', (context_today().replace(day=1)).strftime('%Y-%m-%d')),
+                                 ('scheduled_date', '&lt;', ((context_today().replace(day=1)) + relativedelta(months=1)).strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_awaiting"
+                        string="Awaiting Approval"
+                        domain="[('state', '=', 'pending_approval')]"/>
+                <filter name="filter_completed"
+                        string="Completed"
+                        domain="[('state', 'in', ['completed', 'cert_issued'])]"/>
+                <filter name="filter_cancelled"
+                        string="Cancelled / No Show"
+                        domain="[('state', 'in', ['cancelled', 'no_show'])]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter name="group_by_state"
+                            string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_by_vendor"
+                            string="Vendor"
+                            context="{'group_by': 'vendor_id'}"/>
+                    <filter name="group_by_crew"
+                            string="Crew"
+                            context="{'group_by': 'crew_user_id'}"/>
+                    <filter name="group_by_scheduled"
+                            string="Scheduled Date"
+                            context="{'group_by': 'scheduled_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_external_training_booking"
             model="ir.actions.act_window">
         <field name="name">External Training Bookings</field>
         <field name="res_model">neon.external.training.booking</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id"
+               ref="view_external_training_booking_search"/>
     </record>
 
 </odoo>

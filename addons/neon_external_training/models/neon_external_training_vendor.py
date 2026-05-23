@@ -82,3 +82,18 @@ class NeonExternalTrainingVendor(models.Model):
         for rec in self:
             rec.booking_count = Booking.sudo().search_count(
                 [("vendor_id", "=", rec.id)])
+
+    # ------------------------------------------------------------------
+    # M5 -- smart-button handler for the Booking History card.
+    # Opens the booking action filtered to this vendor.
+    # ------------------------------------------------------------------
+    def action_view_bookings(self):
+        self.ensure_one()
+        return {
+            "name": _("Bookings -- %s") % self.name,
+            "type": "ir.actions.act_window",
+            "res_model": "neon.external.training.booking",
+            "view_mode": "kanban,tree,form",
+            "domain": [("vendor_id", "=", self.id)],
+            "context": {"default_vendor_id": self.id},
+        }
