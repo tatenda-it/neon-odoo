@@ -201,6 +201,33 @@ class NeonTrainingDashboard(models.TransientModel):
     )
 
     # ============================================================
+    # Phase 7c M6 -- External Training counters + drill-through.
+    # Same defensive env.get pattern as the Phase 7e M11 LMS
+    # counters above -- if neon_external_training is not
+    # installed, both counters return 0 and the drill-through
+    # actions return False (the form view's invisible-on-False
+    # button behaviour hides the click target).
+    # ============================================================
+    external_bookings_upcoming = fields.Integer(
+        string="External Bookings (Upcoming 30d)",
+        compute="_compute_external_training_counters",
+        store=False,
+        help="Count of external-training bookings in "
+             "('booked', 'pending_approval') with "
+             "scheduled_date in the next 30 days. Returns 0 "
+             "if neon_external_training is not installed.",
+    )
+    external_bookings_pending_completion = fields.Integer(
+        string="External Bookings (Pending Completion)",
+        compute="_compute_external_training_counters",
+        store=False,
+        help="Count of external-training bookings stuck at "
+             "'attended' for more than 7 days -- pending "
+             "completion verification. Returns 0 if "
+             "neon_external_training is not installed.",
+    )
+
+    # ============================================================
     # Access check + compute
     # ============================================================
     def _check_dashboard_access(self):
@@ -568,6 +595,77 @@ class NeonTrainingDashboard(models.TransientModel):
             "view_mode": "tree,form",
             "domain": [("state", "=", "certified")],
             "context": {"group_by": "track_id"},
+        }
+
+    # ============================================================
+    # Phase 7c M6 -- External Training counters compute +
+    # drill-through actions.
+    # ============================================================
+    def _compute_external_training_counters(self):
+        Booking = self.env.get(
+            "neon.external.training.booking")
+        today = fields.Date.context_today(self)
+        thirty_days = today + timedelta(days=30)
+        seven_days_ago = today - timedelta(days=7)
+        for rec in self:
+            if Booking is None:
+                rec.external_bookings_upcoming = 0
+                rec.external_bookings_pending_completion = 0
+                continue
+            rec.external_bookings_upcoming = (
+                Booking.sudo().search_count([
+                    ("state", "in",
+                     ("booked", "pending_approval")),
+                    ("scheduled_date", ">=", today),
+                    ("scheduled_date", "<=", thirty_days),
+                ]))
+            rec.external_bookings_pending_completion = (
+                Booking.sudo().search_count([
+                    ("state", "=", "attended"),
+                    ("date_attended", "<=", seven_days_ago),
+                ]))
+
+    def action_view_upcoming_external(self):
+        self.ensure_one()
+        Booking = self.env.get(
+            "neon.external.training.booking")
+        if Booking is None:
+            return False
+        today = fields.Date.context_today(self)
+        thirty_days = today + timedelta(days=30)
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("External Bookings (Upcoming 30d)"),
+            "res_model": "neon.external.training.booking",
+            "view_mode": "kanban,tree,form",
+            "domain": [
+                ("state", "in",
+                 ("booked", "pending_approval")),
+                ("scheduled_date", ">=", today),
+                ("scheduled_date", "<=", thirty_days),
+            ],
+            "context": {},
+        }
+
+    def action_view_pending_completion_external(self):
+        self.ensure_one()
+        Booking = self.env.get(
+            "neon.external.training.booking")
+        if Booking is None:
+            return False
+        today = fields.Date.context_today(self)
+        seven_days_ago = today - timedelta(days=7)
+        return {
+            "type": "ir.actions.act_window",
+            "name": _(
+                "External Bookings (Pending Completion)"),
+            "res_model": "neon.external.training.booking",
+            "view_mode": "kanban,tree,form",
+            "domain": [
+                ("state", "=", "attended"),
+                ("date_attended", "<=", seven_days_ago),
+            ],
+            "context": {},
         }
 
     def _drill(self, action_xmlid, domain, name):

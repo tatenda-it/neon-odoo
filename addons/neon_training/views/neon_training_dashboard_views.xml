@@ -188,6 +188,25 @@
                                         class="btn-link"/>
                             </div>
                         </group>
+                        <group string="External Training"
+                               name="external_training_group">
+                            <field name="external_bookings_upcoming"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_upcoming_external"
+                                        type="object"
+                                        string="View Upcoming"
+                                        class="btn-link"/>
+                            </div>
+                            <field name="external_bookings_pending_completion"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_pending_completion_external"
+                                        type="object"
+                                        string="View Pending Completion"
+                                        class="btn-link"/>
+                            </div>
+                        </group>
                     </group>
                 </sheet>
             </form>
