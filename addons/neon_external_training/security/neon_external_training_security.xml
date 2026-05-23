@@ -1,10 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!--
-        Phase 7c security baseline. M1 only ships the vendor
-        model; record rules + portal/crew rules land in M2
-        once neon.external.training.booking exists.
-    -->
+    <data noupdate="0">
+
+        <!--
+            Booking record rules (M2). Pattern follows the
+            tier-rule convention used in neon_lms M7:
+
+            * own-record rule on the broadest group
+              (base.group_user) restricts crew to their own
+              bookings;
+            * permissive rules on superuser + bookkeeper +
+              lead_tech open the entire dataset for those
+              tiers. Odoo OR-merges rules across the groups
+              a user belongs to, so a bookkeeper (also
+              base.group_user) sees all bookings, while a
+              non-tier crew user sees only their own.
+
+            lead_tech currently uses the "see all" placeholder
+            (per M2 brief option). M5/M6 may tighten to
+            "see own crew" once the crew->lead mapping
+            surfaces.
+        -->
+
+        <record id="rule_booking_crew_own"
+                model="ir.rule">
+            <field name="name">
+                Booking: crew sees own
+            </field>
+            <field name="model_id"
+                   ref="model_neon_external_training_booking"/>
+            <field name="domain_force">
+                [('crew_user_id', '=', user.id)]
+            </field>
+            <field name="groups"
+                   eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_booking_lead_tech_all"
+                model="ir.rule">
+            <field name="name">
+                Booking: lead tech sees all (M2 placeholder)
+            </field>
+            <field name="model_id"
+                   ref="model_neon_external_training_booking"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups"
+                   eval="[(4, ref('neon_core.group_neon_lead_tech'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_booking_bookkeeper_all"
+                model="ir.rule">
+            <field name="name">
+                Booking: bookkeeper sees all
+            </field>
+            <field name="model_id"
+                   ref="model_neon_external_training_booking"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups"
+                   eval="[(4, ref('neon_core.group_neon_bookkeeper'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_booking_superuser_all"
+                model="ir.rule">
+            <field name="name">
+                Booking: superuser sees all
+            </field>
+            <field name="model_id"
+                   ref="model_neon_external_training_booking"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups"
+                   eval="[(4, ref('neon_core.group_neon_superuser'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+    </data>
 
 </odoo>

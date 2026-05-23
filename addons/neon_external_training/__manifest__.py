@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon External Training",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "External (off-site) training bookings -- "
                "manufacturer / regulator courses crew attend "
                "outside the internal LMS.",
@@ -32,8 +32,16 @@ neon.training.certification).
     "data": [
         "security/neon_external_training_security.xml",
         "security/ir.model.access.csv",
+        # M2 -- booking sequence. Load before vendor seeds so
+        # sequence is available to any data that might use
+        # it (none in M2; M3+ may).
+        "data/neon_external_training_sequences.xml",
         "data/neon_external_training_vendors.xml",
         "views/neon_external_training_vendor_views.xml",
+        # M2 -- booking form + tree + action.
+        "views/neon_external_training_booking_views.xml",
+        # Menu loads LAST so it can target booking + vendor
+        # actions.
         "views/neon_external_training_menu.xml",
     ],
     "installable": True,

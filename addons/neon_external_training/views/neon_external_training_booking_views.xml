@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_external_training_booking_tree"
+            model="ir.ui.view">
+        <field name="name">neon.external.training.booking.tree</field>
+        <field name="model">neon.external.training.booking</field>
+        <field name="arch" type="xml">
+            <tree string="External Training Bookings"
+                  decoration-info="state == 'pending_approval'"
+                  decoration-success="state == 'cert_issued'"
+                  decoration-muted="state in ['cancelled','no_show']">
+                <field name="reference"/>
+                <field name="scheduled_date"/>
+                <field name="vendor_id"/>
+                <field name="course_name"/>
+                <field name="crew_user_id"/>
+                <field name="duration_days"/>
+                <field name="cost_amount"
+                       widget="monetary"
+                       optional="show"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_external_training_booking_form"
+            model="ir.ui.view">
+        <field name="name">neon.external.training.booking.form</field>
+        <field name="model">neon.external.training.booking</field>
+        <field name="arch" type="xml">
+            <form string="External Training Booking">
+                <header>
+                    <button name="action_submit_for_approval"
+                            string="Submit for Approval"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_mark_attended"
+                            string="Mark Attended"
+                            type="object"
+                            invisible="state != 'booked'"/>
+                    <button name="action_mark_no_show"
+                            string="Mark No-Show"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state != 'booked'"/>
+                    <button name="action_mark_completed"
+                            string="Mark Completed"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'attended'"/>
+                    <button name="action_mark_cert_issued"
+                            string="Mark Cert Issued"
+                            type="object"
+                            class="btn-success"
+                            invisible="state != 'completed'"/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state in ['cert_issued','cancelled']"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="draft,pending_approval,booked,attended,completed,cert_issued"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="reference"
+                                   readonly="1"/>
+                        </h1>
+                        <h2>
+                            <field name="course_name"
+                                   placeholder="Course name"/>
+                        </h2>
+                    </div>
+                    <group>
+                        <group string="Vendor + Crew">
+                            <field name="vendor_id"
+                                   options="{'no_create': True}"/>
+                            <field name="crew_user_id"
+                                   options="{'no_create': True}"/>
+                            <field name="cert_type_id"
+                                   options="{'no_create': True}"/>
+                        </group>
+                        <group string="Schedule">
+                            <field name="scheduled_date"/>
+                            <field name="duration_days"/>
+                            <field name="location"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Cost (admin-only)">
+                            <field name="cost_amount"
+                                   widget="monetary"/>
+                            <field name="currency_id"/>
+                        </group>
+                        <group string="Lifecycle">
+                            <field name="date_attended"/>
+                            <field name="date_completed"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"
+                               colspan="2"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_external_training_booking"
+            model="ir.actions.act_window">
+        <field name="name">External Training Bookings</field>
+        <field name="res_model">neon.external.training.booking</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>
