@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_vendor_superuser,Vendor - Neon Superuser,model_neon_external_training_vendor,neon_core.group_neon_superuser,1,1,1,1
+access_vendor_bookkeeper,Vendor - Bookkeeper (read),model_neon_external_training_vendor,neon_core.group_neon_bookkeeper,1,0,0,0
+access_vendor_lead_tech,Vendor - Lead Tech (read),model_neon_external_training_vendor,neon_core.group_neon_lead_tech,1,0,0,0
+access_vendor_user,Vendor - Internal User (read),model_neon_external_training_vendor,base.group_user,1,0,0,0

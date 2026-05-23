@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        External Training menu root. Sequence 82 places it
+        after Neon LMS (81). Empty groups on the root so the
+        visibility filter sees an empty groups set; children
+        carry their own groups_id.
+
+        Reference: reference_odoo17_menu_visibility_filter.md
+    -->
+    <menuitem id="menu_external_training_root"
+              name="External Training"
+              sequence="82"
+              groups=""/>
+
+    <menuitem id="menu_external_training_vendors"
+              name="Vendors"
+              parent="menu_external_training_root"
+              action="action_external_training_vendor"
+              sequence="20"
+              groups="base.group_user"/>
+
+</odoo>

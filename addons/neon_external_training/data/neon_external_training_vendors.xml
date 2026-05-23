@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+
+    <!--
+        5 seed vendors. noupdate=0 so admin edits do NOT
+        survive a subsequent -u of the module (re-installing
+        re-syncs to the placeholder data here). Tatenda's
+        post-deploy step is to enrich contact / address /
+        website fields via the admin form; subsequent
+        upgrades will overwrite those edits unless this file
+        is also updated alongside.
+
+        Phase 11 candidate: flip to noupdate=1 once Tatenda
+        has populated real contact data through the form
+        and that data should be preserved across upgrades.
+    -->
+
+    <record id="vendor_vid"
+            model="neon.external.training.vendor">
+        <field name="name">
+            Vehicle Inspection Department (VID)
+        </field>
+        <field name="contact_name">(pending)</field>
+        <field name="contact_phone">(pending)</field>
+        <field name="contact_email">(pending)</field>
+        <field name="address">Harare, Zimbabwe</field>
+        <field name="notes">
+            Zimbabwe driver licensing + vehicle inspection
+            authority. Bookings here cover crew driver-licence
+            issuance / renewal + light-vehicle endorsements.
+        </field>
+    </record>
+
+    <record id="vendor_red_cross_zim"
+            model="neon.external.training.vendor">
+        <field name="name">Red Cross Zimbabwe</field>
+        <field name="contact_name">(pending)</field>
+        <field name="contact_phone">(pending)</field>
+        <field name="contact_email">(pending)</field>
+        <field name="website">https://redcross.org.zw</field>
+        <field name="address">Harare, Zimbabwe</field>
+        <field name="notes">
+            First-aid + workplace-safety certification
+            provider. Covers Foundations safety modules that
+            the internal LMS does not certify externally.
+        </field>
+    </record>
+
+    <record id="vendor_allen_heath"
+            model="neon.external.training.vendor">
+        <field name="name">Allen &amp; Heath</field>
+        <field name="contact_name">(pending)</field>
+        <field name="contact_phone">(pending)</field>
+        <field name="contact_email">(pending)</field>
+        <field name="website">
+            https://www.allen-heath.com
+        </field>
+        <field name="address">UK (training delivered remotely
+            + occasional in-region workshops)</field>
+        <field name="notes">
+            Audio mixing console manufacturer (SQ / dLive /
+            Avantis ranges). Training delivered as online
+            courses + occasional regional workshops.
+        </field>
+    </record>
+
+    <record id="vendor_avolites"
+            model="neon.external.training.vendor">
+        <field name="name">Avolites</field>
+        <field name="contact_name">(pending)</field>
+        <field name="contact_phone">(pending)</field>
+        <field name="contact_email">(pending)</field>
+        <field name="website">https://www.avolites.com</field>
+        <field name="address">UK / online + regional events
+        </field>
+        <field name="notes">
+            Lighting console manufacturer (Tiger Touch +
+            Quartz + Diamond ranges). Bookings for op-level
+            training on the consoles Neon owns.
+        </field>
+    </record>
+
+    <record id="vendor_yamaha_pro"
+            model="neon.external.training.vendor">
+        <field name="name">
+            Yamaha Professional Audio
+        </field>
+        <field name="contact_name">(pending)</field>
+        <field name="contact_phone">(pending)</field>
+        <field name="contact_email">(pending)</field>
+        <field name="website">
+            https://uk.yamaha.com/en/products/proaudio
+        </field>
+        <field name="address">Japan / online + EMEA regional
+        </field>
+        <field name="notes">
+            Pro-audio manufacturer training (CL / QL / Rivage
+            consoles + speaker systems). Bookings for
+            certification on Yamaha consoles in Neon's
+            equipment pool.
+        </field>
+    </record>
+
+</odoo>

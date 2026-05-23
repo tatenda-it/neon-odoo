@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Phase 7c security baseline. M1 only ships the vendor
+        model; record rules + portal/crew rules land in M2
+        once neon.external.training.booking exists.
+    -->
+
+</odoo>

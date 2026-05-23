@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_external_training_vendor_tree"
+            model="ir.ui.view">
+        <field name="name">neon.external.training.vendor.tree</field>
+        <field name="model">neon.external.training.vendor</field>
+        <field name="arch" type="xml">
+            <tree string="External Training Vendors">
+                <field name="name"/>
+                <field name="contact_name"/>
+                <field name="country_id"/>
+                <field name="booking_count"/>
+                <field name="active" widget="boolean_toggle"
+                       optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_external_training_vendor_form"
+            model="ir.ui.view">
+        <field name="name">neon.external.training.vendor.form</field>
+        <field name="model">neon.external.training.vendor</field>
+        <field name="arch" type="xml">
+            <form string="External Training Vendor">
+                <sheet>
+                    <widget name="web_ribbon"
+                            title="Archived"
+                            bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"
+                                   placeholder="Vendor name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Contact">
+                            <field name="contact_name"/>
+                            <field name="contact_phone"
+                                   widget="phone"/>
+                            <field name="contact_email"
+                                   widget="email"/>
+                            <field name="website"
+                                   widget="url"/>
+                        </group>
+                        <group string="Location">
+                            <field name="country_id"/>
+                            <field name="address"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="booking_count"
+                               readonly="1"/>
+                        <field name="active"/>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"
+                               colspan="2"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_external_training_vendor"
+            model="ir.actions.act_window">
+        <field name="name">External Training Vendors</field>
+        <field name="res_model">neon.external.training.vendor</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>
