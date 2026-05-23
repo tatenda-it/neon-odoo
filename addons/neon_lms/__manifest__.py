@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
-    "version": "17.0.1.13.0",
+    "version": "17.0.1.14.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -65,6 +65,10 @@ Subsequent milestones:
         # adding LMS badge + autosave indicator + explicit
         # html widget on description.
         "views/neon_lms_slide_views.xml",
+        # LMS Admin Polish M4 -- standalone question form +
+        # tree views with header-button templates + Set
+        # Default Points action.
+        "views/neon_lms_quiz_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

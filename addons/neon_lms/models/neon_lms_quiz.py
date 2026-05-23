@@ -88,6 +88,46 @@ class NeonLMSQuizQuestion(models.Model):
                         "have correct_answer set."
                     ) % (rec.question_text or "(no text)")[:60])
 
+    # ------------------------------------------------------------------
+    # LMS Admin Polish M4 -- header-button wrappers that
+    # delegate to the per-module quick-create methods. Lets
+    # the admin spawn a sibling question from any existing
+    # question form without going back to the module form.
+    # ------------------------------------------------------------------
+    def action_template_mc(self):
+        self.ensure_one()
+        return self.module_id.action_quick_create_mc()
+
+    def action_template_tf(self):
+        self.ensure_one()
+        return self.module_id.action_quick_create_tf()
+
+    def action_template_sa(self):
+        self.ensure_one()
+        return self.module_id.action_quick_create_sa()
+
+    def action_set_default_points(self):
+        """Persist this question's points as the per-user
+        default consumed by future quick-create templates
+        (M2's _quick_create_pref_points)."""
+        self.ensure_one()
+        self.env["ir.config_parameter"].sudo().set_param(
+            "neon_lms.default_points.uid_%d" % self.env.uid,
+            str(int(self.points or 1)))
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Default updated"),
+                "message": _(
+                    "%d point(s) is now the default for "
+                    "future quick-create templates."
+                ) % (self.points or 1),
+                "type": "success",
+                "sticky": False,
+            },
+        }
+
 
 class NeonLMSQuizOption(models.Model):
     _name = "neon.lms.quiz.option"

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LMS Admin Polish M4 standalone quiz question form +
+        tree views. Adds header buttons that delegate to the
+        M2 quick-create helpers + a Set Default Points
+        button that persists the current points value as
+        the per-user default consumed by future templates.
+    -->
+
+    <record id="view_neon_lms_quiz_question_tree"
+            model="ir.ui.view">
+        <field name="name">neon.lms.quiz.question.tree</field>
+        <field name="model">neon.lms.quiz.question</field>
+        <field name="arch" type="xml">
+            <tree string="Quiz Questions">
+                <field name="module_id"/>
+                <field name="sequence"/>
+                <field name="question_text"/>
+                <field name="question_type"/>
+                <field name="points"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_lms_quiz_question_form"
+            model="ir.ui.view">
+        <field name="name">neon.lms.quiz.question.form</field>
+        <field name="model">neon.lms.quiz.question</field>
+        <field name="arch" type="xml">
+            <form string="Quiz Question">
+                <header>
+                    <button name="action_template_mc"
+                            string="Quick MC (4 options)"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="not module_id"/>
+                    <button name="action_template_tf"
+                            string="Quick T/F"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="not module_id"/>
+                    <button name="action_template_sa"
+                            string="Quick Short Answer"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="not module_id"/>
+                    <button name="action_set_default_points"
+                            string="Set as Default Points"
+                            type="object"
+                            class="btn-link"
+                            invisible="not points"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="module_id"
+                                   options="{'no_create': True}"/>
+                            <field name="question_type"/>
+                            <field name="points"/>
+                        </group>
+                        <group>
+                            <field name="active"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                    <group string="Question">
+                        <field name="question_text"
+                               nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Options"
+                           invisible="question_type == 'short_answer'">
+                        <field name="option_ids"
+                               nolabel="1" colspan="2">
+                            <tree editable="bottom">
+                                <field name="sequence"
+                                       widget="handle"/>
+                                <field name="option_text"/>
+                                <field name="is_correct"
+                                       widget="boolean_toggle"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <group string="Correct Answer"
+                           invisible="question_type != 'short_answer'">
+                        <field name="correct_answer"
+                               nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Explanation">
+                        <field name="explanation"
+                               nolabel="1" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_lms_quiz_question"
+            model="ir.actions.act_window">
+        <field name="name">Quiz Questions</field>
+        <field name="res_model">neon.lms.quiz.question</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_lms_questions"
+              name="Quiz Questions"
+              parent="menu_neon_lms_root"
+              action="action_neon_lms_quiz_question"
+              sequence="20"
+              groups="neon_training.group_neon_training_admin"/>
+
+</odoo>
