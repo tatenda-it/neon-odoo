@@ -153,6 +153,25 @@ class NeonTrainingCertification(models.Model):
         index=True,
         tracking=True,
     )
+    # Phase 7c M4: reverse pointer from the external-training
+    # booking that produced this cert. Optional -- only
+    # populated by neon_external_training.booking.action_mark_
+    # cert_issued. Forward-string reference; neon_training
+    # does NOT depend on neon_external_training, so the field
+    # resolves to model-not-loaded as null on a strict
+    # neon_training install. ondelete=set null preserves the
+    # cert when the source booking is deleted (audit-trail
+    # discipline: cert records are append-only).
+    external_booking_id = fields.Many2one(
+        "neon.external.training.booking",
+        string="External Training Booking",
+        ondelete="set null",
+        index=True,
+        tracking=True,
+        help="Source booking if this cert was issued via "
+             "external (off-site) training. Phase 7c M4 "
+             "reverse pointer.",
+    )
     category_id = fields.Many2one(
         "neon.training.certification.category",
         string="Category",
