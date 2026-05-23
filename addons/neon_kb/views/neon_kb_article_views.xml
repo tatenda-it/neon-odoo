@@ -124,11 +124,145 @@
         </field>
     </record>
 
+    <!--
+        M3 kanban view grouped by category. Cards show
+        name + summary + state badge + tags + author +
+        last_updated + view_count.
+    -->
+    <record id="view_kb_article_kanban" model="ir.ui.view">
+        <field name="name">neon.kb.article.kanban</field>
+        <field name="model">neon.kb.article</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="category_id"
+                    sample="1"
+                    quick_create="false">
+                <field name="name"/>
+                <field name="summary"/>
+                <field name="category_id"/>
+                <field name="tag_ids"/>
+                <field name="state"/>
+                <field name="author_id"/>
+                <field name="last_updated"/>
+                <field name="view_count"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top mb-2">
+                                <div class="o_kanban_record_headings">
+                                    <strong>
+                                        <field name="name"/>
+                                    </strong>
+                                    <br/>
+                                    <span class="text-muted small">
+                                        <field name="summary"/>
+                                    </span>
+                                </div>
+                                <div class="o_kanban_record_top_right">
+                                    <span class="badge"
+                                          t-attf-class="badge text-bg-#{record.state.raw_value == 'published' and 'success' or (record.state.raw_value == 'draft' and 'info' or 'secondary')}">
+                                        <field name="state"/>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="o_kanban_record_body mt-2">
+                                <field name="tag_ids"
+                                       widget="many2many_tags"
+                                       options="{'color_field': 'color'}"/>
+                                <div class="d-flex justify-content-between mt-2 small text-muted">
+                                    <span>
+                                        <field name="author_id"
+                                               widget="many2one_avatar_user"/>
+                                    </span>
+                                    <span>
+                                        <i class="fa fa-clock-o me-1"
+                                           role="img"
+                                           aria-label="Last updated"
+                                           title="Last updated"/>
+                                        <field name="last_updated"/>
+                                    </span>
+                                </div>
+                                <div class="mt-1 small text-muted"
+                                     t-if="record.view_count.raw_value">
+                                    <i class="fa fa-eye me-1"
+                                       role="img"
+                                       aria-label="Views"
+                                       title="Views"/>
+                                    <field name="view_count"/> views
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!--
+        M3 search view with 5 filter chips + 4 group-by
+        options. Search input drives name_search across
+        name + summary + keywords (model-side override).
+    -->
+    <record id="view_kb_article_search" model="ir.ui.view">
+        <field name="name">neon.kb.article.search</field>
+        <field name="model">neon.kb.article</field>
+        <field name="arch" type="xml">
+            <search string="KB Articles">
+                <field name="name"
+                       filter_domain="['|', '|',
+                           ('name', 'ilike', self),
+                           ('summary', 'ilike', self),
+                           ('keywords', 'ilike', self)]"/>
+                <field name="category_id"/>
+                <field name="tag_ids"/>
+                <field name="author_id"/>
+                <filter name="filter_published"
+                        string="Published"
+                        domain="[('state', '=', 'published')]"/>
+                <filter name="filter_draft"
+                        string="Draft"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_my"
+                        string="My Articles"
+                        domain="[('author_id', '=', uid)]"/>
+                <filter name="filter_this_month"
+                        string="This Month"
+                        domain="[('date_published', '&gt;=',
+                                  (context_today().replace(day=1)).strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_popular"
+                        string="Popular"
+                        domain="[('view_count', '&gt;=', 10)]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter name="group_by_category"
+                            string="Category"
+                            context="{'group_by': 'category_id'}"/>
+                    <filter name="group_by_tag"
+                            string="Tag"
+                            context="{'group_by': 'tag_ids'}"/>
+                    <filter name="group_by_state"
+                            string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_by_author"
+                            string="Author"
+                            context="{'group_by': 'author_id'}"/>
+                    <filter name="group_by_last_updated"
+                            string="Last Updated"
+                            context="{'group_by': 'last_updated:week'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_kb_article"
             model="ir.actions.act_window">
         <field name="name">KB Articles</field>
         <field name="res_model">neon.kb.article</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id"
+               ref="view_kb_article_search"/>
+        <field name="context">
+            {'group_by': 'category_id'}
+        </field>
     </record>
 
 </odoo>

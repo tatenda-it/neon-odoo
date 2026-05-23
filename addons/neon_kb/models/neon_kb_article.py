@@ -317,3 +317,27 @@ class NeonKBArticle(models.Model):
         self.ensure_one()
         self._assert_author_or_admin()
         self._transition_to("draft")
+
+    # ==================================================================
+    # M3 -- name_search override searches across name +
+    # summary + keywords (not just name). Mailto-style
+    # multi-field OR domain.
+    # ==================================================================
+    @api.model
+    def _name_search(self, name="", domain=None,
+                     operator="ilike", limit=100,
+                     order=None):
+        if name:
+            search_domain = ["|", "|",
+                ("name", operator, name),
+                ("summary", operator, name),
+                ("keywords", operator, name),
+            ]
+            if domain:
+                search_domain = (
+                    ["&"] + search_domain + list(domain))
+            return self._search(
+                search_domain, limit=limit, order=order)
+        return super()._name_search(
+            name=name, domain=domain, operator=operator,
+            limit=limit, order=order)
