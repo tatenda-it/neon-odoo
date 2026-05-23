@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Deactivate website.login_layout. That stock view inherits
+        web.login_layout and replaces the body with <t t-call="website.layout">,
+        which wraps the login in the website chrome (YourLogo + About Us).
+
+        With it inactive, /web/login renders the bare web.login_layout
+        (Neon-branded), still respecting the existing
+        neon_channels.neon_login_footer adjustment.
+    -->
+    <record id="website.login_layout" model="ir.ui.view">
+        <field name="active" eval="False"/>
+    </record>
+
+</odoo>
