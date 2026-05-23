@@ -157,6 +157,50 @@ class NeonTrainingDashboard(models.TransientModel):
     )
 
     # ============================================================
+    # Phase 7e M11 -- LMS progression counters
+    #
+    # Four non-stored Integer / Char computes. Defensive env.get
+    # pattern -- counters return 0 / empty if Phase 7e not
+    # installed.
+    # ============================================================
+    lms_active_enrollments = fields.Integer(
+        string="LMS Active Enrollments",
+        compute="_compute_lms_counters",
+        store=False,
+        help="Count of enrollments where neon_state is in "
+             "('in_progress', 'completed'). Returns 0 if "
+             "neon_lms is not installed.",
+    )
+    lms_pending_capstone = fields.Integer(
+        string="LMS Pending Capstone",
+        compute="_compute_lms_counters",
+        store=False,
+        help="Count of enrollments at neon_state='completed' "
+             "but capstone cert not yet issued (cross-"
+             "milestone drift detector). Returns 0 if "
+             "neon_lms is not installed.",
+    )
+    lms_authorities_granted_30d = fields.Integer(
+        string="LMS Authorities Granted (30 days)",
+        compute="_compute_lms_counters",
+        store=False,
+        help="Count of operating authorities granted via "
+             "LMS track certification in the last 30 days. "
+             "Counted via track.completion records "
+             "transitioning to 'certified' state with "
+             "associated authority grants. Returns 0 if "
+             "neon_lms is not installed.",
+    )
+    lms_track_cert_distribution = fields.Char(
+        string="LMS Track Cert Distribution",
+        compute="_compute_lms_counters",
+        store=False,
+        help="Per-track sub-cert count summary "
+             "(e.g., 'Foundations: 5, Audio: 3, ...'). "
+             "Returns empty string if neon_lms not installed.",
+    )
+
+    # ============================================================
     # Access check + compute
     # ============================================================
     def _check_dashboard_access(self):
@@ -397,6 +441,134 @@ class NeonTrainingDashboard(models.TransientModel):
             "neon_onboarding.action_neon_onboarding_candidate",
             domain=[("state", "=", "probationary")],
             name=_("Candidates in Probationary"))
+
+    # ============================================================
+    # Phase 7e M11 -- LMS counters + drill-through.
+    # ============================================================
+    def _compute_lms_counters(self):
+        """Defensive: neon.lms.enrollment + track.completion +
+        operating.authority may not exist if Phase 7e isn't
+        installed. env.get returns None; counters default to
+        0 / empty string.
+        """
+        Enrollment = self.env.get("slide.channel.partner")
+        TrackComp = self.env.get("neon.lms.track.completion")
+        Track = self.env.get("neon.lms.track")
+        for rec in self:
+            if Enrollment is None or TrackComp is None:
+                rec.lms_active_enrollments = 0
+                rec.lms_pending_capstone = 0
+                rec.lms_authorities_granted_30d = 0
+                rec.lms_track_cert_distribution = ""
+                continue
+            # Active enrollments.
+            rec.lms_active_enrollments = (
+                Enrollment.sudo().search_count([
+                    ("neon_state", "in",
+                     ("in_progress", "completed")),
+                ]))
+            # Pending capstone: state=completed AND no
+            # capstone cert linked.
+            rec.lms_pending_capstone = (
+                Enrollment.sudo().search_count([
+                    ("neon_state", "=", "completed"),
+                    ("neon_capstone_cert_id", "=", False),
+                ]))
+            # Authorities granted in last 30 days: count
+            # track_completion records transitioned to
+            # certified state with associated authorities.
+            cutoff_30d = (
+                fields.Datetime.now() - timedelta(days=30))
+            recent_certified = TrackComp.sudo().search([
+                ("state", "=", "certified"),
+                ("certification_date", ">=", cutoff_30d),
+            ])
+            # Sum authorities across all recent certifications.
+            rec.lms_authorities_granted_30d = sum(
+                len(tc.track_id.operating_authority_ids)
+                for tc in recent_certified)
+            # Per-track cert distribution.
+            if Track is None:
+                rec.lms_track_cert_distribution = ""
+                continue
+            tracks = Track.sudo().search([])
+            parts = []
+            for trk in tracks:
+                count = TrackComp.sudo().search_count([
+                    ("track_id", "=", trk.id),
+                    ("state", "=", "certified"),
+                ])
+                parts.append("%s: %d" % (trk.name, count))
+            rec.lms_track_cert_distribution = ", ".join(parts)
+
+    def action_view_lms_active_enrollments(self):
+        self.ensure_one()
+        Enrollment = self.env.get("slide.channel.partner")
+        if Enrollment is None:
+            return False
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("LMS Active Enrollments"),
+            "res_model": "slide.channel.partner",
+            "view_mode": "tree,form",
+            "domain": [
+                ("neon_state", "in",
+                 ("in_progress", "completed")),
+            ],
+            "context": {},
+        }
+
+    def action_view_lms_pending_capstone(self):
+        self.ensure_one()
+        Enrollment = self.env.get("slide.channel.partner")
+        if Enrollment is None:
+            return False
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("LMS Pending Capstone"),
+            "res_model": "slide.channel.partner",
+            "view_mode": "tree,form",
+            "domain": [
+                ("neon_state", "=", "completed"),
+                ("neon_capstone_cert_id", "=", False),
+            ],
+            "context": {},
+        }
+
+    def action_view_lms_recent_authorities(self):
+        self.ensure_one()
+        TrackComp = self.env.get(
+            "neon.lms.track.completion")
+        if TrackComp is None:
+            return False
+        cutoff_30d = (
+            fields.Datetime.now() - timedelta(days=30))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("LMS Track Certifications (30 days)"),
+            "res_model": "neon.lms.track.completion",
+            "view_mode": "tree,form",
+            "domain": [
+                ("state", "=", "certified"),
+                ("certification_date", ">=", cutoff_30d),
+            ],
+            "context": {},
+        }
+
+    def action_view_lms_track_distribution(self):
+        self.ensure_one()
+        TrackComp = self.env.get(
+            "neon.lms.track.completion")
+        if TrackComp is None:
+            return False
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("LMS Track Completions (Certified)"),
+            "res_model": "neon.lms.track.completion",
+            "view_mode": "tree,form",
+            "domain": [("state", "=", "certified")],
+            "context": {"group_by": "track_id"},
+        }
 
     def _drill(self, action_xmlid, domain, name):
         """Resolve the named action, overlay the drill domain,

@@ -153,6 +153,41 @@
                                         class="btn-link"/>
                             </div>
                         </group>
+                        <group string="LMS Progression"
+                               name="lms_group">
+                            <field name="lms_active_enrollments"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_lms_active_enrollments"
+                                        type="object"
+                                        string="View Active Enrollments"
+                                        class="btn-link"/>
+                            </div>
+                            <field name="lms_pending_capstone"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_lms_pending_capstone"
+                                        type="object"
+                                        string="View Pending Capstone"
+                                        class="btn-link"/>
+                            </div>
+                            <field name="lms_authorities_granted_30d"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_lms_recent_authorities"
+                                        type="object"
+                                        string="View Recent Certifications"
+                                        class="btn-link"/>
+                            </div>
+                            <field name="lms_track_cert_distribution"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_lms_track_distribution"
+                                        type="object"
+                                        string="View Track Distribution"
+                                        class="btn-link"/>
+                            </div>
+                        </group>
                     </group>
                 </sheet>
             </form>
