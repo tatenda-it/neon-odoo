@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LMS Admin Polish M3 slide.slide form override.
+        Adds:
+          * explicit html widget on description (rich editor;
+            stock view leaves it as a plain field which the
+            client autoresolves but the explicit widget gives
+            us a stable hook for the autosave JS).
+          * Neon LMS badge in the title area when the slide
+            belongs to the program channel (channel_id ==
+            neon_lms.program_channel).
+          * autosave indicator span (data-name attribute is
+            the hook the JS in
+            static/src/js/lms_slide_autosave.js binds to).
+    -->
+    <record id="view_slide_slide_form_neon_lms"
+            model="ir.ui.view">
+        <field name="name">slide.slide.form.neon_lms</field>
+        <field name="model">slide.slide</field>
+        <field name="inherit_id"
+               ref="website_slides.view_slide_slide_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@class='oe_title pe-xl-0']"
+                   position="inside">
+                <div class="o_neon_lms_slide_meta mt-2"
+                     invisible="not channel_id">
+                    <span class="badge text-bg-info"
+                          invisible="channel_id != %(neon_lms.program_channel)d">
+                        Neon LMS Slide
+                    </span>
+                    <span class="text-muted ms-2 small"
+                          data-name="neon_lms_autosave_indicator">
+                        autosave: idle
+                    </span>
+                </div>
+            </xpath>
+            <xpath expr="//field[@name='description']"
+                   position="attributes">
+                <attribute name="widget">html</attribute>
+                <attribute name="options">{"resizable": true}</attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
-    "version": "17.0.1.12.0",
+    "version": "17.0.1.13.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -61,7 +61,17 @@ Subsequent milestones:
         # menuitem. Loads AFTER neon_lms_menu.xml so the
         # menuitem can target menu_neon_lms_root.
         "views/neon_lms_module_views.xml",
+        # LMS Admin Polish M3 -- slide.slide form override
+        # adding LMS badge + autosave indicator + explicit
+        # html widget on description.
+        "views/neon_lms_slide_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            # LMS Admin Polish M3 -- autosave indicator JS.
+            "neon_lms/static/src/js/lms_slide_autosave.js",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,
