@@ -228,6 +228,28 @@ class NeonTrainingDashboard(models.TransientModel):
     )
 
     # ============================================================
+    # Phase 7d M6 -- Knowledge Base counters + drill-through.
+    # 5th cross-module touch on this dashboard; same
+    # defensive env.get pattern as Phase 7e M11 LMS counters
+    # and Phase 7c M6 External Training counters.
+    # ============================================================
+    kb_articles_published = fields.Integer(
+        string="KB Articles (Published)",
+        compute="_compute_kb_counters",
+        store=False,
+        help="Total published + active KB articles. "
+             "Returns 0 if neon_kb is not installed.",
+    )
+    kb_articles_recent_30d = fields.Integer(
+        string="KB Articles (New 30d)",
+        compute="_compute_kb_counters",
+        store=False,
+        help="KB articles with date_published within the "
+             "last 30 days. Returns 0 if neon_kb is not "
+             "installed.",
+    )
+
+    # ============================================================
     # Access check + compute
     # ============================================================
     def _check_dashboard_access(self):
@@ -664,6 +686,68 @@ class NeonTrainingDashboard(models.TransientModel):
             "domain": [
                 ("state", "=", "attended"),
                 ("date_attended", "<=", seven_days_ago),
+            ],
+            "context": {},
+        }
+
+    # ============================================================
+    # Phase 7d M6 -- KB counters compute + drill-through.
+    # ============================================================
+    def _compute_kb_counters(self):
+        Article = self.env.get("neon.kb.article")
+        thirty_days_ago = (
+            fields.Datetime.now() - timedelta(days=30))
+        for rec in self:
+            if Article is None:
+                rec.kb_articles_published = 0
+                rec.kb_articles_recent_30d = 0
+                continue
+            rec.kb_articles_published = (
+                Article.sudo().search_count([
+                    ("state", "=", "published"),
+                    ("active", "=", True),
+                ]))
+            rec.kb_articles_recent_30d = (
+                Article.sudo().search_count([
+                    ("state", "=", "published"),
+                    ("active", "=", True),
+                    ("date_published", ">=",
+                     thirty_days_ago),
+                ]))
+
+    def action_view_kb_published(self):
+        self.ensure_one()
+        Article = self.env.get("neon.kb.article")
+        if Article is None:
+            return False
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("KB Articles (Published)"),
+            "res_model": "neon.kb.article",
+            "view_mode": "kanban,tree,form",
+            "domain": [
+                ("state", "=", "published"),
+                ("active", "=", True),
+            ],
+            "context": {},
+        }
+
+    def action_view_kb_recent(self):
+        self.ensure_one()
+        Article = self.env.get("neon.kb.article")
+        if Article is None:
+            return False
+        thirty_days_ago = (
+            fields.Datetime.now() - timedelta(days=30))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("KB Articles (New 30 days)"),
+            "res_model": "neon.kb.article",
+            "view_mode": "kanban,tree,form",
+            "domain": [
+                ("state", "=", "published"),
+                ("active", "=", True),
+                ("date_published", ">=", thirty_days_ago),
             ],
             "context": {},
         }

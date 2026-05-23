@@ -207,6 +207,25 @@
                                         class="btn-link"/>
                             </div>
                         </group>
+                        <group string="Knowledge Base"
+                               name="kb_group">
+                            <field name="kb_articles_published"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_kb_published"
+                                        type="object"
+                                        string="View All Published"
+                                        class="btn-link"/>
+                            </div>
+                            <field name="kb_articles_recent_30d"
+                                   readonly="1"/>
+                            <div>
+                                <button name="action_view_kb_recent"
+                                        type="object"
+                                        string="View Recent"
+                                        class="btn-link"/>
+                            </div>
+                        </group>
                     </group>
                 </sheet>
             </form>
