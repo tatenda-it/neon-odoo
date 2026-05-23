@@ -52,6 +52,25 @@ class CommercialEventJob(models.Model):
         "event_job_id",
         string="Assignment Gate Log",
     )
+    # P7e M10 -- required operating authorities for the
+    # event_job. Admin sets per event_job; M10 gate engine
+    # checks crew users' granted authorities (via neon.lms.
+    # enrollment) against this list. Defensive comodel
+    # string -- field declaration safe even when neon_lms
+    # is not installed (Odoo accepts string comodel refs
+    # for fields that may not exist yet; failure surfaces
+    # only on actual read of a non-empty value).
+    required_authority_ids = fields.Many2many(
+        "neon.lms.operating.authority",
+        "commercial_event_job_required_authority_rel",
+        "event_job_id",
+        "authority_id",
+        string="Required Operating Authorities",
+        help="Operating authorities the crew must hold to "
+             "work this event. Managed by admin; the M10 "
+             "gate engine fires tier_3 logs when crew user_"
+             "id lacks any required authority.",
+    )
 
     training_gate_status = fields.Selection(
         [

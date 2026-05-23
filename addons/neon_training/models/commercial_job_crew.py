@@ -621,6 +621,81 @@ class CommercialJobCrew(models.Model):
                         ej, violation.get("role") or "non-runner")
         return logs
 
+    # ============================================================
+    # Phase 7e M10 -- operating authority gate condition (5th)
+    #
+    # When event_job.required_authority_ids is set + the crew
+    # user lacks the corresponding granted authority, fires a
+    # tier_3 gate_log with fire_reason='operating_authority_
+    # missing:<code>'. Defensive: reads neon.lms.enrollment +
+    # neon.lms.operating.authority via env.get; safe if Phase
+    # 7e not installed.
+    # ============================================================
+    def _m10_operating_authority_violations(self):
+        """Check required_authority_ids on each eligible
+        event_job against the crew user's granted authorities
+        (via neon.lms.enrollment.neon_granted_authority_ids).
+        Returns list of (event_job, missing_authority) tuples
+        for every miss.
+        """
+        self.ensure_one()
+        Enrollment = self.env.get("slide.channel.partner")
+        Authority = self.env.get(
+            "neon.lms.operating.authority")
+        if Enrollment is None or Authority is None:
+            return []
+        if not self.user_id:
+            return []
+        event_jobs = self._m9_eligible_event_jobs()
+        # Filter to event_jobs with required authorities.
+        ej_with_required = event_jobs.filtered(
+            lambda ej: hasattr(ej, "required_authority_ids")
+                       and ej.required_authority_ids)
+        if not ej_with_required:
+            return []
+        # Look up the user's granted authorities via their
+        # enrollment(s). Multiple enrollments possible if
+        # admin enrolled the user in multiple channels --
+        # union all granted authorities.
+        enrollments = Enrollment.sudo().search([
+            ("partner_id", "=", self.user_id.partner_id.id),
+        ])
+        granted = enrollments.mapped(
+            "neon_granted_authority_ids")
+        violations = []
+        for ej in ej_with_required:
+            for required_auth in ej.required_authority_ids:
+                if required_auth not in granted:
+                    violations.append((ej, required_auth))
+        return violations
+
+    def _m10_create_authority_gate_logs(self, violations):
+        """Write tier_3 gate_log per violation. fire_reason
+        format: 'operating_authority_missing:<authority_code>'
+        for downstream filtering / reporting.
+        """
+        self.ensure_one()
+        GateLog = self.env["neon.training.assignment_gate_log"]
+        if not violations:
+            return GateLog
+        triggering_user = self.env.user
+        now = fields.Datetime.now()
+        log_vals_list = []
+        for event_job, authority in violations:
+            log_vals_list.append({
+                "event_job_id": event_job.id,
+                "crew_id": self.id,
+                "user_id": self.user_id.id,
+                "gate_tier": "tier_3_event_start",
+                "gate_status_at_fire": "unqualified",
+                "fire_reason": (
+                    "operating_authority_missing:"
+                    + authority.code),
+                "fired_at": now,
+                "triggered_by_id": triggering_user.id,
+            })
+        return GateLog.sudo().create(log_vals_list)
+
     @api.model_create_multi
     def create(self, vals_list):
         """DP6: create() is the dominant assignment moment. A
@@ -657,6 +732,15 @@ class CommercialJobCrew(models.Model):
                 rec.user_id.id, rec.role)
             if violation:
                 rec_su._m5_create_probationary_gate_log(violation)
+            # P7e M10 -- operating authority check fires
+            # alongside M5 + M9. Independent gate_log per
+            # violation (multiple event_jobs * multiple
+            # missing authorities).
+            authority_violations = (
+                rec_su._m10_operating_authority_violations())
+            if authority_violations:
+                rec_su._m10_create_authority_gate_logs(
+                    authority_violations)
         if buffer:
             # Capture the real user partner BEFORE sudo so the
             # toast lands on the sales rep, not SUPERUSER.
@@ -704,6 +788,13 @@ class CommercialJobCrew(models.Model):
                 rec.user_id.id, rec.role)
             if violation:
                 rec_su._m5_create_probationary_gate_log(violation)
+            # P7e M10 -- operating authority check on
+            # re-assignment.
+            authority_violations = (
+                rec_su._m10_operating_authority_violations())
+            if authority_violations:
+                rec_su._m10_create_authority_gate_logs(
+                    authority_violations)
         if buffer:
             self.sudo()._m9_emit_aggregated_toast(
                 buffer, self.env.user.partner_id)
