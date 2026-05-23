@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
-    "version": "17.0.1.10.0",
+    "version": "17.0.1.11.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -52,6 +52,10 @@ Subsequent milestones:
         # channel exist; cross-module refs to
         # neon_training cert types resolve via depends order.
         "data/neon_lms_cert_type_wiring.xml",
+        # LMS Admin Polish M1 -- Bulk Quiz Import wizard +
+        # LMS admin menu root + Tools submenu.
+        "views/neon_lms_quiz_import_wizard_views.xml",
+        "views/neon_lms_menu.xml",
     ],
     "installable": True,
     "application": False,

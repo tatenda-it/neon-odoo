@@ -6,3 +6,4 @@ Coursera-style architecture: single slide.channel + 7 tracks
 modules + tracks + capstone.
 """
 from . import models
+from . import wizards

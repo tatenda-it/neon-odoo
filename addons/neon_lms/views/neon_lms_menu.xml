@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LMS admin menu root. Sequence 81 places it directly
+        after Neon Training (sequence 80). Empty groups="" so
+        the visibility filter sees an empty groups set; child
+        menuitems each carry their own groups_id and the
+        filter falls through to (action OR visible-child).
+    -->
+    <menuitem id="menu_neon_lms_root"
+              name="Neon LMS"
+              sequence="81"
+              groups=""/>
+
+    <menuitem id="menu_neon_lms_tools"
+              name="Tools"
+              parent="menu_neon_lms_root"
+              sequence="50"
+              groups="neon_training.group_neon_training_admin"/>
+
+    <menuitem id="menu_neon_lms_quiz_import"
+              name="Bulk Quiz Import"
+              parent="menu_neon_lms_tools"
+              action="action_neon_lms_quiz_import_wizard"
+              sequence="10"
+              groups="neon_training.group_neon_training_admin"/>
+
+</odoo>
