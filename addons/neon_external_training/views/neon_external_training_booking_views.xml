@@ -78,6 +78,19 @@
                            statusbar_visible="draft,pending_approval,booked,attended,completed,cert_issued"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_issued_cert"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-certificate"
+                                invisible="not issued_cert_id">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">View</span>
+                                <span class="o_stat_text">Certificate</span>
+                            </div>
+                        </button>
+                    </div>
+                    <field name="issued_cert_id" invisible="1"/>
                     <div class="oe_title">
                         <h1>
                             <field name="reference"

@@ -184,6 +184,21 @@ class NeonExternalTrainingBooking(models.Model):
         copy=False,
     )
 
+    # ------------------------------------------------------------------
+    # M4 -- auto-cert issuance reverse pointer
+    # ------------------------------------------------------------------
+    issued_cert_id = fields.Many2one(
+        "neon.training.certification",
+        string="Issued Certificate",
+        readonly=True,
+        copy=False,
+        ondelete="set null",
+        help="The neon.training.certification record created "
+             "when this booking transitioned to cert_issued. "
+             "Populated by action_mark_cert_issued (M4). "
+             "Cert outlives the booking -- ondelete=set null.",
+    )
+
     _sql_constraints = [
         ("booking_reference_unique",
          "UNIQUE(reference)",
@@ -432,10 +447,112 @@ neon_training_certification import (
         })
 
     def action_mark_cert_issued(self):
-        # M4 will layer auto-cert issuance here. M2 just
-        # transitions state.
+        """Issue a neon.training.certification for the crew
+        member and transition the booking to cert_issued.
+
+        Phase 7c M4 cross-module landing. Defensive triple-
+        guard on the cert model: env.get returns None if
+        neon_training is missing, in which case we raise
+        UserError rather than crash.
+
+        Cert is created with state='active' directly --
+        Phase 7a normally walks through pending_verification,
+        but external-training certs ARE verified at booking
+        approval time (the superuser approved the cost and
+        the vendor; the cert is the paperwork artefact).
+        """
         self.ensure_one()
-        self._transition_to("cert_issued")
+        # Idempotency check first: if a cert exists for this
+        # booking, raising the "already issued" UserError is
+        # more informative than the "state != completed"
+        # one (the booking is in 'cert_issued' state precisely
+        # because issuance already ran).
+        if self.issued_cert_id:
+            raise UserError(_(
+                "Cert already issued for booking %s: %s. "
+                "Cancel the existing cert before re-issuing."
+            ) % (self.reference or "(unsaved)",
+                 self.issued_cert_id.display_name))
+        if self.state != "completed":
+            raise UserError(_(
+                "Can only issue a cert from 'completed' "
+                "state (booking %s is in '%s')."
+            ) % (self.reference or "(unsaved)", self.state))
+        if not self.cert_type_id:
+            raise UserError(_(
+                "Cannot issue cert without cert_type_id "
+                "set. Either pick the expected cert type on "
+                "this booking or leave it at 'completed' "
+                "state (no auto-cert)."))
+
+        Cert = self.env.get("neon.training.certification")
+        if Cert is None:
+            raise UserError(_(
+                "neon.training.certification model not "
+                "available. Ensure neon_training is "
+                "installed before issuing certs."))
+
+        # Approver user identity drives signed_off_by_id;
+        # falls back to the current user (the one marking
+        # cert_issued) when no approval audit exists yet --
+        # i.e., a booking that bypassed the M3 approval
+        # workflow.
+        signoff_user = (
+            self.approved_by_id or self.env.user).id
+        cert_vals = {
+            "user_id": self.crew_user_id.id,
+            "type_id": self.cert_type_id.id,
+            "state": "active",
+            "date_obtained": (
+                self.date_completed or fields.Date.today()),
+            "external_booking_id": self.id,
+            "signed_off_by_id": signoff_user,
+            # Populated unconditionally so cert types whose
+            # category.requires_external_trainer would
+            # otherwise trip _check_external_trainer_when_
+            # required pass cleanly. Harmless on cert types
+            # that don't require it.
+            "external_trainer_name": self.vendor_id.name,
+        }
+        cert = Cert.sudo().create(cert_vals)
+
+        # Transition booking to cert_issued + stash the
+        # reverse pointer.
+        self._transition_to("cert_issued", {
+            "issued_cert_id": cert.id,
+        })
+
+        # Audit chatter on the booking side. Cert side gets
+        # its own create-time chatter from mail.thread.
+        self.sudo().message_post(body=_(
+            "Cert issued: <a href='#' "
+            "data-oe-model='neon.training.certification' "
+            "data-oe-id='%(cert_id)d'>%(cert_name)s</a> "
+            "via %(vendor)s."
+        ) % {
+            "cert_id": cert.id,
+            "cert_name": cert.display_name,
+            "vendor": self.vendor_id.name,
+        })
+        return True
+
+    def action_view_issued_cert(self):
+        """Smart-button handler that opens the cert this
+        booking produced."""
+        self.ensure_one()
+        if not self.issued_cert_id:
+            raise UserError(_(
+                "No cert has been issued for booking %s "
+                "yet."
+            ) % (self.reference or "(unsaved)"))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Issued Certificate"),
+            "res_model": "neon.training.certification",
+            "res_id": self.issued_cert_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
     def action_cancel(self):
         self.ensure_one()
