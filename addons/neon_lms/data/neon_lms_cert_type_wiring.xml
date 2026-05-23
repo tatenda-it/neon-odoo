@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        M9 wiring: populate sub_cert_type_id on each of the 7
+        tracks + neon_capstone_cert_type_id on the program
+        channel. References the 8 cert types seeded in
+        neon_training_data.xml (Phase 7a 17.0.8.5.0).
+
+        Loads after neon_lms_tracks.xml (tracks must exist
+        first) and after neon_training_data.xml (cert types
+        must exist first; depends on neon_training in the
+        manifest ensures cross-module load order).
+    -->
+
+    <record id="program_channel" model="slide.channel">
+        <field name="neon_capstone_cert_type_id"
+               ref="neon_training.cert_type_neon_technical"/>
+    </record>
+
+    <record id="track_foundations_safety"
+            model="neon.lms.track">
+        <field name="sub_cert_type_id"
+               ref="neon_training.cert_type_neon_foundations_safety"/>
+    </record>
+
+    <record id="track_audio" model="neon.lms.track">
+        <field name="sub_cert_type_id"
+               ref="neon_training.cert_type_neon_audio"/>
+    </record>
+
+    <record id="track_lighting" model="neon.lms.track">
+        <field name="sub_cert_type_id"
+               ref="neon_training.cert_type_neon_lighting"/>
+    </record>
+
+    <record id="track_video_led" model="neon.lms.track">
+        <field name="sub_cert_type_id"
+               ref="neon_training.cert_type_neon_video_led"/>
+    </record>
+
+    <record id="track_workflow_ops" model="neon.lms.track">
+        <field name="sub_cert_type_id"
+               ref="neon_training.cert_type_neon_workflow_ops"/>
+    </record>
+
+    <record id="track_soft_skills" model="neon.lms.track">
+        <field name="sub_cert_type_id"
+               ref="neon_training.cert_type_neon_client_ready"/>
+    </record>
+
+    <record id="track_rigging" model="neon.lms.track">
+        <field name="sub_cert_type_id"
+               ref="neon_training.cert_type_neon_rigging"/>
+    </record>
+</odoo>

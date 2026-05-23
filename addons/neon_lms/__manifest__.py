@@ -48,6 +48,10 @@ Subsequent milestones:
         # tracks so the M2M references resolve.
         "data/neon_lms_authorities.xml",
         "data/neon_lms_authority_mapping.xml",
+        # M9 -- cert_type wiring. Load LAST so tracks +
+        # channel exist; cross-module refs to
+        # neon_training cert types resolve via depends order.
+        "data/neon_lms_cert_type_wiring.xml",
     ],
     "installable": True,
     "application": False,
