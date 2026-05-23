@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        M4 portal home card. Inherits portal.portal_my_home
+        so a KB card appears on /my alongside Onboarding +
+        Training cards.
+    -->
+    <template id="portal_kb_home_card"
+              name="Portal: KB Card"
+              inherit_id="portal.portal_my_home"
+              customize_show="True">
+        <xpath expr="//div[hasclass('o_portal_docs')]"
+               position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Knowledge Base</t>
+                <t t-set="text">
+                    Browse Neon SOPs, procedures,
+                    troubleshooting guides.
+                </t>
+                <t t-set="url" t-value="'/my/kb'"/>
+                <t t-set="placeholder_count"
+                   t-value="'kb_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!--
+        /my/kb list view. Search box (form GET) + category
+        sidebar + article cards + pager.
+    -->
+    <template id="portal_kb_list"
+              name="Portal: KB List">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar"
+               t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Knowledge Base</t>
+            </t>
+
+            <div class="row">
+                <div class="col-md-3">
+                    <h5 class="mb-3">Categories</h5>
+                    <div class="list-group mb-4">
+                        <a t-attf-href="/my/kb"
+                           t-attf-class="list-group-item list-group-item-action#{not current_category and ' active' or ''}">
+                            <i class="fa fa-th-list me-2"/>
+                            All
+                        </a>
+                        <t t-foreach="categories"
+                           t-as="cat">
+                            <a t-attf-href="/my/kb?category=#{cat.code}"
+                               t-attf-class="list-group-item list-group-item-action#{current_category and current_category.id == cat.id and ' active' or ''}">
+                                <i t-if="cat.icon"
+                                   t-attf-class="fa #{cat.icon} me-2"/>
+                                <span t-field="cat.name"/>
+                                <span class="badge bg-secondary float-end"
+                                      t-out="cat.article_count"/>
+                            </a>
+                        </t>
+                    </div>
+                </div>
+
+                <div class="col-md-9">
+                    <form action="/my/kb" method="get"
+                          class="mb-3">
+                        <input type="hidden" name="category"
+                               t-att-value="current_category and current_category.code or ''"/>
+                        <div class="input-group">
+                            <input type="text"
+                                   name="search"
+                                   class="form-control"
+                                   placeholder="Search articles..."
+                                   t-att-value="search"/>
+                            <button type="submit"
+                                    class="btn btn-primary">
+                                <i class="fa fa-search"/>
+                            </button>
+                        </div>
+                    </form>
+
+                    <t t-if="not articles">
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle me-2"/>
+                            No articles found.
+                            <t t-if="search">
+                                Try a different search
+                                term.
+                            </t>
+                        </div>
+                    </t>
+
+                    <t t-foreach="articles" t-as="article">
+                        <div class="card mb-3 kb-article-card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <a t-attf-href="/my/kb/article/#{article.code}"
+                                       t-field="article.name"/>
+                                </h5>
+                                <p class="card-text text-muted small"
+                                   t-if="article.summary"
+                                   t-field="article.summary"/>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-info me-2"
+                                              t-field="article.category_id.name"/>
+                                        <t t-foreach="article.tag_ids"
+                                           t-as="tag">
+                                            <span class="badge bg-light text-dark me-1"
+                                                  t-field="tag.name"/>
+                                        </t>
+                                    </div>
+                                    <small class="text-muted">
+                                        <i class="fa fa-clock-o me-1"/>
+                                        <span t-field="article.last_updated"
+                                              t-options="{'widget': 'date'}"/>
+                                        <i class="fa fa-eye ms-3 me-1"/>
+                                        <span t-out="article.view_count"/>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+
+                    <div t-if="pager and pager.get('page_count', 0) > 1"
+                         class="mt-3">
+                        <t t-call="portal.pager"/>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        /my/kb/article/<code> detail view.
+    -->
+    <template id="portal_kb_article"
+              name="Portal: KB Article Detail">
+        <t t-call="portal.portal_layout">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/my">My Account</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/my/kb">Knowledge Base</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a t-attf-href="/my/kb?category=#{article.category_id.code}"
+                       t-field="article.category_id.name"/>
+                </li>
+                <li class="breadcrumb-item active">
+                    <span t-field="article.name"/>
+                </li>
+            </ol>
+
+            <article class="kb-article">
+                <header class="mb-4">
+                    <h1 t-field="article.name"/>
+                    <div class="text-muted small mb-2">
+                        By
+                        <span t-field="article.author_id.name"/>
+                        <span class="ms-3">
+                            <i class="fa fa-calendar me-1"/>
+                            <span t-field="article.date_published"
+                                  t-options="{'widget': 'date'}"/>
+                        </span>
+                        <span class="ms-3">
+                            <i class="fa fa-eye me-1"/>
+                            <span t-out="article.view_count"/>
+                            views
+                        </span>
+                    </div>
+                    <div>
+                        <span class="badge bg-info me-2"
+                              t-field="article.category_id.name"/>
+                        <t t-foreach="article.tag_ids"
+                           t-as="tag">
+                            <span class="badge bg-light text-dark me-1"
+                                  t-field="tag.name"/>
+                        </t>
+                    </div>
+                </header>
+
+                <div class="kb-article-body">
+                    <t t-out="article.body"/>
+                </div>
+
+                <!-- M5 will fill a cross-link section here
+                     once the related_* M2M fields land on
+                     the article model. M4 ships the
+                     placeholder slot only. -->
+                <!-- p7d_m5_related_placeholder -->
+
+
+                <section class="kb-article-attachments mt-4"
+                         t-if="article.attachment_ids">
+                    <h5>Attachments</h5>
+                    <ul class="list-unstyled">
+                        <t t-foreach="article.attachment_ids"
+                           t-as="att">
+                            <li>
+                                <a t-attf-href="/web/content/#{att.id}?download=true">
+                                    <i class="fa fa-download me-1"/>
+                                    <span t-field="att.name"/>
+                                </a>
+                            </li>
+                        </t>
+                    </ul>
+                </section>
+
+                <div class="mt-5">
+                    <a href="/my/kb"
+                       class="btn btn-secondary">
+                        <i class="fa fa-arrow-left me-2"/>
+                        Back to Knowledge Base
+                    </a>
+                </div>
+            </article>
+        </t>
+    </template>
+
+</odoo>

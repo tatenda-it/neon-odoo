@@ -319,6 +319,22 @@ class NeonKBArticle(models.Model):
         self._transition_to("draft")
 
     # ==================================================================
+    # M4 -- view_count helper. Called by the portal article
+    # detail route. Form-opens (admin browsing) DON'T
+    # increment; only portal reads do. This keeps the
+    # popularity metric scoped to the audience the metric
+    # is for. Phase 11 can add rate-limiting (once per
+    # user per hour) without changing callers.
+    # ==================================================================
+    def _increment_view_count(self, user):
+        """Increment view_count by 1. sudo()s the write
+        so portal users (read-only ACL via record rule)
+        don't trip write ACL."""
+        self.ensure_one()
+        self.sudo().write(
+            {"view_count": self.view_count + 1})
+
+    # ==================================================================
     # M3 -- name_search override searches across name +
     # summary + keywords (not just name). Mailto-style
     # multi-field OR domain.
