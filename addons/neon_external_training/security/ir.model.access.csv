@@ -7,3 +7,4 @@ access_booking_superuser,Booking - Neon Superuser,model_neon_external_training_b
 access_booking_bookkeeper,Booking - Bookkeeper (read),model_neon_external_training_booking,neon_core.group_neon_bookkeeper,1,0,0,0
 access_booking_lead_tech,Booking - Lead Tech (read via rule),model_neon_external_training_booking,neon_core.group_neon_lead_tech,1,0,0,0
 access_booking_user,Booking - Internal User (read via rule),model_neon_external_training_booking,base.group_user,1,0,0,0
+access_reject_wizard_superuser,Reject Wizard - Neon Superuser,model_neon_external_training_reject_wizard,neon_core.group_neon_superuser,1,1,1,1

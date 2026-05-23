@@ -37,6 +37,18 @@
                             type="object"
                             class="btn-primary"
                             invisible="state != 'draft'"/>
+                    <button name="action_approve"
+                            string="Approve"
+                            type="object"
+                            class="btn-success"
+                            invisible="state != 'pending_approval'"
+                            groups="neon_core.group_neon_superuser"/>
+                    <button name="action_open_reject_wizard"
+                            string="Reject"
+                            type="object"
+                            class="btn-danger"
+                            invisible="state != 'pending_approval'"
+                            groups="neon_core.group_neon_superuser"/>
                     <button name="action_mark_attended"
                             string="Mark Attended"
                             type="object"
@@ -101,6 +113,13 @@
                             <field name="date_attended"/>
                             <field name="date_completed"/>
                         </group>
+                    </group>
+                    <group string="Approval Audit"
+                           invisible="not approved_by_id and not rejection_reason">
+                        <field name="approved_by_id"/>
+                        <field name="approval_date"/>
+                        <field name="rejection_reason"
+                               readonly="1"/>
                     </group>
                     <group string="Notes">
                         <field name="notes" nolabel="1"
