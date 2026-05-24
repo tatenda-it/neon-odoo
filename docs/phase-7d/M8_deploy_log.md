@@ -228,3 +228,98 @@ Expected post-deploy verifications:
 ## 12. Status: ready for deploy
 
 Phase 7d functionally complete. All 8 milestones land on `feat/kb-phase-7d`; integration smoke 12/12 stages; no regression hits on the canonical baseline.
+
+---
+
+## 13. Phase 7d Production Deploy (24 May 2026, 14:54–15:05 UTC)
+
+### Backup
+
+- Path: `/root/backups/neon_crm_pre_p7d_20260524_145430.dump`
+- Size: 6.6 MB
+- Format: pg_dump custom (-Fc) of `neon_crm` from `neon-odoo-db`
+- Created before any code pull
+
+### Code state
+
+| Stage | Commit |
+|---|---|
+| Prod pre-pull HEAD | `dec36bb` (Phase 7c M8 code commit; deploy-log docs commit `82c04fe` not previously synced — docs-only, expected) |
+| Prod post-pull HEAD | `00f10bb` (Phase 7d M8 sub-phase close) |
+| Pushed M8 commit to origin before pulling | Yes (`b755436..00f10bb`) |
+
+### Migration log excerpts
+
+```
+2026-05-24 14:55:57,125 INFO module neon_training: Running migration [17.0.8.10.0>] post-migrate
+2026-05-24 14:55:57,125 INFO post-migrate: neon_training 17.0.8.10.0: 2 KB counters (published + new_30d) + drill-through actions added to neon.training.dashboard. Defensive env.get pattern; no DB schema changes.
+
+2026-05-24 14:55:58,712 INFO module neon_lms: Running migration [17.0.1.15.0>] post-migrate
+2026-05-24 14:55:58,712 INFO post-migrate: neon_lms 17.0.1.15.0: kb_article_ids M2M added to neon.lms.sop for Phase 7d M5 cross-link. Join table neon_kb_article_sop_rel is created by the neon_kb side; no schema change here.
+
+2026-05-24 14:55:59,483 INFO Loading module neon_kb (93/93)
+2026-05-24 14:55:59,785 INFO loading neon_kb/security/neon_kb_security.xml
+2026-05-24 14:55:59,823 INFO loading neon_kb/security/ir.model.access.csv
+2026-05-24 14:55:59,850 INFO loading neon_kb/data/neon_kb_categories.xml
+2026-05-24 14:55:59,895 INFO loading neon_kb/views/neon_kb_category_views.xml
+2026-05-24 14:55:59,913 INFO loading neon_kb/views/neon_kb_tag_views.xml
+2026-05-24 14:55:59,927 INFO loading neon_kb/views/neon_kb_article_views.xml
+2026-05-24 14:55:59,964 INFO loading neon_kb/views/neon_kb_portal_templates.xml
+2026-05-24 14:55:59,996 INFO loading neon_kb/views/neon_kb_menu.xml
+2026-05-24 14:56:00,049 INFO Module neon_kb loaded in 0.57s, 404 queries
+2026-05-24 14:56:00,049 INFO 93 modules loaded in 0.57s
+2026-05-24 14:56:01,301 INFO Modules loaded.
+2026-05-24 14:56:01,307 INFO Registry loaded in 8.109s
+```
+
+Pre-existing forward-string warning logged during `neon_lms` load (expected — `neon.lms.sop.kb_article_ids` references `neon.kb.article` before `neon_kb` loads later in the same pass):
+
+```
+2026-05-24 14:55:58,255 WARNING Field neon.lms.sop.kb_article_ids with unknown comodel_name 'neon.kb.article'
+```
+
+This is the forward-string pattern proven across Phase 7c M4 and Phase 7d M5. Resolves once `neon_kb` loads (1.3 s later).
+
+No `CRITICAL`, no `Traceback`, no `OperationalError` / `IntegrityError` / `ProgrammingError`.
+
+### Asset regeneration
+
+- Purged: 9 `/web/assets/*` ir.attachment records
+- Regenerated bundles: 4/4 OK
+  - `web.assets_backend`: OK
+  - `web.assets_web`: OK
+  - `web_editor.backend_assets_wysiwyg`: OK
+  - `web.assets_frontend`: OK
+- New attachments after regen: 8 (rest materialise lazily on first HTTP hit)
+
+### Verification (8 checks)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Module versions | `neon_training` 17.0.8.10.0 / `neon_lms` 17.0.1.15.0 / `neon_kb` 17.0.1.5.0 — all `state=installed` |
+| 2 | Category seeds (count + 5 xmlrefs) | 5 / 5: Audio, Lighting, Video, Safety, Admin all resolve via `env.ref()` |
+| 3 | 3 M2M join tables | All 3 present (`neon_kb_article_cert_type_rel`, `neon_kb_article_sop_rel`, `neon_kb_article_module_rel`) |
+| 4 | Dashboard KB counters (as Robin) | `kb_articles_published=0`, `kb_articles_recent_30d=0` (expected — no articles authored yet) |
+| 5 | SOP reverse pointer | `neon.lms.sop._fields['kb_article_ids']` OK |
+| 6 | Portal `/my/kb` routes | 3 found: `/my/kb`, `/my/kb/article/<string:code>`, `/my/kb/page/<int:page>` |
+| 7 | Login bypass invariant | `website.login_layout.active = False` (preserved) |
+| 8 | External training regression | 5 vendors — Phase 7c live state unchanged |
+
+### Module count growth
+
+- Pre-Phase-7d (after Phase 7c live): 92 installed modules
+- Post-Phase-7d (this deploy): 93 installed modules
+- Delta: +1 (`neon_kb`)
+
+### Tag
+
+- `v17.0.8.10.0-phase7d-live` pushed to origin pointing at commit `00f10bb`
+
+### Outstanding follow-ups (deferred to admin run / Phase 9)
+
+- WhatsApp + email actual dispatch (`_notify_send` stub overridden in Phase 9; pending Meta business-account approval)
+- Initial content authoring — 5 categories shipped; article table empty. Tatenda + content team author first batch post-deploy.
+
+### Phase 7d live
+
+Phase 7d Custom Knowledge Base is live on `crm.neonhiring.com` at tag `v17.0.8.10.0-phase7d-live`. Knowledge Base menu visible in the Training app; portal `/my/kb` available to authenticated users; dashboard exposes 2 new KB counters with drill-through actions.
