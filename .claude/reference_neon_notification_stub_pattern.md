@@ -96,3 +96,34 @@ Single-dispatcher pattern centralises:
 ## Body marker (do not change without coordinating with Phase 9)
 
 Phase 9's regression smoke greps for the stub marker `[Notification stub - Phase 9 will send]` to confirm fallback path. If a notify message in chatter contains the marker post-Phase-9-deploy, dispatch failed and the M12 stub fired as a backstop.
+
+**Use ASCII hyphen `-` (U+002D), not em-dash `—` (U+2014) or en-dash `–` (U+2013).** Phase 7c M7 first tripped this when the brief used an em-dash; T7c704 caught it pre-deploy.
+
+## Marker greppability — rendered body, not source (Phase 7d M7)
+
+The marker text may live in source as adjacent string literals split across multiple lines:
+
+```python
+full_body = (
+    "<p><strong>[Notification stub - Phase 9 will "
+    "send]</strong></p>"
+    "<p><b>Event:</b> %s</p>"
+    ...
+) % (...)
+```
+
+Python concatenates adjacent string literals at compile time, so the **rendered** chatter body has the marker as a single greppable substring. But `inspect.getsource()` sees the split form — a smoke test that checks the source for the literal marker string will report false-negative.
+
+**Lesson** (caught in Phase 7d M7's T7d704):
+
+- Smokes verifying the marker MUST check the rendered body (e.g., `article.message_ids[-1].body`), not the source via `inspect.getsource()`.
+- Phase 9's grep regression operates on rendered bodies — it works correctly regardless of source layout. Smokes should follow the same path.
+
+Quick check pattern for a smoke:
+
+```python
+bodies = "\n".join(record.message_ids.mapped("body"))
+has_marker = "[Notification stub - Phase 9 will send]" in bodies
+```
+
+This works whether the source has the marker on one line or split across many.
