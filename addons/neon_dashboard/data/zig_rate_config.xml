@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M6 - ZiG-USD rate ir.config_parameter seed.
+
+    All four keys created with safe defaults so the runtime never
+    crashes on missing keys. Only `zig_usd_rate_manual` is
+    actually consulted (per project_zig_usd_rate_manual_only memory);
+    the other three are kept for forward-compat and admin
+    visibility.
+
+    noupdate=1 so admin edits via the wizard are not overwritten
+    by future -u upgrades.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="zig_usd_rate_manual"
+                model="ir.config_parameter">
+            <field name="key">neon_dashboard.zig_usd_rate_manual</field>
+            <field name="value">0</field>
+        </record>
+
+        <record id="zig_usd_rate_auto"
+                model="ir.config_parameter">
+            <field name="key">neon_dashboard.zig_usd_rate</field>
+            <field name="value">0</field>
+        </record>
+
+        <record id="zig_usd_rate_source"
+                model="ir.config_parameter">
+            <field name="key">neon_dashboard.zig_usd_rate_source</field>
+            <field name="value">unset</field>
+        </record>
+
+        <record id="zig_usd_rate_updated_at"
+                model="ir.config_parameter">
+            <field name="key">neon_dashboard.zig_usd_rate_updated_at</field>
+            <field name="value"></field>
+        </record>
+
+    </data>
+</odoo>

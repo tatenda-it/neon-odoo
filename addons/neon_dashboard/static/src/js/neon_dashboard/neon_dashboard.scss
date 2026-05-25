@@ -510,8 +510,94 @@ $neon-bg:            #FAFAFC;
         }
     }
 
-    // No filter rule for "all" (everything visible by default) or
-    // "finance" (still a toast; never sets activeFilter).
+    // No filter rule for "all" (everything visible by default).
+    // Finance now functional (M6); replaces the M5 toast.
+
+    &.o_neon_dashboard__filter_finance {
+        // Finance view: Cash + AR Overdue + Forecast KPI tiles +
+        // Finance block. Hide Jobs / Sales / Crew & Equipment +
+        // ops-y KPI tiles.
+        .widget--block_jobs,
+        .widget--block_sales,
+        .widget--block_crew_equipment,
+        .widget--kpi_jobs_today,
+        .widget--kpi_jobs_week,
+        .widget--kpi_pipeline,
+        .widget--kpi_leads {
+            display: none;
+        }
+    }
+
+    // -------- M6 Finance block --------
+    .o_neon_block_finance {
+        .o_neon_block_header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .o_neon_finance_manage_rate {
+            color: $neon-purple !important;
+            font-weight: 600;
+            font-size: 0.8em;
+            padding: 0 6px;
+            &:hover { background: $neon-purple-pale; }
+        }
+        .o_neon_finance_cash_card,
+        .o_neon_finance_ar_card {
+            margin-bottom: 12px;
+            h4 {
+                margin: 0 0 6px;
+                font-size: 0.85em;
+                color: $neon-muted;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+        }
+        .o_neon_finance_cash_table,
+        .o_neon_finance_ar_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+            td, th { padding: 4px 6px; }
+            thead th {
+                color: $neon-muted;
+                font-weight: 600;
+                text-transform: uppercase;
+                font-size: 0.85em;
+                letter-spacing: 0.03em;
+                border-bottom: 1px solid $neon-line;
+            }
+        }
+        .o_neon_finance_cash_zig_usd_row td {
+            padding-top: 0;
+            padding-bottom: 6px;
+        }
+        .o_neon_finance_cash_total_row td,
+        .o_neon_finance_ar_total_row td {
+            border-top: 2px solid $neon-text;
+            padding-top: 4px;
+        }
+        .o_neon_finance_ar_row {
+            cursor: pointer;
+            &:hover { background: $neon-purple-pale; }
+        }
+        .o_neon_finance_ar_row_critical {
+            color: $neon-accent-red;
+            font-weight: 700;
+            background: rgba($neon-accent-red, 0.04);
+            &:hover { background: rgba($neon-accent-red, 0.12); }
+        }
+        .o_neon_finance_rate_meta {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.75em;
+        }
+        .o_neon_finance_ar_excluded {
+            display: block;
+            margin-top: 4px;
+            color: $neon-accent-amber;
+        }
+    }
 
     // -------- Error / loading --------
     .o_neon_dashboard_error {

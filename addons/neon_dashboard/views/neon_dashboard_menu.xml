@@ -46,4 +46,16 @@
               action="action_neon_dashboard_target"
               sequence="10"
               groups="neon_core.group_neon_superuser"/>
+
+    <!--
+        M6 - Settings - Neon - ZiG-USD Rate.
+        Wizard opens in dialog (target='new'); save stamps four
+        ir.config_parameter keys. Gated to superuser only.
+    -->
+    <menuitem id="menu_neon_dashboard_zig_rate"
+              name="ZiG-USD Rate"
+              parent="menu_neon_settings_root"
+              action="action_neon_dashboard_zig_rate_wizard"
+              sequence="20"
+              groups="neon_core.group_neon_superuser"/>
 </odoo>

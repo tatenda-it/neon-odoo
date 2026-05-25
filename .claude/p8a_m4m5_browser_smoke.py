@@ -354,7 +354,14 @@ def run() -> int:
             # Scenario 6: Finance chip remains a toast.
             # ========================================================
             with smoke.scenario(
-                    "Finance chip still shows M6 toast"):
+                    "Finance chip filters (M6-superseded; covered "
+                    "in p8a_m6 browser smoke)"):
+                # M5 era: Finance chip toasted "ships in M6" and didn't
+                # change activeFilter. M6 wired it up. The actual
+                # Finance-chip behavior is now covered by Scenario 2
+                # of p8a_m6_browser_smoke.py; this scenario kept here
+                # as a contract-shape canary -- the chip clicks
+                # without throwing, OK either way.
                 smoke.open_action(
                     "neon_dashboard.action_neon_dashboard_server")
                 smoke.page.wait_for_selector(
@@ -363,22 +370,19 @@ def run() -> int:
                     ".o_neon_filter_chip", has_text="Finance"
                 ).first.click()
                 smoke.page.wait_for_timeout(300)
-                # The toast appears in .o_notification. We can't assert
-                # text reliably across Odoo versions, but the chip
-                # MUST NOT change the activeFilter; verify Sales block
-                # still visible (i.e., we're still on the "all" view).
-                still_visible = smoke.page.evaluate(
-                    "() => { const e = document.querySelector('.widget--block_sales');"
-                    " return e ? getComputedStyle(e).display !== 'none' : false; }"
+                # Contract-only: dashboard still rendered post-click.
+                still_present = smoke.page.evaluate(
+                    "() => !!document.querySelector('.o_neon_dashboard')"
                 )
                 smoke._record_assert(
-                    "Finance chip is non-applying (Sales still visible)",
-                    expect="visible", actual="visible" if still_visible else "hidden",
-                    passed=still_visible,
+                    "Finance chip click doesn't crash the dashboard",
+                    expect="dashboard present",
+                    actual="present" if still_present else "missing",
+                    passed=still_present,
                 )
-                if not still_visible:
+                if not still_present:
                     raise AssertionFail(
-                        "Finance filter unexpectedly hid Sales block")
+                        "Finance chip click broke the dashboard root")
 
             return smoke.summary()
     finally:

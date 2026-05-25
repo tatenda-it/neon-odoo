@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M6 - wizard form + action wrapper.
+    Settings - Neon - ZiG-USD Rate is wired in
+    views/neon_dashboard_menu.xml (loads after this file).
+-->
+<odoo>
+
+    <record id="view_neon_dashboard_zig_rate_wizard_form"
+            model="ir.ui.view">
+        <field name="name">neon.dashboard.zig.rate.wizard.form</field>
+        <field name="model">neon.dashboard.zig.rate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="ZiG-USD Rate (manual override)">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>ZiG-USD Rate</h1>
+                        <p class="text-muted">
+                            Manual override used across the
+                            dashboard to convert ZiG journal balances
+                            to USD-equivalent. Updated by Finance when
+                            RBZ publishes a new official rate.
+                        </p>
+                    </div>
+                    <group>
+                        <group string="Rate">
+                            <field name="rate"
+                                   widget="float"
+                                   options="{'digits': [12, 4]}"
+                                   help="ZiG per 1 USD"/>
+                        </group>
+                        <group string="Last update">
+                            <field name="source_display"/>
+                            <field name="updated_at_display"/>
+                        </group>
+                    </group>
+                    <p class="text-muted">
+                        Setting the rate to 0 clears the override -
+                        ZiG balances will be excluded from any
+                        USD-equivalent total and a "no rate set"
+                        note will appear in the Cash tile subtitle.
+                    </p>
+                </sheet>
+                <footer>
+                    <button name="action_save"
+                            type="object"
+                            string="Save"
+                            class="btn-primary"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_dashboard_zig_rate_wizard"
+            model="ir.actions.act_window">
+        <field name="name">ZiG-USD Rate</field>
+        <field name="res_model">neon.dashboard.zig.rate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id"
+               ref="view_neon_dashboard_zig_rate_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

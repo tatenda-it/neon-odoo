@@ -367,12 +367,116 @@
                      ================================================= -->
                 <section class="o_neon_row_b">
                     <div t-if="isWidgetVisible('block_finance')"
-                         class="o_neon_block o_neon_block_placeholder widget--block_finance">
+                         class="o_neon_block o_neon_block_finance widget--block_finance">
                         <div class="o_neon_block_header">
                             <h3>Finance &#183; AR &amp; Cash</h3>
+                            <button class="btn btn-sm btn-link o_neon_finance_manage_rate"
+                                    t-if="isSuperuser"
+                                    t-on-click="onManageRateClick">
+                                <i class="fa fa-pencil me-1"/>
+                                Manage ZiG rate
+                            </button>
                         </div>
                         <div class="o_neon_block_body">
-                            <p class="text-muted">Coming in M6.</p>
+
+                            <!-- Cash detail card -->
+                            <div class="o_neon_finance_cash_card">
+                                <div t-if="financeBlock.cash.empty"
+                                     class="o_neon_block_empty">
+                                    <p class="o_neon_block_empty_msg">
+                                        No bank/cash journals configured yet
+                                    </p>
+                                </div>
+                                <div t-if="!financeBlock.cash.empty"
+                                     class="o_neon_finance_cash_inner">
+                                    <h4>Cash on Hand</h4>
+                                    <table class="o_neon_finance_cash_table">
+                                        <tr>
+                                            <td>USD journals</td>
+                                            <td class="text-end"
+                                                t-esc="formatUsd(financeBlock.cash.usd_total)"/>
+                                        </tr>
+                                        <tr>
+                                            <td>ZiG journals</td>
+                                            <td class="text-end">
+                                                <t t-esc="formatZwg(financeBlock.cash.zig_total)"/>
+                                                <small class="text-muted ms-2"
+                                                       t-if="financeBlock.cash.rate">
+                                                    @ <t t-esc="financeBlock.cash.rate.toFixed(2)"/>
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr t-if="financeBlock.cash.rate"
+                                            class="o_neon_finance_cash_zig_usd_row">
+                                            <td>
+                                                <small class="text-muted">ZiG in USD-equiv</small>
+                                            </td>
+                                            <td class="text-end">
+                                                <small class="text-muted"
+                                                       t-esc="formatUsd(financeBlock.cash.zig_in_usd)"/>
+                                            </td>
+                                        </tr>
+                                        <tr class="o_neon_finance_cash_total_row">
+                                            <td><strong>Total (USD-equiv)</strong></td>
+                                            <td class="text-end">
+                                                <strong t-esc="formatUsd(financeBlock.cash.usd_total + financeBlock.cash.zig_in_usd)"/>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <small class="text-muted o_neon_finance_rate_meta">
+                                        Rate source:
+                                        <t t-esc="financeBlock.cash.rate_source"/>
+                                        <t t-if="financeBlock.cash.rate_as_of">
+                                            &#183; updated
+                                            <t t-esc="financeBlock.cash.rate_as_of"/>
+                                        </t>
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- AR Aging table -->
+                            <div class="o_neon_finance_ar_card">
+                                <h4>AR Aging</h4>
+                                <div t-if="financeBlock.ar_aging.empty"
+                                     class="o_neon_block_empty">
+                                    <p class="o_neon_block_empty_msg"
+                                       t-esc="financeBlock.ar_aging.empty_message"/>
+                                </div>
+                                <table t-if="!financeBlock.ar_aging.empty"
+                                       class="o_neon_finance_ar_table">
+                                    <thead>
+                                        <tr>
+                                            <th>Bucket</th>
+                                            <th class="text-end">#</th>
+                                            <th class="text-end">USD-equiv</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="financeBlock.ar_aging.buckets"
+                                           t-as="bucket" t-key="bucket.key">
+                                            <tr class="o_neon_finance_ar_row"
+                                                t-att-class="bucket.critical ? 'o_neon_finance_ar_row_critical' : ''"
+                                                t-on-click="() => this.onAgingBucketClick(bucket)">
+                                                <td t-esc="bucket.label"/>
+                                                <td class="text-end" t-esc="bucket.count"/>
+                                                <td class="text-end" t-esc="bucket.amount_display"/>
+                                            </tr>
+                                        </t>
+                                        <tr class="o_neon_finance_ar_total_row">
+                                            <td><strong>Total</strong></td>
+                                            <td class="text-end">
+                                                <strong t-esc="financeBlock.ar_aging.total_count"/>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong t-esc="financeBlock.ar_aging.total_amount_display"/>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <small t-if="financeBlock.ar_aging.zig_excluded_count"
+                                       class="text-muted o_neon_finance_ar_excluded"
+                                       t-esc="financeBlock.ar_aging.zig_excluded_message"/>
+                            </div>
                         </div>
                     </div>
 

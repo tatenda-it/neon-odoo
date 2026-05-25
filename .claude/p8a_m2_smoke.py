@@ -162,15 +162,21 @@ results["T8204"] = ok
 
 # ============================================================
 print()
-print("T8205 -- kpi_cash subtitle discloses ZWG gap")
+print("T8205 -- kpi_cash subtitle non-empty + truthful (M6-superseded)")
 print("=" * 72)
-# Per M2 marker 3 contract: subtitle must include the string 'ZWG'
-# on the non-empty path so Robin sees the gap.
+# Post-M6: subtitle paths are 'USD only' / 'ZiG X @ rate' /
+# 'USD X + ZiG Y @ rate' / 'USD X (ZiG Y excluded -- no rate)' /
+# 'No cash on hand'. Original M2 'ZWG total in M6' string is gone
+# (intentional supersession). The contract this test now guards:
+# subtitle is non-empty AND mentions either USD or ZiG explicitly
+# (never silent about what's included).
 data3 = _data_as(u_director)
 cash3 = data3["kpi"]["kpi_cash"]
 if not cash3.get("empty"):
-    ok = "ZWG" in (cash3.get("subtitle") or "")
-    print("  subtitle:", cash3.get("subtitle"))
+    sub = cash3.get("subtitle") or ""
+    ok = (len(sub) > 0
+          and ("USD" in sub or "ZiG" in sub or "cash" in sub.lower()))
+    print("  subtitle:", sub)
 else:
     print("  cash tile is in empty-state; subtitle disclosure not applicable")
     ok = True

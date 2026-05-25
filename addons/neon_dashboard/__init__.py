@@ -8,3 +8,4 @@ Finance, Alerts, Tasks, AI Insights, weekly digest, exports, and
 mobile polish.
 """
 from . import models
+from . import wizards

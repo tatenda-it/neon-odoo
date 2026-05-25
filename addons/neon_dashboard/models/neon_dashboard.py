@@ -420,6 +420,10 @@ class NeonDashboard(models.Model):
                 self._compute_crew_equipment_block(resolved_type),
             # M5: Sales block (pipeline + win rate + lead sources).
             "sales_block": self._compute_sales_block(resolved_type),
+            # M6: Finance block (AR aging + cash detail + rate
+            # metadata). Shares the cash breakdown payload with the
+            # Cash KPI tile so the two views never disagree.
+            "finance_block": self._compute_finance_block(resolved_type),
             "available_types": self._available_types_for_user(),
             # p8a-hygiene tz: render the refresh timestamp in
             # Africa/Harare so Robin sees the operational TZ.
@@ -476,60 +480,186 @@ class NeonDashboard(models.Model):
     # deferred to M6 alongside the RBZ ZiG-USD rate cron (per schema
     # sketch §7.5). For M1-M3 the tile shows USD-only total with a
     # subtitle disclosing the ZWG gap.
+    # ⚠️ DECISION (M6, marker 1): supersedes M2's USD-only stub.
+    # Cash KPI now sums bank/cash journal balances split by currency
+    # (USD direct + ZiG-via-manual-rate). Per
+    # project_zig_usd_rate_manual_only memory: the rate is the
+    # finance team's manual override at ir.config_parameter
+    # neon_dashboard.zig_usd_rate_manual; rate=0 means "no rate
+    # set" and ZiG is excluded from the headline total (subtitle
+    # surfaces the exclusion -- never silent).
     def _kpi_cash_on_hand(self):
-        Journal = self.env["account.journal"].sudo()
-        # ⚠️ DECISION (M2, marker inline): dotted-domain filters on
-        # NULL FKs (currency_id.name in (USD, False)) do not match
-        # journals where currency_id IS NULL -- Odoo's domain
-        # resolver follows the FK and there's no row to read .name
-        # from. Surfaced by T8204. Filter Python-side instead:
-        # search all bank/cash journals, then pick the ones whose
-        # effective currency (explicit OR company-default) is USD.
-        all_bank_cash = Journal.search([
-            ("type", "in", ("bank", "cash")),
-        ])
-        if not all_bank_cash:
+        breakdown = self._cash_journals_breakdown()
+        if breakdown.get("empty"):
             return self._empty_kpi(
                 _("No bank/cash journals configured yet"),
                 value_display="$0",
                 deeplink_action="account.action_account_journal_form",
             )
-        company_currency = self.env.company.currency_id
-        usd_journals = all_bank_cash.filtered(
-            lambda j: (j.currency_id or company_currency).name == "USD"
-        )
-        if not usd_journals:
-            return self._empty_kpi(
-                _("No USD bank/cash journals -- ZWG total in M6"),
-                value_display="$0",
-                deeplink_action="account.action_account_journal_form",
-            )
-        total = 0.0
-        for j in usd_journals:
-            # account.journal exposes a computed ``current_account_
-            # balance`` since Odoo 17 (sum of posted move lines on
-            # default accounts). Fall back to summing move lines
-            # directly when the field isn't available.
-            if hasattr(j, "current_account_balance"):
-                total += j.current_account_balance or 0.0
-            else:
-                lines = self.env["account.move.line"].sudo().search([
-                    ("journal_id", "=", j.id),
-                    ("parent_state", "=", "posted"),
-                ])
-                total += sum(lines.mapped("balance"))
+        usd_total = breakdown["usd_total"]
+        zig_total = breakdown["zig_total"]
+        rate = breakdown["rate"]
+        zig_in_usd = breakdown["zig_in_usd"]
+        total_usd_equiv = usd_total + zig_in_usd
         return {
-            "value": total,
-            "value_display": self._format_money(total, "USD"),
+            "value": total_usd_equiv,
+            "value_display": self._format_money(total_usd_equiv, "USD"),
             "currency": "USD",
-            # ⚠️ DECISION (M2, marker 3 cont'd): subtitle discloses
-            # ZWG omission until M6. Robin sees the gap, no fake data.
-            "subtitle": _(
-                "USD only -- ZWG total lands in M6 with RBZ rate"),
+            "subtitle": self._cash_subtitle(
+                usd_total, zig_total, rate),
             "trend_pct": None,
             "trend_dir": "flat",
             "empty": False,
             "deeplink_action": "account.action_account_journal_form",
+            # Extra payload consumed by the Finance block's cash
+            # detail card -- single source of truth, computed once.
+            "breakdown": {
+                "usd_amount": usd_total,
+                "zig_amount": zig_total,
+                "zig_in_usd": zig_in_usd,
+                "rate_used": rate,
+                "rate_source": breakdown["rate_source"],
+                "rate_as_of": breakdown["rate_as_of"],
+                "usd_display": self._format_money(usd_total, "USD"),
+                "zig_display": self._format_money(zig_total, "ZWG"),
+                "zig_in_usd_display":
+                    self._format_money(zig_in_usd, "USD"),
+            },
+        }
+
+    # ------------------------------------------------------------------
+    # M6 -- cash + AR + rate helpers used by both the KPI tile and the
+    # Finance block.
+    # ------------------------------------------------------------------
+    @api.model
+    def _cash_journals_breakdown(self):
+        """Walk bank+cash journals once. Returns:
+           {empty, usd_total, zig_total, rate, zig_in_usd,
+            rate_source, rate_as_of}
+
+        ⚠️ DECISION (M6, marker 2): journal balance prefers the
+        Odoo 17 computed ``current_account_balance`` (sum of posted
+        move lines on the journal's default account, in journal
+        currency); falls back to manual SQL aggregation if absent.
+
+        ⚠️ DECISION (M6, marker 3): currency bucketing uses the
+        journal's effective currency (explicit currency_id OR
+        company-default). ZWG matches the canonical
+        neon_finance.currency_zwg ref. ZWL is dead and not handled.
+        """
+        Journal = self.env["account.journal"].sudo()
+        journals = Journal.search([
+            ("type", "in", ("bank", "cash")),
+            ("company_id", "=", self.env.company.id),
+        ])
+        if not journals:
+            return {"empty": True}
+        company_currency = self.env.company.currency_id
+        usd_total = 0.0
+        zig_total = 0.0
+        for j in journals:
+            balance = self._journal_balance(j)
+            effective = j.currency_id or company_currency
+            if effective.name == "ZWG":
+                zig_total += balance
+            elif effective.name == "USD":
+                usd_total += balance
+            # Other currencies (unlikely on this build) silently
+            # ignored from the headline -- they don't fit USD/ZiG
+            # buckets. M6+ polish could surface a third bucket if
+            # the company ever opens, say, a ZAR account.
+        rate = self._get_zig_usd_rate()
+        zig_in_usd = (zig_total / rate) if (rate and rate > 0) else 0.0
+        return {
+            "empty": False,
+            "usd_total": usd_total,
+            "zig_total": zig_total,
+            "rate": rate,
+            "zig_in_usd": zig_in_usd,
+            "rate_source": self._zig_rate_source(),
+            "rate_as_of": self._zig_rate_timestamp_harare(),
+        }
+
+    @api.model
+    def _journal_balance(self, journal):
+        """Posted balance on a journal's default account."""
+        if not journal.default_account_id:
+            return 0.0
+        Line = self.env["account.move.line"].sudo()
+        lines = Line.search([
+            ("account_id", "=", journal.default_account_id.id),
+            ("parent_state", "=", "posted"),
+        ])
+        return sum(lines.mapped("balance"))
+
+    @api.model
+    def _get_zig_usd_rate(self):
+        """Manual override at neon_dashboard.zig_usd_rate_manual.
+        Returns float; 0 means "no rate set". Per
+        project_zig_usd_rate_manual_only: there is no fallback to an
+        auto-fetched value (no RBZ cron). The manual value is the
+        single source of truth."""
+        Config = self.env["ir.config_parameter"].sudo()
+        try:
+            raw = Config.get_param(
+                "neon_dashboard.zig_usd_rate_manual", "0") or "0"
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = 0.0
+        return value if value > 0 else 0.0
+
+    @api.model
+    def _zig_rate_source(self):
+        """'manual' when the override is non-zero, else 'unset'.
+        Reserved values 'rbz' / 'auto' exist in the schema for
+        forward-compat but are never set by current code."""
+        return "manual" if self._get_zig_usd_rate() > 0 else "unset"
+
+    @api.model
+    def _zig_rate_timestamp_harare(self):
+        """Returns the rate-last-updated timestamp formatted in
+        Africa/Harare for display. Empty string if unset."""
+        Config = self.env["ir.config_parameter"].sudo()
+        raw = Config.get_param(
+            "neon_dashboard.zig_usd_rate_updated_at", "") or ""
+        if not raw:
+            return ""
+        try:
+            dt = fields.Datetime.from_string(raw)
+        except Exception:  # noqa: BLE001
+            try:
+                from datetime import datetime as _dt
+                dt = _dt.fromisoformat(raw.split(".")[0])
+            except Exception:  # noqa: BLE001
+                return raw
+        return self._format_harare_timestamp(dt)
+
+    @api.model
+    def _cash_subtitle(self, usd, zig, rate):
+        """Build the cash-tile subtitle disclosing the breakdown.
+        Never silent -- the user always sees what's included and
+        why ZiG might be excluded."""
+        if zig == 0 and usd > 0:
+            return _("USD only")
+        if zig == 0 and usd == 0:
+            return _("No cash on hand")
+        if usd == 0 and zig > 0 and rate:
+            return _("ZiG %(z)s @ %(r).2f") % {
+                "z": self._format_money(zig, "ZWG"), "r": rate}
+        if usd > 0 and zig > 0 and rate:
+            return _(
+                "USD %(u)s + ZiG %(z)s @ %(r).2f"
+            ) % {
+                "u": self._format_money(usd, "USD"),
+                "z": self._format_money(zig, "ZWG"),
+                "r": rate,
+            }
+        # zig > 0 and no rate -- exclusion path; subtitle says so.
+        return _(
+            "USD %(u)s (ZiG %(z)s excluded -- no rate)"
+        ) % {
+            "u": self._format_money(usd, "USD"),
+            "z": self._format_money(zig, "ZWG"),
         }
 
     def _kpi_ar_overdue(self):
@@ -1301,4 +1431,128 @@ class NeonDashboard(models.Model):
                 }
                 for name, count in ranked
             ],
+        }
+
+    # ==================================================================
+    # M6 -- Finance block (AR aging + cash detail).
+    #
+    # The block consumes the same cash breakdown as the Cash KPI tile
+    # (single round-trip; one journal walk per RPC). AR aging is
+    # 3-bucket (0-30 / 31-60 / 61-90+) with the 61-90+ bucket marked
+    # critical for the mockup F3 red highlight.
+    #
+    # ⚠️ DECISION (M6, marker 4): AR sums in USD-equivalent. USD
+    # invoices contribute their amount_residual directly; ZiG
+    # invoices convert via the manual rate. If the rate is unset,
+    # ZiG invoices are excluded from the bucket totals AND the
+    # exclusion is surfaced via a 'zig_excluded' flag the OWL
+    # template renders as a subtitle.
+    #
+    # ⚠️ DECISION (M6, marker 5): "today" cutoff for overdue uses
+    # Harare today (per p8a-hygiene gate-1 lock). Invoice
+    # invoice_date_due is a Date field stored TZ-naively; comparing
+    # to Harare-today gives the Robin-friendly answer at any UTC
+    # clock-hour.
+    # ==================================================================
+    @api.model
+    def _compute_finance_block(self, dashboard_type):
+        cash = self._cash_journals_breakdown()
+        ar = self._compute_ar_aging()
+        return {
+            "cash": cash,
+            "ar_aging": ar,
+        }
+
+    @api.model
+    def _compute_ar_aging(self):
+        today = self._today_harare()
+        Move = self.env["account.move"].sudo()
+        overdue = Move.search([
+            ("move_type", "=", "out_invoice"),
+            ("state", "=", "posted"),
+            ("payment_state", "in",
+             ("not_paid", "partial", "in_payment")),
+            ("invoice_date_due", "<", today),
+        ])
+
+        rate = self._get_zig_usd_rate()
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        zwg = self.env.ref(
+            "neon_finance.currency_zwg", raise_if_not_found=False)
+
+        buckets = {
+            "0-30": {"count": 0, "amount_usd_equiv": 0.0},
+            "31-60": {"count": 0, "amount_usd_equiv": 0.0},
+            "61-90+": {"count": 0, "amount_usd_equiv": 0.0},
+        }
+        zig_excluded_count = 0
+
+        for inv in overdue:
+            days = (today - inv.invoice_date_due).days
+            if days <= 30:
+                bucket = "0-30"
+            elif days <= 60:
+                bucket = "31-60"
+            else:
+                bucket = "61-90+"
+            buckets[bucket]["count"] += 1
+            residual = inv.amount_residual or 0.0
+            inv_currency = inv.currency_id
+            if usd and inv_currency.id == usd.id:
+                buckets[bucket]["amount_usd_equiv"] += residual
+            elif zwg and inv_currency.id == zwg.id:
+                if rate and rate > 0:
+                    buckets[bucket]["amount_usd_equiv"] += residual / rate
+                else:
+                    zig_excluded_count += 1
+                    # Don't add to total; surfaced via flag.
+            else:
+                # Other currencies (unusual on this build): treat
+                # as USD-equivalent at face value rather than skip.
+                buckets[bucket]["amount_usd_equiv"] += residual
+
+        if not overdue:
+            return {
+                "empty": True,
+                "empty_message": _("No overdue invoices"),
+                "buckets": [],
+                "total_count": 0,
+                "total_amount_display": "$0",
+                "zig_excluded_count": 0,
+                "deeplink_action":
+                    "neon_finance.action_dashboard_top_overdue",
+            }
+
+        bucket_rows = []
+        for key, label, critical in (
+            ("0-30", _("0-30 days"), False),
+            ("31-60", _("31-60 days"), False),
+            ("61-90+", _("61-90+ days"), True),
+        ):
+            data = buckets[key]
+            bucket_rows.append({
+                "key": key,
+                "label": label,
+                "count": data["count"],
+                "amount": data["amount_usd_equiv"],
+                "amount_display": self._format_money(
+                    data["amount_usd_equiv"], "USD"),
+                "critical": critical,
+            })
+        total_amount = sum(b["amount"] for b in bucket_rows)
+        return {
+            "empty": False,
+            "buckets": bucket_rows,
+            "total_count": len(overdue),
+            "total_amount_display": self._format_money(
+                total_amount, "USD"),
+            "zig_excluded_count": zig_excluded_count,
+            "zig_excluded_message": (
+                _(
+                    "%(n)s ZiG invoice(s) excluded -- no rate set"
+                ) % {"n": zig_excluded_count}
+                if zig_excluded_count else ""
+            ),
+            "deeplink_action":
+                "neon_finance.action_dashboard_top_overdue",
         }

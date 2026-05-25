@@ -121,14 +121,10 @@ export class NeonDashboard extends Component {
     }
 
     onFilterChange(filter) {
-        // M5: "all", "operations", "sales" are functional; "finance"
-        // remains a toast until M6 ships the Finance block.
-        if (filter === "finance") {
-            this.notification.add(
-                _t("'finance' filter ships in Phase 8A M6."),
-                { type: "info" });
-            return;
-        }
+        // M6: "all", "operations", "sales", "finance" all functional.
+        // The Finance chip drives a Bookkeeper-style view (Cash + AR
+        // + Forecast KPI + Finance block visible; Jobs/Sales/Crew
+        // hidden).
         this.state.activeFilter = filter;
     }
 
@@ -265,6 +261,50 @@ export class NeonDashboard extends Component {
                 lead_sources: { empty: true, sources: [] },
             }
         );
+    }
+
+    get financeBlock() {
+        return (
+            (this.state.data && this.state.data.finance_block) || {
+                cash: { empty: true, usd_total: 0, zig_total: 0,
+                        rate: 0, zig_in_usd: 0,
+                        rate_source: "unset", rate_as_of: "" },
+                ar_aging: { empty: true, buckets: [],
+                            total_count: 0, total_amount_display: "$0",
+                            zig_excluded_count: 0 },
+            }
+        );
+    }
+
+    formatUsd(v) {
+        if (v === null || v === undefined || isNaN(v)) return "$0";
+        if (Math.abs(v) >= 1000) {
+            return "$" + (v / 1000).toFixed(1) + "k";
+        }
+        return "$" + Math.round(v).toLocaleString("en-US");
+    }
+
+    formatZwg(v) {
+        if (v === null || v === undefined || isNaN(v)) return "Z$0";
+        if (Math.abs(v) >= 1000) {
+            return "Z$" + (v / 1000).toFixed(1) + "k";
+        }
+        return "Z$" + Math.round(v).toLocaleString("en-US");
+    }
+
+    async onManageRateClick() {
+        await this.action.doAction(
+            "neon_dashboard.action_neon_dashboard_zig_rate_wizard");
+    }
+
+    async onAgingBucketClick(bucket) {
+        const xmlid = this.financeBlock.ar_aging.deeplink_action;
+        if (!xmlid) return;
+        // Per-bucket filtering at the URL level is awkward (the AR
+        // aging buckets are derived in our compute, not stored on
+        // the move). Open the overdue list; the user can filter
+        // further from there.
+        await this.action.doAction(xmlid);
     }
 
     async onPipelineStageClick(stage) {
