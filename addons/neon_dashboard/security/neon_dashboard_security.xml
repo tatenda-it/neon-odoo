@@ -67,5 +67,23 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
+        <!-- ============================================================
+             M7 - per-user alert dismissal rule.
+             Internal users see + create only their own rows.
+             Superuser bypasses for audit override.
+             ============================================================ -->
+        <record id="rule_neon_dashboard_alert_dismissal_own"
+                model="ir.rule">
+            <field name="name">Alert dismissal: own user only</field>
+            <field name="model_id"
+                   ref="model_neon_dashboard_alert_dismissal"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
     </data>
 </odoo>

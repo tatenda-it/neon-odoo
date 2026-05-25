@@ -19,3 +19,5 @@ access_neon_dashboard_target_sales_rep,target / sales rep read-only,model_neon_d
 access_neon_dashboard_target_lead_tech,target / lead tech read-only,model_neon_dashboard_target,neon_core.group_neon_lead_tech,1,0,0,0
 access_neon_dashboard_target_crew,target / crew read-only,model_neon_dashboard_target,neon_core.group_neon_crew,1,0,0,0
 access_neon_dashboard_zig_rate_wizard_superuser,zig rate wizard / superuser,model_neon_dashboard_zig_rate_wizard,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_alert_dismissal_internal,alert dismissal / internal users,model_neon_dashboard_alert_dismissal,base.group_user,1,1,1,0
+access_neon_dashboard_alert_dismissal_superuser,alert dismissal / superuser,model_neon_dashboard_alert_dismissal,neon_core.group_neon_superuser,1,1,1,1

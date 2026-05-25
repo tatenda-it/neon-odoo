@@ -276,6 +276,45 @@ export class NeonDashboard extends Component {
         );
     }
 
+    get alertsBlock() {
+        return (
+            (this.state.data && this.state.data.alerts_block) || {
+                empty: true,
+                empty_message: "Everything looks healthy",
+                total_count: 0,
+                severity_counts: { critical: 0, warning: 0, info: 0 },
+                alerts: [],
+                has_more: false,
+            }
+        );
+    }
+
+    async onAlertClick(alert) {
+        if (!alert || !alert.deeplink_action) return;
+        if (alert.deeplink_res_id) {
+            await this.action.doAction(alert.deeplink_action, {
+                additionalContext: {
+                    active_id: alert.deeplink_res_id,
+                },
+            });
+        } else {
+            await this.action.doAction(alert.deeplink_action);
+        }
+    }
+
+    async onAlertAck(alert) {
+        if (!alert || !alert.fingerprint) return;
+        // RPC to dismiss + receive refreshed alerts block.
+        const refreshed = await this.orm.call(
+            "neon.dashboard",
+            "dashboard_dismiss_alert",
+            [alert.fingerprint],
+        );
+        if (this.state.data) {
+            this.state.data.alerts_block = refreshed;
+        }
+    }
+
     formatUsd(v) {
         if (v === null || v === undefined || isNaN(v)) return "$0";
         if (Math.abs(v) >= 1000) {

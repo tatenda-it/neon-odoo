@@ -424,6 +424,9 @@ class NeonDashboard(models.Model):
             # metadata). Shares the cash breakdown payload with the
             # Cash KPI tile so the two views never disagree.
             "finance_block": self._compute_finance_block(resolved_type),
+            # M7: Alerts block. Aggregates from 5 sources, filters
+            # per-user dismissals, returns severity-sorted list.
+            "alerts_block": self._compute_alerts_block(resolved_type),
             "available_types": self._available_types_for_user(),
             # p8a-hygiene tz: render the refresh timestamp in
             # Africa/Harare so Robin sees the operational TZ.
@@ -1556,3 +1559,446 @@ class NeonDashboard(models.Model):
             "deeplink_action":
                 "neon_finance.action_dashboard_top_overdue",
         }
+
+    # ==================================================================
+    # M7 -- Alerts panel.
+    #
+    # ⚠️ DECISION (M7, marker 4): five sources, per-user dismissal,
+    # severity sort. Each source returns a list of alert dicts with
+    # a stable ``fingerprint``. _compute_alerts_block aggregates,
+    # filters by per-tier scoping (gate-1 lock §Per-source tier
+    # scoping), filters out dismissed fingerprints, sorts by
+    # (severity, detected_at), caps at 10 with has_more flag.
+    #
+    # ⚠️ DECISION (M7, marker 5): fingerprint scheme (gate-1 locked):
+    #   overdue_invoice:<id>:week-<iso-year>-<iso-week>
+    #   pending_approval:<id>:week-<iso-year>-<iso-week>
+    #   crew_gap:<job_id>:<event_date_iso>
+    #   stale_quote:<id>:week-<iso-year>-<iso-week>
+    #   forecast_at_risk:<target_id>
+    # ISO-week bucket on time-decaying sources gives automatic
+    # re-surface next week if the underlying condition persists.
+    # Crew_gap uses event_date so a rescheduled event re-surfaces.
+    # Forecast uses target id only -- new target period = new
+    # fingerprint.
+    #
+    # ⚠️ DECISION (M7, marker 6): documented v1 limitation -- the
+    # fingerprint does NOT re-surface on severity escalation alone.
+    # An overdue invoice dismissed at 'warning' age stays dismissed
+    # when it crosses into 'critical' age within the same ISO week.
+    # Re-surfacing on severity change is a Phase 8.5 polish item:
+    # would require encoding severity in the fingerprint, which
+    # makes every-day-the-clock-ticks generate a new dismissal row.
+    # Acceptable for v1 given the weekly re-surface cadence.
+    # ==================================================================
+    _ALERT_MAX_VISIBLE = 10
+
+    _SEVERITY_RANK = {"critical": 0, "warning": 1, "info": 2}
+
+    @api.model
+    def _iso_week_bucket(self, dt_or_date):
+        """Return 'week-<iso-year>-<iso-week>' for the given datetime
+        or date. Bucket is computed in Harare-tz so a dismiss at
+        23:30 UTC Sunday (Harare Monday 01:30) lands in the new
+        week as expected."""
+        if hasattr(dt_or_date, "astimezone"):
+            local = dt_or_date.astimezone(HARARE_TZ).date()
+        elif hasattr(dt_or_date, "isocalendar"):
+            local = dt_or_date
+        else:
+            local = self._today_harare()
+        y, w, _d = local.isocalendar()
+        return f"week-{y:04d}-{w:02d}"
+
+    @api.model
+    def _compute_alerts_block(self, dashboard_type):
+        user = self.env.user
+        flat = []
+        flat.extend(self._alerts_overdue_invoices(user))
+        flat.extend(self._alerts_pending_approvals(user))
+        flat.extend(self._alerts_crew_gaps(user))
+        flat.extend(self._alerts_stale_quotes(user))
+        flat.extend(self._alerts_forecast_at_risk(user))
+
+        # Filter dismissed.
+        Dismissal = self.env["neon.dashboard.alert.dismissal"]
+        dismissed = Dismissal.get_dismissed_fingerprints_for_user(
+            user.id)
+        flat = [a for a in flat if a["fingerprint"] not in dismissed]
+
+        # Severity sort (critical first), detected_at desc within.
+        flat.sort(key=lambda a: (
+            self._SEVERITY_RANK.get(a["severity"], 99),
+            -1 * self._isoformat_to_sortable_int(
+                a.get("detected_at", "")),
+        ))
+
+        severity_counts = {"critical": 0, "warning": 0, "info": 0}
+        for a in flat:
+            sev = a.get("severity", "info")
+            if sev in severity_counts:
+                severity_counts[sev] += 1
+
+        total = len(flat)
+        visible = flat[: self._ALERT_MAX_VISIBLE]
+        has_more = total > self._ALERT_MAX_VISIBLE
+
+        if total == 0:
+            return {
+                "empty": True,
+                "empty_message": _("Everything looks healthy"),
+                "total_count": 0,
+                "severity_counts": severity_counts,
+                "alerts": [],
+                "has_more": False,
+            }
+        return {
+            "empty": False,
+            "total_count": total,
+            "severity_counts": severity_counts,
+            "alerts": visible,
+            "has_more": has_more,
+        }
+
+    @staticmethod
+    def _isoformat_to_sortable_int(iso_string):
+        """Sort-key for ISO timestamps: strip non-digits, parse to
+        int. Lexical/numeric ordering matches chronological."""
+        if not iso_string:
+            return 0
+        digits = "".join(c for c in iso_string if c.isdigit())
+        return int(digits[:14]) if digits else 0
+
+    # ------------------------------------------------------------------
+    # Tier-scoping helpers (gate-1 lock).
+    # ------------------------------------------------------------------
+    @api.model
+    def _user_is_approver(self, user=None):
+        user = user or self.env.user
+        return user.has_group(
+            "neon_finance.group_neon_finance_approver")
+
+    @api.model
+    def _user_is_bookkeeper(self, user=None):
+        user = user or self.env.user
+        return user.has_group(
+            "neon_finance.group_neon_finance_bookkeeper")
+
+    @api.model
+    def _user_is_sales(self, user=None):
+        user = user or self.env.user
+        return (user.has_group("neon_finance.group_neon_finance_sales")
+                or user.has_group("neon_core.group_neon_sales_rep"))
+
+    @api.model
+    def _user_is_lead_tech(self, user=None):
+        user = user or self.env.user
+        return (user.has_group("neon_jobs.group_neon_jobs_crew_leader")
+                or user.has_group("neon_core.group_neon_lead_tech"))
+
+    # ------------------------------------------------------------------
+    # Source (a): Overdue invoices.
+    # ------------------------------------------------------------------
+    @api.model
+    def _alerts_overdue_invoices(self, user):
+        is_super = self._is_superuser(user)
+        is_approver = self._user_is_approver(user)
+        is_bookkeeper = self._user_is_bookkeeper(user)
+        is_sales = self._user_is_sales(user)
+        if not (is_super or is_approver or is_bookkeeper or is_sales):
+            return []
+
+        today = self._today_harare()
+        Move = self.env["account.move"].sudo()
+        base = [
+            ("move_type", "=", "out_invoice"),
+            ("state", "=", "posted"),
+            ("payment_state", "in",
+             ("not_paid", "partial", "in_payment")),
+            ("invoice_date_due", "<", today),
+        ]
+        if is_sales and not (is_super or is_approver or is_bookkeeper):
+            user_quotes = self.env["neon.finance.quote"].sudo().search([
+                ("salesperson_id", "=", user.id),
+            ])
+            user_sched_names = self.env[
+                "neon.finance.invoice.schedule"
+            ].sudo().search([
+                ("quote_id", "in", user_quotes.ids),
+            ]).mapped("name")
+            if not user_sched_names:
+                return []
+            base = base + [("ref", "in", user_sched_names)]
+
+        overdue = Move.search(base)
+        week_bucket = self._iso_week_bucket(today)
+        now_iso = self._now_harare().isoformat()
+        alerts = []
+        for inv in overdue:
+            days = (today - inv.invoice_date_due).days
+            if days > 90:
+                severity = "critical"
+            elif days > 30:
+                severity = "warning"
+            else:
+                severity = "info"
+            alerts.append({
+                "fingerprint":
+                    f"overdue_invoice:{inv.id}:{week_bucket}",
+                "source": "finance",
+                "severity": severity,
+                "title": _(
+                    "Invoice %(name)s - %(days)d days overdue"
+                ) % {"name": inv.name or inv.ref or f"#{inv.id}",
+                     "days": days},
+                "subtitle": _(
+                    "%(partner)s - %(amt)s"
+                ) % {
+                    "partner": (inv.partner_id.name or ""),
+                    "amt": self._format_money(
+                        inv.amount_residual,
+                        inv.currency_id.name or "USD"),
+                },
+                "detected_at": now_iso,
+                "deeplink_action":
+                    "neon_finance.action_dashboard_top_overdue",
+                "deeplink_res_id": inv.id,
+                "can_acknowledge": True,
+            })
+        return alerts
+
+    # ------------------------------------------------------------------
+    # Source (b): Pending OD/MD approvals.
+    # ------------------------------------------------------------------
+    @api.model
+    def _alerts_pending_approvals(self, user):
+        if not (self._is_superuser(user)
+                or self._user_is_approver(user)):
+            return []
+        Quote = self.env["neon.finance.quote"].sudo()
+        pending = Quote.search([("state", "=", "pending_approval")])
+        now_harare = self._now_harare()
+        today = self._today_harare()
+        week_bucket = self._iso_week_bucket(today)
+        now_iso = now_harare.isoformat()
+        alerts = []
+        for q in pending:
+            write_dt = q.write_date
+            if write_dt is None:
+                hours_pending = 0
+            else:
+                aware = pytz.utc.localize(write_dt)
+                hours_pending = (
+                    now_harare - aware
+                ).total_seconds() / 3600.0
+            if hours_pending > 72:
+                severity = "critical"
+            elif hours_pending > 24:
+                severity = "warning"
+            else:
+                severity = "info"
+            alerts.append({
+                "fingerprint":
+                    f"pending_approval:{q.id}:{week_bucket}",
+                "source": "sales",
+                "severity": severity,
+                "title": _(
+                    "Quote %(name)s pending approval"
+                ) % {"name": q.name or f"#{q.id}"},
+                "subtitle": _(
+                    "%(partner)s - %(amt)s - %(hrs)d hours waiting"
+                ) % {
+                    "partner": (q.partner_id.name or ""),
+                    "amt": self._format_money(
+                        q.amount_total,
+                        q.currency_id.name or "USD"),
+                    "hrs": int(hours_pending),
+                },
+                "detected_at": now_iso,
+                "deeplink_action":
+                    "neon_finance.action_dashboard_pipeline",
+                "deeplink_res_id": q.id,
+                "can_acknowledge": True,
+            })
+        return alerts
+
+    # ------------------------------------------------------------------
+    # Source (c): Crew gaps.
+    # ------------------------------------------------------------------
+    @api.model
+    def _alerts_crew_gaps(self, user):
+        if not (self._is_superuser(user)
+                or self._user_is_approver(user)
+                or self._user_is_lead_tech(user)):
+            return []
+        EventJob = self.env["commercial.event.job"].sudo()
+        today = self._today_harare()
+        end = today + timedelta(days=7)
+        jobs = EventJob.search([
+            ("event_date", ">=", today),
+            ("event_date", "<=", end),
+            ("state", "not in", ("cancelled", "released")),
+        ])
+        now_iso = self._now_harare().isoformat()
+        alerts = []
+        for job in jobs:
+            total = job.crew_total_count or 0
+            confirmed = job.crew_confirmed_count or 0
+            gap = total - confirmed
+            if gap <= 0:
+                continue
+            days_until = (job.event_date - today).days
+            severity = "critical" if days_until <= 2 else "warning"
+            event_iso = job.event_date.isoformat()
+            alerts.append({
+                "fingerprint":
+                    f"crew_gap:{job.id}:{event_iso}",
+                "source": "operations",
+                "severity": severity,
+                "title": _(
+                    "Crew gap: %(name)s - %(gap)d needed"
+                ) % {"name": job.name, "gap": gap},
+                "subtitle": _(
+                    "%(date)s (%(days)d days) - "
+                    "%(conf)d/%(total)d confirmed"
+                ) % {
+                    "date": (job.event_date.strftime("%a %d %b")
+                             if job.event_date else ""),
+                    "days": days_until,
+                    "conf": confirmed,
+                    "total": total,
+                },
+                "detected_at": now_iso,
+                "deeplink_action":
+                    "neon_jobs.commercial_event_job_action",
+                "deeplink_res_id": job.id,
+                "can_acknowledge": True,
+            })
+        return alerts
+
+    # ------------------------------------------------------------------
+    # Source (d): Stale quotes.
+    # ------------------------------------------------------------------
+    @api.model
+    def _alerts_stale_quotes(self, user):
+        is_super = self._is_superuser(user)
+        is_approver = self._user_is_approver(user)
+        is_sales = self._user_is_sales(user)
+        if not (is_super or is_approver or is_sales):
+            return []
+        Quote = self.env["neon.finance.quote"].sudo()
+        now_harare = self._now_harare()
+        cutoff_14 = (now_harare - timedelta(days=14)).astimezone(
+            pytz.utc).replace(tzinfo=None)
+        domain = [
+            ("state", "in",
+             ("pending_approval", "approved", "sent")),
+            ("write_date", "<", cutoff_14),
+        ]
+        if is_sales and not (is_super or is_approver):
+            domain.append(("salesperson_id", "=", user.id))
+        stale = Quote.search(domain)
+        today = self._today_harare()
+        week_bucket = self._iso_week_bucket(today)
+        now_iso = now_harare.isoformat()
+        alerts = []
+        for q in stale:
+            aware = pytz.utc.localize(q.write_date)
+            age_days = (now_harare - aware).days
+            severity = "warning" if age_days > 30 else "info"
+            alerts.append({
+                "fingerprint":
+                    f"stale_quote:{q.id}:{week_bucket}",
+                "source": "sales",
+                "severity": severity,
+                "title": _(
+                    "Quote %(name)s stale (%(days)d days)"
+                ) % {"name": q.name or f"#{q.id}", "days": age_days},
+                "subtitle": _(
+                    "%(partner)s - %(state)s - %(amt)s"
+                ) % {
+                    "partner": (q.partner_id.name or ""),
+                    "state": q.state,
+                    "amt": self._format_money(
+                        q.amount_total,
+                        q.currency_id.name or "USD"),
+                },
+                "detected_at": now_iso,
+                "deeplink_action":
+                    "neon_finance.action_dashboard_pipeline",
+                "deeplink_res_id": q.id,
+                "can_acknowledge": True,
+            })
+        return alerts
+
+    # ------------------------------------------------------------------
+    # Source (e): Forecast at risk.
+    # ------------------------------------------------------------------
+    @api.model
+    def _alerts_forecast_at_risk(self, user):
+        if not (self._is_superuser(user)
+                or self._user_is_approver(user)):
+            return []
+        Target = self.env["neon.dashboard.target"].sudo()
+        today = self._today_harare()
+        target = Target.search([
+            ("target_type", "=", "revenue"),
+            ("active", "=", True),
+            ("date_from", "<=", today),
+            ("date_to", ">=", today),
+        ], limit=1, order="date_from desc")
+        if not target:
+            return []
+        period_total = (target.date_to - target.date_from).days + 1
+        period_elapsed = (today - target.date_from).days + 1
+        if period_total <= 0:
+            return []
+        expected_pct = (period_elapsed / period_total) * 100.0
+        actual_pct = target.progress_pct or 0.0
+        gap = expected_pct - actual_pct
+        if gap < 20:
+            return []
+        return [{
+            "fingerprint": f"forecast_at_risk:{target.id}",
+            "source": "sales",
+            "severity": "warning",
+            "title": _(
+                "Forecast at risk: %(actual)d%% vs %(expected)d%% "
+                "expected"
+            ) % {"actual": int(actual_pct),
+                 "expected": int(expected_pct)},
+            "subtitle": _(
+                "%(name)s - %(elapsed)d of %(total)d days elapsed"
+            ) % {
+                "name": target.name,
+                "elapsed": period_elapsed,
+                "total": period_total,
+            },
+            "detected_at": self._now_harare().isoformat(),
+            "deeplink_action":
+                "neon_dashboard.action_neon_dashboard_target",
+            "deeplink_res_id": target.id,
+            "can_acknowledge": True,
+        }]
+
+    # ------------------------------------------------------------------
+    # Dismissal RPC -- idempotent ack.
+    # ------------------------------------------------------------------
+    @api.model
+    def dashboard_dismiss_alert(self, fingerprint):
+        """Creates a dismissal row for the current user if absent,
+        then returns the refreshed alerts_block payload."""
+        self._check_dashboard_access()
+        if fingerprint:
+            Dismissal = self.env["neon.dashboard.alert.dismissal"]
+            existing = Dismissal.search([
+                ("user_id", "=", self.env.user.id),
+                ("fingerprint", "=", fingerprint),
+            ], limit=1)
+            if not existing:
+                Dismissal.create({
+                    "user_id": self.env.user.id,
+                    "fingerprint": fingerprint,
+                })
+        resolved = self._resolve_dashboard_type(None)
+        return self._compute_alerts_block(resolved)

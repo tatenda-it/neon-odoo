@@ -599,6 +599,116 @@ $neon-bg:            #FAFAFC;
         }
     }
 
+    // -------- M7 Alerts block --------
+    .o_neon_block_alerts {
+        .o_neon_block_header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .o_neon_alerts_total {
+            font-size: 0.85em;
+            color: $neon-muted;
+            font-weight: 600;
+        }
+        .o_neon_alerts_severity_row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .o_neon_alerts_pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.75em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .o_neon_alerts_pill_critical {
+            background: rgba($neon-accent-red, 0.12);
+            color: $neon-accent-red;
+        }
+        .o_neon_alerts_pill_warning {
+            background: rgba($neon-accent-amber, 0.18);
+            color: darken($neon-accent-amber, 12%);
+        }
+        .o_neon_alerts_pill_info {
+            background: rgba($neon-accent-blue, 0.12);
+            color: $neon-accent-blue;
+        }
+        .o_neon_alerts_list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .o_neon_alerts_row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border-left: 3px solid transparent;
+            margin-bottom: 4px;
+        }
+        .o_neon_alerts_row_critical {
+            background: rgba($neon-accent-red, 0.05);
+            border-left-color: $neon-accent-red;
+        }
+        .o_neon_alerts_row_warning {
+            background: rgba($neon-accent-amber, 0.06);
+            border-left-color: $neon-accent-amber;
+        }
+        .o_neon_alerts_row_info {
+            background: rgba($neon-accent-blue, 0.05);
+            border-left-color: $neon-accent-blue;
+        }
+        .o_neon_alerts_dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        .o_neon_alerts_dot_critical { background: $neon-accent-red;   }
+        .o_neon_alerts_dot_warning  { background: $neon-accent-amber; }
+        .o_neon_alerts_dot_info     { background: $neon-accent-blue;  }
+        .o_neon_alerts_body {
+            flex: 1;
+            cursor: pointer;
+            min-width: 0;
+            &:hover .o_neon_alerts_title {
+                color: $neon-purple;
+                text-decoration: underline;
+            }
+        }
+        .o_neon_alerts_title {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: $neon-text;
+            line-height: 1.2;
+        }
+        .o_neon_alerts_subtitle {
+            color: $neon-muted;
+            display: block;
+            margin-top: 2px;
+        }
+        .o_neon_alerts_ack {
+            color: $neon-purple !important;
+            font-weight: 600;
+            font-size: 0.8em;
+            padding: 0 6px;
+            flex-shrink: 0;
+            &:hover { background: $neon-purple-pale; }
+        }
+        .o_neon_alerts_more {
+            text-align: center;
+            padding: 4px;
+        }
+    }
+
     // -------- Error / loading --------
     .o_neon_dashboard_error {
         margin-bottom: 8px;

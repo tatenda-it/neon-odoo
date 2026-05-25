@@ -481,12 +481,69 @@
                     </div>
 
                     <div t-if="isWidgetVisible('block_alerts')"
-                         class="o_neon_block o_neon_block_placeholder widget--block_alerts">
+                         class="o_neon_block o_neon_block_alerts widget--block_alerts">
                         <div class="o_neon_block_header">
                             <h3>Alerts</h3>
+                            <span class="o_neon_alerts_total"
+                                  t-if="!alertsBlock.empty">
+                                <t t-esc="alertsBlock.total_count"/> active
+                            </span>
                         </div>
                         <div class="o_neon_block_body">
-                            <p class="text-muted">Coming in M7.</p>
+                            <div t-if="alertsBlock.empty"
+                                 class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg">
+                                    <t t-esc="alertsBlock.empty_message"/> &#10003;
+                                </p>
+                            </div>
+
+                            <div t-if="!alertsBlock.empty"
+                                 class="o_neon_alerts_inner">
+                                <div class="o_neon_alerts_severity_row">
+                                    <span class="o_neon_alerts_pill o_neon_alerts_pill_critical"
+                                          t-if="alertsBlock.severity_counts.critical">
+                                        <t t-esc="alertsBlock.severity_counts.critical"/> critical
+                                    </span>
+                                    <span class="o_neon_alerts_pill o_neon_alerts_pill_warning"
+                                          t-if="alertsBlock.severity_counts.warning">
+                                        <t t-esc="alertsBlock.severity_counts.warning"/> warning
+                                    </span>
+                                    <span class="o_neon_alerts_pill o_neon_alerts_pill_info"
+                                          t-if="alertsBlock.severity_counts.info">
+                                        <t t-esc="alertsBlock.severity_counts.info"/> info
+                                    </span>
+                                </div>
+
+                                <ul class="o_neon_alerts_list">
+                                    <t t-foreach="alertsBlock.alerts"
+                                       t-as="alert" t-key="alert.fingerprint">
+                                        <li class="o_neon_alerts_row"
+                                            t-att-class="'o_neon_alerts_row_' + alert.severity">
+                                            <span class="o_neon_alerts_dot"
+                                                  t-att-class="'o_neon_alerts_dot_' + alert.severity"/>
+                                            <div class="o_neon_alerts_body"
+                                                 t-on-click="() => this.onAlertClick(alert)">
+                                                <div class="o_neon_alerts_title"
+                                                     t-esc="alert.title"/>
+                                                <small class="o_neon_alerts_subtitle"
+                                                       t-esc="alert.subtitle"/>
+                                            </div>
+                                            <button class="btn btn-sm btn-link o_neon_alerts_ack"
+                                                    t-if="alert.can_acknowledge"
+                                                    t-on-click="() => this.onAlertAck(alert)">
+                                                Ack
+                                            </button>
+                                        </li>
+                                    </t>
+                                </ul>
+
+                                <div t-if="alertsBlock.has_more"
+                                     class="o_neon_alerts_more">
+                                    <small class="text-muted">
+                                        + more alerts not shown
+                                    </small>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
