@@ -304,12 +304,105 @@
                     </div>
 
                     <div t-if="isWidgetVisible('block_crew_equipment')"
-                         class="o_neon_block o_neon_block_placeholder">
+                         class="o_neon_block o_neon_block_crew_equipment widget--block_crew_equipment">
                         <div class="o_neon_block_header">
                             <h3>Crew &amp; Equipment</h3>
                         </div>
                         <div class="o_neon_block_body">
-                            <p class="text-muted">Coming in M4.</p>
+
+                            <!-- Crew sub-widget -->
+                            <div class="o_neon_crew_subwidget">
+                                <div t-if="crewEquipment.crew.empty"
+                                     class="o_neon_block_empty">
+                                    <p class="o_neon_block_empty_msg"
+                                       t-esc="crewEquipment.crew.empty_message"/>
+                                    <button class="btn btn-link"
+                                            t-if="crewEquipment.crew.empty_cta_action"
+                                            t-on-click="() => this.onCrewEmptyClick()">
+                                        <t t-esc="crewEquipment.crew.empty_cta_label"/>
+                                    </button>
+                                </div>
+
+                                <table t-if="!crewEquipment.crew.empty"
+                                       class="o_neon_crew_table">
+                                    <thead>
+                                        <tr>
+                                            <th>Crew</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="crewEquipment.crew.rows"
+                                           t-as="crewRow" t-key="crewRow.user_id">
+                                            <tr class="o_neon_crew_row"
+                                                t-att-class="crewRow.deeplink_event_job_id ? 'o_neon_crew_row_clickable' : ''"
+                                                t-on-click="() => this.onCrewRowClick(crewRow)">
+                                                <td>
+                                                    <div class="o_neon_crew_name"
+                                                         t-esc="crewRow.name"/>
+                                                    <small class="text-muted"
+                                                           t-esc="crewRow.role_label"/>
+                                                </td>
+                                                <td>
+                                                    <span class="o_neon_crew_status"
+                                                          t-att-class="'o_neon_crew_status_' + crewRow.status"
+                                                          t-esc="crewRow.booking_label"/>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+
+                                <!-- Gap indicators (events with confirmed < required) -->
+                                <div t-if="crewEquipment.crew.gaps and crewEquipment.crew.gaps.length"
+                                     class="o_neon_crew_gaps">
+                                    <h4>Gaps</h4>
+                                    <t t-foreach="crewEquipment.crew.gaps"
+                                       t-as="gap" t-key="gap.event_job_id">
+                                        <div class="o_neon_crew_gap_row"
+                                             t-on-click="() => this.onCrewGapClick(gap)">
+                                            <span class="o_neon_crew_gap_badge">
+                                                Gap - <t t-esc="gap.gap_count"/> needed
+                                            </span>
+                                            <span class="o_neon_crew_gap_event">
+                                                <t t-esc="gap.event_name"/>
+                                                <small class="text-muted">
+                                                    <t t-esc="gap.event_date"/>
+                                                </small>
+                                            </span>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Equipment sub-widget (one-liner per category) -->
+                            <div class="o_neon_equipment_subwidget">
+                                <div t-if="crewEquipment.equipment.empty"
+                                     class="o_neon_block_empty">
+                                    <p class="o_neon_block_empty_msg"
+                                       t-esc="crewEquipment.equipment.empty_message"/>
+                                    <button class="btn btn-link"
+                                            t-if="crewEquipment.equipment.empty_cta_action"
+                                            t-on-click="() => this.onEquipmentEmptyClick()">
+                                        <t t-esc="crewEquipment.equipment.empty_cta_label"/>
+                                    </button>
+                                </div>
+
+                                <div t-if="!crewEquipment.equipment.empty"
+                                     class="o_neon_equipment_line">
+                                    <h4>Equipment</h4>
+                                    <t t-foreach="crewEquipment.equipment.categories"
+                                       t-as="cat" t-key="cat.category_id || 'uncategorised'">
+                                        <span class="o_neon_equipment_cat"
+                                              t-on-click="() => this.onEquipmentCatClick(cat)">
+                                            <span class="o_neon_equipment_cat_name"
+                                                  t-esc="cat.category_name"/>:
+                                            <span class="o_neon_equipment_cat_count"
+                                                  t-esc="cat.display"/>
+                                        </span>
+                                    </t>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>

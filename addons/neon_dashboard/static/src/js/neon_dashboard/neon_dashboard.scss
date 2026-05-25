@@ -301,6 +301,122 @@ $neon-bg:            #FAFAFC;
         margin-left: 4px;
     }
 
+    // -------- M4 Crew & Equipment block --------
+    .o_neon_block_crew_equipment {
+        .o_neon_crew_subwidget {
+            margin-bottom: 12px;
+        }
+
+        .o_neon_crew_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+            thead th {
+                text-align: left;
+                color: $neon-muted;
+                font-weight: 600;
+                border-bottom: 1px solid $neon-line;
+                padding: 4px 6px;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+                font-size: 0.85em;
+            }
+            tbody td {
+                padding: 6px;
+                border-bottom: 1px solid $neon-line;
+                vertical-align: middle;
+            }
+            .o_neon_crew_row_clickable {
+                cursor: pointer;
+                &:hover { background: $neon-purple-pale; }
+            }
+            .o_neon_crew_name {
+                font-weight: 600;
+                color: $neon-text;
+            }
+        }
+
+        .o_neon_crew_status {
+            font-size: 0.8em;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .o_neon_crew_status_booked {
+            background: $neon-accent-blue;
+            color: white;
+        }
+        .o_neon_crew_status_available {
+            background: $neon-purple-pale;
+            color: $neon-purple;
+        }
+
+        .o_neon_crew_gaps {
+            margin-top: 8px;
+            padding: 6px 8px;
+            background: rgba($neon-accent-red, 0.06);
+            border-left: 3px solid $neon-accent-red;
+            border-radius: 4px;
+            h4 {
+                margin: 0 0 4px;
+                font-size: 0.85em;
+                color: $neon-accent-red;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+        }
+        .o_neon_crew_gap_row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 3px 0;
+            font-size: 0.85em;
+            cursor: pointer;
+            &:hover { background: rgba($neon-accent-red, 0.12); }
+        }
+        .o_neon_crew_gap_badge {
+            color: $neon-accent-red;
+            font-weight: 700;
+        }
+        .o_neon_crew_gap_event {
+            color: $neon-text;
+            small { margin-left: 6px; }
+        }
+
+        .o_neon_equipment_subwidget {
+            padding-top: 8px;
+            border-top: 1px solid $neon-line;
+        }
+        .o_neon_equipment_line {
+            h4 {
+                margin: 0 0 6px;
+                font-size: 0.85em;
+                color: $neon-muted;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+        .o_neon_equipment_cat {
+            display: inline-block;
+            margin-right: 14px;
+            cursor: pointer;
+            &:hover .o_neon_equipment_cat_name {
+                text-decoration: underline;
+            }
+        }
+        .o_neon_equipment_cat_name {
+            color: $neon-purple;
+            font-weight: 600;
+        }
+        .o_neon_equipment_cat_count {
+            color: $neon-text;
+            margin-left: 2px;
+            font-variant-numeric: tabular-nums;
+        }
+    }
+
     // -------- Error / loading --------
     .o_neon_dashboard_error {
         margin-bottom: 8px;

@@ -348,6 +348,11 @@ class NeonDashboard(models.Model):
             "layout": self._serialize_layout(dashboard),
             "kpi": self._compute_kpi(resolved_type),
             "jobs_block": self._compute_jobs_block(resolved_type),
+            # M4: Crew & Equipment block. dashboard_type currently
+            # unused but reserved for Phase 8B variant scoping (lead
+            # tech sees own crew assignments only, etc.).
+            "crew_equipment_block":
+                self._compute_crew_equipment_block(resolved_type),
             "available_types": self._available_types_for_user(),
             "last_updated": fields.Datetime.to_string(
                 fields.Datetime.now()),
@@ -733,3 +738,290 @@ class NeonDashboard(models.Model):
         if days_out == 1:
             return _("1 day")
         return _("%d days") % days_out
+
+    # ==================================================================
+    # Crew & Equipment block (M4).
+    #
+    # ⚠️ DECISION (M4, marker 1): crew availability reads through
+    # commercial_job_id.crew_assignment_ids on event_job. The crew
+    # assignment model is commercial.job.crew (on the parent
+    # commercial.job, NOT event_job-direct). Reaches by traversing the
+    # related field. Discovery confirmed M1-M3 Jobs block already does
+    # this pattern via crew_total_count / crew_confirmed_count
+    # computes.
+    #
+    # ⚠️ DECISION (M4, marker 2): two-bucket equipment count -- "out"
+    # vs "in workshop". Damaged / maintenance / decommissioned /
+    # returned / draft units are EXCLUDED from the totals (they're
+    # anomaly states, not "available stock" or "currently out").
+    # Mockup-exact format: "Audio: 3/4" reads as out/(out+workshop).
+    # If a lead tech wants the full state breakdown they have the
+    # workshop dashboard from P5.M10. Trade-off is honest signal vs.
+    # mockup parity; mockup wins per the schema-sketch lock.
+    #
+    # ⚠️ DECISION (M4, marker 3): "out" definition follows the
+    # gate-1 lock: unit.state in (reserved, checked_out, transferred).
+    # "transferred" is included even when both endpoints are internal
+    # (workshop A -> workshop B) because the headline question is "is
+    # it physically at THE workshop right now" -- a unit in transit
+    # isn't on the shelf for next event's allocation regardless of
+    # destination.
+    # ==================================================================
+    @api.model
+    def _compute_crew_equipment_block(self, dashboard_type):
+        """Two sub-widgets stacked vertically: crew availability table
+        (next 7 days, one row per user_id who carries a crew
+        assignment in the window or who is a lead-tech-tier user) +
+        equipment one-liner (out vs workshop per category)."""
+        return {
+            "crew": self._compute_crew_availability(dashboard_type),
+            "equipment": self._compute_equipment_summary(dashboard_type),
+        }
+
+    @api.model
+    def _compute_crew_availability(self, dashboard_type):
+        """Walk event_jobs in the next 7 days, aggregate crew
+        assignments by user_id. Each user gets: name + role + booking
+        range OR 'Available'. Sales/lead-tech variants (Phase 8B) can
+        scope by lead_tech_id; M4 returns all assignments for any
+        tier."""
+        today = fields.Date.context_today(self)
+        end = today + timedelta(days=7)
+        EventJob = self.env["commercial.event.job"].sudo()
+        Crew = self.env["commercial.job.crew"].sudo()
+
+        # ⚠️ DECISION (M4, marker 4): empty-state semantics. "No crew
+        # configured" means zero commercial.job.crew rows ANYWHERE,
+        # not zero in this 7-day window. A fresh install with no
+        # event_jobs but crew users present should render the crew
+        # list as "Available" (informational), not as an empty-state
+        # CTA pointing at Settings -> Users.
+        any_crew = Crew.search_count([])
+        if not any_crew:
+            return {
+                "empty": True,
+                "empty_message": _("No crew configured yet"),
+                "empty_cta_label": _("Add team members →"),
+                # base.action_res_users is the stock Users action.
+                # Settings -> Users is the canonical create path.
+                "empty_cta_action": "base.action_res_users",
+                "rows": [],
+            }
+
+        jobs = EventJob.search([
+            ("event_date", ">=", today),
+            ("event_date", "<=", end),
+            ("state", "not in", ("cancelled", "released")),
+        ])
+
+        # Aggregate assignments by user_id. Skip rows where user_id is
+        # NULL (freelancer-only contacts have partner_id but not
+        # user_id; M4 widget shows internal-team availability only --
+        # freelancer scheduling is a separate Phase 9 widget).
+        per_user = {}  # user_id -> {"name", "role", "events": [...]}
+        for job in jobs:
+            for assignment in job.commercial_job_id.crew_assignment_ids:
+                if not assignment.user_id:
+                    continue
+                # state == 'declined' means the crew member won't be
+                # there. Exclude from the booking display but keep
+                # the user as a row so they show "Available".
+                if assignment.state == "declined":
+                    continue
+                uid = assignment.user_id.id
+                entry = per_user.setdefault(uid, {
+                    "user_id": uid,
+                    "name": assignment.user_id.name,
+                    "role": assignment.role,
+                    "role_label":
+                        dict(assignment._fields["role"].selection).get(
+                            assignment.role, assignment.role),
+                    "events": [],
+                })
+                # Track first/last booked date for the range label.
+                entry["events"].append({
+                    "event_job_id": job.id,
+                    "event_name": job.name,
+                    "event_date": job.event_date,
+                    "state": assignment.state,
+                })
+
+        # Also include lead-tech-tier users who AREN'T booked in the
+        # window, so Robin sees the full availability picture.
+        lead_tech_group = self.env.ref(
+            "neon_jobs.group_neon_jobs_crew_leader",
+            raise_if_not_found=False,
+        )
+        if lead_tech_group:
+            for user in lead_tech_group.users:
+                if user.id in per_user:
+                    continue
+                per_user[user.id] = {
+                    "user_id": user.id,
+                    "name": user.name,
+                    "role": "lead_tech",
+                    "role_label": _("Lead Tech"),
+                    "events": [],
+                }
+
+        rows = []
+        for entry in per_user.values():
+            if entry["events"]:
+                # Build a compact "Mon-Thu" range label across the
+                # event_dates this user is booked for in the window.
+                sorted_dates = sorted(set(e["event_date"]
+                                          for e in entry["events"]
+                                          if e["event_date"]))
+                if sorted_dates:
+                    start_label = sorted_dates[0].strftime("%a")
+                    end_label = sorted_dates[-1].strftime("%a")
+                    if start_label == end_label:
+                        range_label = start_label
+                    else:
+                        range_label = f"{start_label}-{end_label}"
+                    booking_label = _(
+                        "%(range)s · Booked"
+                    ) % {"range": range_label}
+                else:
+                    booking_label = _("Booked")
+                status = "booked"
+            else:
+                booking_label = _("Available")
+                status = "available"
+
+            rows.append({
+                "user_id": entry["user_id"],
+                "name": entry["name"],
+                "role": entry["role"],
+                "role_label": entry["role_label"],
+                "booking_label": booking_label,
+                "status": status,
+                # First event_job for the deeplink target. If a user
+                # has multiple bookings, we pick the earliest.
+                "deeplink_event_job_id":
+                    entry["events"][0]["event_job_id"]
+                    if entry["events"] else False,
+            })
+
+        # Add gap rows: any event_job in the window with confirmed <
+        # required gets surfaced as a separate "Gap" row.
+        gap_rows = []
+        for job in jobs:
+            total = job.crew_total_count or 0
+            confirmed = job.crew_confirmed_count or 0
+            gap = total - confirmed
+            if gap > 0:
+                gap_rows.append({
+                    "event_job_id": job.id,
+                    "event_name": job.name,
+                    "client_name":
+                        (job.partner_id and job.partner_id.name) or "",
+                    "event_date": (job.event_date.strftime("%a %d %b")
+                                   if job.event_date else ""),
+                    "gap_count": gap,
+                    "crew_required": total,
+                    "crew_confirmed": confirmed,
+                    "deeplink_event_job_id": job.id,
+                })
+
+        # Sort: booked rows first (by name), then available rows by
+        # name. Lead tech surfaced first within each band.
+        def _row_sort_key(r):
+            return (
+                0 if r["status"] == "booked" else 1,
+                0 if r["role"] == "lead_tech" else 1,
+                r["name"],
+            )
+        rows.sort(key=_row_sort_key)
+
+        return {
+            "empty": False,
+            "rows": rows,
+            "gaps": gap_rows,
+        }
+
+    @api.model
+    def _compute_equipment_summary(self, dashboard_type):
+        """One row per equipment category: name + out_count +
+        workshop_count. Empty-state when zero units configured."""
+        Unit = self.env["neon.equipment.unit"].sudo()
+        any_unit = Unit.search_count([])
+        if not any_unit:
+            return {
+                "empty": True,
+                "empty_message": _("No equipment configured yet"),
+                # Equipment menu lives at neon_jobs.menu_workshop_*
+                # but the safe deeplink is the unit list action.
+                "empty_cta_label": _("Add inventory →"),
+                "empty_cta_action":
+                    "neon_jobs.neon_equipment_unit_action",
+                "categories": [],
+            }
+
+        Category = self.env["neon.equipment.category"].sudo()
+        cats = Category.search([])
+        out_states = ("reserved", "checked_out", "transferred")
+        workshop_state = "active"
+
+        # Read all units at once via read_group for performance.
+        Unit_sql = Unit.with_context(active_test=False)
+        rg = Unit_sql.read_group(
+            domain=[("state", "in", out_states + (workshop_state,))],
+            fields=["equipment_category_id", "state"],
+            groupby=["equipment_category_id", "state"],
+            lazy=False,
+        )
+        # Build a {cat_id: {"out": N, "workshop": N}} map.
+        by_cat = {}
+        for row in rg:
+            cat = row.get("equipment_category_id")
+            cat_id = cat[0] if cat else False
+            state = row.get("state")
+            count = row.get("__count", 0)
+            entry = by_cat.setdefault(
+                cat_id, {"out": 0, "workshop": 0})
+            if state in out_states:
+                entry["out"] += count
+            elif state == workshop_state:
+                entry["workshop"] += count
+
+        categories = []
+        for cat in cats:
+            counts = by_cat.get(cat.id, {"out": 0, "workshop": 0})
+            total = counts["out"] + counts["workshop"]
+            if total == 0:
+                # Skip categories with zero qualifying units. They
+                # exist but have all units in anomaly states; not
+                # useful signal for the headline row.
+                continue
+            categories.append({
+                "category_id": cat.id,
+                "category_name": cat.name,
+                "out_count": counts["out"],
+                "workshop_count": counts["workshop"],
+                "total": total,
+                "display": f"{counts['out']}/{total}",
+                "deeplink_action":
+                    "neon_jobs.neon_equipment_unit_action",
+            })
+
+        # Capture "uncategorised" units only if present.
+        uncategorised = by_cat.get(False, {"out": 0, "workshop": 0})
+        if uncategorised["out"] + uncategorised["workshop"] > 0:
+            categories.append({
+                "category_id": False,
+                "category_name": _("Uncategorised"),
+                "out_count": uncategorised["out"],
+                "workshop_count": uncategorised["workshop"],
+                "total": uncategorised["out"] + uncategorised["workshop"],
+                "display":
+                    f"{uncategorised['out']}/"
+                    f"{uncategorised['out'] + uncategorised['workshop']}",
+                "deeplink_action":
+                    "neon_jobs.neon_equipment_unit_action",
+            })
+
+        return {
+            "empty": False,
+            "categories": categories,
+        }

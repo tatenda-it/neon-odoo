@@ -173,6 +173,63 @@ export class NeonDashboard extends Component {
     }
 
     // ------------------------------------------------------------------
+    // M4 -- Crew & Equipment block handlers.
+    // ------------------------------------------------------------------
+    async onCrewEmptyClick() {
+        const xmlid = this.crewEquipment.crew.empty_cta_action;
+        if (xmlid) {
+            await this.action.doAction(xmlid);
+        }
+    }
+
+    async onCrewRowClick(row) {
+        // Booked rows deeplink to the first event_job the user is on.
+        // Available rows have no deeplink (status === 'available' and
+        // deeplink_event_job_id is false).
+        if (!row || !row.deeplink_event_job_id) {
+            return;
+        }
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "commercial.event.job",
+            res_id: row.deeplink_event_job_id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    async onCrewGapClick(gap) {
+        if (!gap || !gap.deeplink_event_job_id) return;
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "commercial.event.job",
+            res_id: gap.deeplink_event_job_id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    async onEquipmentEmptyClick() {
+        const xmlid = this.crewEquipment.equipment.empty_cta_action;
+        if (xmlid) {
+            await this.action.doAction(xmlid);
+        }
+    }
+
+    async onEquipmentCatClick(cat) {
+        if (!cat || !cat.deeplink_action) return;
+        // Deeplink to the equipment unit list, with a context filter
+        // by category. doAction merges additionalContext.
+        const ctx = {};
+        if (cat.category_id) {
+            ctx.search_default_equipment_category_id = cat.category_id;
+        }
+        await this.action.doAction(cat.deeplink_action, {
+            additionalContext: ctx,
+        });
+    }
+
+    // ------------------------------------------------------------------
     // Layout helpers consumed by the template.
     // ------------------------------------------------------------------
     isWidgetVisible(widgetKey) {
@@ -189,6 +246,15 @@ export class NeonDashboard extends Component {
         return (this.state.data && this.state.data.jobs_block) || {
             empty: true, rows: [],
         };
+    }
+
+    get crewEquipment() {
+        return (
+            (this.state.data && this.state.data.crew_equipment_block) || {
+                crew: { empty: true, rows: [], gaps: [] },
+                equipment: { empty: true, categories: [] },
+            }
+        );
     }
 
     get availableTypes() {
