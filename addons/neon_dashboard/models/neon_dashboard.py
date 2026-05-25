@@ -36,11 +36,22 @@ is the project convention. See reference_odoo17_implied_ids_orm_vs_sql.
 sitting above ``neon_jobs.menu_operations_root`` (40). Gate-1 locked.
 """
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 import logging
+
+import pytz
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+
+
+# ⚠️ DECISION (p8a-hygiene timezone): all dashboard datetime
+# computations resolve "today" / "now" in Africa/Harare (UTC+2).
+# Odoo stores datetimes UTC-naive; rendering and date arithmetic
+# both shift through this helper. Per gate-1 lock: stored audit
+# timestamps (last_refresh field) stay UTC; only computed
+# queries + display strings use Harare.
+HARARE_TZ = pytz.timezone("Africa/Harare")
 
 
 _logger = logging.getLogger(__name__)
@@ -309,6 +320,60 @@ class NeonDashboard(models.Model):
         return self._default_dashboard_type_for_user(user.id)
 
     # ------------------------------------------------------------------
+    # Africa/Harare timezone helpers (gate-1 hygiene #2).
+    #
+    # ⚠️ DECISION (p8a-hygiene tz, marker 1): the three helpers below
+    # are @api.model so any model in the registry can call them via
+    # self.env['neon.dashboard']._today_harare() etc. Single source of
+    # truth -- no scattered pytz.timezone('Africa/Harare') literals
+    # across files. Per gate-1 §4.4 lock.
+    #
+    # ⚠️ DECISION (p8a-hygiene tz, marker 2): stored audit timestamps
+    # (e.g. neon.dashboard.last_refresh, ir.config_parameter
+    # zig_usd_rate_updated_at) stay UTC. ONLY query-window math and
+    # display strings shift to Harare. Round-trip integrity preserved
+    # for historical audit.
+    # ------------------------------------------------------------------
+    @api.model
+    def _today_harare(self):
+        """Calendar date in Africa/Harare. Use for "today", "today-7d",
+        etc. windowing in KPI tiles + block queries. At 23:30 UTC on
+        a Tuesday it's already Wednesday 01:30 Harare -- this returns
+        Wednesday."""
+        now_utc = fields.Datetime.now()  # naive UTC per Odoo convention
+        return pytz.utc.localize(now_utc).astimezone(HARARE_TZ).date()
+
+    @api.model
+    def _now_harare(self):
+        """Aware datetime in Africa/Harare. Use for "since yesterday
+        00:00" style sub-day windows."""
+        now_utc = fields.Datetime.now()
+        return pytz.utc.localize(now_utc).astimezone(HARARE_TZ)
+
+    @api.model
+    def _format_harare_timestamp(self, dt=None):
+        """Format a UTC-naive datetime (or now) as an ISO-ish Harare
+        string for display. Used by the dashboard 'last_updated'
+        payload key + future audit footnotes."""
+        if dt is None:
+            dt = fields.Datetime.now()
+        if dt.tzinfo is None:
+            dt = pytz.utc.localize(dt)
+        return dt.astimezone(HARARE_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+    @api.model
+    def _harare_date_to_utc_string(self, harare_date):
+        """Convert a Harare-tz date (start-of-day) to the naive-UTC
+        string suitable for DB comparisons against write_date /
+        create_date columns. e.g. Harare midnight = 22:00 UTC the
+        previous day."""
+        harare_midnight = HARARE_TZ.localize(
+            datetime.combine(harare_date, time.min))
+        utc_naive = harare_midnight.astimezone(pytz.utc).replace(
+            tzinfo=None)
+        return fields.Datetime.to_string(utc_naive)
+
+    # ------------------------------------------------------------------
     # Server-action entry point -- mirrors cash_flow_dashboard.
     # ------------------------------------------------------------------
     @api.model
@@ -356,8 +421,9 @@ class NeonDashboard(models.Model):
             # M5: Sales block (pipeline + win rate + lead sources).
             "sales_block": self._compute_sales_block(resolved_type),
             "available_types": self._available_types_for_user(),
-            "last_updated": fields.Datetime.to_string(
-                fields.Datetime.now()),
+            # p8a-hygiene tz: render the refresh timestamp in
+            # Africa/Harare so Robin sees the operational TZ.
+            "last_updated": self._format_harare_timestamp(),
         }
 
     def _user_role_label(self):
@@ -467,7 +533,7 @@ class NeonDashboard(models.Model):
         }
 
     def _kpi_ar_overdue(self):
-        today = fields.Date.context_today(self)
+        today = self._today_harare()
         Move = self.env["account.move"].sudo()
         # ⚠️ DECISION (M2, marker inline): account.move uses
         # ``invoice_date_due`` (not ``date_due``) and payment_state
@@ -496,7 +562,7 @@ class NeonDashboard(models.Model):
         }
 
     def _kpi_jobs_today(self):
-        today = fields.Date.context_today(self)
+        today = self._today_harare()
         EventJob = self.env["commercial.event.job"].sudo()
         # ⚠️ DECISION (M2, marker inline): commercial.event.job has
         # NO 'confirmed'/'active'/'prep' literal states. Map to the
@@ -529,7 +595,7 @@ class NeonDashboard(models.Model):
         }
 
     def _kpi_jobs_week(self):
-        today = fields.Date.context_today(self)
+        today = self._today_harare()
         end = today + timedelta(days=7)
         EventJob = self.env["commercial.event.job"].sudo()
         jobs = EventJob.search([
@@ -590,7 +656,11 @@ class NeonDashboard(models.Model):
         # "Since yesterday" means create_date >= yesterday-midnight,
         # which gives the Robin-friendly "today + yesterday" rolling
         # window the mockup implies.
-        yesterday_start = fields.Datetime.now() - timedelta(days=1)
+        # p8a-hygiene tz: compute the cutoff in Harare so "yesterday"
+        # tracks the operational day, not UTC.
+        yesterday_start_harare = self._now_harare() - timedelta(days=1)
+        yesterday_start = yesterday_start_harare.astimezone(
+            pytz.utc).replace(tzinfo=None)
         Lead = self.env["crm.lead"].sudo()
         leads = Lead.search([
             ("create_date", ">=", yesterday_start),
@@ -619,7 +689,7 @@ class NeonDashboard(models.Model):
         without a configured target.
         """
         Target = self.env["neon.dashboard.target"].sudo()
-        today = fields.Date.context_today(self)
+        today = self._today_harare()
         target = Target.search([
             ("target_type", "=", "revenue"),
             ("active", "=", True),
@@ -684,7 +754,7 @@ class NeonDashboard(models.Model):
     # desc, limit 10 rows. Click-through opens the event_job form.
     # ==================================================================
     def _compute_jobs_block(self, dashboard_type):
-        today = fields.Date.context_today(self)
+        today = self._today_harare()
         end = today + timedelta(days=7)
         EventJob = self.env["commercial.event.job"].sudo()
         # ⚠️ DECISION (M3, marker 5 cont'd): orders by event_date asc,
@@ -823,7 +893,7 @@ class NeonDashboard(models.Model):
         range OR 'Available'. Sales/lead-tech variants (Phase 8B) can
         scope by lead_tech_id; M4 returns all assignments for any
         tier."""
-        today = fields.Date.context_today(self)
+        today = self._today_harare()
         end = today + timedelta(days=7)
         EventJob = self.env["commercial.event.job"].sudo()
         Crew = self.env["commercial.job.crew"].sudo()
@@ -1163,10 +1233,12 @@ class NeonDashboard(models.Model):
         for the OWL template).
         """
         Quote = self.env["neon.finance.quote"].sudo()
-        today = fields.Date.context_today(self)
-        cutoff = fields.Datetime.to_string(
-            fields.Datetime.to_datetime(
-                today - timedelta(days=90)))
+        today = self._today_harare()
+        # p8a-hygiene tz: cutoff is Harare midnight of (today - 90d)
+        # converted back to UTC for the DB comparison against
+        # write_date (Odoo stores naive UTC).
+        cutoff = self._harare_date_to_utc_string(
+            today - timedelta(days=90))
         won = Quote.search_count([
             ("state", "=", "accepted"),
             ("write_date", ">=", cutoff),
@@ -1194,10 +1266,10 @@ class NeonDashboard(models.Model):
         bucket into "Unspecified".
         """
         Lead = self.env["crm.lead"].sudo()
-        today = fields.Date.context_today(self)
-        cutoff = fields.Datetime.to_string(
-            fields.Datetime.to_datetime(
-                today - timedelta(days=30)))
+        today = self._today_harare()
+        # p8a-hygiene tz: see _compute_win_rate for cutoff rationale.
+        cutoff = self._harare_date_to_utc_string(
+            today - timedelta(days=30))
         leads = Lead.search([("create_date", ">=", cutoff)])
         if not leads:
             return {

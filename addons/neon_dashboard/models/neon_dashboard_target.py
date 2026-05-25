@@ -65,7 +65,8 @@ class NeonDashboardTarget(models.Model):
     )
     date_from = fields.Date(
         required=True,
-        default=lambda self: fields.Date.today().replace(day=1),
+        default=lambda self: self.env["neon.dashboard"]
+            ._today_harare().replace(day=1),
     )
     date_to = fields.Date(
         compute="_compute_date_to",
@@ -120,7 +121,8 @@ class NeonDashboardTarget(models.Model):
 
     @api.model
     def _default_name(self):
-        today = fields.Date.today()
+        # p8a-hygiene tz: today resolved in Africa/Harare.
+        today = self.env["neon.dashboard"]._today_harare()
         return _("%(month)s Revenue Target") % {
             "month": today.strftime("%B %Y"),
         }
