@@ -1,0 +1,333 @@
+// Phase 8A.M1-M3 -- Neon Dashboard SCSS.
+//
+// Palette + KPI/jobs styles per Neon_Dashboard_Sketch_v2.pdf.
+// Mobile breakpoint at 768px (auto-stack KPI strip to 2 cols, hide
+// Edit Layout button). Tablet at 1024px collapses 7-col KPI strip
+// to 4 cols. Mockup parity is the goal -- not pixel-perfect, but
+// brand colour + grid structure intact.
+
+$neon-purple:        #5B2A8A;
+$neon-purple-light:  #9F7BD3;
+$neon-purple-pale:   #F0E7FA;
+$neon-accent-green:  #3FBF7F;
+$neon-accent-amber:  #F5A623;
+$neon-accent-red:    #E94F4F;
+$neon-accent-blue:   #3A7BD5;
+$neon-text:          #2D2D3F;
+$neon-muted:         #6B6B7E;
+$neon-line:          #E5E5EE;
+$neon-bg:            #FAFAFC;
+
+.o_neon_dashboard {
+    padding: 16px;
+    background: $neon-bg;
+    min-height: 100vh;
+    color: $neon-text;
+
+    // -------- Header --------
+    .o_neon_dashboard_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid $neon-purple-light;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .o_neon_dashboard_brand {
+        h1 {
+            color: $neon-purple;
+            font-size: 1.5em;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.1;
+        }
+        .o_neon_dashboard_sep {
+            color: $neon-muted;
+            font-weight: 400;
+        }
+        .o_neon_dashboard_subtitle {
+            color: $neon-muted;
+            font-size: 0.85em;
+            margin: 2px 0 0;
+        }
+    }
+
+    .o_neon_dashboard_header_right {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        flex: 0 0 auto;
+    }
+
+    .o_neon_dashboard_user_line {
+        font-size: 0.85em;
+        color: $neon-text;
+        .o_neon_dashboard_user_name { font-weight: 600; }
+        .o_neon_dashboard_user_role { color: $neon-muted; }
+    }
+
+    .o_neon_dashboard_controls {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .o_neon_dashboard_viewas {
+        border: 1px solid $neon-purple-light;
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 0.85em;
+        background: white;
+        color: $neon-purple;
+    }
+
+    .o_neon_dashboard_edit_layout {
+        color: $neon-purple !important;
+        font-weight: 700;
+        font-size: 0.8em;
+        text-decoration: none;
+        &:hover { background: $neon-purple-pale; }
+    }
+
+    .o_neon_dashboard_refresh {
+        color: $neon-purple;
+        border-color: $neon-purple-light;
+    }
+
+    // -------- KPI strip --------
+    .o_neon_kpi_strip {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .o_neon_kpi_tile {
+        background: white;
+        border: 1px solid $neon-line;
+        border-left: 3px solid $neon-purple;
+        border-radius: 4px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-height: 84px;
+        transition: box-shadow 120ms ease;
+        &.o_neon_kpi_clickable {
+            cursor: pointer;
+            &:hover {
+                box-shadow: 0 1px 4px rgba($neon-purple, 0.18);
+            }
+        }
+    }
+
+    .o_neon_kpi_tile_big {
+        border-left-width: 4px;
+        .o_neon_kpi_value {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: $neon-accent-green;
+        }
+    }
+
+    .o_neon_kpi_tile_cta {
+        border-left-color: $neon-purple-light;
+        background: $neon-purple-pale;
+    }
+
+    .o_neon_kpi_skeleton {
+        background: $neon-purple-pale;
+        opacity: 0.5;
+        animation: o_neon_skeleton_pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes o_neon_skeleton_pulse {
+        0%, 100% { opacity: 0.4; }
+        50%      { opacity: 0.75; }
+    }
+
+    .o_neon_kpi_label {
+        font-size: 0.75em;
+        color: $neon-muted;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+    }
+
+    .o_neon_kpi_value {
+        font-size: 1.3em;
+        font-weight: 700;
+        color: $neon-text;
+        line-height: 1.1;
+    }
+
+    .o_neon_kpi_value_red  { color: $neon-accent-red; }
+    .o_neon_kpi_empty      { color: $neon-muted; font-weight: 500; }
+    .o_neon_kpi_cta        { color: $neon-purple; font-size: 1em; }
+
+    .o_neon_kpi_subtitle {
+        font-size: 0.75em;
+        color: $neon-muted;
+    }
+
+    // -------- Filter chips --------
+    .o_neon_filter_chips {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    .o_neon_filter_chip {
+        background: white;
+        border: 1px solid $neon-purple-light;
+        color: $neon-purple;
+        border-radius: 999px;
+        padding: 2px 12px;
+        font-size: 0.8em;
+        font-weight: 600;
+        cursor: pointer;
+        &:hover { background: $neon-purple-pale; }
+        &.o_neon_filter_chip_active {
+            background: $neon-purple;
+            color: white;
+        }
+    }
+
+    // -------- Block rows --------
+    .o_neon_row_a {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .o_neon_row_b, .o_neon_row_c {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .o_neon_block {
+        background: white;
+        border: 1px solid $neon-line;
+        border-radius: 4px;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 200px;
+    }
+
+    .o_neon_block_placeholder {
+        background: $neon-purple-pale;
+        border-color: $neon-purple-light;
+        min-height: 120px;
+    }
+
+    .o_neon_block_header {
+        padding: 8px 12px;
+        border-bottom: 1px solid $neon-line;
+        background: $neon-purple-pale;
+        h3 {
+            margin: 0;
+            color: $neon-purple;
+            font-size: 0.95em;
+            font-weight: 700;
+        }
+    }
+
+    .o_neon_block_body {
+        padding: 8px 12px;
+        flex: 1;
+        overflow: auto;
+    }
+
+    .o_neon_block_empty {
+        text-align: center;
+        color: $neon-muted;
+        padding: 24px 8px;
+        .o_neon_block_empty_msg { margin: 0 0 6px; font-weight: 600; }
+    }
+
+    // -------- Jobs table --------
+    .o_neon_jobs_table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85em;
+        thead th {
+            text-align: left;
+            color: $neon-muted;
+            font-weight: 600;
+            border-bottom: 1px solid $neon-line;
+            padding: 4px 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            font-size: 0.85em;
+        }
+        tbody td {
+            padding: 6px;
+            border-bottom: 1px solid $neon-line;
+            vertical-align: top;
+        }
+        .o_neon_jobs_row {
+            cursor: pointer;
+            &:hover { background: $neon-purple-pale; }
+        }
+    }
+
+    .o_neon_jobs_badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 0.75em;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: white;
+    }
+    .o_neon_jobs_badge_amber  { background: $neon-accent-amber; }
+    .o_neon_jobs_badge_blue   { background: $neon-accent-blue;  }
+    .o_neon_jobs_badge_green  { background: $neon-accent-green; }
+    .o_neon_jobs_badge_grey   { background: $neon-muted;        }
+    .o_neon_jobs_badge_red    { background: $neon-accent-red;   }
+
+    .o_neon_jobs_gap {
+        color: $neon-accent-red;
+        font-weight: 700;
+        margin-left: 4px;
+    }
+
+    // -------- Error / loading --------
+    .o_neon_dashboard_error {
+        margin-bottom: 8px;
+    }
+
+    // -------- Responsive --------
+    @media (max-width: 1024px) {
+        .o_neon_kpi_strip {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        .o_neon_row_a {
+            grid-template-columns: 1fr;
+        }
+        .o_neon_row_b, .o_neon_row_c {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .o_neon_kpi_strip {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .o_neon_row_a, .o_neon_row_b, .o_neon_row_c {
+            grid-template-columns: 1fr;
+        }
+        .o_neon_dashboard_edit_layout {
+            display: none;
+        }
+    }
+}

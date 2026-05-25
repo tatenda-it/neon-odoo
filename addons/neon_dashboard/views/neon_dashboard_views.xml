@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Phase 8A.M1-M3 views.
+
+    Inline-return server-action wrapper for the menu. Mirrors
+    cash_flow_dashboard precedent (P6.M10) and the workshop
+    dashboard before it (P5.M10).
+
+    ⚠️ DECISION (M1, marker 3 cont'd / repeated for clarity):
+    groups_id on the server-action wrapper is mandatory. Without
+    it Odoo's ir_actions.py:912-922 falls into the write-ACL
+    branch and our model only grants read. P5.M10 and P6.M10
+    both surfaced this; we don't re-learn it here.
+-->
+<odoo>
+
+    <!-- ============================================================
+         Server-action wrapper. Three-layer access enforcement
+         (this groups_id, the RPC _check_dashboard_access guard, and
+         the menu groups_id below) keeps the dashboard tier-bound
+         even if one layer regresses.
+         ============================================================ -->
+    <record id="action_neon_dashboard_server"
+            model="ir.actions.server">
+        <field name="name">Neon Dashboard</field>
+        <field name="model_id" ref="model_neon_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_neon_dashboard()</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_core.group_neon_superuser'),
+            ref('neon_core.group_neon_bookkeeper'),
+            ref('neon_core.group_neon_sales_rep'),
+            ref('neon_core.group_neon_lead_tech'),
+            ref('neon_core.group_neon_crew'),
+        ])]"/>
+    </record>
+
+</odoo>

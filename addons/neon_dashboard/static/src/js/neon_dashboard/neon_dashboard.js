@@ -1,0 +1,247 @@
+/** @odoo-module **/
+
+import {
+    Component,
+    onMounted,
+    onWillStart,
+    onWillUnmount,
+    useState,
+} from "@odoo/owl";
+import { registry } from "@web/core/registry";
+import { useService } from "@web/core/utils/hooks";
+import { _t } from "@web/core/l10n/translation";
+
+/**
+ * Neon Dashboard root component (Phase 8A M1-M3).
+ *
+ * Mirrors the P6.M10 Cash Flow Dashboard scaffold:
+ *
+ * - Single get_dashboard_data RPC on mount + on dashboard_type flip.
+ * - 5-minute auto-refresh that pauses on tab-hidden.
+ * - Loading skeleton on first paint, error banner on RPC failure.
+ *
+ * Phase 8B will add an Edit-Layout sub-component; for M1-M3 the
+ * "Edit Layout" button shows a toast and the View-filter chips
+ * (Operations / Sales / Finance) show "coming in M5/M6" toasts.
+ *
+ * ⚠️ DECISION (M1, marker 1 reinforced client-side): the OWL
+ * component talks to a virtual model via the ORM service. NO direct
+ * /neon/... HTTP route. The route the prompt sketched is replaced by
+ * orm.call("neon.dashboard", "get_dashboard_data", []).
+ */
+export class NeonDashboard extends Component {
+    static template = "neon_dashboard.NeonDashboard";
+    static props = { "*": true };
+
+    setup() {
+        this.orm = useService("orm");
+        this.action = useService("action");
+        this.notification = useService("notification");
+
+        this.state = useState({
+            loading: true,
+            error: null,
+            data: null,
+            activeFilter: "all",
+        });
+
+        // 5-minute auto-refresh (same cadence as cash_flow_dashboard;
+        // dashboard data sources change minute-to-minute at most).
+        this.REFRESH_MS = 5 * 60 * 1000;
+        this._refreshInterval = null;
+        this._visibilityHandler = null;
+
+        onWillStart(async () => {
+            await this.loadData();
+        });
+
+        onMounted(() => {
+            this._startAutoRefresh();
+            this._visibilityHandler = () => {
+                if (document.hidden) {
+                    this._stopAutoRefresh();
+                } else {
+                    this.loadData();
+                    this._startAutoRefresh();
+                }
+            };
+            document.addEventListener(
+                "visibilitychange", this._visibilityHandler);
+        });
+
+        onWillUnmount(() => {
+            this._stopAutoRefresh();
+            if (this._visibilityHandler) {
+                document.removeEventListener(
+                    "visibilitychange", this._visibilityHandler);
+                this._visibilityHandler = null;
+            }
+        });
+    }
+
+    async loadData(dashboardType = null) {
+        this.state.loading = true;
+        this.state.error = null;
+        try {
+            this.state.data = await this.orm.call(
+                "neon.dashboard",
+                "get_dashboard_data",
+                [],
+                { dashboard_type: dashboardType },
+            );
+            this.state.loading = false;
+        } catch (e) {
+            this.state.error = (e && e.message) || String(e);
+            this.state.loading = false;
+        }
+    }
+
+    _startAutoRefresh() {
+        this._stopAutoRefresh();
+        this._refreshInterval = setInterval(
+            () => this.loadData(), this.REFRESH_MS);
+    }
+
+    _stopAutoRefresh() {
+        if (this._refreshInterval) {
+            clearInterval(this._refreshInterval);
+            this._refreshInterval = null;
+        }
+    }
+
+    onRefreshClick() {
+        this.loadData(
+            (this.state.data && this.state.data.dashboard_type) || null);
+    }
+
+    onViewAsChange(ev) {
+        const newType = (ev && ev.target && ev.target.value) || null;
+        if (!newType) return;
+        this.loadData(newType);
+    }
+
+    onFilterChange(filter) {
+        // M1-M3 only the "all" filter is wired. Others stub a toast.
+        if (filter !== "all") {
+            this.notification.add(
+                _t("'%s' filter ships in Phase 8A M5/M6.").replace(
+                    "%s", filter),
+                { type: "info" });
+            return;
+        }
+        this.state.activeFilter = filter;
+    }
+
+    onEditLayoutClick() {
+        // Edit-Layout UI lands in Phase 8B M5. For M1-M3, we keep the
+        // pencil visible (mockup parity) and stub the action.
+        this.notification.add(
+            _t("Edit Layout ships in Phase 8B M5."),
+            { type: "info" });
+    }
+
+    async onKpiClick(kpi) {
+        // KPI tiles deep-link to a stock or Neon action xmlid; empty-
+        // state tiles return false for deeplink_action and become
+        // no-ops.
+        if (!kpi || !kpi.deeplink_action) {
+            return;
+        }
+        await this.action.doAction(kpi.deeplink_action);
+    }
+
+    async onJobClick(row) {
+        if (!row || !row.deeplink_id) {
+            return;
+        }
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "commercial.event.job",
+            res_id: row.deeplink_id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    async onEmptyJobsClick() {
+        const data = this.state.data;
+        if (!data || !data.jobs_block) return;
+        const xmlid = data.jobs_block.empty_cta_action;
+        if (xmlid) {
+            await this.action.doAction(xmlid);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Layout helpers consumed by the template.
+    // ------------------------------------------------------------------
+    isWidgetVisible(widgetKey) {
+        const layout = (this.state.data && this.state.data.layout) || [];
+        const row = layout.find((l) => l.widget_key === widgetKey);
+        return !!(row && row.visible);
+    }
+
+    get kpi() {
+        return (this.state.data && this.state.data.kpi) || {};
+    }
+
+    get jobsBlock() {
+        return (this.state.data && this.state.data.jobs_block) || {
+            empty: true, rows: [],
+        };
+    }
+
+    get availableTypes() {
+        return (this.state.data && this.state.data.available_types) || [];
+    }
+
+    get isSuperuser() {
+        return !!(this.state.data && this.state.data.is_superuser);
+    }
+
+    get dashboardTypeLabel() {
+        const opts = this.availableTypes;
+        const t = this.state.data && this.state.data.dashboard_type;
+        const match = opts.find((o) => o.value === t);
+        if (match) return match.label;
+        // Fall back to a static map for non-superusers (no dropdown
+        // options shipped down).
+        const fallback = {
+            director: "Director",
+            sales: "Sales",
+            bookkeeper: "Bookkeeper",
+            lead_tech: "Lead Tech",
+            tech: "Tech",
+        };
+        return fallback[t] || "";
+    }
+
+    get userRoleLabel() {
+        return (this.state.data && this.state.data.user_role_label) || "";
+    }
+
+    get userName() {
+        return (this.state.data && this.state.data.user_name) || "";
+    }
+
+    get lastUpdated() {
+        return (this.state.data && this.state.data.last_updated) || "";
+    }
+
+    // ------------------------------------------------------------------
+    // Filter chips. Locked set; per-chip filtering wires up alongside
+    // each block (Sales chip in M5, Finance chip in M6, Operations
+    // already correct since M3 ships only the Operations-flavoured
+    // Jobs block).
+    // ------------------------------------------------------------------
+    get filters() {
+        return [
+            { key: "all", label: "All" },
+            { key: "operations", label: "Operations" },
+            { key: "sales", label: "Sales" },
+            { key: "finance", label: "Finance" },
+        ];
+    }
+}
+
+registry.category("actions").add("neon_dashboard", NeonDashboard);

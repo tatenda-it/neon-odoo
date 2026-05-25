@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_dashboard.NeonDashboard">
+        <div class="o_neon_dashboard">
+
+            <!-- =====================================================
+                 Header row - brand block on the left, user-line
+                 + View-as dropdown + Edit Layout pencil on the right.
+                 ===================================================== -->
+            <div class="o_neon_dashboard_header">
+                <div class="o_neon_dashboard_brand">
+                    <h1>
+                        Neon CRM
+                        <span class="o_neon_dashboard_sep">--</span>
+                        <span t-esc="dashboardTypeLabel"/> Dashboard
+                    </h1>
+                    <p class="o_neon_dashboard_subtitle">
+                        Operations &#183; Sales &#183; Finance &#183; Alerts
+                    </p>
+                </div>
+                <div class="o_neon_dashboard_header_right">
+                    <div class="o_neon_dashboard_user_line">
+                        <span class="o_neon_dashboard_user_name"
+                              t-esc="userName"/>
+                        <span class="o_neon_dashboard_user_role"
+                              t-if="userRoleLabel">
+                            &#183; <t t-esc="userRoleLabel"/>
+                        </span>
+                        <small class="text-muted ms-2"
+                               t-if="lastUpdated">
+                            (refreshed <t t-esc="lastUpdated"/>)
+                        </small>
+                    </div>
+                    <div class="o_neon_dashboard_controls">
+                        <select t-if="isSuperuser"
+                                class="o_neon_dashboard_viewas"
+                                t-on-change="onViewAsChange">
+                            <option value="" disabled="disabled">
+                                View as...
+                            </option>
+                            <t t-foreach="availableTypes"
+                               t-as="opt" t-key="opt.value">
+                                <option t-att-value="opt.value"
+                                        t-att-selected="state.data and state.data.dashboard_type === opt.value">
+                                    <t t-esc="opt.label"/>
+                                </option>
+                            </t>
+                        </select>
+                        <button class="btn btn-sm btn-link o_neon_dashboard_edit_layout"
+                                t-on-click="onEditLayoutClick">
+                            <i class="fa fa-pencil me-1"/>
+                            EDIT LAYOUT
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary o_neon_dashboard_refresh"
+                                t-on-click="onRefreshClick"
+                                t-att-disabled="state.loading">
+                            <i class="fa"
+                               t-att-class="state.loading ? 'fa-refresh fa-spin' : 'fa-refresh'"/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error banner -->
+            <div t-if="state.error"
+                 class="alert alert-danger o_neon_dashboard_error"
+                 role="alert">
+                <i class="fa fa-exclamation-circle me-2"/>
+                <span>Failed to load dashboard data: </span>
+                <span t-esc="state.error"/>
+                <button class="btn btn-sm btn-outline-danger ms-3"
+                        t-on-click="onRefreshClick">Retry</button>
+            </div>
+
+            <!-- Loading skeleton (first load only) -->
+            <div t-if="state.loading and !state.data"
+                 class="o_neon_dashboard_loading">
+                <div class="o_neon_kpi_strip">
+                    <t t-foreach="[1,2,3,4,5,6,7]" t-as="_" t-key="_">
+                        <div class="o_neon_kpi_tile o_neon_kpi_skeleton"/>
+                    </t>
+                </div>
+            </div>
+
+            <!-- ===================================================== -->
+            <!-- Rendered content (after first successful load).      -->
+            <!-- ===================================================== -->
+            <div t-if="state.data" class="o_neon_dashboard_content">
+
+                <!-- =================================================
+                     KPI strip - 7 tiles, grid-template-columns 7.
+                     ================================================= -->
+                <section class="o_neon_kpi_strip">
+
+                    <!-- Cash on Hand (mandatory; always visible per
+                         schema sketch §4.2). -->
+                    <div class="o_neon_kpi_tile o_neon_kpi_tile_big"
+                         t-if="isWidgetVisible('kpi_cash')"
+                         t-att-class="kpi.kpi_cash and kpi.kpi_cash.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_cash)">
+                        <div class="o_neon_kpi_label">Cash on Hand</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_cash and kpi.kpi_cash.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_cash and kpi.kpi_cash.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_cash and kpi.kpi_cash.subtitle"/>
+                    </div>
+
+                    <!-- AR Overdue (mandatory) -->
+                    <div class="o_neon_kpi_tile"
+                         t-if="isWidgetVisible('kpi_ar_overdue')"
+                         t-att-class="kpi.kpi_ar_overdue and kpi.kpi_ar_overdue.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_ar_overdue)">
+                        <div class="o_neon_kpi_label">AR Overdue</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_ar_overdue and kpi.kpi_ar_overdue.empty ? 'o_neon_kpi_empty' : 'o_neon_kpi_value_red'"
+                             t-esc="kpi.kpi_ar_overdue and kpi.kpi_ar_overdue.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_ar_overdue and kpi.kpi_ar_overdue.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile"
+                         t-if="isWidgetVisible('kpi_jobs_today')"
+                         t-att-class="kpi.kpi_jobs_today and kpi.kpi_jobs_today.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_jobs_today)">
+                        <div class="o_neon_kpi_label">Jobs Today</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_jobs_today and kpi.kpi_jobs_today.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_jobs_today and kpi.kpi_jobs_today.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_jobs_today and kpi.kpi_jobs_today.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile"
+                         t-if="isWidgetVisible('kpi_jobs_week')"
+                         t-att-class="kpi.kpi_jobs_week and kpi.kpi_jobs_week.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_jobs_week)">
+                        <div class="o_neon_kpi_label">Jobs This Week</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_jobs_week and kpi.kpi_jobs_week.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_jobs_week and kpi.kpi_jobs_week.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_jobs_week and kpi.kpi_jobs_week.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile"
+                         t-if="isWidgetVisible('kpi_pipeline')"
+                         t-att-class="kpi.kpi_pipeline and kpi.kpi_pipeline.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_pipeline)">
+                        <div class="o_neon_kpi_label">Pipeline Value</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_pipeline and kpi.kpi_pipeline.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_pipeline and kpi.kpi_pipeline.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_pipeline and kpi.kpi_pipeline.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile"
+                         t-if="isWidgetVisible('kpi_leads')"
+                         t-att-class="kpi.kpi_leads and kpi.kpi_leads.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_leads)">
+                        <div class="o_neon_kpi_label">New Leads</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_leads and kpi.kpi_leads.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_leads and kpi.kpi_leads.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_leads and kpi.kpi_leads.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile o_neon_kpi_tile_cta"
+                         t-if="isWidgetVisible('kpi_forecast')"
+                         t-att-class="kpi.kpi_forecast and kpi.kpi_forecast.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_forecast)">
+                        <div class="o_neon_kpi_label">Forecast vs Target</div>
+                        <div class="o_neon_kpi_value o_neon_kpi_cta"
+                             t-esc="kpi.kpi_forecast and kpi.kpi_forecast.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_forecast and kpi.kpi_forecast.subtitle"/>
+                    </div>
+                </section>
+
+                <!-- =================================================
+                     View filter chip row.
+                     ================================================= -->
+                <section class="o_neon_filter_chips">
+                    <t t-foreach="filters" t-as="f" t-key="f.key">
+                        <button class="o_neon_filter_chip"
+                                t-att-class="state.activeFilter === f.key ? 'o_neon_filter_chip_active' : ''"
+                                t-on-click="() => this.onFilterChange(f.key)">
+                            <t t-esc="f.label"/>
+                        </button>
+                    </t>
+                </section>
+
+                <!-- =================================================
+                     Row A - Jobs block (M3) + Sales placeholder.
+                     ================================================= -->
+                <section class="o_neon_row_a">
+
+                    <div class="o_neon_block o_neon_block_jobs"
+                         t-if="isWidgetVisible('block_jobs')">
+                        <div class="o_neon_block_header">
+                            <h3>Jobs &#183; Today + This Week</h3>
+                        </div>
+
+                        <div class="o_neon_block_body">
+                            <div t-if="jobsBlock.empty"
+                                 class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg"
+                                   t-esc="jobsBlock.empty_message"/>
+                                <button class="btn btn-link"
+                                        t-on-click="onEmptyJobsClick"
+                                        t-if="jobsBlock.empty_cta_action">
+                                    <t t-esc="jobsBlock.empty_cta_label"/>
+                                </button>
+                            </div>
+
+                            <table t-if="!jobsBlock.empty"
+                                   class="o_neon_jobs_table">
+                                <thead>
+                                    <tr>
+                                        <th>Client</th>
+                                        <th>Event</th>
+                                        <th>When</th>
+                                        <th>State</th>
+                                        <th class="text-end">Crew</th>
+                                        <th>Venue</th>
+                                        <th class="text-end">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="jobsBlock.rows"
+                                       t-as="row" t-key="row.id">
+                                        <tr class="o_neon_jobs_row"
+                                            t-on-click="() => this.onJobClick(row)">
+                                            <td t-esc="row.client_name"/>
+                                            <td t-esc="row.event_name"/>
+                                            <td>
+                                                <div t-esc="row.event_label"/>
+                                                <small class="text-muted"
+                                                       t-esc="row.days_label"/>
+                                            </td>
+                                            <td>
+                                                <span class="o_neon_jobs_badge"
+                                                      t-att-class="'o_neon_jobs_badge_' + row.state_color"
+                                                      t-esc="row.state_label"/>
+                                            </td>
+                                            <td class="text-end">
+                                                <span t-esc="row.crew_confirmed"/>
+                                                /
+                                                <span t-esc="row.crew_required"/>
+                                                <span t-if="row.crew_gap > 0"
+                                                      class="o_neon_jobs_gap"
+                                                      t-esc="' (-' + row.crew_gap + ')'"/>
+                                            </td>
+                                            <td t-esc="row.venue"/>
+                                            <td class="text-end"
+                                                t-esc="row.value_display"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Sales placeholder (M5 fills this) -->
+                    <div t-if="isWidgetVisible('block_sales')"
+                         class="o_neon_block o_neon_block_placeholder">
+                        <div class="o_neon_block_header">
+                            <h3>Sales Pipeline</h3>
+                        </div>
+                        <div class="o_neon_block_body">
+                            <p class="text-muted">
+                                Coming in Phase 8A M5.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =================================================
+                     Row B - Finance + Alerts + Crew/Equipment.
+                     M4 / M6 / M7 placeholders.
+                     ================================================= -->
+                <section class="o_neon_row_b">
+                    <div t-if="isWidgetVisible('block_finance')"
+                         class="o_neon_block o_neon_block_placeholder">
+                        <div class="o_neon_block_header">
+                            <h3>Finance &#183; AR &amp; Cash</h3>
+                        </div>
+                        <div class="o_neon_block_body">
+                            <p class="text-muted">Coming in M6.</p>
+                        </div>
+                    </div>
+
+                    <div t-if="isWidgetVisible('block_alerts')"
+                         class="o_neon_block o_neon_block_placeholder">
+                        <div class="o_neon_block_header">
+                            <h3>Alerts</h3>
+                        </div>
+                        <div class="o_neon_block_body">
+                            <p class="text-muted">Coming in M7.</p>
+                        </div>
+                    </div>
+
+                    <div t-if="isWidgetVisible('block_crew_equipment')"
+                         class="o_neon_block o_neon_block_placeholder">
+                        <div class="o_neon_block_header">
+                            <h3>Crew &amp; Equipment</h3>
+                        </div>
+                        <div class="o_neon_block_body">
+                            <p class="text-muted">Coming in M4.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =================================================
+                     Row C - Tasks + AI Insights placeholders.
+                     M8 / M11.
+                     ================================================= -->
+                <section class="o_neon_row_c">
+                    <div t-if="isWidgetVisible('block_tasks')"
+                         class="o_neon_block o_neon_block_placeholder">
+                        <div class="o_neon_block_header">
+                            <h3>Tasks</h3>
+                        </div>
+                        <div class="o_neon_block_body">
+                            <p class="text-muted">Coming in M8.</p>
+                        </div>
+                    </div>
+                    <div t-if="isWidgetVisible('block_ai_insights')"
+                         class="o_neon_block o_neon_block_placeholder">
+                        <div class="o_neon_block_header">
+                            <h3>AI Insights</h3>
+                        </div>
+                        <div class="o_neon_block_body">
+                            <p class="text-muted">Coming in M11.</p>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

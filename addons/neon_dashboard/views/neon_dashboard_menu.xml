@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Top-level Dashboard menu. sequence=5 sits above
+    neon_jobs.menu_operations_root (40), making it the leftmost
+    Neon app in the launcher and on the breadcrumb chain.
+
+    ⚠️ DECISION (M1, marker 7 repeated): top-level menu (NO
+    parent="..."). The M1-M3 prompt's parent reference
+    neon_partners.menu_neon_root does not exist on this build.
+    Gate 1 locked the top-level placement.
+
+    Visible to all five tier meta-groups. Each tier sees the menu;
+    the RPC route returns a tier-appropriate dashboard_type via
+    _default_dashboard_type_for_user.
+-->
+<odoo>
+    <menuitem id="menu_neon_dashboard_root"
+              name="Dashboard"
+              action="action_neon_dashboard_server"
+              sequence="5"
+              groups="neon_core.group_neon_superuser,neon_core.group_neon_bookkeeper,neon_core.group_neon_sales_rep,neon_core.group_neon_lead_tech,neon_core.group_neon_crew"/>
+</odoo>

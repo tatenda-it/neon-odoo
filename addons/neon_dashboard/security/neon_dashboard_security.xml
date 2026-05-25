@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Phase 8A.M1 security.
+
+    ⚠️ DECISION (M1, marker 2 repeated): NO new groups defined here.
+    Five tier meta-groups in neon_core already own the cascade for
+    Robin / Munashe / Tatenda / Kudzaiishe / Lisa / Evrill /
+    Ranganai. Creating shadow group_neon_dashboard_* would split
+    that single source of truth into two and require duplicate
+    migration scripts for every future user.
+
+    ⚠️ DECISION (M1, marker 6 repeated): NO user XML-ID grants
+    here either. The M1-M3 prompt referenced records like
+    neon_partners.user_robin that do not exist on this build;
+    neon_core's login-based post_init_hook is the canonical path.
+
+    Only thing this file defines: a record rule scoping
+    neon.dashboard rows + neon.dashboard.user.layout rows to the
+    owning user. Superusers bypass the rule (group_no_one alias).
+-->
+<odoo>
+    <data noupdate="0">
+
+        <!-- ============================================================
+             Own-dashboard record rule.
+
+             Users see only their own dashboard rows. Superusers
+             (tier 1) can use the View-as dropdown to pull a row for
+             ANY user-and-type combo, so the rule must NOT apply to
+             them. We tag the rule with the four non-superuser tier
+             groups - superuser tier is intentionally absent.
+             ============================================================ -->
+        <record id="rule_neon_dashboard_own"
+                model="ir.rule">
+            <field name="name">Users see only their own dashboards</field>
+            <field name="model_id" ref="model_neon_dashboard"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(6, 0, [
+                ref('neon_core.group_neon_bookkeeper'),
+                ref('neon_core.group_neon_sales_rep'),
+                ref('neon_core.group_neon_lead_tech'),
+                ref('neon_core.group_neon_crew'),
+            ])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_neon_dashboard_user_layout_own"
+                model="ir.rule">
+            <field name="name">Users see only their own layout rows</field>
+            <field name="model_id"
+                   ref="model_neon_dashboard_user_layout"/>
+            <field name="domain_force">[
+                ('dashboard_id.user_id', '=', user.id)
+            ]</field>
+            <field name="groups" eval="[(6, 0, [
+                ref('neon_core.group_neon_bookkeeper'),
+                ref('neon_core.group_neon_sales_rep'),
+                ref('neon_core.group_neon_lead_tech'),
+                ref('neon_core.group_neon_crew'),
+            ])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

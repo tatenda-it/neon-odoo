@@ -1,0 +1,15 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_dashboard_superuser,dashboard / superuser,model_neon_dashboard,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_bookkeeper,dashboard / bookkeeper,model_neon_dashboard,neon_core.group_neon_bookkeeper,1,1,1,0
+access_neon_dashboard_sales_rep,dashboard / sales rep,model_neon_dashboard,neon_core.group_neon_sales_rep,1,1,1,0
+access_neon_dashboard_lead_tech,dashboard / lead tech,model_neon_dashboard,neon_core.group_neon_lead_tech,1,1,1,0
+access_neon_dashboard_crew,dashboard / crew,model_neon_dashboard,neon_core.group_neon_crew,1,1,1,0
+access_neon_dashboard_user_layout_superuser,layout / superuser,model_neon_dashboard_user_layout,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_user_layout_bookkeeper,layout / bookkeeper,model_neon_dashboard_user_layout,neon_core.group_neon_bookkeeper,1,1,1,0
+access_neon_dashboard_user_layout_sales_rep,layout / sales rep,model_neon_dashboard_user_layout,neon_core.group_neon_sales_rep,1,1,1,0
+access_neon_dashboard_user_layout_lead_tech,layout / lead tech,model_neon_dashboard_user_layout,neon_core.group_neon_lead_tech,1,1,1,0
+access_neon_dashboard_user_layout_crew,layout / crew,model_neon_dashboard_user_layout,neon_core.group_neon_crew,1,1,1,0
+access_neon_dashboard_default_layout_superuser,default layout / superuser,model_neon_dashboard_default_layout,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_default_layout_all,default layout / all internal users,model_neon_dashboard_default_layout,base.group_user,1,0,0,0
+access_neon_dashboard_default_layout_line_superuser,default layout line / superuser,model_neon_dashboard_default_layout_line,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_default_layout_line_all,default layout line / all internal users,model_neon_dashboard_default_layout_line,base.group_user,1,0,0,0
