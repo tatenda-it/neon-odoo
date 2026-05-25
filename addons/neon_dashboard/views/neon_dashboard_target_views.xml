@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M5 - neon.dashboard.target tree + form + action.
+
+    Settings menu placement and group gating are wired in
+    neon_dashboard_menu.xml (loads after this file).
+-->
+<odoo>
+
+    <record id="view_neon_dashboard_target_tree"
+            model="ir.ui.view">
+        <field name="name">neon.dashboard.target.tree</field>
+        <field name="model">neon.dashboard.target</field>
+        <field name="arch" type="xml">
+            <tree string="Dashboard Targets" decoration-success="progress_pct &gt;= 100" decoration-warning="progress_pct &lt; 100 and progress_pct &gt;= 70" decoration-danger="progress_pct &lt; 70">
+                <field name="name"/>
+                <field name="period"/>
+                <field name="target_type"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="target_amount" widget="monetary"/>
+                <field name="actual_amount" widget="monetary"/>
+                <field name="progress_pct" widget="percentage" string="Progress"/>
+                <field name="currency_id" optional="hide"/>
+                <field name="active" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_dashboard_target_form"
+            model="ir.ui.view">
+        <field name="name">neon.dashboard.target.form</field>
+        <field name="model">neon.dashboard.target</field>
+        <field name="arch" type="xml">
+            <form string="Dashboard Target">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. May 2026 Revenue Target"/></h1>
+                    </div>
+                    <group>
+                        <group string="Definition">
+                            <field name="target_type"/>
+                            <field name="period"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="target_amount" widget="monetary"/>
+                            <field name="currency_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Progress (computed)">
+                            <field name="actual_amount" widget="monetary"
+                                   readonly="1"/>
+                            <field name="progress_pct" widget="percentage"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_neon_dashboard_target_search"
+            model="ir.ui.view">
+        <field name="name">neon.dashboard.target.search</field>
+        <field name="model">neon.dashboard.target</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="target_type"/>
+                <field name="period"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter string="Revenue" name="type_revenue" domain="[('target_type', '=', 'revenue')]"/>
+                <filter string="Pipeline" name="type_pipeline" domain="[('target_type', '=', 'pipeline_value')]"/>
+                <filter string="New Deals" name="type_new_deals" domain="[('target_type', '=', 'new_deals')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Type" name="group_type" context="{'group_by': 'target_type'}"/>
+                    <filter string="Period" name="group_period" context="{'group_by': 'period'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_dashboard_target"
+            model="ir.actions.act_window">
+        <field name="name">Dashboard Targets</field>
+        <field name="res_model">neon.dashboard.target</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_neon_dashboard_target_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first dashboard target
+            </p>
+            <p>
+                Targets drive the Forecast vs Target tile on the
+                Director Dashboard. Set a revenue target for the
+                current month / quarter / year, and the dashboard
+                tile auto-computes progress from accepted quotes.
+            </p>
+        </field>
+    </record>
+
+</odoo>

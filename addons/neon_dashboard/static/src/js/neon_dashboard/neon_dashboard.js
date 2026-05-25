@@ -121,11 +121,11 @@ export class NeonDashboard extends Component {
     }
 
     onFilterChange(filter) {
-        // M1-M3 only the "all" filter is wired. Others stub a toast.
-        if (filter !== "all") {
+        // M5: "all", "operations", "sales" are functional; "finance"
+        // remains a toast until M6 ships the Finance block.
+        if (filter === "finance") {
             this.notification.add(
-                _t("'%s' filter ships in Phase 8A M5/M6.").replace(
-                    "%s", filter),
+                _t("'finance' filter ships in Phase 8A M6."),
                 { type: "info" });
             return;
         }
@@ -255,6 +255,23 @@ export class NeonDashboard extends Component {
                 equipment: { empty: true, categories: [] },
             }
         );
+    }
+
+    get salesBlock() {
+        return (
+            (this.state.data && this.state.data.sales_block) || {
+                pipeline_by_stage: { empty: true, stages: [] },
+                win_rate: { empty: true },
+                lead_sources: { empty: true, sources: [] },
+            }
+        );
+    }
+
+    async onPipelineStageClick(stage) {
+        if (!stage || !stage.deeplink_action) return;
+        // All pipeline stages share the same act_window (filtered to
+        // pending_approval/approved/sent at the action level).
+        await this.action.doAction(stage.deeplink_action);
     }
 
     get availableTypes() {

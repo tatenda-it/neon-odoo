@@ -13,3 +13,8 @@ access_neon_dashboard_default_layout_superuser,default layout / superuser,model_
 access_neon_dashboard_default_layout_all,default layout / all internal users,model_neon_dashboard_default_layout,base.group_user,1,0,0,0
 access_neon_dashboard_default_layout_line_superuser,default layout line / superuser,model_neon_dashboard_default_layout_line,neon_core.group_neon_superuser,1,1,1,1
 access_neon_dashboard_default_layout_line_all,default layout line / all internal users,model_neon_dashboard_default_layout_line,base.group_user,1,0,0,0
+access_neon_dashboard_target_superuser,target / superuser RW,model_neon_dashboard_target,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_target_bookkeeper,target / bookkeeper read-only,model_neon_dashboard_target,neon_core.group_neon_bookkeeper,1,0,0,0
+access_neon_dashboard_target_sales_rep,target / sales rep read-only,model_neon_dashboard_target,neon_core.group_neon_sales_rep,1,0,0,0
+access_neon_dashboard_target_lead_tech,target / lead tech read-only,model_neon_dashboard_target,neon_core.group_neon_lead_tech,1,0,0,0
+access_neon_dashboard_target_crew,target / crew read-only,model_neon_dashboard_target,neon_core.group_neon_crew,1,0,0,0

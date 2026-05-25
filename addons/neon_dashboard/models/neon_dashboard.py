@@ -353,6 +353,8 @@ class NeonDashboard(models.Model):
             # tech sees own crew assignments only, etc.).
             "crew_equipment_block":
                 self._compute_crew_equipment_block(resolved_type),
+            # M5: Sales block (pipeline + win rate + lead sources).
+            "sales_block": self._compute_sales_block(resolved_type),
             "available_types": self._available_types_for_user(),
             "last_updated": fields.Datetime.to_string(
                 fields.Datetime.now()),
@@ -605,17 +607,53 @@ class NeonDashboard(models.Model):
         }
 
     def _kpi_forecast(self):
-        """Forecast vs Target. ``neon.dashboard.target`` lands in M5;
-        until then the tile is an empty-state CTA per prompt M2 spec.
+        """Forecast vs Target tile.
+
+        M5: wires to ``neon.dashboard.target``. The CTA empty-state
+        (M2's original behaviour) is preserved as a fall-through when
+        no target row covers today.
+
+        ⚠️ DECISION (M5, marker 6): supersedes M2's CTA-only empty
+        state. CTA still surfaces when no target exists for the
+        current period -- the dashboard never crashes for users
+        without a configured target.
         """
+        Target = self.env["neon.dashboard.target"].sudo()
+        today = fields.Date.context_today(self)
+        target = Target.search([
+            ("target_type", "=", "revenue"),
+            ("active", "=", True),
+            ("date_from", "<=", today),
+            ("date_to", ">=", today),
+        ], limit=1, order="date_from desc")
+
+        if not target:
+            return {
+                "value": None,
+                "value_display": _("Set a target -->"),
+                "subtitle": _("No target set for current period"),
+                "empty": True,
+                "empty_message": _("Set a target -->"),
+                "deeplink_action":
+                    "neon_dashboard.action_neon_dashboard_target",
+                "cta_label": _("Configure target"),
+            }
+
+        days_remaining = max((target.date_to - today).days, 0)
         return {
-            "value": None,
-            "value_display": _("Set a target -->"),
-            "subtitle": _("Forecast vs Target ships in M5"),
-            "empty": True,
-            "empty_message": _("Set a target -->"),
-            "deeplink_action": False,
-            "cta_label": _("Configure target"),
+            "value": target.progress_pct,
+            "value_display": f"{int(target.progress_pct)}%",
+            "subtitle": _(
+                "%(name)s -- %(days)d days left"
+            ) % {"name": target.name, "days": days_remaining},
+            "progress_pct": target.progress_pct,
+            "target_amount_display": self._format_money(
+                target.target_amount, target.currency_id.name),
+            "actual_amount_display": self._format_money(
+                target.actual_amount, target.currency_id.name),
+            "empty": False,
+            "deeplink_action":
+                "neon_dashboard.action_neon_dashboard_target",
         }
 
     def _empty_kpi(self, message, value_display="$0",
@@ -1024,4 +1062,171 @@ class NeonDashboard(models.Model):
         return {
             "empty": False,
             "categories": categories,
+        }
+
+    # ==================================================================
+    # Sales block (M5).
+    #
+    # Three sub-widgets: pipeline-by-stage, win rate (last 90 days),
+    # lead sources (last 30 days). All sums USD-only with a ZWG
+    # disclosure -- ZWG sums land in M6 alongside the RBZ rate cron.
+    #
+    # ⚠️ DECISION (M5, marker 7): win/loss mapping locked at gate 1:
+    #   * won  -> state == "accepted"   (customer signed)
+    #   * lost -> state in ("rejected", "expired")  (declined OR aged out)
+    # ``cancelled`` is excluded (internal abandonment, not a business
+    # loss). Last 90 days uses write_date as the accept-transition
+    # proxy (same caveat as the target actuals -- M6 polish item to
+    # introduce a dedicated accepted_on / rejected_on audit field on
+    # neon.finance.quote).
+    # ==================================================================
+    @api.model
+    def _compute_sales_block(self, dashboard_type):
+        return {
+            "pipeline_by_stage": self._compute_pipeline_by_stage(),
+            "win_rate": self._compute_win_rate(),
+            "lead_sources": self._compute_lead_sources(),
+        }
+
+    @api.model
+    def _compute_pipeline_by_stage(self):
+        """USD-only sums per pipeline state. Mirrors
+        neon.finance.dashboard._tile_pipeline state filter.
+
+        Mockup-friendly stage labels are mapped from the real
+        neon.finance.quote states.
+        """
+        Quote = self.env["neon.finance.quote"].sudo()
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        if not usd:
+            return {
+                "empty": True,
+                "empty_message": _("USD currency missing"),
+                "stages": [],
+                "currency_note": _(
+                    "ZWG totals ship in M6 with RBZ rate cron"),
+            }
+        active = Quote.search([
+            ("state", "in",
+             ("pending_approval", "approved", "sent")),
+            ("currency_id", "=", usd.id),
+        ])
+        if not active:
+            return {
+                "empty": True,
+                "empty_message": _("No active deals in pipeline"),
+                "stages": [],
+                "currency_note": _(
+                    "ZWG totals ship in M6 with RBZ rate cron"),
+            }
+
+        # Build per-state buckets. Order = pipeline progression.
+        order = [
+            ("pending_approval", _("Qualified")),
+            ("approved", _("Proposal Sent")),
+            ("sent", _("Negotiation")),
+        ]
+        per_state = {s: {"count": 0, "value": 0.0} for s, _l in order}
+        for q in active:
+            if q.state in per_state:
+                per_state[q.state]["count"] += 1
+                per_state[q.state]["value"] += q.amount_total
+
+        stages = []
+        for state, label in order:
+            entry = per_state[state]
+            stages.append({
+                "state": state,
+                "label": label,
+                "count": entry["count"],
+                "value": entry["value"],
+                "value_display": self._format_money(
+                    entry["value"], "USD"),
+                "deeplink_action":
+                    "neon_finance.action_dashboard_pipeline",
+            })
+        return {
+            "empty": False,
+            "stages": stages,
+            "currency_note": _(
+                "USD only -- ZWG totals ship in M6"),
+        }
+
+    @api.model
+    def _compute_win_rate(self):
+        """Won / (Won + Lost) over the last 90 days, write_date-bounded.
+
+        won  := state == 'accepted'
+        lost := state in ('rejected', 'expired')
+
+        Returns rate_pct=None when total == 0 (empty-state path
+        for the OWL template).
+        """
+        Quote = self.env["neon.finance.quote"].sudo()
+        today = fields.Date.context_today(self)
+        cutoff = fields.Datetime.to_string(
+            fields.Datetime.to_datetime(
+                today - timedelta(days=90)))
+        won = Quote.search_count([
+            ("state", "=", "accepted"),
+            ("write_date", ">=", cutoff),
+        ])
+        lost = Quote.search_count([
+            ("state", "in", ("rejected", "expired")),
+            ("write_date", ">=", cutoff),
+        ])
+        total = won + lost
+        return {
+            "won_count": won,
+            "lost_count": lost,
+            "total": total,
+            "rate_pct": round(won / total * 100, 1) if total else None,
+            "empty": total == 0,
+            "empty_message": _("No closed deals in last 90 days"),
+            "window_label": _("Last 90 days"),
+        }
+
+    @api.model
+    def _compute_lead_sources(self):
+        """Top 4 lead sources by count over the last 30 days.
+
+        Uses crm.lead.source_id (utm.source). Leads without a source
+        bucket into "Unspecified".
+        """
+        Lead = self.env["crm.lead"].sudo()
+        today = fields.Date.context_today(self)
+        cutoff = fields.Datetime.to_string(
+            fields.Datetime.to_datetime(
+                today - timedelta(days=30)))
+        leads = Lead.search([("create_date", ">=", cutoff)])
+        if not leads:
+            return {
+                "empty": True,
+                "empty_message": _(
+                    "No new leads in last 30 days"),
+                "sources": [],
+                "total": 0,
+                "window_label": _("Last 30 days"),
+            }
+        by_source = {}
+        for lead in leads:
+            src_name = (lead.source_id.name
+                        if lead.source_id
+                        else _("Unspecified"))
+            by_source[src_name] = by_source.get(src_name, 0) + 1
+        total = len(leads)
+        ranked = sorted(by_source.items(), key=lambda kv: -kv[1])[:4]
+        return {
+            "empty": False,
+            "total": total,
+            "window_label": _("Last 30 days"),
+            "sources": [
+                {
+                    "source": name,
+                    "count": count,
+                    "pct": (round(count / total * 100)
+                            if total else 0),
+                }
+                for name, count in ranked
+            ],
         }

@@ -417,6 +417,102 @@ $neon-bg:            #FAFAFC;
         }
     }
 
+    // -------- M5 Sales block --------
+    .o_neon_block_sales {
+        .o_neon_sales_subwidget {
+            margin-bottom: 10px;
+            h4 {
+                margin: 0 0 4px;
+                font-size: 0.85em;
+                color: $neon-muted;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+        }
+        .o_neon_sales_subrow {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .o_neon_sales_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+            thead th {
+                text-align: left;
+                color: $neon-muted;
+                font-weight: 600;
+                border-bottom: 1px solid $neon-line;
+                padding: 4px 6px;
+                text-transform: uppercase;
+                font-size: 0.85em;
+                letter-spacing: 0.03em;
+            }
+            tbody td {
+                padding: 5px 6px;
+                border-bottom: 1px solid $neon-line;
+            }
+            .o_neon_sales_row {
+                cursor: pointer;
+                &:hover { background: $neon-purple-pale; }
+            }
+        }
+        .o_neon_sales_currency_note {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.75em;
+        }
+        .o_neon_sales_win_rate_value {
+            font-size: 1.6em;
+            font-weight: 700;
+            color: $neon-accent-green;
+            line-height: 1.1;
+        }
+        .o_neon_sales_lead_table {
+            width: 100%;
+            font-size: 0.85em;
+            border-collapse: collapse;
+            td {
+                padding: 3px 0;
+            }
+        }
+    }
+
+    // -------- M5 filter-chip CSS rules --------
+    // Client-side widget visibility flips driven by activeFilter.
+    // Server payload is unchanged; we just CSS-hide non-matching
+    // widgets via the .widget--<key> classes added to each root.
+
+    &.o_neon_dashboard__filter_operations {
+        // Operations view: Jobs + Crew/Equipment + Alerts + Tasks +
+        // operational KPI tiles. Hide Sales + Finance.
+        .widget--block_sales,
+        .widget--block_finance,
+        .widget--kpi_pipeline,
+        .widget--kpi_leads,
+        .widget--kpi_forecast,
+        .widget--kpi_ar_overdue {
+            display: none;
+        }
+    }
+
+    &.o_neon_dashboard__filter_sales {
+        // Sales view: Sales block + sales KPI tiles (pipeline, leads,
+        // forecast, jobs_week). Hide Jobs / Finance / Crew & Equip,
+        // and the operational/cash KPI tiles.
+        .widget--block_jobs,
+        .widget--block_finance,
+        .widget--block_crew_equipment,
+        .widget--kpi_cash,
+        .widget--kpi_ar_overdue,
+        .widget--kpi_jobs_today {
+            display: none;
+        }
+    }
+
+    // No filter rule for "all" (everything visible by default) or
+    // "finance" (still a toast; never sets activeFilter).
+
     // -------- Error / loading --------
     .o_neon_dashboard_error {
         margin-bottom: 8px;

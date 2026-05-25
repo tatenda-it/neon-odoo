@@ -19,4 +19,31 @@
               action="action_neon_dashboard_server"
               sequence="5"
               groups="neon_core.group_neon_superuser,neon_core.group_neon_bookkeeper,neon_core.group_neon_sales_rep,neon_core.group_neon_lead_tech,neon_core.group_neon_crew"/>
+
+    <!--
+        M5 - Settings > Neon > Dashboard Targets.
+
+        ⚠️ DECISION (M5, marker 5): new top-level "Neon" parent
+        under base.menu_administration (the Settings app root).
+        Gate 1 amendment: "Don't put a business-user feature behind
+        Technical. Create Settings > Neon as part of M5 (it's where
+        Phase 9+ settings will land anyway: n8n config, OpenClaw
+        keys, etc.)."
+
+        sequence=99 puts the Neon group near the bottom of the
+        Settings sidebar - standard for company-specific
+        configuration parents.
+    -->
+    <menuitem id="menu_neon_settings_root"
+              name="Neon"
+              parent="base.menu_administration"
+              sequence="99"
+              groups="neon_core.group_neon_superuser,neon_core.group_neon_bookkeeper,neon_core.group_neon_sales_rep,neon_core.group_neon_lead_tech,neon_core.group_neon_crew"/>
+
+    <menuitem id="menu_neon_dashboard_targets"
+              name="Dashboard Targets"
+              parent="menu_neon_settings_root"
+              action="action_neon_dashboard_target"
+              sequence="10"
+              groups="neon_core.group_neon_superuser"/>
 </odoo>

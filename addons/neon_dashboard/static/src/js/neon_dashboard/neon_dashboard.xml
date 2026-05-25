@@ -2,7 +2,8 @@
 <templates xml:space="preserve">
 
     <t t-name="neon_dashboard.NeonDashboard">
-        <div class="o_neon_dashboard">
+        <div class="o_neon_dashboard"
+             t-att-class="'o_neon_dashboard__filter_' + state.activeFilter">
 
             <!-- =====================================================
                  Header row - brand block on the left, user-line
@@ -95,7 +96,7 @@
 
                     <!-- Cash on Hand (mandatory; always visible per
                          schema sketch §4.2). -->
-                    <div class="o_neon_kpi_tile o_neon_kpi_tile_big"
+                    <div class="o_neon_kpi_tile o_neon_kpi_tile_big widget--kpi_cash"
                          t-if="isWidgetVisible('kpi_cash')"
                          t-att-class="kpi.kpi_cash and kpi.kpi_cash.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_cash)">
@@ -108,7 +109,7 @@
                     </div>
 
                     <!-- AR Overdue (mandatory) -->
-                    <div class="o_neon_kpi_tile"
+                    <div class="o_neon_kpi_tile widget--kpi_ar_overdue"
                          t-if="isWidgetVisible('kpi_ar_overdue')"
                          t-att-class="kpi.kpi_ar_overdue and kpi.kpi_ar_overdue.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_ar_overdue)">
@@ -120,7 +121,7 @@
                              t-esc="kpi.kpi_ar_overdue and kpi.kpi_ar_overdue.subtitle"/>
                     </div>
 
-                    <div class="o_neon_kpi_tile"
+                    <div class="o_neon_kpi_tile widget--kpi_jobs_today"
                          t-if="isWidgetVisible('kpi_jobs_today')"
                          t-att-class="kpi.kpi_jobs_today and kpi.kpi_jobs_today.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_jobs_today)">
@@ -132,7 +133,7 @@
                              t-esc="kpi.kpi_jobs_today and kpi.kpi_jobs_today.subtitle"/>
                     </div>
 
-                    <div class="o_neon_kpi_tile"
+                    <div class="o_neon_kpi_tile widget--kpi_jobs_week"
                          t-if="isWidgetVisible('kpi_jobs_week')"
                          t-att-class="kpi.kpi_jobs_week and kpi.kpi_jobs_week.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_jobs_week)">
@@ -144,7 +145,7 @@
                              t-esc="kpi.kpi_jobs_week and kpi.kpi_jobs_week.subtitle"/>
                     </div>
 
-                    <div class="o_neon_kpi_tile"
+                    <div class="o_neon_kpi_tile widget--kpi_pipeline"
                          t-if="isWidgetVisible('kpi_pipeline')"
                          t-att-class="kpi.kpi_pipeline and kpi.kpi_pipeline.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_pipeline)">
@@ -156,7 +157,7 @@
                              t-esc="kpi.kpi_pipeline and kpi.kpi_pipeline.subtitle"/>
                     </div>
 
-                    <div class="o_neon_kpi_tile"
+                    <div class="o_neon_kpi_tile widget--kpi_leads"
                          t-if="isWidgetVisible('kpi_leads')"
                          t-att-class="kpi.kpi_leads and kpi.kpi_leads.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_leads)">
@@ -168,7 +169,7 @@
                              t-esc="kpi.kpi_leads and kpi.kpi_leads.subtitle"/>
                     </div>
 
-                    <div class="o_neon_kpi_tile o_neon_kpi_tile_cta"
+                    <div class="o_neon_kpi_tile o_neon_kpi_tile_cta widget--kpi_forecast"
                          t-if="isWidgetVisible('kpi_forecast')"
                          t-att-class="kpi.kpi_forecast and kpi.kpi_forecast.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_forecast)">
@@ -198,7 +199,7 @@
                      ================================================= -->
                 <section class="o_neon_row_a">
 
-                    <div class="o_neon_block o_neon_block_jobs"
+                    <div class="o_neon_block o_neon_block_jobs widget--block_jobs"
                          t-if="isWidgetVisible('block_jobs')">
                         <div class="o_neon_block_header">
                             <h3>Jobs &#183; Today + This Week</h3>
@@ -264,16 +265,98 @@
                         </div>
                     </div>
 
-                    <!-- Sales placeholder (M5 fills this) -->
+                    <!-- M5 - Sales block -->
                     <div t-if="isWidgetVisible('block_sales')"
-                         class="o_neon_block o_neon_block_placeholder">
+                         class="o_neon_block o_neon_block_sales widget--block_sales">
                         <div class="o_neon_block_header">
                             <h3>Sales Pipeline</h3>
                         </div>
                         <div class="o_neon_block_body">
-                            <p class="text-muted">
-                                Coming in Phase 8A M5.
-                            </p>
+
+                            <!-- Pipeline by stage -->
+                            <div class="o_neon_sales_subwidget">
+                                <h4>Pipeline by stage</h4>
+                                <div t-if="salesBlock.pipeline_by_stage.empty"
+                                     class="o_neon_block_empty">
+                                    <p class="o_neon_block_empty_msg"
+                                       t-esc="salesBlock.pipeline_by_stage.empty_message"/>
+                                </div>
+                                <table t-if="!salesBlock.pipeline_by_stage.empty"
+                                       class="o_neon_sales_table">
+                                    <thead>
+                                        <tr>
+                                            <th>Stage</th>
+                                            <th class="text-end">Count</th>
+                                            <th class="text-end">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="salesBlock.pipeline_by_stage.stages"
+                                           t-as="stage" t-key="stage.state">
+                                            <tr class="o_neon_sales_row"
+                                                t-on-click="() => this.onPipelineStageClick(stage)">
+                                                <td t-esc="stage.label"/>
+                                                <td class="text-end"
+                                                    t-esc="stage.count"/>
+                                                <td class="text-end"
+                                                    t-esc="stage.value_display"/>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                                <small class="text-muted o_neon_sales_currency_note"
+                                       t-esc="salesBlock.pipeline_by_stage.currency_note"/>
+                            </div>
+
+                            <!-- Win rate + lead sources two-up row -->
+                            <div class="o_neon_sales_subrow">
+
+                                <div class="o_neon_sales_subwidget">
+                                    <h4>Win rate</h4>
+                                    <div t-if="salesBlock.win_rate.empty"
+                                         class="text-muted small"
+                                         t-esc="salesBlock.win_rate.empty_message"/>
+                                    <div t-if="!salesBlock.win_rate.empty"
+                                         class="o_neon_sales_win_rate">
+                                        <div class="o_neon_sales_win_rate_value">
+                                            <t t-esc="salesBlock.win_rate.rate_pct"/>%
+                                        </div>
+                                        <small class="text-muted">
+                                            <t t-esc="salesBlock.win_rate.won_count"/>W /
+                                            <t t-esc="salesBlock.win_rate.lost_count"/>L
+                                            &#183;
+                                            <t t-esc="salesBlock.win_rate.window_label"/>
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <div class="o_neon_sales_subwidget">
+                                    <h4>Lead sources</h4>
+                                    <div t-if="salesBlock.lead_sources.empty"
+                                         class="text-muted small"
+                                         t-esc="salesBlock.lead_sources.empty_message"/>
+                                    <table t-if="!salesBlock.lead_sources.empty"
+                                           class="o_neon_sales_lead_table">
+                                        <tbody>
+                                            <t t-foreach="salesBlock.lead_sources.sources"
+                                               t-as="src" t-key="src.source">
+                                                <tr>
+                                                    <td t-esc="src.source"/>
+                                                    <td class="text-end">
+                                                        <t t-esc="src.count"/>
+                                                        <small class="text-muted ms-1">
+                                                            (<t t-esc="src.pct"/>%)
+                                                        </small>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                    <small t-if="!salesBlock.lead_sources.empty"
+                                           class="text-muted"
+                                           t-esc="salesBlock.lead_sources.window_label"/>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -284,7 +367,7 @@
                      ================================================= -->
                 <section class="o_neon_row_b">
                     <div t-if="isWidgetVisible('block_finance')"
-                         class="o_neon_block o_neon_block_placeholder">
+                         class="o_neon_block o_neon_block_placeholder widget--block_finance">
                         <div class="o_neon_block_header">
                             <h3>Finance &#183; AR &amp; Cash</h3>
                         </div>
@@ -294,7 +377,7 @@
                     </div>
 
                     <div t-if="isWidgetVisible('block_alerts')"
-                         class="o_neon_block o_neon_block_placeholder">
+                         class="o_neon_block o_neon_block_placeholder widget--block_alerts">
                         <div class="o_neon_block_header">
                             <h3>Alerts</h3>
                         </div>
@@ -413,7 +496,7 @@
                      ================================================= -->
                 <section class="o_neon_row_c">
                     <div t-if="isWidgetVisible('block_tasks')"
-                         class="o_neon_block o_neon_block_placeholder">
+                         class="o_neon_block o_neon_block_placeholder widget--block_tasks">
                         <div class="o_neon_block_header">
                             <h3>Tasks</h3>
                         </div>
@@ -422,7 +505,7 @@
                         </div>
                     </div>
                     <div t-if="isWidgetVisible('block_ai_insights')"
-                         class="o_neon_block o_neon_block_placeholder">
+                         class="o_neon_block o_neon_block_placeholder widget--block_ai_insights">
                         <div class="o_neon_block_header">
                             <h3>AI Insights</h3>
                         </div>

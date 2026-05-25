@@ -3,7 +3,7 @@
     "name": "Neon Dashboard",
     # Phase 8 era opener -- new central pivot model (neon.dashboard).
     # Per CLAUDE.md manifest versioning: 17.0.<phase>.<minor>.<patch>.
-    "version": "17.0.8.1.0",
+    "version": "17.0.8.2.0",
     "summary": "Phase 8A -- unified role-aware Director Dashboard "
                "framework + headline KPI strip + Jobs block. "
                "Frames the Phase 8B role variants (Sales / "
@@ -82,7 +82,10 @@ ranganai by login).
         # Views second-to-last so menu can resolve the client-
         # action wrapper.
         "views/neon_dashboard_views.xml",
+        # M5 -- target model tree + form views. Load before menu.
+        "views/neon_dashboard_target_views.xml",
         # Menu loads LAST so all action xmlids exist in registry.
+        # M5 adds Settings -> Neon -> Dashboard Targets here.
         "views/neon_dashboard_menu.xml",
     ],
     "assets": {
