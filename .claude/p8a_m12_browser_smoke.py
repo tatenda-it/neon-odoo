@@ -55,6 +55,24 @@ def _get_or_make(login, group_xmlids):
 u_director = _get_or_make(
     'p8a_director', ['neon_core.group_neon_superuser'])
 
+# M11.1: seed a zero-item rule-based-fallback insight as the
+# LATEST row for the director's dashboard, so the widget renders
+# the all-clear empty state deterministically (real rule-based
+# output on this DB may have matches; we force the zero case).
+Dashboard = env['neon.dashboard'].sudo()
+dash = Dashboard.search([('user_id', '=', u_director.id)], limit=1)
+if not dash:
+    dash = Dashboard.get_or_create_for_user(u_director.id)
+rule_provider = env.ref(
+    'neon_dashboard.ai_provider_rule_based', raise_if_not_found=False)
+env['neon.dashboard.ai.insight'].sudo().create({
+    'dashboard_id': dash.id,
+    'provider_id': rule_provider.id if rule_provider else False,
+    'content_json': '[]',
+    'is_fallback': True,
+    'error_message': 'M11.1 smoke: forced zero-item fallback',
+})
+
 env.cr.commit()
 print('IDS_JSON=' + repr({'director_id': u_director.id}))
 """
@@ -369,6 +387,52 @@ def run() -> int:
                     "mobile: AI Insights block not reachable via scroll")
 
             smoke.screenshot("mobile_375")
+
+        # ----------------------------------------------------------
+        # Scenario 4 (M11.1): AI Insights all-clear empty state.
+        # Setup seeded a zero-item is_fallback=True insight as the
+        # latest row. Reset to desktop, reload, assert the body
+        # shows the all-clear copy AND the subtitle still shows the
+        # rule-based fallback note.
+        # ----------------------------------------------------------
+        with smoke.scenario("M11.1 AI Insights all-clear empty state"):
+            _resize_and_settle(smoke, 1280, 800)
+            smoke.open_action(
+                "neon_dashboard.action_neon_dashboard_server")
+            smoke.page.wait_for_selector(
+                ".o_neon_block_ai", timeout=10000)
+            smoke.page.wait_for_timeout(800)
+            body_text = smoke.page.evaluate(
+                "() => {"
+                " const b = document.querySelector('.o_neon_block_ai');"
+                " return b ? b.innerText : '';"
+                "}"
+            )
+            has_all_clear = "All clear" in body_text and "nothing flagged this cycle" in body_text
+            smoke._record_assert(
+                "M11.1: all-clear copy renders for zero-item insight",
+                expect="'All clear — nothing flagged this cycle.'",
+                actual=("present" if has_all_clear else f"absent; body={body_text[:160]!r}"),
+                passed=has_all_clear,
+            )
+            if not has_all_clear:
+                raise AssertionFail(
+                    f"M11.1: all-clear copy missing; body={body_text[:300]!r}")
+            # Subtitle still carries the fallback note (both pieces present)
+            has_fallback_subtitle = (
+                "Rule-based fallback" in body_text
+                or "AI provider unavailable" in body_text
+            )
+            smoke._record_assert(
+                "M11.1: fallback subtitle still present alongside all-clear",
+                expect="'Rule-based fallback' in subtitle",
+                actual=("present" if has_fallback_subtitle else "absent"),
+                passed=has_fallback_subtitle,
+            )
+            if not has_fallback_subtitle:
+                raise AssertionFail(
+                    "M11.1: fallback subtitle missing alongside all-clear copy")
+            smoke.screenshot("ai_all_clear")
 
         return smoke.summary()
 

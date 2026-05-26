@@ -782,6 +782,10 @@
                                        t-esc="ins.detail"/>
                                 </li>
                             </ul>
+                            <div t-if="!aiInsights.empty and !(aiInsights.insights and aiInsights.insights.length)"
+                                 class="o_neon_ai_all_clear text-muted">
+                                <p>All clear — nothing flagged this cycle.</p>
+                            </div>
                             <div t-if="aiInsights.error_message and !aiInsights.is_fallback"
                                  class="o_neon_ai_error text-danger small">
                                 <i class="fa fa-exclamation-circle me-1"/>
