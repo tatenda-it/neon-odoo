@@ -294,6 +294,80 @@ def run() -> int:
                     passed=ai_insight_count >= 1,
                 )
 
+            # ----------------------------------------------------------
+            # M12.1 regression guard: SCROLL REACHABILITY.
+            # DOM-presence (asserted above) is NOT enough -- the M12
+            # scroll-lock bug had all 7 blocks in the DOM but trapped
+            # below an overflow:hidden parent, unreachable on phones.
+            # This asserts the dashboard root is a working scroll
+            # container: scrollHeight > clientHeight AND scrollTo
+            # actually moves the viewport. Tag:
+            # browser-smoke-must-test-scroll-reachability.
+            # ----------------------------------------------------------
+            scroll_probe = smoke.page.evaluate(
+                "() => {\n"
+                " const el = document.querySelector('.o_neon_dashboard');\n"
+                " if (!el) return {found: false};\n"
+                " const cs = getComputedStyle(el);\n"
+                " const scrollable = el.scrollHeight > el.clientHeight + 10;\n"
+                " el.scrollTop = 0;\n"
+                " el.scrollTo({top: 1500});\n"
+                " const moved = el.scrollTop > 200;\n"
+                " return {\n"
+                "   found: true,\n"
+                "   overflowY: cs.overflowY,\n"
+                "   scrollHeight: el.scrollHeight,\n"
+                "   clientHeight: el.clientHeight,\n"
+                "   scrollable: scrollable,\n"
+                "   scrollTopAfter: el.scrollTop,\n"
+                "   moved: moved\n"
+                " };\n"
+                "}"
+            )
+            ok_scroll = (
+                scroll_probe.get("found")
+                and scroll_probe.get("scrollable")
+                and scroll_probe.get("moved")
+            )
+            smoke._record_assert(
+                "mobile: dashboard content scroll-reachable",
+                expect="scrollable + scrollTo moves viewport",
+                actual=(
+                    f"overflowY={scroll_probe.get('overflowY')} "
+                    f"scrollH={scroll_probe.get('scrollHeight')} "
+                    f"clientH={scroll_probe.get('clientHeight')} "
+                    f"scrollTopAfter={scroll_probe.get('scrollTopAfter')} "
+                    f"moved={scroll_probe.get('moved')}"
+                ),
+                passed=bool(ok_scroll),
+            )
+            if not ok_scroll:
+                raise AssertionFail(
+                    "mobile: dashboard content NOT scroll-reachable -- "
+                    f"probe={scroll_probe}")
+
+            # Verify the deepest block (AI Insights) is actually
+            # reachable: scroll it into view + confirm it intersects
+            # the viewport.
+            ai_reachable = smoke.page.evaluate(
+                "() => {"
+                " const ai = document.querySelector('.o_neon_block_ai, .widget--block_ai_insights');"
+                " if (!ai) return false;"
+                " ai.scrollIntoView({block: 'center'});"
+                " const r = ai.getBoundingClientRect();"
+                " return r.top < window.innerHeight && r.bottom > 0;"
+                "}"
+            )
+            smoke._record_assert(
+                "mobile: deepest block (AI Insights) reachable via scroll",
+                expect="intersects viewport after scrollIntoView",
+                actual=("reachable" if ai_reachable else "unreachable"),
+                passed=bool(ai_reachable),
+            )
+            if not ai_reachable:
+                raise AssertionFail(
+                    "mobile: AI Insights block not reachable via scroll")
+
             smoke.screenshot("mobile_375")
 
         return smoke.summary()

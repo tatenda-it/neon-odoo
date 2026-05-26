@@ -909,6 +909,22 @@ $neon-bg:            #FAFAFC;
 
     // ---- Tablet (768-991px): KPI 4-up, blocks reflow 2-up ----
     @media (max-width: 991.98px) {
+        // ⚠️ DECISION (M12.1 hotfix): scroll-lock fix. Odoo 17's
+        // .o_action_manager has overflow-y: hidden by default. At
+        // desktop the dashboard fits (blocks 2-up = shorter total
+        // height); at <992px the 1-up/2-up stacking exceeds the
+        // action_manager clientHeight and content below the fold
+        // is unreachable. Making the dashboard root its own scroll
+        // container (height:100% + overflow-y:auto) restores
+        // reachability. iOS momentum scroll via
+        // -webkit-overflow-scrolling. Scoped to <992 so desktop is
+        // untouched. See [[reference_odoo17_action_manager_scroll_lock]].
+        & {
+            height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .o_neon_kpi_strip {
             grid-template-columns: repeat(4, 1fr);
         }
