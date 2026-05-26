@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M9 - Send Weekly Digest Now wizard.
+    Settings > Neon > Send Weekly Digest opens this in dialog
+    (target='new'). Action button fires the same path as the
+    Monday cron, scoped to the triggering user.
+-->
+<odoo>
+
+    <record id="view_neon_dashboard_send_digest_wizard_form"
+            model="ir.ui.view">
+        <field name="name">neon.dashboard.send.digest.wizard.form</field>
+        <field name="model">neon.dashboard.send.digest.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Send Weekly Digest Now">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Send Weekly Digest</h1>
+                        <p class="text-muted">
+                            Fires the same path the Monday 06:00
+                            Harare cron runs. Email + PDF go to
+                            the Finance Approver group (Robin,
+                            Munashe, Tatenda).
+                        </p>
+                    </div>
+                    <group>
+                        <field name="last_log_summary"/>
+                    </group>
+                    <p class="text-muted">
+                        Every send is recorded under Settings >
+                        Neon > Digest History.
+                    </p>
+                </sheet>
+                <footer>
+                    <button name="action_send_now"
+                            type="object"
+                            string="Send Now"
+                            class="btn-primary"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_dashboard_send_digest_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Send Weekly Digest</field>
+        <field name="res_model">neon.dashboard.send.digest.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id"
+               ref="view_neon_dashboard_send_digest_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

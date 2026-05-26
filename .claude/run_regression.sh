@@ -25,6 +25,7 @@ SMOKES=(
   p8a_hygiene_tz p8a_m6_finance p8a_m6_zig_rate
   p8a_m7_alerts p8a_m7_dismissal
   p8a_m8_tasks
+  p8a_m9_digest
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0
@@ -77,7 +78,7 @@ echo
 echo "================================================="
 echo "BROWSER SMOKES (Playwright, headless)"
 echo "================================================="
-BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11 p6_predeploy_fixes p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1 p8a_m1m3 p8a_m4m5 p8a_m6 p8a_m7 p8a_m8)
+BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11 p6_predeploy_fixes p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1 p8a_m1m3 p8a_m4m5 p8a_m6 p8a_m7 p8a_m8 p8a_m9)
 VENV_PY="${SCRIPT_DIR}/.venv-browser/Scripts/python.exe"
 if [[ ! -x "$VENV_PY" ]] && [[ ! -f "$VENV_PY" ]]; then
   echo "MISSING venv: $VENV_PY"

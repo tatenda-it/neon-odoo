@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M9 - Digest history list + form. Settings > Neon > Digest
+    History. Read-only inspection of past sends. Superuser-only.
+-->
+<odoo>
+
+    <record id="view_neon_dashboard_digest_log_tree"
+            model="ir.ui.view">
+        <field name="name">neon.dashboard.digest.log.tree</field>
+        <field name="model">neon.dashboard.digest.log</field>
+        <field name="arch" type="xml">
+            <tree string="Weekly Digest History"
+                  create="false"
+                  edit="false"
+                  delete="false"
+                  default_order="sent_at desc">
+                <field name="sent_at"/>
+                <field name="window_label"/>
+                <field name="status" decoration-success="status == 'sent'"
+                       decoration-warning="status == 'no_recipients'"
+                       decoration-danger="status == 'error'"/>
+                <field name="recipient_count"/>
+                <field name="triggered_by_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_dashboard_digest_log_form"
+            model="ir.ui.view">
+        <field name="name">neon.dashboard.digest.log.form</field>
+        <field name="model">neon.dashboard.digest.log</field>
+        <field name="arch" type="xml">
+            <form string="Weekly Digest Send" create="false"
+                  edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="window_label" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Send">
+                            <field name="sent_at"/>
+                            <field name="status"/>
+                            <field name="recipient_count"/>
+                            <field name="triggered_by_id"/>
+                        </group>
+                        <group string="Window">
+                            <field name="window_start"/>
+                            <field name="window_end"/>
+                            <field name="pdf_attachment_id"/>
+                        </group>
+                    </group>
+                    <group string="Recipients">
+                        <field name="recipient_ids"
+                               nolabel="1"
+                               widget="many2many_tags"/>
+                    </group>
+                    <group string="Error"
+                           invisible="status != 'error'">
+                        <field name="error_message"
+                               nolabel="1"
+                               readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_dashboard_digest_log"
+            model="ir.actions.act_window">
+        <field name="name">Digest History</field>
+        <field name="res_model">neon.dashboard.digest.log</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M9 - Weekly digest cron.
+
+    Daily cadence with a Monday-in-Harare guard inside the Python
+    method. Sidesteps the Odoo weekly-cron DST issues + makes the
+    test path one mock (_today_harare()).
+
+    Cron fires daily; the actual send only fires on Mondays. No
+    explicit nextcall - Odoo's scheduler picks the first run.
+    Robin should see the first digest the first Monday after this
+    cron lands on prod.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="cron_weekly_digest" model="ir.cron">
+            <field name="name">Neon Dashboard: Weekly Digest (Mondays 06:00 Harare)</field>
+            <field name="model_id"
+                   ref="model_neon_dashboard_weekly_digest"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_send_weekly_digest()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

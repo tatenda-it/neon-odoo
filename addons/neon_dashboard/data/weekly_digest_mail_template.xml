@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M9 - mail.template for the weekly digest email.
+
+    Bound to neon.dashboard.digest.log (concrete Model) so render
+    + send work naturally. The recipient_ids + attachment_ids come
+    in via email_values in the dispatch call; the body only needs
+    object (=log) and ctx (=context).
+
+    Template variables (object = neon.dashboard.digest.log):
+      object.window_label
+      object.window_start
+      object.window_end
+      object.sent_at
+    Plus context['digest_payload'] dict carrying the dashboard
+    snapshot (KPIs, alerts count, AR aging).
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="mail_template_weekly_digest" model="mail.template">
+            <field name="name">Neon Dashboard: Weekly Digest</field>
+            <field name="model_id"
+                   ref="model_neon_dashboard_digest_log"/>
+            <field name="subject">Neon - weekly digest - {{ object.window_label }}</field>
+            <field name="email_from">{{ user.email_formatted or 'dashboard@neonhiring.com' }}</field>
+            <field name="auto_delete" eval="False"/>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; font-size: 0.95em; color: #333;">
+                    <p>Good morning,</p>
+                    <p>Your Neon weekly digest for
+                        <strong t-out="object.window_label or ''"/>
+                        is attached.
+                    </p>
+                    <p>Highlights:</p>
+                    <ul>
+                        <li>
+                            Forecast:
+                            <t t-set="kpi_forecast"
+                               t-value="ctx.get('digest_payload', {}).get('kpi_forecast', {})"/>
+                            <span t-out="kpi_forecast.get('display') or kpi_forecast.get('value') or '-'"/>
+                        </li>
+                        <li>
+                            Cash on hand:
+                            <t t-set="kpi_cash"
+                               t-value="ctx.get('digest_payload', {}).get('kpi_cash', {})"/>
+                            <span t-out="kpi_cash.get('display') or kpi_cash.get('value') or '-'"/>
+                        </li>
+                        <li>
+                            AR overdue:
+                            <t t-set="kpi_ar"
+                               t-value="ctx.get('digest_payload', {}).get('kpi_ar_overdue', {})"/>
+                            <span t-out="kpi_ar.get('display') or kpi_ar.get('value') or '-'"/>
+                        </li>
+                        <li>
+                            Jobs this week:
+                            <t t-set="kpi_week"
+                               t-value="ctx.get('digest_payload', {}).get('kpi_jobs_week', {})"/>
+                            <span t-out="kpi_week.get('display') or kpi_week.get('value') or '-'"/>
+                        </li>
+                    </ul>
+                    <p>
+                        Open the dashboard for full detail and actions:
+                        <a t-att-href="ctx.get('digest_payload', {}).get('dashboard_url', '#')">
+                            crm.neonhiring.com
+                        </a>
+                    </p>
+                    <p style="margin-top: 16px; color: #7165AC; font-size: 0.9em;">
+                        Neon Events Elements
+                    </p>
+                </div>
+            </field>
+        </record>
+
+    </data>
+</odoo>

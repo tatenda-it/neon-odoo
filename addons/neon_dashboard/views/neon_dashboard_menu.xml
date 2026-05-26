@@ -58,4 +58,23 @@
               action="action_neon_dashboard_zig_rate_wizard"
               sequence="20"
               groups="neon_core.group_neon_superuser"/>
+
+    <!--
+        M9 - Send Weekly Digest manual trigger + Digest History.
+        Both superuser only. Sequence 30/40 keeps them grouped
+        with the existing settings sidebar entries.
+    -->
+    <menuitem id="menu_neon_dashboard_send_digest"
+              name="Send Weekly Digest"
+              parent="menu_neon_settings_root"
+              action="action_neon_dashboard_send_digest_wizard"
+              sequence="30"
+              groups="neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_neon_dashboard_digest_log"
+              name="Digest History"
+              parent="menu_neon_settings_root"
+              action="action_neon_dashboard_digest_log"
+              sequence="40"
+              groups="neon_core.group_neon_superuser"/>
 </odoo>

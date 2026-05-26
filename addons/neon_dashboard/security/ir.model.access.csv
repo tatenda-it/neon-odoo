@@ -21,3 +21,5 @@ access_neon_dashboard_target_crew,target / crew read-only,model_neon_dashboard_t
 access_neon_dashboard_zig_rate_wizard_superuser,zig rate wizard / superuser,model_neon_dashboard_zig_rate_wizard,neon_core.group_neon_superuser,1,1,1,1
 access_neon_dashboard_alert_dismissal_internal,alert dismissal / internal users,model_neon_dashboard_alert_dismissal,base.group_user,1,1,1,0
 access_neon_dashboard_alert_dismissal_superuser,alert dismissal / superuser,model_neon_dashboard_alert_dismissal,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_digest_log_superuser,digest log / superuser,model_neon_dashboard_digest_log,neon_core.group_neon_superuser,1,1,1,0
+access_neon_dashboard_send_digest_wizard_superuser,send digest wizard / superuser,model_neon_dashboard_send_digest_wizard,neon_core.group_neon_superuser,1,1,1,1
