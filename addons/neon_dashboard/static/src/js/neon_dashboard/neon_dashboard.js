@@ -43,6 +43,10 @@ export class NeonDashboard extends Component {
             error: null,
             data: null,
             activeFilter: "all",
+            // M10: 'pdf' or 'xlsx' while an export is in flight;
+            // null when idle. Disables both buttons during the
+            // 2-5s server roundtrip to prevent double-clicks.
+            exporting: null,
         });
 
         // 5-minute auto-refresh (same cadence as cash_flow_dashboard;
@@ -134,6 +138,44 @@ export class NeonDashboard extends Component {
         this.notification.add(
             _t("Edit Layout ships in Phase 8B M5."),
             { type: "info" });
+    }
+
+    async onExportPdf() {
+        // M10: PDF snapshot honouring active dashboard_type + filter.
+        await this._exportSnapshot("pdf", "export_snapshot_pdf");
+    }
+
+    async onExportXlsx() {
+        // M10: xlsx workbook snapshot.
+        await this._exportSnapshot("xlsx", "export_snapshot_xlsx");
+    }
+
+    async _exportSnapshot(format, rpcMethod) {
+        if (this.state.exporting) return;
+        this.state.exporting = format;
+        try {
+            const dashboardType = (this.state.data
+                && this.state.data.dashboard_type) || null;
+            const action = await this.orm.call(
+                "neon.dashboard",
+                rpcMethod,
+                [],
+                {
+                    dashboard_type: dashboardType,
+                    active_filter: this.state.activeFilter || "all",
+                },
+            );
+            // The server returns an ir.actions.act_url descriptor.
+            // doAction triggers the /web/content download via the
+            // standard backend action handler.
+            await this.action.doAction(action);
+        } catch (e) {
+            this.notification.add(
+                _t("Export failed: ") + ((e && e.message) || String(e)),
+                { type: "danger" });
+        } finally {
+            this.state.exporting = null;
+        }
     }
 
     async onKpiClick(kpi) {

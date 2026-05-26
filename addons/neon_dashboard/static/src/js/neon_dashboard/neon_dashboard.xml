@@ -53,6 +53,23 @@
                             <i class="fa fa-pencil me-1"/>
                             EDIT LAYOUT
                         </button>
+                        <!-- M10 -- export buttons (PDF + Excel) -->
+                        <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_pdf"
+                                t-on-click="onExportPdf"
+                                t-att-disabled="state.exporting or state.loading"
+                                title="Download PDF snapshot">
+                            <i class="fa"
+                               t-att-class="state.exporting === 'pdf' ? 'fa-spinner fa-spin' : 'fa-file-pdf-o'"/>
+                            <span class="ms-1">PDF</span>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_xlsx"
+                                t-on-click="onExportXlsx"
+                                t-att-disabled="state.exporting or state.loading"
+                                title="Download Excel snapshot">
+                            <i class="fa"
+                               t-att-class="state.exporting === 'xlsx' ? 'fa-spinner fa-spin' : 'fa-file-excel-o'"/>
+                            <span class="ms-1">Excel</span>
+                        </button>
                         <button class="btn btn-sm btn-outline-primary o_neon_dashboard_refresh"
                                 t-on-click="onRefreshClick"
                                 t-att-disabled="state.loading">

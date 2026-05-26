@@ -45,71 +45,8 @@
                             <span t-out="payload.get('anchor_today_label') or ''"/>
                         </p>
 
-                        <!-- KPI snapshot -->
-                        <h3>Current state</h3>
-                        <table class="table table-sm">
-                            <thead>
-                                <tr><th>KPI</th><th>Value</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Cash on hand</td>
-                                    <td>
-                                        <t t-set="k"
-                                           t-value="payload.get('kpi_cash', {})"/>
-                                        <span t-out="k.get('display') or k.get('value') or '-'"/>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>AR overdue</td>
-                                    <td>
-                                        <t t-set="k"
-                                           t-value="payload.get('kpi_ar_overdue', {})"/>
-                                        <span t-out="k.get('display') or k.get('value') or '-'"/>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Jobs today</td>
-                                    <td>
-                                        <t t-set="k"
-                                           t-value="payload.get('kpi_jobs_today', {})"/>
-                                        <span t-out="k.get('display') or k.get('value') or '-'"/>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Jobs this week</td>
-                                    <td>
-                                        <t t-set="k"
-                                           t-value="payload.get('kpi_jobs_week', {})"/>
-                                        <span t-out="k.get('display') or k.get('value') or '-'"/>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Pipeline value</td>
-                                    <td>
-                                        <t t-set="k"
-                                           t-value="payload.get('kpi_pipeline', {})"/>
-                                        <span t-out="k.get('display') or k.get('value') or '-'"/>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>New leads</td>
-                                    <td>
-                                        <t t-set="k"
-                                           t-value="payload.get('kpi_leads', {})"/>
-                                        <span t-out="k.get('display') or k.get('value') or '-'"/>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Forecast vs target</td>
-                                    <td>
-                                        <t t-set="k"
-                                           t-value="payload.get('kpi_forecast', {})"/>
-                                        <span t-out="k.get('display') or k.get('value') or '-'"/>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <!-- KPI snapshot - shared partial (M10 extract). -->
+                        <t t-call="neon_dashboard.snapshot_section_kpis"/>
 
                         <!-- Last week activity -->
                         <h3>Last week</h3>
@@ -132,54 +69,11 @@
                             </li>
                         </ul>
 
-                        <!-- Forward look -->
-                        <h3>Coming up this week</h3>
-                        <t t-set="jb"
-                           t-value="payload.get('jobs_block', {})"/>
-                        <t t-set="job_rows"
-                           t-value="(jb.get('rows') or jb.get('jobs') or [])"/>
-                        <t t-if="not job_rows">
-                            <p><em>No upcoming jobs in the next 7 days.</em></p>
-                        </t>
-                        <t t-else="">
-                            <ul>
-                                <li t-foreach="job_rows" t-as="job">
-                                    <span t-out="job.get('title') or job.get('name') or job.get('display_name') or '-'"/>
-                                    ·
-                                    <span t-out="job.get('date_display') or job.get('event_date') or ''"/>
-                                    ·
-                                    <span t-out="job.get('value_display') or job.get('value') or ''"/>
-                                </li>
-                            </ul>
-                        </t>
+                        <!-- Forward look - shared partial (M10 extract). -->
+                        <t t-call="neon_dashboard.snapshot_section_jobs"/>
 
-                        <!-- Outstanding items -->
-                        <h3>Needs attention</h3>
-                        <t t-set="ar"
-                           t-value="payload.get('ar_aging', {})"/>
-                        <t t-set="buckets"
-                           t-value="(ar.get('buckets') or [])"/>
-                        <t t-if="ar.get('empty') or not buckets">
-                            <p><em>No overdue invoices.</em></p>
-                        </t>
-                        <t t-else="">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Bucket</th>
-                                        <th>Count</th>
-                                        <th>Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr t-foreach="buckets" t-as="b">
-                                        <td t-out="b.get('label') or '-'"/>
-                                        <td t-out="b.get('count') or 0"/>
-                                        <td t-out="b.get('amount_display') or b.get('amount') or '-'"/>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </t>
+                        <!-- Outstanding items - shared partial (M10 extract). -->
+                        <t t-call="neon_dashboard.snapshot_section_ar_aging"/>
 
                         <t t-set="ab"
                            t-value="payload.get('alerts_block', {})"/>

@@ -35,6 +35,7 @@ is the project convention. See reference_odoo17_implied_ids_orm_vs_sql.
 ⚠️ DECISION (M1, marker 7): top-level menu (no parent) at sequence=5,
 sitting above ``neon_jobs.menu_operations_root`` (40). Gate-1 locked.
 """
+import base64
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 import logging
@@ -2211,3 +2212,532 @@ class NeonDashboard(models.Model):
                 "You can only complete your own tasks."))
         activity.action_done()
         return self._compute_tasks_block()
+
+    # ==================================================================
+    # M10 -- On-demand exports (PDF + Excel snapshots).
+    #
+    # Two RPC entry points the dashboard's OWL header buttons call:
+    #   * export_snapshot_pdf(dashboard_type, active_filter)
+    #   * export_snapshot_xlsx(dashboard_type, active_filter)
+    # Both return an ir.actions.act_url descriptor pointing at
+    # /web/content/<attachment_id>?download=true. Standard Odoo 17
+    # download path; user isolation is enforced by attachment ACL.
+    #
+    # ⚠️ DECISION (M10, marker 1): authoritative widget-list source
+    # is the seeded neon.dashboard.default.layout records. Reading
+    # XML at runtime instead of hardcoding a Python dict avoids a
+    # second source of truth that can drift from the M1 seed. Per-
+    # request, the result is cached in env.context via a private key
+    # so repeated calls in the same RPC don't re-query.
+    #
+    # ⚠️ DECISION (M10, marker 2): filter hide rules duplicate
+    # between SCSS (M5/M6 client-side hide via
+    # .o_neon_dashboard__filter_<x> .widget--<key> { display: none })
+    # and Python (_widgets_for_filter for server-side scope). Accepted
+    # for v1; test_filter_rules_match_scss parses the SCSS at test
+    # time and asserts agreement. Deduping to a single source of
+    # truth deferred to Phase 9.
+    #
+    # ⚠️ DECISION (M10, marker 3): no persistent export-log model.
+    # _logger.info per call only. Exports are user-initiated and
+    # self-evident; users keep the downloaded file. Different from
+    # the M9 digest, where the audit log proves the Monday cron
+    # actually fired and reached recipients.
+    #
+    # ⚠️ DECISION (M10, marker 4): one-shot ir.attachment with
+    # res_model=False, res_id=False. User isolation via session-
+    # level /web/content ACL (non-public attachment + create_uid
+    # check). Odoo's standard attachment GC handles cleanup.
+    # ==================================================================
+    @api.model
+    def export_snapshot_pdf(self, dashboard_type=None, active_filter="all"):
+        """Generate dashboard snapshot PDF; return download action."""
+        self._check_dashboard_access()
+        dashboard_type = self._resolve_dashboard_type(dashboard_type)
+        payload = self._build_snapshot_payload(
+            dashboard_type, active_filter)
+        Report = self.env["ir.actions.report"].sudo()
+        pdf_bytes, _content_type = Report._render_qweb_pdf(
+            "neon_dashboard.report_snapshot",
+            res_ids=None,
+            data={"payload": payload},
+        )
+        if not pdf_bytes:
+            raise ValueError(_(
+                "Snapshot PDF render returned empty bytes."))
+        filename = self._snapshot_filename("pdf", dashboard_type)
+        attachment = self._store_snapshot_attachment(
+            pdf_bytes, filename, "application/pdf")
+        _logger.info(
+            "M10 snapshot PDF export: user=%s type=%s filter=%s "
+            "attachment=%d size=%d",
+            self.env.user.login, dashboard_type, active_filter,
+            attachment.id, len(pdf_bytes),
+        )
+        return self._download_action(attachment, filename)
+
+    @api.model
+    def export_snapshot_xlsx(self, dashboard_type=None, active_filter="all"):
+        """Generate dashboard snapshot xlsx workbook; return
+        download action."""
+        self._check_dashboard_access()
+        dashboard_type = self._resolve_dashboard_type(dashboard_type)
+        payload = self._build_snapshot_payload(
+            dashboard_type, active_filter)
+        xlsx_bytes = self._render_snapshot_xlsx(payload)
+        filename = self._snapshot_filename("xlsx", dashboard_type)
+        attachment = self._store_snapshot_attachment(
+            xlsx_bytes, filename,
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet",
+        )
+        _logger.info(
+            "M10 snapshot xlsx export: user=%s type=%s filter=%s "
+            "attachment=%d size=%d",
+            self.env.user.login, dashboard_type, active_filter,
+            attachment.id, len(xlsx_bytes),
+        )
+        return self._download_action(attachment, filename)
+
+    @api.model
+    def _snapshot_filename(self, extension, dashboard_type):
+        today = self._today_harare()
+        return "neon-{type}-snapshot-{date}.{ext}".format(
+            type=dashboard_type or "director",
+            date=today.isoformat(),
+            ext=extension,
+        )
+
+    @api.model
+    def _store_snapshot_attachment(self, bytes_content, filename, mimetype):
+        """One-shot ir.attachment with no parent record. The
+        creating user's session is the only path to /web/content
+        download (non-public attachment scoping)."""
+        return self.env["ir.attachment"].create({
+            "name": filename,
+            "datas": base64.b64encode(bytes_content),
+            "type": "binary",
+            "mimetype": mimetype,
+            "res_model": False,
+            "res_id": False,
+        })
+
+    @api.model
+    def _download_action(self, attachment, filename):
+        """OWL-consumable download descriptor."""
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/web/content/{aid}?download=true&filename={fname}".format(
+                aid=attachment.id, fname=filename,
+            ),
+            "target": "self",
+        }
+
+    @api.model
+    def _build_snapshot_payload(self, dashboard_type, active_filter):
+        """Snapshot payload mirroring M9 digest shape but framed
+        as current state. Tier + filter govern which sections land."""
+        visible = self._widgets_for_filter(
+            dashboard_type, active_filter)
+        payload = {
+            "snapshot_title": "Neon dashboard snapshot - {}".format(
+                dashboard_type.title() if dashboard_type else "Director"),
+            "generated_at_harare": self._format_harare_timestamp(),
+            "dashboard_type": dashboard_type,
+            "active_filter": active_filter,
+            "user_name": self.env.user.name,
+            "dashboard_url": self._snapshot_dashboard_url(),
+        }
+
+        # KPIs -- each key only included if its widget is visible
+        # under the current filter+tier.
+        kpi_methods = {
+            "kpi_cash": "_kpi_cash_on_hand",
+            "kpi_ar_overdue": "_kpi_ar_overdue",
+            "kpi_jobs_today": "_kpi_jobs_today",
+            "kpi_jobs_week": "_kpi_jobs_week",
+            "kpi_pipeline": "_kpi_pipeline",
+            "kpi_leads": "_kpi_new_leads",
+            "kpi_forecast": "_kpi_forecast",
+        }
+        for widget_key, method_name in kpi_methods.items():
+            if widget_key in visible:
+                payload[widget_key] = getattr(self, method_name)()
+
+        # Blocks -- each gated on visibility.
+        if "block_jobs" in visible:
+            payload["jobs_block"] = self._compute_jobs_block(
+                dashboard_type)
+        if "block_sales" in visible:
+            payload["sales_block"] = self._compute_sales_block(
+                dashboard_type)
+        if "block_finance" in visible:
+            payload["finance_block"] = self._compute_finance_block(
+                dashboard_type)
+            # Extract ar_aging up to top level so the shared partial
+            # finds it without spelunking through finance_block.
+            payload["ar_aging"] = self._compute_ar_aging()
+        if "block_crew_equipment" in visible:
+            payload["crew_equipment_block"] = (
+                self._compute_crew_equipment_block(dashboard_type))
+        if "block_alerts" in visible:
+            payload["alerts_block"] = self._compute_alerts_block(
+                dashboard_type)
+        if "block_tasks" in visible:
+            payload["tasks_block"] = self._compute_tasks_block()
+
+        return payload
+
+    @api.model
+    def _snapshot_dashboard_url(self):
+        """Deep-link URL to the live dashboard. Reuses the M9
+        digest helper's contract but is named separately to keep
+        the module-level constant scoping for the M9 helper."""
+        Config = self.env["ir.config_parameter"].sudo()
+        base_url = (Config.get_param("web.base.url")
+                    or "https://crm.neonhiring.com")
+        try:
+            action = self.env.ref(
+                "neon_dashboard.action_neon_dashboard_server",
+                raise_if_not_found=True)
+            menu = self.env.ref(
+                "neon_dashboard.menu_neon_dashboard_root",
+                raise_if_not_found=True)
+            return (
+                f"{base_url}/web#action={action.id}"
+                f"&cids=1&menu_id={menu.id}"
+            )
+        except Exception:  # noqa: BLE001
+            return f"{base_url}/web"
+
+    # SCSS hide rules sourced from
+    # static/src/js/neon_dashboard/neon_dashboard.scss lines 482-526.
+    # test_filter_rules_match_scss parses the SCSS at test time and
+    # asserts this dict agrees. If you change this dict, change the
+    # SCSS too (or fix the SCSS to match -- it's the prior source of
+    # truth, present since M5/M6 walkthroughs).
+    _FILTER_HIDE_RULES = {
+        "all": frozenset(),
+        "operations": frozenset({
+            "block_sales", "block_finance",
+            "kpi_pipeline", "kpi_leads",
+            "kpi_forecast", "kpi_ar_overdue",
+        }),
+        "sales": frozenset({
+            "block_jobs", "block_finance",
+            "block_crew_equipment",
+            "kpi_cash", "kpi_ar_overdue",
+            "kpi_jobs_today",
+        }),
+        "finance": frozenset({
+            "block_jobs", "block_sales",
+            "block_crew_equipment",
+            "kpi_jobs_today", "kpi_jobs_week",
+            "kpi_pipeline", "kpi_leads",
+        }),
+    }
+
+    @api.model
+    def _widgets_for_filter(self, dashboard_type, active_filter):
+        """Returns the set of widget keys that should be in the
+        export payload for (dashboard_type, active_filter).
+
+        Logic:
+        1. Start with the tier's default widget list from the
+           seeded neon.dashboard.default.layout records.
+        2. Subtract the active filter's hide set.
+        Unknown filter -> treat as 'all' (no hiding).
+        """
+        base = self._default_widgets_for_dashboard_type(
+            dashboard_type)
+        hide = self._FILTER_HIDE_RULES.get(
+            active_filter, frozenset())
+        return [w for w in base if w not in hide]
+
+    @api.model
+    def _default_widgets_for_dashboard_type(self, dashboard_type):
+        """Read the authoritative widget list from the seeded
+        default-layout records. Returns a list (preserving
+        order_index ASC) of widget_key strings."""
+        DefaultLayout = self.env[
+            "neon.dashboard.default.layout"].sudo()
+        layout = DefaultLayout.search(
+            [("dashboard_type", "=", dashboard_type)], limit=1)
+        if not layout:
+            # Defensive: shouldn't happen on a properly-installed
+            # module (M1 seed loads all 5 records). Log + fall
+            # back to director's all-widgets list.
+            _logger.warning(
+                "No default layout for dashboard_type=%s; "
+                "falling back to director.", dashboard_type,
+            )
+            layout = DefaultLayout.search(
+                [("dashboard_type", "=", "director")], limit=1)
+            if not layout:
+                return []
+        return [
+            line.widget_key
+            for line in layout.layout_line_ids.sorted(
+                key=lambda l: (l.order_index, l.id))
+        ]
+
+    @api.model
+    def _render_snapshot_xlsx(self, payload):
+        """Build a multi-sheet xlsx workbook in memory.
+        Sheets are conditional on payload keys -- a sales-tier
+        export with no finance section gets no Finance sheet.
+
+        ⚠️ DECISION (M10, marker 5): xlsxwriter import at top of
+        method scope, not module-level. Library is installed in
+        prod (verified at gate-1: xlsxwriter 3.0.2 in container)
+        but deferring keeps the module importable on any dev box
+        where the wheel is missing. Same pattern as
+        [[reference_odoo17_deferred_external_dep]] from P7e.M13.
+        """
+        import io  # noqa: PLC0415
+        import xlsxwriter  # noqa: PLC0415
+
+        buffer = io.BytesIO()
+        workbook = xlsxwriter.Workbook(buffer, {"in_memory": True})
+
+        fmt_title = workbook.add_format(
+            {"bold": True, "font_size": 14, "font_color": "#7165AC"})
+        fmt_header = workbook.add_format({
+            "bold": True, "bg_color": "#534AB7",
+            "font_color": "white", "border": 1,
+        })
+        fmt_label = workbook.add_format({"bold": True})
+        fmt_overdue = workbook.add_format({
+            "bg_color": "#FEE2E2", "font_color": "#991B1B",
+        })
+
+        self._xlsx_summary_sheet(
+            workbook, payload, fmt_title, fmt_header, fmt_label)
+        if any(payload.get(k) is not None for k in (
+                "kpi_cash", "kpi_ar_overdue", "kpi_jobs_today",
+                "kpi_jobs_week", "kpi_pipeline", "kpi_leads",
+                "kpi_forecast")):
+            self._xlsx_kpis_sheet(
+                workbook, payload, fmt_title, fmt_header)
+        if payload.get("jobs_block") is not None:
+            self._xlsx_jobs_sheet(
+                workbook, payload, fmt_title, fmt_header)
+        if payload.get("sales_block") is not None:
+            self._xlsx_sales_sheet(
+                workbook, payload, fmt_title, fmt_header)
+        if payload.get("finance_block") is not None:
+            self._xlsx_finance_sheet(
+                workbook, payload, fmt_title, fmt_header,
+                fmt_overdue)
+        if payload.get("crew_equipment_block") is not None:
+            self._xlsx_crew_sheet(
+                workbook, payload, fmt_title, fmt_header)
+        if payload.get("alerts_block") is not None:
+            self._xlsx_alerts_sheet(
+                workbook, payload, fmt_title, fmt_header)
+        if payload.get("tasks_block") is not None:
+            self._xlsx_tasks_sheet(
+                workbook, payload, fmt_title, fmt_header)
+
+        workbook.close()
+        return buffer.getvalue()
+
+    @api.model
+    def _xlsx_summary_sheet(self, wb, payload, fmt_title, fmt_header,
+                            fmt_label):
+        s = wb.add_worksheet("Summary")
+        s.set_column(0, 0, 28)
+        s.set_column(1, 1, 40)
+        s.write(0, 0, payload.get("snapshot_title") or "Snapshot",
+                fmt_title)
+        s.write(2, 0, "Generated", fmt_label)
+        s.write(2, 1, payload.get("generated_at_harare") or "")
+        s.write(3, 0, "User", fmt_label)
+        s.write(3, 1, payload.get("user_name") or "")
+        s.write(4, 0, "Dashboard type", fmt_label)
+        s.write(4, 1, payload.get("dashboard_type") or "")
+        s.write(5, 0, "Filter", fmt_label)
+        s.write(5, 1, payload.get("active_filter") or "all")
+        s.write(7, 0, "Dashboard URL", fmt_label)
+        s.write(7, 1, payload.get("dashboard_url") or "")
+
+    @api.model
+    def _xlsx_kpis_sheet(self, wb, payload, fmt_title, fmt_header):
+        s = wb.add_worksheet("KPIs")
+        s.set_column(0, 0, 24)
+        s.set_column(1, 1, 36)
+        s.write(0, 0, "KPI snapshot", fmt_title)
+        s.write(2, 0, "KPI", fmt_header)
+        s.write(2, 1, "Value", fmt_header)
+        row = 3
+        kpi_labels = [
+            ("kpi_cash", "Cash on hand"),
+            ("kpi_ar_overdue", "AR overdue"),
+            ("kpi_jobs_today", "Jobs today"),
+            ("kpi_jobs_week", "Jobs this week"),
+            ("kpi_pipeline", "Pipeline value"),
+            ("kpi_leads", "New leads"),
+            ("kpi_forecast", "Forecast vs target"),
+        ]
+        for key, label in kpi_labels:
+            data = payload.get(key)
+            if data is None:
+                continue
+            display = (data.get("display") if isinstance(data, dict)
+                       else None) or (
+                data.get("value") if isinstance(data, dict) else None
+            ) or "-"
+            s.write(row, 0, label)
+            s.write(row, 1, str(display))
+            row += 1
+
+    @api.model
+    def _xlsx_jobs_sheet(self, wb, payload, fmt_title, fmt_header):
+        s = wb.add_worksheet("Jobs")
+        s.set_column(0, 0, 30)
+        s.set_column(1, 1, 14)
+        s.set_column(2, 2, 18)
+        s.set_column(3, 3, 14)
+        s.write(0, 0, "Upcoming jobs", fmt_title)
+        jb = payload.get("jobs_block") or {}
+        rows = jb.get("rows") or jb.get("jobs") or []
+        if not rows:
+            s.write(2, 0, "(none)")
+            return
+        s.write(2, 0, "Title", fmt_header)
+        s.write(2, 1, "Date", fmt_header)
+        s.write(2, 2, "Status", fmt_header)
+        s.write(2, 3, "Value", fmt_header)
+        for i, j in enumerate(rows, start=3):
+            s.write(i, 0, (j.get("title") or j.get("name")
+                           or j.get("display_name") or "-"))
+            s.write(i, 1, str(j.get("date_display")
+                              or j.get("event_date") or ""))
+            s.write(i, 2, str(j.get("badge") or j.get("status")
+                              or ""))
+            s.write(i, 3, str(j.get("value_display")
+                              or j.get("value") or ""))
+
+    @api.model
+    def _xlsx_sales_sheet(self, wb, payload, fmt_title, fmt_header):
+        s = wb.add_worksheet("Sales")
+        s.set_column(0, 0, 28)
+        s.set_column(1, 1, 20)
+        s.write(0, 0, "Sales pipeline", fmt_title)
+        sb = payload.get("sales_block") or {}
+        # Real shape: sales_block.pipeline_by_stage is a dict with
+        # keys (empty / empty_message / stages / currency_note);
+        # stages is the list of dicts to iterate.
+        pbs = sb.get("pipeline_by_stage") or {}
+        stages = (pbs.get("stages") if isinstance(pbs, dict)
+                  else pbs) or []
+        if not stages:
+            msg = (pbs.get("empty_message") if isinstance(pbs, dict)
+                   else "") or "(no active pipeline)"
+            s.write(2, 0, msg)
+            return
+        s.write(2, 0, "Stage", fmt_header)
+        s.write(2, 1, "Value", fmt_header)
+        for i, st in enumerate(stages, start=3):
+            if not isinstance(st, dict):
+                s.write(i, 0, str(st))
+                continue
+            s.write(i, 0, st.get("label") or st.get("stage") or "-")
+            s.write(i, 1, str(st.get("value_display")
+                              or st.get("value") or 0))
+
+    @api.model
+    def _xlsx_finance_sheet(self, wb, payload, fmt_title, fmt_header,
+                            fmt_overdue):
+        s = wb.add_worksheet("Finance")
+        s.set_column(0, 0, 20)
+        s.set_column(1, 1, 12)
+        s.set_column(2, 2, 18)
+        s.write(0, 0, "AR aging + cash mix", fmt_title)
+        ar = payload.get("ar_aging") or {}
+        buckets = ar.get("buckets") or []
+        if buckets:
+            s.write(2, 0, "Bucket", fmt_header)
+            s.write(2, 1, "Count", fmt_header)
+            s.write(2, 2, "Amount", fmt_header)
+            for i, b in enumerate(buckets, start=3):
+                fmt = (fmt_overdue
+                       if "overdue" in (b.get("label") or "").lower()
+                       else None)
+                s.write(i, 0, b.get("label") or "-", fmt)
+                s.write(i, 1, b.get("count") or 0, fmt)
+                s.write(i, 2, str(b.get("amount_display")
+                                  or b.get("amount") or "-"), fmt)
+        else:
+            s.write(2, 0, "(no AR aging data)")
+
+    @api.model
+    def _xlsx_crew_sheet(self, wb, payload, fmt_title, fmt_header):
+        # Sheet name uses '+' not '&' because xlsxwriter / OOXML
+        # entity-encodes '&' as '&amp;' in workbook.xml, which is
+        # invisible in Excel but trips naive regex matchers in
+        # tests + downstream tooling.
+        s = wb.add_worksheet("Crew + Equipment")
+        s.set_column(0, 0, 28)
+        s.set_column(1, 1, 36)
+        s.write(0, 0, "Crew + equipment", fmt_title)
+        ceb = payload.get("crew_equipment_block") or {}
+        # Real shape: {'crew': {...}, 'equipment': {...}}. Both
+        # subdicts have a 'label' / 'count' / 'detail' shape. Dump
+        # whatever scalars exist; nested lists print as their length.
+        s.write(2, 0, "Section", fmt_header)
+        s.write(2, 1, "Detail", fmt_header)
+        row = 3
+        for section_name in ("crew", "equipment"):
+            section = ceb.get(section_name) or {}
+            if not isinstance(section, dict):
+                continue
+            for k, v in section.items():
+                if isinstance(v, (list, tuple)):
+                    display = f"{len(v)} item(s)"
+                elif isinstance(v, dict):
+                    display = ", ".join(f"{ik}={iv}" for ik, iv
+                                        in list(v.items())[:5])
+                else:
+                    display = str(v) if v is not None else ""
+                s.write(row, 0, f"{section_name}.{k}")
+                s.write(row, 1, display)
+                row += 1
+            row += 1  # blank between sections
+
+    @api.model
+    def _xlsx_alerts_sheet(self, wb, payload, fmt_title, fmt_header):
+        s = wb.add_worksheet("Alerts")
+        s.set_column(0, 0, 12)
+        s.set_column(1, 1, 50)
+        s.write(0, 0, "Open alerts", fmt_title)
+        ab = payload.get("alerts_block") or {}
+        alerts = ab.get("alerts") or []
+        if not alerts:
+            s.write(2, 0, "(no alerts)")
+            return
+        s.write(2, 0, "Severity", fmt_header)
+        s.write(2, 1, "Title", fmt_header)
+        for i, a in enumerate(alerts, start=3):
+            s.write(i, 0, (a.get("severity") or "").upper())
+            s.write(i, 1, a.get("title") or a.get("message") or "-")
+
+    @api.model
+    def _xlsx_tasks_sheet(self, wb, payload, fmt_title, fmt_header):
+        s = wb.add_worksheet("Tasks")
+        s.set_column(0, 0, 40)
+        s.set_column(1, 1, 30)
+        s.set_column(2, 2, 16)
+        s.write(0, 0, "Your open tasks", fmt_title)
+        tb = payload.get("tasks_block") or {}
+        tasks = tb.get("tasks") or []
+        if not tasks:
+            s.write(2, 0, "(none)")
+            return
+        s.write(2, 0, "Summary", fmt_header)
+        s.write(2, 1, "Source", fmt_header)
+        s.write(2, 2, "Deadline", fmt_header)
+        for i, t in enumerate(tasks, start=3):
+            s.write(i, 0, t.get("summary") or "-")
+            s.write(i, 1, t.get("source_label") or "")
+            s.write(i, 2, t.get("deadline_display") or "")

@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M10 On-Demand Snapshot Export. PDF report + 3 shared partials.
+
+    Partial templates extracted here are t-called by BOTH this
+    snapshot report AND the M9 weekly_digest_report. M10 is the
+    new home (M9 was first but its scope was narrower).
+
+    Spec source of truth for filter hide rules: the SCSS
+    static/src/js/neon_dashboard/neon_dashboard.scss
+    .o_neon_dashboard__filter_* blocks. Python _widgets_for_filter
+    must agree (regression test test_filter_rules_match_scss asserts).
+
+    Superuser-only via the report's groups_id; the per-user
+    invocation path (export_snapshot_pdf / _xlsx) goes through the
+    standard /web/content download with attachment ACL doing the
+    real isolation.
+-->
+<odoo>
+
+    <!-- ============================================================
+         SHARED PARTIALS (3). t-called by M9 digest + M10 snapshot.
+         Each accepts a `payload` dict in scope.
+         ============================================================ -->
+
+    <template id="snapshot_section_kpis">
+        <h3>Current state</h3>
+        <table class="table table-sm">
+            <thead>
+                <tr><th>KPI</th><th>Value</th></tr>
+            </thead>
+            <tbody>
+                <t t-if="payload.get('kpi_cash') is not None">
+                    <tr>
+                        <td>Cash on hand</td>
+                        <td>
+                            <t t-set="k" t-value="payload.get('kpi_cash', {})"/>
+                            <span t-out="k.get('display') or k.get('value') or '-'"/>
+                        </td>
+                    </tr>
+                </t>
+                <t t-if="payload.get('kpi_ar_overdue') is not None">
+                    <tr>
+                        <td>AR overdue</td>
+                        <td>
+                            <t t-set="k" t-value="payload.get('kpi_ar_overdue', {})"/>
+                            <span t-out="k.get('display') or k.get('value') or '-'"/>
+                        </td>
+                    </tr>
+                </t>
+                <t t-if="payload.get('kpi_jobs_today') is not None">
+                    <tr>
+                        <td>Jobs today</td>
+                        <td>
+                            <t t-set="k" t-value="payload.get('kpi_jobs_today', {})"/>
+                            <span t-out="k.get('display') or k.get('value') or '-'"/>
+                        </td>
+                    </tr>
+                </t>
+                <t t-if="payload.get('kpi_jobs_week') is not None">
+                    <tr>
+                        <td>Jobs this week</td>
+                        <td>
+                            <t t-set="k" t-value="payload.get('kpi_jobs_week', {})"/>
+                            <span t-out="k.get('display') or k.get('value') or '-'"/>
+                        </td>
+                    </tr>
+                </t>
+                <t t-if="payload.get('kpi_pipeline') is not None">
+                    <tr>
+                        <td>Pipeline value</td>
+                        <td>
+                            <t t-set="k" t-value="payload.get('kpi_pipeline', {})"/>
+                            <span t-out="k.get('display') or k.get('value') or '-'"/>
+                        </td>
+                    </tr>
+                </t>
+                <t t-if="payload.get('kpi_leads') is not None">
+                    <tr>
+                        <td>New leads</td>
+                        <td>
+                            <t t-set="k" t-value="payload.get('kpi_leads', {})"/>
+                            <span t-out="k.get('display') or k.get('value') or '-'"/>
+                        </td>
+                    </tr>
+                </t>
+                <t t-if="payload.get('kpi_forecast') is not None">
+                    <tr>
+                        <td>Forecast vs target</td>
+                        <td>
+                            <t t-set="k" t-value="payload.get('kpi_forecast', {})"/>
+                            <span t-out="k.get('display') or k.get('value') or '-'"/>
+                        </td>
+                    </tr>
+                </t>
+            </tbody>
+        </table>
+    </template>
+
+    <template id="snapshot_section_jobs">
+        <h3>Coming up this week</h3>
+        <t t-set="jb" t-value="payload.get('jobs_block') or payload.get('jobs') or {}"/>
+        <t t-set="job_rows" t-value="(jb.get('rows') or jb.get('jobs') or [])"/>
+        <t t-if="not job_rows">
+            <p><em>No upcoming jobs in the next 7 days.</em></p>
+        </t>
+        <t t-else="">
+            <ul>
+                <li t-foreach="job_rows" t-as="job">
+                    <span t-out="job.get('title') or job.get('name') or job.get('display_name') or '-'"/>
+                    ·
+                    <span t-out="job.get('date_display') or job.get('event_date') or ''"/>
+                    ·
+                    <span t-out="job.get('value_display') or job.get('value') or ''"/>
+                </li>
+            </ul>
+        </t>
+    </template>
+
+    <template id="snapshot_section_ar_aging">
+        <h3>Needs attention</h3>
+        <t t-set="ar" t-value="payload.get('ar_aging') or (payload.get('finance') or {}).get('ar_aging') or {}"/>
+        <t t-set="buckets" t-value="(ar.get('buckets') or [])"/>
+        <t t-if="ar.get('empty') or not buckets">
+            <p><em>No overdue invoices.</em></p>
+        </t>
+        <t t-else="">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Bucket</th>
+                        <th>Count</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="buckets" t-as="b">
+                        <td t-out="b.get('label') or '-'"/>
+                        <td t-out="b.get('count') or 0"/>
+                        <td t-out="b.get('amount_display') or b.get('amount') or '-'"/>
+                    </tr>
+                </tbody>
+            </table>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         M10 ir.actions.report + snapshot template.
+
+         Renders with res_ids=None + data={'payload': payload} (no
+         concrete res record needed; snapshot is stateless,
+         attachment lives separately).
+         ============================================================ -->
+    <record id="report_snapshot" model="ir.actions.report">
+        <field name="name">Neon Dashboard Snapshot</field>
+        <field name="model">neon.dashboard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">neon_dashboard.report_snapshot_document</field>
+        <field name="report_file">neon_dashboard.report_snapshot_document</field>
+        <field name="binding_type">report</field>
+        <field name="groups_id" eval="[
+            (4, ref('neon_core.group_neon_superuser')),
+        ]"/>
+    </record>
+
+    <template id="report_snapshot_document">
+        <t t-call="web.html_container">
+            <t t-set="payload"
+               t-value="(data and data.get('payload')) or {}"/>
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2 style="color:#7165AC;">
+                        <span t-out="payload.get('snapshot_title') or 'Neon Dashboard snapshot'"/>
+                    </h2>
+                    <p class="text-muted">
+                        Snapshot ·
+                        Generated <span t-out="payload.get('generated_at_harare') or ''"/> Harare ·
+                        by <span t-out="payload.get('user_name') or ''"/>
+                        <t t-if="payload.get('active_filter') and payload.get('active_filter') != 'all'">
+                            · Filter: <span t-out="payload.get('active_filter')"/>
+                        </t>
+                    </p>
+                    <hr/>
+
+                    <t t-if="payload.get('kpi_cash') is not None
+                             or payload.get('kpi_ar_overdue') is not None
+                             or payload.get('kpi_pipeline') is not None
+                             or payload.get('kpi_forecast') is not None">
+                        <t t-call="neon_dashboard.snapshot_section_kpis"/>
+                    </t>
+
+                    <t t-if="payload.get('jobs_block') is not None or payload.get('jobs') is not None">
+                        <t t-call="neon_dashboard.snapshot_section_jobs"/>
+                    </t>
+
+                    <t t-if="payload.get('ar_aging') is not None
+                             or (payload.get('finance') is not None
+                                 and (payload.get('finance') or {}).get('ar_aging') is not None)">
+                        <t t-call="neon_dashboard.snapshot_section_ar_aging"/>
+                    </t>
+
+                    <t t-set="ab" t-value="payload.get('alerts_block') or payload.get('alerts') or {}"/>
+                    <t t-set="alerts" t-value="(ab.get('alerts') or [])"/>
+                    <t t-if="alerts">
+                        <h3>Open alerts</h3>
+                        <ul>
+                            <li t-foreach="alerts" t-as="a">
+                                <strong t-out="(a.get('severity') or '').upper()"/>
+                                ·
+                                <span t-out="a.get('title') or a.get('message') or '-'"/>
+                            </li>
+                        </ul>
+                    </t>
+
+                    <t t-set="tb" t-value="payload.get('tasks_block') or payload.get('tasks') or {}"/>
+                    <t t-set="tasks" t-value="(tb.get('tasks') or [])"/>
+                    <t t-if="tasks">
+                        <h3>Your tasks</h3>
+                        <ul>
+                            <li t-foreach="tasks" t-as="t">
+                                <span t-out="t.get('summary') or '-'"/>
+                                ·
+                                <span t-out="t.get('source_label') or ''"/>
+                                ·
+                                <span t-out="t.get('deadline_display') or ''"/>
+                            </li>
+                        </ul>
+                    </t>
+
+                    <p class="text-muted small" style="margin-top:20px;">
+                        Open the live dashboard:
+                        <a t-att-href="payload.get('dashboard_url') or '#'">
+                            <span t-out="payload.get('dashboard_url') or ''"/>
+                        </a>
+                    </p>
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

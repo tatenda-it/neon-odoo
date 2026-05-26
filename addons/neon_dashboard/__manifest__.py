@@ -3,7 +3,7 @@
     "name": "Neon Dashboard",
     # Phase 8 era opener -- new central pivot model (neon.dashboard).
     # Per CLAUDE.md manifest versioning: 17.0.<phase>.<minor>.<patch>.
-    "version": "17.0.8.6.0",
+    "version": "17.0.8.7.0",
     "summary": "Phase 8A -- unified role-aware Director Dashboard "
                "framework + headline KPI strip + Jobs block. "
                "Frames the Phase 8B role variants (Sales / "
@@ -88,10 +88,15 @@ ranganai by login).
         # likewise.
         "data/ir_cron_data.xml",
         "data/weekly_digest_mail_template.xml",
+        # M10 -- snapshot report + 3 SHARED partials (kpis / jobs /
+        # ar_aging). MUST load before weekly_digest_report so the
+        # partial xmlids exist when the M9 digest t-calls them.
+        "report/snapshot_report.xml",
         # M9 -- QWeb report (ir.actions.report + template). Loads
         # before the digest log view + menu so the report record
         # exists when the binding_type=report wires it onto the
-        # log's print menu.
+        # log's print menu. Refactored at M10 to t-call the shared
+        # partials from snapshot_report.xml above.
         "report/weekly_digest_report.xml",
         # Views second-to-last so menu can resolve the client-
         # action wrapper.
