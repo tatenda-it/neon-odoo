@@ -36,7 +36,7 @@ is the project convention. See reference_odoo17_implied_ids_orm_vs_sql.
 sitting above ``neon_jobs.menu_operations_root`` (40). Gate-1 locked.
 """
 from collections import defaultdict
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 import logging
 
 import pytz
@@ -427,6 +427,9 @@ class NeonDashboard(models.Model):
             # M7: Alerts block. Aggregates from 5 sources, filters
             # per-user dismissals, returns severity-sorted list.
             "alerts_block": self._compute_alerts_block(resolved_type),
+            # M8: Tasks block. Current-user mail.activity rows,
+            # urgency-bucketed in Harare-tz.
+            "tasks_block": self._compute_tasks_block(),
             "available_types": self._available_types_for_user(),
             # p8a-hygiene tz: render the refresh timestamp in
             # Africa/Harare so Robin sees the operational TZ.
@@ -2002,3 +2005,209 @@ class NeonDashboard(models.Model):
                 })
         resolved = self._resolve_dashboard_type(None)
         return self._compute_alerts_block(resolved)
+
+    # ==================================================================
+    # M8 -- Tasks block.
+    #
+    # Surfaces the current user's open mail.activity rows -- Odoo's
+    # native to-do mechanism. No new model, no new ACL, no new group:
+    # mail.activity rows scope to current user by user_id and respect
+    # parent-record permissions natively.
+    #
+    # ⚠️ DECISION (M8, marker 1): accept the duplication with M7
+    # pending-approval alerts for v1. P6.M4 schedules an activity on
+    # the approval record when a quote enters pending_approval; the
+    # same approval surfaces as an M7 alert. Two surfaces for the
+    # same thing, but DIFFERENT action affordances:
+    #   M7 Alert "Ack" = system-detected condition; disappears when
+    #                    state changes (e.g., quote -> approved)
+    #   M8 Task "Done" = user-assigned action; disappears when the
+    #                    activity is completed
+    # Robin has two ways to resolve, both valid. Future polish
+    # candidate: dedup filter to hide M8 tasks whose res_id already
+    # appears in M7 alerts. Premature for v1 -- the surfaces have
+    # different semantics. Same reasoning applies to budget breach
+    # activities scheduled by neon_finance.commercial_event_job
+    # extension and to invoice-schedule activities.
+    #
+    # ⚠️ DECISION (M8, marker 2): urgency bucketing uses
+    # _today_harare(), NOT mail.activity.state. The stock state
+    # field computes overdue/today/planned against UTC midnight,
+    # which misclassifies "Today" for users in +2 timezones. See
+    # p8a-hygiene gate-1 lock + the inline comment in
+    # _compute_tasks_block for the precise reason.
+    # ==================================================================
+    _TASK_MAX_VISIBLE = 10
+
+    @api.model
+    def _compute_tasks_block(self):
+        """Aggregate the current user's open mail.activity rows.
+
+        Activities are deleted when marked done in Odoo, so any
+        existing row IS open by definition -- no state filter
+        needed.
+        """
+        Activity = self.env["mail.activity"]
+        # Harare-tz urgency: mail.activity.state uses UTC midnight,
+        # which misclassifies "Today" for users in +2 timezones.
+        # See M6 hygiene + M8 DECISION marker 2.
+        today = self._today_harare()
+        activities = Activity.search([
+            ("user_id", "=", self.env.user.id),
+        ], order="date_deadline asc, id asc")
+
+        if not activities:
+            return {
+                "empty": True,
+                "empty_message": _(
+                    "Nothing on your list -- caught up"),
+                "total_count": 0,
+                "overdue_count": 0,
+                "today_count": 0,
+                "upcoming_count": 0,
+                "tasks": [],
+                "has_more": False,
+            }
+
+        rows = []
+        overdue = 0
+        due_today = 0
+        upcoming = 0
+        for act in activities:
+            deadline = act.date_deadline
+            if deadline is False or deadline is None:
+                # No deadline -> treat as upcoming (won't have an
+                # 'overdue' identity without a date).
+                urgency = "upcoming"
+                upcoming += 1
+            elif deadline < today:
+                urgency = "overdue"
+                overdue += 1
+            elif deadline == today:
+                urgency = "today"
+                due_today += 1
+            else:
+                urgency = "upcoming"
+                upcoming += 1
+
+            rows.append({
+                "id": act.id,
+                "summary": (act.summary
+                            or (act.activity_type_id.name if
+                                act.activity_type_id else "")
+                            or _("Activity")),
+                "activity_type":
+                    (act.activity_type_id.name
+                     if act.activity_type_id else ""),
+                "activity_icon":
+                    (act.activity_type_id.icon
+                     if act.activity_type_id
+                     and act.activity_type_id.icon else "fa-tasks"),
+                "deadline_display":
+                    self._format_deadline(deadline, today),
+                "urgency": urgency,
+                "source_label": self._task_source_label(act),
+                "res_model": act.res_model or "",
+                "res_id": act.res_id or 0,
+                # Internal sort key only; not exposed to OWL.
+                "_sort_deadline": deadline or date.max,
+            })
+
+        # Sort: overdue first (oldest deadline asc -> most overdue
+        # first), then today, then upcoming (earliest deadline
+        # first). Within same urgency, sort by deadline asc.
+        _URGENCY_RANK = {"overdue": 0, "today": 1, "upcoming": 2}
+        rows.sort(key=lambda r: (
+            _URGENCY_RANK.get(r["urgency"], 99),
+            r["_sort_deadline"],
+            r["id"],
+        ))
+        # Strip internal sort key before returning.
+        for r in rows:
+            r.pop("_sort_deadline", None)
+
+        # We want overdue oldest-first (most overdue at top). The
+        # ORM search already orders by date_deadline asc, so within
+        # overdue the oldest deadlines come first naturally.
+        total = len(rows)
+        visible = rows[: self._TASK_MAX_VISIBLE]
+        return {
+            "empty": False,
+            "total_count": total,
+            "overdue_count": overdue,
+            "today_count": due_today,
+            "upcoming_count": upcoming,
+            "tasks": visible,
+            "has_more": total > self._TASK_MAX_VISIBLE,
+        }
+
+    @api.model
+    def _format_deadline(self, deadline, today):
+        """Human-readable deadline string. Used by the OWL template's
+        right-aligned column. Returns 'Overdue N day(s)', 'Today',
+        'In N day(s)' for within-week, else a 'Mon DD' format."""
+        if deadline is False or deadline is None:
+            return _("No deadline")
+        delta = (deadline - today).days
+        if delta < 0:
+            days = abs(delta)
+            return _("Overdue %(n)d day%(s)s") % {
+                "n": days, "s": "" if days == 1 else "s",
+            }
+        if delta == 0:
+            return _("Today")
+        if delta <= 7:
+            return _("In %(n)d day%(s)s") % {
+                "n": delta, "s": "" if delta == 1 else "s",
+            }
+        try:
+            return deadline.strftime("%b %d")
+        except Exception:  # noqa: BLE001
+            return str(deadline)
+
+    @api.model
+    def _task_source_label(self, activity):
+        """Human-readable label for the activity's source record.
+
+        Returns display_name (truncated at 50 chars) or empty
+        string when the source is missing / orphaned. sudo() the
+        lookup because mail.activity's user might not have read
+        on every linked model -- for SOURCE-LABELING purposes only
+        we want to render the reference; the deeplink action will
+        respect ACLs at click time.
+        """
+        if not activity.res_model or not activity.res_id:
+            return ""
+        try:
+            Model = self.env[activity.res_model].sudo()
+        except KeyError:
+            return ""
+        record = Model.browse(activity.res_id).exists()
+        if not record:
+            return ""
+        name = record.display_name or ""
+        if len(name) > 50:
+            return name[:50] + "..."
+        return name
+
+    @api.model
+    def dashboard_complete_task(self, activity_id):
+        """Mark a mail.activity done. Returns the refreshed
+        tasks_block payload.
+
+        Safety: scopes to current user's own activities. Cross-user
+        completion raises AccessError -- shouldn't happen via UI but
+        a strict defense at the RPC boundary.
+        """
+        self._check_dashboard_access()
+        Activity = self.env["mail.activity"]
+        activity = Activity.browse(activity_id).exists()
+        if not activity:
+            # Race condition: activity already deleted by another
+            # action. Just refresh.
+            return self._compute_tasks_block()
+        if activity.user_id.id != self.env.user.id:
+            raise AccessError(_(
+                "You can only complete your own tasks."))
+        activity.action_done()
+        return self._compute_tasks_block()

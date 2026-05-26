@@ -709,6 +709,104 @@ $neon-bg:            #FAFAFC;
         }
     }
 
+    // -------- M8 Tasks block --------
+    .o_neon_block_tasks {
+        .o_neon_block_header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .o_neon_tasks_counts {
+            font-size: 0.85em;
+            color: $neon-muted;
+            font-weight: 600;
+        }
+        .o_neon_tasks_count_overdue {
+            color: $neon-accent-red;
+        }
+        .o_neon_tasks_count_today {
+            color: darken($neon-accent-amber, 12%);
+        }
+        .o_neon_tasks_list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .o_neon_tasks_row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border-left: 3px solid transparent;
+            margin-bottom: 4px;
+        }
+        .o_neon_tasks_row_overdue {
+            background: rgba($neon-accent-red, 0.05);
+            border-left-color: $neon-accent-red;
+        }
+        .o_neon_tasks_row_today {
+            background: rgba($neon-accent-amber, 0.06);
+            border-left-color: $neon-accent-amber;
+        }
+        .o_neon_tasks_row_upcoming {
+            background: transparent;
+            border-left-color: $neon-line;
+        }
+        .o_neon_tasks_icon {
+            color: $neon-purple;
+            font-size: 1em;
+            flex-shrink: 0;
+            width: 18px;
+            text-align: center;
+        }
+        .o_neon_tasks_body {
+            flex: 1;
+            cursor: pointer;
+            min-width: 0;
+            &:hover .o_neon_tasks_summary {
+                color: $neon-purple;
+                text-decoration: underline;
+            }
+        }
+        .o_neon_tasks_summary {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: $neon-text;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .o_neon_tasks_source {
+            color: $neon-muted;
+            display: block;
+            margin-top: 2px;
+        }
+        .o_neon_tasks_deadline {
+            font-size: 0.8em;
+            font-weight: 600;
+            flex-shrink: 0;
+            color: $neon-muted;
+        }
+        .o_neon_tasks_deadline_overdue { color: $neon-accent-red; }
+        .o_neon_tasks_deadline_today   {
+            color: darken($neon-accent-amber, 12%);
+        }
+        .o_neon_tasks_done {
+            color: $neon-purple !important;
+            font-weight: 600;
+            font-size: 0.8em;
+            padding: 0 6px;
+            flex-shrink: 0;
+            &:hover { background: $neon-purple-pale; }
+        }
+        .o_neon_tasks_more {
+            text-align: center;
+            padding: 4px;
+        }
+    }
+
     // -------- Error / loading --------
     .o_neon_dashboard_error {
         margin-bottom: 8px;

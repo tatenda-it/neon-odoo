@@ -657,12 +657,68 @@
                      ================================================= -->
                 <section class="o_neon_row_c">
                     <div t-if="isWidgetVisible('block_tasks')"
-                         class="o_neon_block o_neon_block_placeholder widget--block_tasks">
+                         class="o_neon_block o_neon_block_tasks widget--block_tasks">
                         <div class="o_neon_block_header">
                             <h3>Tasks</h3>
+                            <span class="o_neon_tasks_counts"
+                                  t-if="!tasksBlock.empty">
+                                <span t-if="tasksBlock.overdue_count"
+                                      class="o_neon_tasks_count_overdue">
+                                    <t t-esc="tasksBlock.overdue_count"/> overdue
+                                </span>
+                                <span t-if="tasksBlock.today_count"
+                                      class="o_neon_tasks_count_today">
+                                    <t t-if="tasksBlock.overdue_count"> &#183; </t>
+                                    <t t-esc="tasksBlock.today_count"/> today
+                                </span>
+                                <span t-if="tasksBlock.upcoming_count"
+                                      class="o_neon_tasks_count_upcoming">
+                                    <t t-if="tasksBlock.overdue_count or tasksBlock.today_count"> &#183; </t>
+                                    <t t-esc="tasksBlock.upcoming_count"/> upcoming
+                                </span>
+                            </span>
                         </div>
                         <div class="o_neon_block_body">
-                            <p class="text-muted">Coming in M8.</p>
+                            <div t-if="tasksBlock.empty"
+                                 class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg">
+                                    <t t-esc="tasksBlock.empty_message"/> &#10003;
+                                </p>
+                            </div>
+
+                            <ul t-if="!tasksBlock.empty"
+                                class="o_neon_tasks_list">
+                                <t t-foreach="tasksBlock.tasks"
+                                   t-as="task" t-key="task.id">
+                                    <li class="o_neon_tasks_row"
+                                        t-att-class="'o_neon_tasks_row_' + task.urgency">
+                                        <i class="fa o_neon_tasks_icon"
+                                           t-att-class="'fa ' + task.activity_icon"/>
+                                        <div class="o_neon_tasks_body"
+                                             t-on-click="() => this.onTaskClick(task)">
+                                            <div class="o_neon_tasks_summary"
+                                                 t-esc="task.summary"/>
+                                            <small class="o_neon_tasks_source"
+                                                   t-if="task.source_label"
+                                                   t-esc="task.source_label"/>
+                                        </div>
+                                        <span class="o_neon_tasks_deadline"
+                                              t-att-class="'o_neon_tasks_deadline_' + task.urgency"
+                                              t-esc="task.deadline_display"/>
+                                        <button class="btn btn-sm btn-link o_neon_tasks_done"
+                                                t-on-click="() => this.onTaskDone(task)">
+                                            Done
+                                        </button>
+                                    </li>
+                                </t>
+                            </ul>
+
+                            <div t-if="!tasksBlock.empty and tasksBlock.has_more"
+                                 class="o_neon_tasks_more">
+                                <small class="text-muted">
+                                    View all (<t t-esc="tasksBlock.total_count"/>)
+                                </small>
+                            </div>
                         </div>
                     </div>
                     <div t-if="isWidgetVisible('block_ai_insights')"

@@ -289,6 +289,47 @@ export class NeonDashboard extends Component {
         );
     }
 
+    get tasksBlock() {
+        return (
+            (this.state.data && this.state.data.tasks_block) || {
+                empty: true,
+                empty_message: "Nothing on your list",
+                total_count: 0,
+                overdue_count: 0,
+                today_count: 0,
+                upcoming_count: 0,
+                tasks: [],
+                has_more: false,
+            }
+        );
+    }
+
+    async onTaskClick(task) {
+        if (!task || !task.res_model || !task.res_id) return;
+        // Deeplink to the activity's source record via a generic
+        // act_window descriptor; no static xmlid since the model
+        // is dynamic.
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: task.res_model,
+            res_id: task.res_id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    async onTaskDone(task) {
+        if (!task || !task.id) return;
+        const refreshed = await this.orm.call(
+            "neon.dashboard",
+            "dashboard_complete_task",
+            [task.id],
+        );
+        if (this.state.data) {
+            this.state.data.tasks_block = refreshed;
+        }
+    }
+
     async onAlertClick(alert) {
         if (!alert || !alert.deeplink_action) return;
         if (alert.deeplink_res_id) {
