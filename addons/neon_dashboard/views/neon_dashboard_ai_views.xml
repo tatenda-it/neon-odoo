@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M11 AI Insights Settings page + provider list + insight
+    history view.
+
+    Single Settings > Neon > AI Insights menu item lands a list
+    view of providers; clicking Groq opens the edit form with
+    API key + Test + Generate Now buttons.
+
+    Insight history is a read-only list under the same menu
+    (sequence 60) for audit.
+-->
+<odoo>
+
+    <!--
+        =========================================================
+        neon.dashboard.ai.provider: list + form
+        =========================================================
+    -->
+    <record id="view_neon_dashboard_ai_provider_tree" model="ir.ui.view">
+        <field name="name">neon.dashboard.ai.provider.tree</field>
+        <field name="model">neon.dashboard.ai.provider</field>
+        <field name="arch" type="xml">
+            <tree string="AI Insight Providers"
+                  create="false" delete="false"
+                  default_order="is_default desc, sequence, id">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="provider_key"/>
+                <field name="model_id"/>
+                <field name="is_enabled"/>
+                <field name="is_default" widget="boolean_toggle"/>
+                <field name="last_health_status"
+                       decoration-success="last_health_status == 'ok'"
+                       decoration-danger="last_health_status == 'error'"
+                       decoration-muted="last_health_status == 'untested'"/>
+                <field name="daily_call_count"/>
+                <field name="daily_call_limit"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_dashboard_ai_provider_form" model="ir.ui.view">
+        <field name="name">neon.dashboard.ai.provider.form</field>
+        <field name="model">neon.dashboard.ai.provider</field>
+        <field name="arch" type="xml">
+            <form string="AI Provider">
+                <header>
+                    <button name="action_test_connection"
+                            type="object" string="Test Connection"
+                            class="btn-secondary"
+                            invisible="provider_key == 'rule_based'"/>
+                    <button name="action_set_default"
+                            type="object" string="Set as Default"
+                            class="btn-primary"
+                            invisible="is_default or provider_key == 'rule_based'"/>
+                    <button name="action_generate_now"
+                            type="object" string="Generate Now"
+                            class="btn-secondary"
+                            invisible="not is_default"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="provider_key == 'rule_based'"/>
+                        </h1>
+                        <p class="text-muted">
+                            <field name="provider_key" readonly="1"/>
+                        </p>
+                    </div>
+                    <group>
+                        <group string="Configuration">
+                            <field name="endpoint_url"
+                                   invisible="provider_key == 'rule_based'"/>
+                            <field name="model_id"
+                                   invisible="provider_key == 'rule_based'"
+                                   help="Provider-specific model identifier (e.g. llama-3.3-70b-versatile)."/>
+                            <field name="api_key_encrypted"
+                                   string="API Key Reference"
+                                   invisible="provider_key == 'rule_based'"
+                                   readonly="1"
+                                   help="The actual secret lives in ir.config_parameter. This field shows only a reference marker. Use the Test button after editing the key via the system parameters page."/>
+                            <field name="is_enabled"/>
+                            <field name="is_default" widget="boolean_toggle"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group string="Tuning"
+                               invisible="provider_key == 'rule_based'">
+                            <field name="max_tokens"/>
+                            <field name="temperature"/>
+                            <field name="daily_call_limit"/>
+                        </group>
+                    </group>
+                    <group string="Health + usage">
+                        <group>
+                            <field name="last_health_check" readonly="1"/>
+                            <field name="last_health_status" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="daily_call_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Prompt template"
+                           invisible="provider_key == 'rule_based'">
+                        <field name="system_prompt_template"
+                               nolabel="1"
+                               placeholder="Leave blank to use the adapter's built-in default system prompt."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_dashboard_ai_provider"
+            model="ir.actions.act_window">
+        <field name="name">AI Insights</field>
+        <field name="res_model">neon.dashboard.ai.provider</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!--
+        =========================================================
+        neon.dashboard.ai.insight: read-only audit history
+        =========================================================
+    -->
+    <record id="view_neon_dashboard_ai_insight_tree" model="ir.ui.view">
+        <field name="name">neon.dashboard.ai.insight.tree</field>
+        <field name="model">neon.dashboard.ai.insight</field>
+        <field name="arch" type="xml">
+            <tree string="AI Insight Generations"
+                  create="false" edit="false" delete="false"
+                  default_order="generated_on desc">
+                <field name="generated_on"/>
+                <field name="provider_id"/>
+                <field name="dashboard_id"/>
+                <field name="is_fallback"
+                       decoration-warning="is_fallback"/>
+                <field name="latency_ms"/>
+                <field name="prompt_tokens"/>
+                <field name="completion_tokens"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_dashboard_ai_insight_form" model="ir.ui.view">
+        <field name="name">neon.dashboard.ai.insight.form</field>
+        <field name="model">neon.dashboard.ai.insight</field>
+        <field name="arch" type="xml">
+            <form string="AI Insight" create="false" edit="false"
+                  delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Generation at <field name="generated_on" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Provenance">
+                            <field name="provider_id" readonly="1"/>
+                            <field name="model_version" readonly="1"/>
+                            <field name="dashboard_id" readonly="1"/>
+                            <field name="is_fallback" readonly="1"/>
+                            <field name="age_display" readonly="1"/>
+                        </group>
+                        <group string="Metrics">
+                            <field name="latency_ms" readonly="1"/>
+                            <field name="prompt_tokens" readonly="1"/>
+                            <field name="completion_tokens" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Error"
+                           invisible="not error_message">
+                        <field name="error_message" nolabel="1"
+                               readonly="1"/>
+                    </group>
+                    <group string="Content (JSON)">
+                        <field name="content_json" nolabel="1"
+                               readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_dashboard_ai_insight"
+            model="ir.actions.act_window">
+        <field name="name">AI Insight History</field>
+        <field name="res_model">neon.dashboard.ai.insight</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

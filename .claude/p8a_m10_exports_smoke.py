@@ -542,11 +542,13 @@ results["T8986"] = ok
 
 # ============================================================
 print()
-print("T8987 -- manifest version 17.0.8.7.0")
+print("T8987 -- manifest version >= 17.0.8.7.0 (M10 bump or later)")
 print("=" * 72)
 mod = env["ir.module.module"].search(
     [("name", "=", "neon_dashboard")], limit=1)
-ok = mod and mod.latest_version == "17.0.8.7.0"
+def _ver_tuple(v):
+    return tuple(int(x) for x in (v or "0").split(".") if x.isdigit())
+ok = mod and _ver_tuple(mod.latest_version) >= _ver_tuple("17.0.8.7.0")
 print(f"  installed version: {mod.latest_version if mod else 'MISSING'}")
 print("T8987:", "PASS" if ok else "FAIL")
 results["T8987"] = ok

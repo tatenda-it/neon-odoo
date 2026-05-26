@@ -77,4 +77,24 @@
               action="action_neon_dashboard_digest_log"
               sequence="40"
               groups="neon_core.group_neon_superuser"/>
+
+    <!--
+        M11: AI Insights settings + audit history.
+        Both superuser-only; provider config is sensitive (API
+        keys live in ir.config_parameter but the catalog model
+        itself is restricted to keep usage stats private).
+    -->
+    <menuitem id="menu_neon_dashboard_ai_provider"
+              name="AI Insights"
+              parent="menu_neon_settings_root"
+              action="action_neon_dashboard_ai_provider"
+              sequence="50"
+              groups="neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_neon_dashboard_ai_insight"
+              name="AI Insight History"
+              parent="menu_neon_settings_root"
+              action="action_neon_dashboard_ai_insight"
+              sequence="60"
+              groups="neon_core.group_neon_superuser"/>
 </odoo>

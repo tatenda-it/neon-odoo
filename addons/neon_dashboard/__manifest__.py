@@ -3,7 +3,7 @@
     "name": "Neon Dashboard",
     # Phase 8 era opener -- new central pivot model (neon.dashboard).
     # Per CLAUDE.md manifest versioning: 17.0.<phase>.<minor>.<patch>.
-    "version": "17.0.8.7.0",
+    "version": "17.0.8.8.0",
     "summary": "Phase 8A -- unified role-aware Director Dashboard "
                "framework + headline KPI strip + Jobs block. "
                "Frames the Phase 8B role variants (Sales / "
@@ -88,6 +88,11 @@ ranganai by login).
         # likewise.
         "data/ir_cron_data.xml",
         "data/weekly_digest_mail_template.xml",
+        # M11 -- AI provider seed (Groq + Rule-based) MUST load
+        # before the AI cron so the ir.cron's model_id resolves +
+        # before the views that reference action xmlids.
+        "data/ai_provider_seed.xml",
+        "data/ai_insights_cron.xml",
         # M10 -- snapshot report + 3 SHARED partials (kpis / jobs /
         # ar_aging). MUST load before weekly_digest_report so the
         # partial xmlids exist when the M9 digest t-calls them.
@@ -105,6 +110,9 @@ ranganai by login).
         "views/neon_dashboard_target_views.xml",
         # M9 -- digest log list + form. Load before menu.
         "views/neon_dashboard_digest_log_views.xml",
+        # M11 -- AI provider + insight history views. Load
+        # before the menu so the action xmlids resolve.
+        "views/neon_dashboard_ai_views.xml",
         # M6 -- ZiG-USD rate wizard form. Load before menu.
         "wizards/neon_dashboard_zig_rate_wizard_views.xml",
         # M9 -- Send Weekly Digest wizard form. Load before menu.

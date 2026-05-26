@@ -23,3 +23,6 @@ access_neon_dashboard_alert_dismissal_internal,alert dismissal / internal users,
 access_neon_dashboard_alert_dismissal_superuser,alert dismissal / superuser,model_neon_dashboard_alert_dismissal,neon_core.group_neon_superuser,1,1,1,1
 access_neon_dashboard_digest_log_superuser,digest log / superuser,model_neon_dashboard_digest_log,neon_core.group_neon_superuser,1,1,1,0
 access_neon_dashboard_send_digest_wizard_superuser,send digest wizard / superuser,model_neon_dashboard_send_digest_wizard,neon_core.group_neon_superuser,1,1,1,1
+access_neon_dashboard_ai_provider_superuser,ai provider / superuser RW,model_neon_dashboard_ai_provider,neon_core.group_neon_superuser,1,1,1,0
+access_neon_dashboard_ai_insight_internal,ai insight / internal users read,model_neon_dashboard_ai_insight,base.group_user,1,0,0,0
+access_neon_dashboard_ai_insight_superuser,ai insight / superuser RW append-only,model_neon_dashboard_ai_insight,neon_core.group_neon_superuser,1,1,1,0

@@ -47,6 +47,17 @@ export class NeonDashboard extends Component {
             // null when idle. Disables both buttons during the
             // 2-5s server roundtrip to prevent double-clicks.
             exporting: null,
+            // M11: AI Insights widget state. Initial-load payload
+            // comes from rpc_latest_insight_for_current_user;
+            // manual refresh button calls rpc_refresh_for_current
+            // _user. aiRefreshing flips the spinner while the
+            // call is in flight.
+            aiInsights: {
+                empty: true,
+                empty_message: "Loading...",
+                insights: [],
+            },
+            aiRefreshing: false,
         });
 
         // 5-minute auto-refresh (same cadence as cash_flow_dashboard;
@@ -57,6 +68,9 @@ export class NeonDashboard extends Component {
 
         onWillStart(async () => {
             await this.loadData();
+            // M11: load latest AI insight in parallel-ish after
+            // main data (non-blocking on dashboard render).
+            this._loadAiInsight();
         });
 
         onMounted(() => {
@@ -417,6 +431,86 @@ export class NeonDashboard extends Component {
     async onManageRateClick() {
         await this.action.doAction(
             "neon_dashboard.action_neon_dashboard_zig_rate_wizard");
+    }
+
+    // ============================================================
+    // M11 -- AI Insights widget handlers
+    // ============================================================
+    get aiInsights() {
+        return this.state.aiInsights || {
+            empty: true, empty_message: "Loading...", insights: [],
+        };
+    }
+
+    get canRefreshAi() {
+        // Superuser-only per D12. The widget itself is visible to
+        // all tiers but the refresh button is hidden for non-supers.
+        return !!(this.state.data && this.state.data.is_superuser);
+    }
+
+    async _loadAiInsight() {
+        try {
+            const payload = await this.orm.call(
+                "neon.dashboard.ai.provider",
+                "rpc_latest_insight_for_current_user",
+                [],
+            );
+            this.state.aiInsights = payload || {
+                empty: true,
+                empty_message: "No insight available.",
+                insights: [],
+            };
+        } catch (e) {
+            // Non-blocking: dashboard renders without AI block
+            // content; widget shows error footer.
+            this.state.aiInsights = {
+                empty: false,
+                insights: [],
+                error_message:
+                    "Failed to load AI insights: "
+                    + ((e && e.message) || String(e)),
+            };
+        }
+    }
+
+    async onAiRefresh() {
+        if (this.state.aiRefreshing) return;
+        this.state.aiRefreshing = true;
+        try {
+            const payload = await this.orm.call(
+                "neon.dashboard.ai.provider",
+                "rpc_refresh_for_current_user",
+                [],
+            );
+            this.state.aiInsights = payload;
+        } catch (e) {
+            this.notification.add(
+                _t("AI refresh failed: ")
+                + ((e && e.message) || String(e)),
+                { type: "danger" });
+        } finally {
+            this.state.aiRefreshing = false;
+        }
+    }
+
+    async onAiInsightClick(ins) {
+        if (!ins || !ins.source_ref) return;
+        const ref = ins.source_ref;
+        if (!ref.model || !ref.res_id) return;
+        try {
+            await this.action.doAction({
+                type: "ir.actions.act_window",
+                res_model: ref.model,
+                res_id: parseInt(ref.res_id, 10),
+                views: [[false, "form"]],
+                target: "current",
+            });
+        } catch (e) {
+            this.notification.add(
+                _t("Cannot open source record: ")
+                + ((e && e.message) || String(e)),
+                { type: "warning" });
+        }
     }
 
     async onAgingBucketClick(bucket) {

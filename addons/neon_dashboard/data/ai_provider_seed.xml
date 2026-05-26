@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M11: AI Provider catalog seed.
+
+    Two records on install (per prompt D3):
+    * Groq: is_default=True, is_enabled=True, awaits API key
+    * Rule-based: is_enabled=True, is_default=False, no config
+
+    M11.1 will add Anthropic / Google / Ollama as siblings (is_
+    enabled=False until admin configures).
+
+    noupdate=1 so subsequent -u cycles don't overwrite admin
+    configuration (model, max_tokens, temperature, system_prompt).
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="ai_provider_groq" model="neon.dashboard.ai.provider">
+            <field name="name">Groq (Llama 3.3 70B Versatile)</field>
+            <field name="provider_key">groq</field>
+            <field name="endpoint_url">https://api.groq.com/openai/v1/chat/completions</field>
+            <field name="model_id">llama-3.3-70b-versatile</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="is_default" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="max_tokens">800</field>
+            <field name="temperature">0.3</field>
+            <field name="daily_call_limit">1000</field>
+        </record>
+
+        <record id="ai_provider_rule_based" model="neon.dashboard.ai.provider">
+            <field name="name">Rule-based fallback</field>
+            <field name="provider_key">rule_based</field>
+            <field name="endpoint_url"></field>
+            <field name="model_id">sql-rules-v1</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="is_default" eval="False"/>
+            <field name="sequence">90</field>
+            <field name="max_tokens">0</field>
+            <field name="temperature">0.0</field>
+            <field name="daily_call_limit">0</field>
+        </record>
+
+    </data>
+</odoo>

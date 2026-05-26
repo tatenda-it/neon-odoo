@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    M11: AI Insights cron.
+
+    Hourly cadence with an internal Python guard that fires the
+    actual generation only at hours 6, 12, 18 in Africa/Harare.
+    Mirrors the M9 weekly digest daily-cron-internal-guard
+    pattern. interval_type=hours so we sweep often enough to
+    catch the Harare hour boundary; numbercall=-1 + active=True.
+
+    No nextcall set; Odoo scheduler picks the first run.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="cron_ai_insights_refresh" model="ir.cron">
+            <field name="name">Neon Dashboard: AI Insights Refresh (06/12/18 Harare)</field>
+            <field name="model_id"
+                   ref="model_neon_dashboard_ai_provider"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_refresh_ai_insights()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

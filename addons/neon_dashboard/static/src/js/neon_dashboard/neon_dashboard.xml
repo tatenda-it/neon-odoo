@@ -739,12 +739,53 @@
                         </div>
                     </div>
                     <div t-if="isWidgetVisible('block_ai_insights')"
-                         class="o_neon_block o_neon_block_placeholder widget--block_ai_insights">
+                         class="o_neon_block o_neon_block_ai widget--block_ai_insights">
                         <div class="o_neon_block_header">
                             <h3>AI Insights</h3>
+                            <span class="o_neon_ai_subtitle text-muted"
+                                  t-if="aiInsights.id">
+                                <t t-if="aiInsights.is_fallback">
+                                    AI provider unavailable. Rule-based fallback.
+                                </t>
+                                <t t-else="">
+                                    Updated <t t-esc="aiInsights.age_display or 'just now'"/>
+                                </t>
+                            </span>
+                            <button t-if="canRefreshAi"
+                                    class="btn btn-sm btn-link o_neon_ai_refresh"
+                                    t-on-click="onAiRefresh"
+                                    t-att-disabled="state.aiRefreshing"
+                                    title="Refresh AI Insights">
+                                <i class="fa"
+                                   t-att-class="state.aiRefreshing ? 'fa-spinner fa-spin' : 'fa-refresh'"/>
+                            </button>
                         </div>
                         <div class="o_neon_block_body">
-                            <p class="text-muted">Coming in M11.</p>
+                            <div t-if="aiInsights.empty"
+                                 class="o_neon_ai_empty text-muted">
+                                <p t-esc="aiInsights.empty_message"/>
+                            </div>
+                            <ul t-if="!aiInsights.empty and aiInsights.insights and aiInsights.insights.length"
+                                class="o_neon_ai_list">
+                                <li t-foreach="aiInsights.insights" t-as="ins"
+                                    t-key="ins_index"
+                                    class="o_neon_ai_item"
+                                    t-att-class="'o_neon_ai_priority_' + (ins.priority or 9)"
+                                    t-on-click="() => this.onAiInsightClick(ins)">
+                                    <div class="o_neon_ai_title">
+                                        <span class="o_neon_ai_priority_badge"
+                                              t-esc="ins.priority or '-'"/>
+                                        <span t-esc="ins.title"/>
+                                    </div>
+                                    <p class="o_neon_ai_detail text-muted"
+                                       t-esc="ins.detail"/>
+                                </li>
+                            </ul>
+                            <div t-if="aiInsights.error_message and !aiInsights.is_fallback"
+                                 class="o_neon_ai_error text-danger small">
+                                <i class="fa fa-exclamation-circle me-1"/>
+                                <t t-esc="aiInsights.error_message"/>
+                            </div>
                         </div>
                     </div>
                 </section>
