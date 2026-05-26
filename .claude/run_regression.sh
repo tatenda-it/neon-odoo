@@ -5,6 +5,7 @@
 set -u
 DB="${1:-neon_crm}"
 SMOKES=(
+  p8a_xml_lint
   p2m2 p2m3 p2m4 p2m5 p2m6
   p2m7 p2m7_5 p2m7_6 p2m7_7 p2m7_7_3 p2m7_8
   p2m8

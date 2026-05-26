@@ -93,7 +93,7 @@ def _trigger_export_and_capture(smoke, format_label):
         smoke.page.locator(btn_class).click()
     download = dl_info.value
     # Save to a known path so test can inspect bytes.
-    target = (smoke._output_dir
+    target = (smoke.output_dir
               / f"export_{format_label}_{download.suggested_filename}")
     download.save_as(str(target))
     return target
