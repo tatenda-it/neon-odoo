@@ -896,28 +896,169 @@ $neon-bg:            #FAFAFC;
         margin-bottom: 8px;
     }
 
-    // -------- Responsive --------
-    @media (max-width: 1024px) {
+    // ==============================================================
+    // M12 -- Responsive breakpoints (3 tiers).
+    //
+    // Bootstrap 5 boundaries: lg starts at 992px, md at 768px.
+    // Phase 8A's existing 1024px breakpoint replaced with 991.98
+    // to align (per M12 prompt D2).
+    //
+    // Touch targets: tappable elements get min-height: 44px at
+    // <768px per iOS/Android accessibility minimum (D3).
+    // ==============================================================
+
+    // ---- Tablet (768-991px): KPI 4-up, blocks reflow 2-up ----
+    @media (max-width: 991.98px) {
         .o_neon_kpi_strip {
             grid-template-columns: repeat(4, 1fr);
         }
         .o_neon_row_a {
             grid-template-columns: 1fr;
         }
-        .o_neon_row_b, .o_neon_row_c {
+        .o_neon_row_b,
+        .o_neon_row_c {
             grid-template-columns: repeat(2, 1fr);
         }
     }
 
-    @media (max-width: 768px) {
+    // ---- Mobile (<768px): KPI 2-up, blocks 1-up, icon-only header ----
+    @media (max-width: 767.98px) {
         .o_neon_kpi_strip {
             grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
         }
-        .o_neon_row_a, .o_neon_row_b, .o_neon_row_c {
+        .o_neon_row_a,
+        .o_neon_row_b,
+        .o_neon_row_c {
             grid-template-columns: 1fr;
+            gap: 10px;
         }
-        .o_neon_dashboard_edit_layout {
-            display: none;
+
+        // KPI value font scales down (D8)
+        .o_neon_kpi_value {
+            font-size: 20pt;
+        }
+        .o_neon_kpi_tile {
+            padding: 10px 12px;
+            min-height: 44px;
+        }
+
+        // Header buttons collapse to icon-only (D4). Each button's
+        // label text is wrapped in .d-none.d-md-inline so it
+        // disappears at mobile while the icon stays.
+        .o_neon_dashboard_controls {
+            flex-wrap: wrap;
+            gap: 6px;
+            .o_neon_dashboard_viewas {
+                flex: 1 1 100%;
+            }
+            .o_neon_dashboard_edit_layout,
+            .o_neon_dashboard_export_pdf,
+            .o_neon_dashboard_export_xlsx,
+            .o_neon_dashboard_refresh {
+                min-height: 44px;
+                min-width: 44px;
+                padding: 6px 10px;
+            }
+        }
+
+        // Filter chips: horizontal scroll, never wrap (D5)
+        .o_neon_filter_chips {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+        }
+        .o_neon_filter_chip {
+            flex-shrink: 0;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        // AR aging table -> stacked card view (D7). CSS-only
+        // pseudo-content adds the column label since we can't
+        // edit the XML (D1: CSS only).
+        .o_neon_finance_ar_table {
+            thead {
+                display: none;
+            }
+            tbody, tr, td {
+                display: block;
+                width: 100%;
+            }
+            tr {
+                padding: 8px 10px;
+                margin-bottom: 8px;
+                border-radius: 4px;
+                background: rgba($neon-purple, 0.04);
+                border-left: 3px solid $neon-line;
+                min-height: 44px;
+            }
+            tr.o_neon_finance_ar_row_critical {
+                border-left-color: $neon-accent-red;
+                background: rgba($neon-accent-red, 0.05);
+            }
+            td {
+                text-align: left !important;
+                padding: 2px 0;
+                font-size: 0.95em;
+            }
+            td:nth-child(1)::before {
+                content: "Bucket: ";
+                font-weight: 600;
+                color: $neon-muted;
+                display: inline-block;
+                min-width: 70px;
+            }
+            td:nth-child(2)::before {
+                content: "Count: ";
+                font-weight: 600;
+                color: $neon-muted;
+                display: inline-block;
+                min-width: 70px;
+            }
+            td:nth-child(3)::before {
+                content: "USD: ";
+                font-weight: 600;
+                color: $neon-muted;
+                display: inline-block;
+                min-width: 70px;
+            }
+            tr.o_neon_finance_ar_total_row td:nth-child(1)::before {
+                content: "";
+                min-width: 0;
+            }
+        }
+
+        // AI Insight cards full-width + larger tap targets (D7)
+        .o_neon_block_ai {
+            .o_neon_ai_item {
+                min-height: 44px;
+                padding: 10px 12px;
+            }
+        }
+
+        // Tasks block rows likewise
+        .o_neon_block_tasks {
+            .o_neon_tasks_row {
+                min-height: 44px;
+            }
+        }
+
+        // Alerts rows
+        .o_neon_block_alerts {
+            .o_neon_alert_row {
+                min-height: 44px;
+            }
+        }
+    }
+
+    // ---- Very narrow (<420px): KPI 1-up ----
+    @media (max-width: 419.98px) {
+        .o_neon_kpi_strip {
+            grid-template-columns: 1fr;
         }
     }
 }

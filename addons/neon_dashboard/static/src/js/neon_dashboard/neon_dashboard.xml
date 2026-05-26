@@ -49,9 +49,10 @@
                             </t>
                         </select>
                         <button class="btn btn-sm btn-link o_neon_dashboard_edit_layout"
-                                t-on-click="onEditLayoutClick">
-                            <i class="fa fa-pencil me-1"/>
-                            EDIT LAYOUT
+                                t-on-click="onEditLayoutClick"
+                                title="Edit Layout">
+                            <i class="fa fa-pencil"/>
+                            <span class="d-none d-md-inline ms-1">EDIT LAYOUT</span>
                         </button>
                         <!-- M10: export buttons (PDF + Excel). -->
                         <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_pdf"
@@ -60,7 +61,7 @@
                                 title="Download PDF snapshot">
                             <i class="fa"
                                t-att-class="state.exporting === 'pdf' ? 'fa-spinner fa-spin' : 'fa-file-pdf-o'"/>
-                            <span class="ms-1">PDF</span>
+                            <span class="d-none d-md-inline ms-1">PDF</span>
                         </button>
                         <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_xlsx"
                                 t-on-click="onExportXlsx"
@@ -68,7 +69,7 @@
                                 title="Download Excel snapshot">
                             <i class="fa"
                                t-att-class="state.exporting === 'xlsx' ? 'fa-spinner fa-spin' : 'fa-file-excel-o'"/>
-                            <span class="ms-1">Excel</span>
+                            <span class="d-none d-md-inline ms-1">Excel</span>
                         </button>
                         <button class="btn btn-sm btn-outline-primary o_neon_dashboard_refresh"
                                 t-on-click="onRefreshClick"
