@@ -47,13 +47,13 @@
                 (0, 0, {'widget_key': 'kpi_pipeline',      'order_index': 5}),
                 (0, 0, {'widget_key': 'kpi_leads',         'order_index': 6}),
                 (0, 0, {'widget_key': 'kpi_forecast',      'order_index': 7}),
-                (0, 0, {'widget_key': 'block_jobs',        'order_index': 10}),
+                (0, 0, {'widget_key': 'block_jobs',        'order_index': 10, 'size': 'large'}),
                 (0, 0, {'widget_key': 'block_sales',       'order_index': 11}),
                 (0, 0, {'widget_key': 'block_finance',     'order_index': 12}),
                 (0, 0, {'widget_key': 'block_alerts',      'order_index': 13}),
                 (0, 0, {'widget_key': 'block_crew_equipment','order_index': 14}),
                 (0, 0, {'widget_key': 'block_tasks',       'order_index': 15}),
-                (0, 0, {'widget_key': 'block_ai_insights', 'order_index': 16}),
+                (0, 0, {'widget_key': 'block_ai_insights', 'order_index': 16, 'size': 'large'}),
             ]"/>
         </record>
 
@@ -70,12 +70,12 @@
                 (0, 0, {'widget_key': 'kpi_aging_quotes',  'order_index': 4}),
                 (0, 0, {'widget_key': 'kpi_won_mtd',       'order_index': 5}),
                 (0, 0, {'widget_key': 'kpi_win_rate',      'order_index': 6}),
-                (0, 0, {'widget_key': 'block_sales',       'order_index': 10}),
+                (0, 0, {'widget_key': 'block_sales',       'order_index': 10, 'size': 'large'}),
                 (0, 0, {'widget_key': 'block_hot_deals',   'order_index': 11}),
                 (0, 0, {'widget_key': 'block_aging_quotes','order_index': 12}),
                 (0, 0, {'widget_key': 'block_alerts',      'order_index': 13}),
                 (0, 0, {'widget_key': 'block_tasks',       'order_index': 14}),
-                (0, 0, {'widget_key': 'block_ai_insights', 'order_index': 15}),
+                (0, 0, {'widget_key': 'block_ai_insights', 'order_index': 15, 'size': 'large'}),
             ]"/>
         </record>
 
@@ -92,13 +92,13 @@
                 (0, 0, {'widget_key': 'kpi_pending_invoices','order_index': 4}),
                 (0, 0, {'widget_key': 'kpi_recent_payments', 'order_index': 5}),
                 (0, 0, {'widget_key': 'kpi_recent_costs',    'order_index': 6}),
-                (0, 0, {'widget_key': 'block_finance',       'order_index': 10}),
+                (0, 0, {'widget_key': 'block_finance',       'order_index': 10, 'size': 'large'}),
                 (0, 0, {'widget_key': 'block_budget_alerts', 'order_index': 11}),
                 (0, 0, {'widget_key': 'block_invoice_queue', 'order_index': 12}),
                 (0, 0, {'widget_key': 'block_zig_costs',     'order_index': 13}),
                 (0, 0, {'widget_key': 'block_alerts',        'order_index': 14}),
                 (0, 0, {'widget_key': 'block_tasks',         'order_index': 15}),
-                (0, 0, {'widget_key': 'block_ai_insights',   'order_index': 16}),
+                (0, 0, {'widget_key': 'block_ai_insights',   'order_index': 16, 'size': 'large'}),
             ]"/>
         </record>
 
@@ -113,13 +113,13 @@
                 (0, 0, {'widget_key': 'kpi_jobs_week',    'order_index': 2}),
                 (0, 0, {'widget_key': 'kpi_crew_gaps',    'order_index': 3}),
                 (0, 0, {'widget_key': 'kpi_certs_30',     'order_index': 4}),
-                (0, 0, {'widget_key': 'block_jobs',       'order_index': 10}),
+                (0, 0, {'widget_key': 'block_jobs',       'order_index': 10, 'size': 'large'}),
                 (0, 0, {'widget_key': 'block_crew_gaps',  'order_index': 11}),
                 (0, 0, {'widget_key': 'block_cert_expiry','order_index': 12}),
                 (0, 0, {'widget_key': 'block_crew_equipment','order_index': 13}),
                 (0, 0, {'widget_key': 'block_alerts',     'order_index': 14}),
                 (0, 0, {'widget_key': 'block_tasks',      'order_index': 15}),
-                (0, 0, {'widget_key': 'block_ai_insights','order_index': 16}),
+                (0, 0, {'widget_key': 'block_ai_insights','order_index': 16, 'size': 'large'}),
             ]"/>
         </record>
 

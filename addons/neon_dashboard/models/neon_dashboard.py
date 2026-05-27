@@ -166,6 +166,12 @@ class NeonDashboard(models.Model):
         string="Widget Layout",
     )
     last_refresh = fields.Datetime(default=fields.Datetime.now)
+    # P8B.M4: once a user saves an Edit-Layout customization, this
+    # flips True and the OWL view renders the unified single-container
+    # grid (drag-reorderable) instead of the seeded 4-section layout.
+    # Reset-to-defaults flips it back to False. New column on -u;
+    # existing rows read False (NULL).
+    is_customized = fields.Boolean(default=False)
 
     _sql_constraints = [
         ("user_type_unique",
@@ -407,6 +413,7 @@ class NeonDashboard(models.Model):
         payload = {
             "dashboard_id": dashboard.id,
             "dashboard_type": resolved_type,
+            "is_customized": dashboard.is_customized,
             "user_name": self.env.user.name,
             "user_login": self.env.user.login,
             "user_role_label": self._user_role_label(),
@@ -473,6 +480,134 @@ class NeonDashboard(models.Model):
             "order_index": layout.order_index,
             "size": layout.size,
         } for layout in dashboard.layout_ids.sorted("order_index")]
+
+    # ==================================================================
+    # P8B.M4 -- Edit Layout write RPCs.
+    #
+    # Mirror the M7 dashboard_dismiss_alert contract: @api.model,
+    # _check_dashboard_access guard, per-user (own-row record rule +
+    # get_or_create_for_user scope), idempotent, return the refreshed
+    # get_dashboard_data payload. No new model -- these mutate the
+    # existing neon.dashboard.user.layout rows + the is_customized flag.
+    # ==================================================================
+    @api.model
+    def dashboard_update_layout(self, dashboard_type, updates):
+        """Batch-write the current user's layout for dashboard_type.
+
+        ``updates`` = [{widget_key, visible, order_index}, ...].
+        Idempotent. Flips is_customized=True so the OWL view switches
+        to the unified grid. Returns the refreshed payload.
+
+        Mandatory-widget protection still applies via the
+        @api.constrains on neon.dashboard.user.layout (D6): attempts to
+        hide kpi_cash / kpi_ar_overdue (and block_alerts unless the
+        org param permits) are silently re-shown.
+        """
+        self._check_dashboard_access()
+        resolved = self._resolve_dashboard_type(dashboard_type)
+        dashboard = self.get_or_create_for_user(
+            user_id=self.env.user.id, dashboard_type=resolved)
+        self._apply_layout_updates(dashboard, updates)
+        dashboard.sudo().write({"is_customized": True})
+        return self.get_dashboard_data(resolved)
+
+    @api.model
+    def dashboard_reset_layout(self, dashboard_type):
+        """Delete the user's user.layout rows for dashboard_type, flip
+        is_customized=False, and lazy re-seed from default.layout so
+        the next render returns to the rich 4-section layout. Returns
+        the refreshed payload."""
+        self._check_dashboard_access()
+        resolved = self._resolve_dashboard_type(dashboard_type)
+        dashboard = self.get_or_create_for_user(
+            user_id=self.env.user.id, dashboard_type=resolved)
+        dashboard.layout_ids.sudo().unlink()
+        dashboard.sudo().write({"is_customized": False})
+        dashboard._seed_default_layout()
+        return self.get_dashboard_data(resolved)
+
+    @api.model
+    def dashboard_apply_layout_to_all_variants(self, source_dashboard_type,
+                                               updates):
+        """Persist the source layout, then copy its (visible,
+        order_index) onto every other dashboard_type the user can
+        access -- but only for widget_keys that EXIST in the target
+        (variants carry different block sets; a Sales-only block isn't
+        forced onto Bookkeeper). Returns {dashboard_type: 'applied' |
+        'no_access'}.
+
+        ⚠️ DECISION (M8B.4, marker 2): "accessible" = superuser -> all
+        five types; everyone else -> their own default type only. The
+        live ACL grants multi-variant visibility through
+        group_neon_superuser (the View-as selector is superuser-only,
+        M8B.1-3), so there is no per-tier peek beyond superuser. The
+        button only renders for >=2 accessible types, so non-superusers
+        never reach this path. Reuses _is_superuser rather than
+        hardcoding a tier->variant table (D7)."""
+        self._check_dashboard_access()
+        source = self._resolve_dashboard_type(source_dashboard_type)
+        src_dash = self.get_or_create_for_user(
+            user_id=self.env.user.id, dashboard_type=source)
+        self._apply_layout_updates(src_dash, updates)
+        src_dash.sudo().write({"is_customized": True})
+
+        result = {source: "applied"}
+        accessible = self._accessible_dashboard_types()
+        for dtype in (v for v, _l in _DASHBOARD_TYPES):
+            if dtype == source:
+                continue
+            if dtype not in accessible:
+                result[dtype] = "no_access"
+                continue
+            target = self.get_or_create_for_user(
+                user_id=self.env.user.id, dashboard_type=dtype)
+            tgt_by_key = {l.widget_key: l for l in target.layout_ids}
+            for upd in (updates or []):
+                row = tgt_by_key.get(upd.get("widget_key"))
+                if not row:
+                    continue  # widget not present on this variant
+                vals = {}
+                if "order_index" in upd:
+                    vals["order_index"] = int(upd["order_index"])
+                if "visible" in upd:
+                    vals["visible"] = bool(upd["visible"])
+                if vals:
+                    row.write(vals)
+            target.sudo().write({"is_customized": True})
+            result[dtype] = "applied"
+        return result
+
+    @api.model
+    def _apply_layout_updates(self, dashboard, updates):
+        """Write visible / order_index onto the dashboard's existing
+        user.layout rows, matched by widget_key. Unknown keys ignored;
+        rows not mentioned are left untouched. ``size`` is display-only
+        (D3) and not edited here. sudo() so a tier user without direct
+        write on the model can still personalise their own row (the
+        own-row record rule already permits write; sudo keeps the
+        mandatory @api.constrains the single enforcement point)."""
+        by_key = {l.widget_key: l for l in dashboard.layout_ids}
+        for upd in (updates or []):
+            row = by_key.get(upd.get("widget_key"))
+            if not row:
+                continue
+            vals = {}
+            if "order_index" in upd:
+                vals["order_index"] = int(upd["order_index"])
+            if "visible" in upd:
+                vals["visible"] = bool(upd["visible"])
+            if vals:
+                row.sudo().write(vals)
+        return True
+
+    @api.model
+    def _accessible_dashboard_types(self):
+        """Dashboard types the current user may personalise. Superuser
+        -> all five; everyone else -> their own default only. See the
+        DECISION marker on dashboard_apply_layout_to_all_variants."""
+        if self._is_superuser():
+            return [v for v, _l in _DASHBOARD_TYPES]
+        return [self._default_dashboard_type_for_user(self.env.user.id)]
 
     # ==================================================================
     # KPI tiles (M2) -- 7 tiles, every returned dict shape-compatible.

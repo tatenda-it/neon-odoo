@@ -653,6 +653,100 @@ $neon-bg:            #FAFAFC;
         .o_neon_zig_rate_value { font-weight: 700; color: $neon-purple; }
     }
 
+    // -------- P8B.M4 Edit Layout: unified block grid --------
+    // Rendered when a user has customised their layout OR is in edit
+    // mode. Single container so CSS `order` + useSortable drag work
+    // across ALL content blocks (the rich 4-section layout can't).
+    .o_neon_blocks_unified {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 8px;
+        @media (min-width: 1400px) {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        @media (max-width: 991.98px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        @media (max-width: 767.98px) {
+            grid-template-columns: 1fr;
+        }
+        .o_neon_block_slot {
+            grid-column: span 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            &.o_neon_block_size_large {
+                grid-column: span 2;
+            }
+            // The inner .o_neon_block fills the slot.
+            .o_neon_block { flex: 1 1 auto; }
+        }
+        @media (max-width: 767.98px) {
+            .o_neon_block_slot.o_neon_block_size_large {
+                grid-column: span 1 !important;
+            }
+        }
+    }
+
+    // Edit-mode affordances.
+    .o_neon_block_edit_bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px;
+        background: $neon-purple-pale;
+        border: 1px solid $neon-purple-light;
+        border-bottom: none;
+        border-radius: 4px 4px 0 0;
+        min-height: 36px;
+    }
+    .o_neon_drag_handle {
+        cursor: grab;
+        color: $neon-purple;
+        // Long-press initiates drag; native touch scroll otherwise.
+        touch-action: none;
+        padding: 4px 6px;
+        &:active { cursor: grabbing; }
+    }
+    .o_neon_always_shown_badge {
+        font-size: 0.7em;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: $neon-line;
+        color: $neon-muted;
+        padding: 2px 8px;
+        border-radius: 10px;
+        margin-left: auto;
+    }
+    .o_neon_block_hide_btn {
+        margin-left: auto;
+        color: $neon-muted !important;
+        font-size: 0.8em;
+    }
+    .o_neon_block_stub {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px;
+        background: #f7f7fb;
+        border: 1px dashed $neon-line;
+        border-radius: 0 0 4px 4px;
+        min-height: 80px;
+        .o_neon_block_stub_name {
+            font-weight: 600;
+            color: $neon-muted;
+        }
+    }
+    // Subtle outline on slots while editing so the draggable surface
+    // reads as interactive.
+    &.o_neon_dashboard_editing {
+        .o_neon_block_slot .o_neon_block {
+            border-style: dashed;
+        }
+    }
+
     // -------- M6 Finance block --------
     .o_neon_block_finance {
         .o_neon_block_header {

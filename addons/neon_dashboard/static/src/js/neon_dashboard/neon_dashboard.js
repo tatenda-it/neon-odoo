@@ -5,11 +5,39 @@ import {
     onMounted,
     onWillStart,
     onWillUnmount,
+    useRef,
     useState,
 } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { useSortable } from "@web/core/utils/sortable_owl";
 import { _t } from "@web/core/l10n/translation";
+
+
+// P8B.M4: content blocks that may be hidden/reordered, with their
+// human labels (for the hidden-stub card). KPI tiles are NOT here --
+// they always show (scope lock). Mandatory blocks (can't hide) below.
+const BLOCK_LABELS = {
+    block_jobs: "Jobs",
+    block_sales: "Sales Pipeline",
+    block_finance: "Finance · AR & Cash",
+    block_alerts: "Alerts",
+    block_crew_equipment: "Crew & Equipment",
+    block_tasks: "Tasks",
+    block_ai_insights: "AI Insights",
+    block_hot_deals: "Hot Deals Watch",
+    block_aging_quotes: "Aging Quotes",
+    block_budget_alerts: "Budget Alerts",
+    block_invoice_queue: "Invoice Queue",
+    block_zig_costs: "ZiG Rate · Recent Costs",
+    block_crew_gaps: "Crew Gaps Watch",
+    block_cert_expiry: "Cert Expiry Watch",
+};
+
+// block_alerts is the only mandatory CONTENT block (D6); the UI never
+// offers a Hide button for it. kpi_cash / kpi_ar_overdue are mandatory
+// too but are KPI tiles, never in the block list.
+const MANDATORY_BLOCKS = new Set(["block_alerts"]);
 
 /**
  * Neon Dashboard root component (Phase 8A M1-M3).
@@ -58,6 +86,25 @@ export class NeonDashboard extends Component {
                 insights: [],
             },
             aiRefreshing: false,
+            // P8B.M4 Edit Layout: client-side edit mode + a working
+            // copy of the content-block layout. layoutDraft is the
+            // mutable mirror used while editing; Save persists it,
+            // Cancel discards it.
+            editMode: false,
+            layoutDraft: [],
+        });
+
+        // P8B.M4: useSortable wires onto the unified block container
+        // (only rendered in edit/customised mode). Reorder updates
+        // layoutDraft order_index from the post-drop DOM order; Save
+        // persists. touch_delay 300ms long-press coexists with the
+        // M12.1 scroll fix (discovery Q5) -- no custom touch handlers.
+        this.blocksContainerRef = useRef("blocksContainer");
+        useSortable({
+            ref: this.blocksContainerRef,
+            elements: ".o_neon_block_slot",
+            handle: ".o_neon_drag_handle",
+            onDrop: () => this._syncOrderFromDom(),
         });
 
         // 5-minute auto-refresh (same cadence as cash_flow_dashboard;
@@ -180,12 +227,174 @@ export class NeonDashboard extends Component {
         }
     }
 
+    // ==============================================================
+    // P8B.M4 -- Edit Layout (hide/reorder content blocks).
+    // ==============================================================
     onEditLayoutClick() {
-        // Edit-Layout UI lands in Phase 8B M5. For M1-M3, we keep the
-        // pencil visible (mockup parity) and stub the action.
-        this.notification.add(
-            _t("Edit Layout ships in Phase 8B M5."),
-            { type: "info" });
+        // Enter edit mode: snapshot the current layout into a mutable
+        // draft. Edit mode renders the unified grid (see M8B.4.1
+        // marker in the template) so useSortable has one container.
+        const layout = (this.state.data && this.state.data.layout) || [];
+        this.state.layoutDraft = layout.map((l) => ({ ...l }));
+        this.state.editMode = true;
+    }
+
+    onLayoutCancel() {
+        this.state.editMode = false;
+        this.state.layoutDraft = [];
+    }
+
+    _layoutUpdatesFromDraft() {
+        return (this.state.layoutDraft || [])
+            .filter((l) => l.widget_key.startsWith("block_"))
+            .map((l) => ({
+                widget_key: l.widget_key,
+                visible: l.visible,
+                order_index: l.order_index,
+            }));
+    }
+
+    async onLayoutSave() {
+        const dtype = (this.state.data && this.state.data.dashboard_type)
+            || null;
+        try {
+            const refreshed = await this.orm.call(
+                "neon.dashboard", "dashboard_update_layout",
+                [dtype, this._layoutUpdatesFromDraft()],
+            );
+            this.state.data = refreshed;
+        } catch (e) {
+            this.notification.add(
+                _t("Save failed: ") + ((e && e.message) || String(e)),
+                { type: "danger" });
+            return;
+        }
+        this.state.editMode = false;
+        this.state.layoutDraft = [];
+    }
+
+    async onLayoutReset() {
+        const dtype = (this.state.data && this.state.data.dashboard_type)
+            || null;
+        try {
+            const refreshed = await this.orm.call(
+                "neon.dashboard", "dashboard_reset_layout", [dtype]);
+            this.state.data = refreshed;
+        } catch (e) {
+            this.notification.add(
+                _t("Reset failed: ") + ((e && e.message) || String(e)),
+                { type: "danger" });
+            return;
+        }
+        this.state.editMode = false;
+        this.state.layoutDraft = [];
+    }
+
+    async onLayoutApplyAll() {
+        const dtype = (this.state.data && this.state.data.dashboard_type)
+            || null;
+        try {
+            const result = await this.orm.call(
+                "neon.dashboard",
+                "dashboard_apply_layout_to_all_variants",
+                [dtype, this._layoutUpdatesFromDraft()],
+            );
+            const applied = Object.entries(result || {})
+                .filter(([, v]) => v === "applied")
+                .map(([k]) => k);
+            this.notification.add(
+                _t("Layout applied to: ") + applied.join(", "),
+                { type: "success" });
+            // Refresh the current variant view.
+            this.state.data = await this.orm.call(
+                "neon.dashboard", "get_dashboard_data", [],
+                { dashboard_type: dtype });
+        } catch (e) {
+            this.notification.add(
+                _t("Apply-to-all failed: ")
+                + ((e && e.message) || String(e)),
+                { type: "danger" });
+            return;
+        }
+        this.state.editMode = false;
+        this.state.layoutDraft = [];
+    }
+
+    onBlockHide(widgetKey) {
+        const row = (this.state.layoutDraft || []).find(
+            (l) => l.widget_key === widgetKey);
+        if (row && !this.isMandatoryBlock(widgetKey)) {
+            row.visible = false;
+        }
+    }
+
+    onBlockShow(widgetKey) {
+        const row = (this.state.layoutDraft || []).find(
+            (l) => l.widget_key === widgetKey);
+        if (row) {
+            row.visible = true;
+        }
+    }
+
+    _syncOrderFromDom() {
+        // After a useSortable drop, re-derive order_index from the new
+        // DOM order of the slots. OWL re-renders orderedBlocks (sorted
+        // by order_index) + CSS `order`, reconciling the transient
+        // node move the hook performed.
+        const container = this.blocksContainerRef.el;
+        if (!container) {
+            return;
+        }
+        const slots = Array.from(
+            container.querySelectorAll(".o_neon_block_slot"));
+        slots.forEach((el, i) => {
+            const key = el.dataset.widgetKey;
+            const row = (this.state.layoutDraft || []).find(
+                (l) => l.widget_key === key);
+            if (row) {
+                row.order_index = (i + 1) * 10;
+            }
+        });
+    }
+
+    // ----- Edit-mode template helpers -----
+    get isCustomized() {
+        return !!(this.state.data && this.state.data.is_customized);
+    }
+
+    get useUnified() {
+        return this.state.editMode || this.isCustomized;
+    }
+
+    get orderedBlocks() {
+        const src = this.state.editMode
+            ? (this.state.layoutDraft || [])
+            : ((this.state.data && this.state.data.layout) || []);
+        let blocks = src.filter((l) => l.widget_key.startsWith("block_"));
+        if (!this.state.editMode) {
+            blocks = blocks.filter((l) => l.visible);
+        }
+        return [...blocks].sort(
+            (a, b) => (a.order_index || 0) - (b.order_index || 0));
+    }
+
+    getBlockTemplate(widgetKey) {
+        return "neon_dashboard.block." + widgetKey;
+    }
+
+    blockLabel(widgetKey) {
+        return BLOCK_LABELS[widgetKey] || widgetKey;
+    }
+
+    isMandatoryBlock(widgetKey) {
+        return MANDATORY_BLOCKS.has(widgetKey);
+    }
+
+    get canApplyToAll() {
+        // Only meaningful for multi-variant users (superusers). Mirror
+        // the server's _accessible_dashboard_types >= 2 rule via the
+        // View-as option list the payload already ships.
+        return this.availableTypes.length >= 2;
     }
 
     async onExportPdf() {

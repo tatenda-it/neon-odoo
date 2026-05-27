@@ -98,18 +98,37 @@ class NeonDashboardUserLayout(models.Model):
     @api.constrains("widget_key", "visible")
     def _check_mandatory_widgets(self):
         """Silently re-show + log a warning if a mandatory widget is
-        hidden. See module docstring for the rationale."""
+        hidden. See module docstring for the rationale.
+
+        ⚠️ DECISION (P8B.M4, D6): block_alerts is mandatory BY DEFAULT
+        but an org can opt it out via the ir.config_parameter
+        ``neon_dashboard.alerts_block_optional`` (default False, no UI
+        in M8B.4 -- flip via Technical -> Parameters). kpi_cash and
+        kpi_ar_overdue stay mandatory unconditionally. When the param
+        is truthy, block_alerts is allowed to hide; the silent-re-flip
+        protection on the other two is unchanged."""
+        alerts_optional = self._alerts_block_optional()
         for rec in self:
-            if (rec.widget_key in _MANDATORY_WIDGETS
-                    and not rec.visible):
-                # Re-flip via sudo() to bypass any rule that might
-                # already have blocked a normal write.
-                rec.sudo().write({"visible": True})
-                _logger.warning(
-                    "neon.dashboard.user.layout: mandatory widget %s "
-                    "on dashboard %s (user %s) was set to hidden; "
-                    "restored to visible per schema sketch §4.2.",
-                    rec.widget_key,
-                    rec.dashboard_id.id,
-                    rec.dashboard_id.user_id.login,
-                )
+            if rec.visible or rec.widget_key not in _MANDATORY_WIDGETS:
+                continue
+            if rec.widget_key == "block_alerts" and alerts_optional:
+                continue
+            # Re-flip via sudo() to bypass any rule that might
+            # already have blocked a normal write.
+            rec.sudo().write({"visible": True})
+            _logger.warning(
+                "neon.dashboard.user.layout: mandatory widget %s "
+                "on dashboard %s (user %s) was set to hidden; "
+                "restored to visible per schema sketch §4.2.",
+                rec.widget_key,
+                rec.dashboard_id.id,
+                rec.dashboard_id.user_id.login,
+            )
+
+    @api.model
+    def _alerts_block_optional(self):
+        """Read the org-level opt-out for the Alerts mandatory lock.
+        Tolerant of 'True'/'true'/'1' string forms."""
+        raw = (self.env["ir.config_parameter"].sudo()
+               .get_param("neon_dashboard.alerts_block_optional", "False"))
+        return str(raw).strip().lower() in ("true", "1", "yes")

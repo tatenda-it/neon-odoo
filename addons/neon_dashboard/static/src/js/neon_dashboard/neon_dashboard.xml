@@ -1,14 +1,739 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
+    <!-- ====================================================================
+         P8B.M4: each content block is a named sub-template = its full
+         .o_neon_block div, verbatim from M1-M3 (only the t-if gate removed).
+         Reused by BOTH render branches (rich 4-section + unified grid) via
+         t-call, so markup lives once. Acceptance #15.
+         ==================================================================== -->
+
+    <t t-name="neon_dashboard.block.block_jobs">
+        <div class="o_neon_block o_neon_block_jobs widget--block_jobs">
+            <div class="o_neon_block_header">
+                <h3>Jobs &#183; Today + This Week</h3>
+            </div>
+            <div class="o_neon_block_body">
+                <div t-if="jobsBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="jobsBlock.empty_message"/>
+                    <button class="btn btn-link" t-on-click="onEmptyJobsClick"
+                            t-if="jobsBlock.empty_cta_action">
+                        <t t-esc="jobsBlock.empty_cta_label"/>
+                    </button>
+                </div>
+                <table t-if="!jobsBlock.empty" class="o_neon_jobs_table">
+                    <thead>
+                        <tr>
+                            <th>Client</th><th>Event</th><th>When</th><th>State</th>
+                            <th class="text-end">Crew</th><th>Venue</th>
+                            <th class="text-end">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="jobsBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_jobs_row"
+                                t-on-click="() => this.onJobClick(row)">
+                                <td t-esc="row.client_name"/>
+                                <td t-esc="row.event_name"/>
+                                <td>
+                                    <div t-esc="row.event_label"/>
+                                    <small class="text-muted" t-esc="row.days_label"/>
+                                </td>
+                                <td>
+                                    <span class="o_neon_jobs_badge"
+                                          t-att-class="'o_neon_jobs_badge_' + row.state_color"
+                                          t-esc="row.state_label"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="row.crew_confirmed"/>
+                                    /
+                                    <span t-esc="row.crew_required"/>
+                                    <span t-if="row.crew_gap > 0"
+                                          class="o_neon_jobs_gap"
+                                          t-esc="' (-' + row.crew_gap + ')'"/>
+                                </td>
+                                <td t-esc="row.venue"/>
+                                <td class="text-end" t-esc="row.value_display"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_sales">
+        <div class="o_neon_block o_neon_block_sales widget--block_sales">
+            <div class="o_neon_block_header">
+                <h3>Sales Pipeline</h3>
+            </div>
+            <div class="o_neon_block_body">
+                <div class="o_neon_sales_subwidget">
+                    <h4>Pipeline by stage</h4>
+                    <div t-if="salesBlock.pipeline_by_stage.empty"
+                         class="o_neon_block_empty">
+                        <p class="o_neon_block_empty_msg"
+                           t-esc="salesBlock.pipeline_by_stage.empty_message"/>
+                    </div>
+                    <table t-if="!salesBlock.pipeline_by_stage.empty"
+                           class="o_neon_sales_table">
+                        <thead>
+                            <tr>
+                                <th>Stage</th>
+                                <th class="text-end">Count</th>
+                                <th class="text-end">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="salesBlock.pipeline_by_stage.stages"
+                               t-as="stage" t-key="stage.state">
+                                <tr class="o_neon_sales_row"
+                                    t-on-click="() => this.onPipelineStageClick(stage)">
+                                    <td t-esc="stage.label"/>
+                                    <td class="text-end" t-esc="stage.count"/>
+                                    <td class="text-end" t-esc="stage.value_display"/>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                    <small class="text-muted o_neon_sales_currency_note"
+                           t-esc="salesBlock.pipeline_by_stage.currency_note"/>
+                </div>
+                <div class="o_neon_sales_subrow">
+                    <div class="o_neon_sales_subwidget">
+                        <h4>Win rate</h4>
+                        <div t-if="salesBlock.win_rate.empty"
+                             class="text-muted small"
+                             t-esc="salesBlock.win_rate.empty_message"/>
+                        <div t-if="!salesBlock.win_rate.empty"
+                             class="o_neon_sales_win_rate">
+                            <div class="o_neon_sales_win_rate_value">
+                                <t t-esc="salesBlock.win_rate.rate_pct"/>%
+                            </div>
+                            <small class="text-muted">
+                                <t t-esc="salesBlock.win_rate.won_count"/>W /
+                                <t t-esc="salesBlock.win_rate.lost_count"/>L
+                                &#183;
+                                <t t-esc="salesBlock.win_rate.window_label"/>
+                            </small>
+                        </div>
+                    </div>
+                    <div class="o_neon_sales_subwidget">
+                        <h4>Lead sources</h4>
+                        <div t-if="salesBlock.lead_sources.empty"
+                             class="text-muted small"
+                             t-esc="salesBlock.lead_sources.empty_message"/>
+                        <table t-if="!salesBlock.lead_sources.empty"
+                               class="o_neon_sales_lead_table">
+                            <tbody>
+                                <t t-foreach="salesBlock.lead_sources.sources"
+                                   t-as="src" t-key="src.source">
+                                    <tr>
+                                        <td t-esc="src.source"/>
+                                        <td class="text-end">
+                                            <t t-esc="src.count"/>
+                                            <small class="text-muted ms-1">
+                                                (<t t-esc="src.pct"/>%)
+                                            </small>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                        <small t-if="!salesBlock.lead_sources.empty"
+                               class="text-muted"
+                               t-esc="salesBlock.lead_sources.window_label"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_finance">
+        <div class="o_neon_block o_neon_block_finance widget--block_finance">
+            <div class="o_neon_block_header">
+                <h3>Finance &#183; AR &amp; Cash</h3>
+                <button class="btn btn-sm btn-link o_neon_finance_manage_rate"
+                        t-if="isSuperuser"
+                        t-on-click="onManageRateClick">
+                    <i class="fa fa-pencil me-1"/>
+                    Manage ZiG rate
+                </button>
+            </div>
+            <div class="o_neon_block_body">
+                <div class="o_neon_finance_cash_card">
+                    <div t-if="financeBlock.cash.empty" class="o_neon_block_empty">
+                        <p class="o_neon_block_empty_msg">
+                            No bank/cash journals configured yet
+                        </p>
+                    </div>
+                    <div t-if="!financeBlock.cash.empty"
+                         class="o_neon_finance_cash_inner">
+                        <h4>Cash on Hand</h4>
+                        <table class="o_neon_finance_cash_table">
+                            <tr>
+                                <td>USD journals</td>
+                                <td class="text-end"
+                                    t-esc="formatUsd(financeBlock.cash.usd_total)"/>
+                            </tr>
+                            <tr>
+                                <td>ZiG journals</td>
+                                <td class="text-end">
+                                    <t t-esc="formatZwg(financeBlock.cash.zig_total)"/>
+                                    <small class="text-muted ms-2"
+                                           t-if="financeBlock.cash.rate">
+                                        @ <t t-esc="financeBlock.cash.rate.toFixed(2)"/>
+                                    </small>
+                                </td>
+                            </tr>
+                            <tr t-if="financeBlock.cash.rate"
+                                class="o_neon_finance_cash_zig_usd_row">
+                                <td>
+                                    <small class="text-muted">ZiG in USD-equiv</small>
+                                </td>
+                                <td class="text-end">
+                                    <small class="text-muted"
+                                           t-esc="formatUsd(financeBlock.cash.zig_in_usd)"/>
+                                </td>
+                            </tr>
+                            <tr class="o_neon_finance_cash_total_row">
+                                <td><strong>Total (USD-equiv)</strong></td>
+                                <td class="text-end">
+                                    <strong t-esc="formatUsd(financeBlock.cash.usd_total + financeBlock.cash.zig_in_usd)"/>
+                                </td>
+                            </tr>
+                        </table>
+                        <small class="text-muted o_neon_finance_rate_meta">
+                            Rate source:
+                            <t t-esc="financeBlock.cash.rate_source"/>
+                            <t t-if="financeBlock.cash.rate_as_of">
+                                &#183; updated
+                                <t t-esc="financeBlock.cash.rate_as_of"/>
+                            </t>
+                        </small>
+                    </div>
+                </div>
+                <div class="o_neon_finance_ar_card">
+                    <h4>AR Aging</h4>
+                    <div t-if="financeBlock.ar_aging.empty" class="o_neon_block_empty">
+                        <p class="o_neon_block_empty_msg"
+                           t-esc="financeBlock.ar_aging.empty_message"/>
+                    </div>
+                    <table t-if="!financeBlock.ar_aging.empty"
+                           class="o_neon_finance_ar_table">
+                        <thead>
+                            <tr>
+                                <th>Bucket</th>
+                                <th class="text-end">#</th>
+                                <th class="text-end">USD-equiv</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="financeBlock.ar_aging.buckets"
+                               t-as="bucket" t-key="bucket.key">
+                                <tr class="o_neon_finance_ar_row"
+                                    t-att-class="bucket.critical ? 'o_neon_finance_ar_row_critical' : ''"
+                                    t-on-click="() => this.onAgingBucketClick(bucket)">
+                                    <td t-esc="bucket.label"/>
+                                    <td class="text-end" t-esc="bucket.count"/>
+                                    <td class="text-end" t-esc="bucket.amount_display"/>
+                                </tr>
+                            </t>
+                            <tr class="o_neon_finance_ar_total_row">
+                                <td><strong>Total</strong></td>
+                                <td class="text-end">
+                                    <strong t-esc="financeBlock.ar_aging.total_count"/>
+                                </td>
+                                <td class="text-end">
+                                    <strong t-esc="financeBlock.ar_aging.total_amount_display"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <small t-if="financeBlock.ar_aging.zig_excluded_count"
+                           class="text-muted o_neon_finance_ar_excluded"
+                           t-esc="financeBlock.ar_aging.zig_excluded_message"/>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_alerts">
+        <div class="o_neon_block o_neon_block_alerts widget--block_alerts">
+            <div class="o_neon_block_header">
+                <h3>Alerts</h3>
+                <span class="o_neon_alerts_total" t-if="!alertsBlock.empty">
+                    <t t-esc="alertsBlock.total_count"/> active
+                </span>
+            </div>
+            <div class="o_neon_block_body">
+                <div t-if="alertsBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg">
+                        <t t-esc="alertsBlock.empty_message"/> &#10003;
+                    </p>
+                </div>
+                <div t-if="!alertsBlock.empty" class="o_neon_alerts_inner">
+                    <div class="o_neon_alerts_severity_row">
+                        <span class="o_neon_alerts_pill o_neon_alerts_pill_critical"
+                              t-if="alertsBlock.severity_counts.critical">
+                            <t t-esc="alertsBlock.severity_counts.critical"/> critical
+                        </span>
+                        <span class="o_neon_alerts_pill o_neon_alerts_pill_warning"
+                              t-if="alertsBlock.severity_counts.warning">
+                            <t t-esc="alertsBlock.severity_counts.warning"/> warning
+                        </span>
+                        <span class="o_neon_alerts_pill o_neon_alerts_pill_info"
+                              t-if="alertsBlock.severity_counts.info">
+                            <t t-esc="alertsBlock.severity_counts.info"/> info
+                        </span>
+                    </div>
+                    <ul class="o_neon_alerts_list">
+                        <t t-foreach="alertsBlock.alerts" t-as="alert"
+                           t-key="alert.fingerprint">
+                            <li class="o_neon_alerts_row"
+                                t-att-class="'o_neon_alerts_row_' + alert.severity">
+                                <span class="o_neon_alerts_dot"
+                                      t-att-class="'o_neon_alerts_dot_' + alert.severity"/>
+                                <div class="o_neon_alerts_body"
+                                     t-on-click="() => this.onAlertClick(alert)">
+                                    <div class="o_neon_alerts_title" t-esc="alert.title"/>
+                                    <small class="o_neon_alerts_subtitle"
+                                           t-esc="alert.subtitle"/>
+                                </div>
+                                <button class="btn btn-sm btn-link o_neon_alerts_ack"
+                                        t-if="alert.can_acknowledge"
+                                        t-on-click="() => this.onAlertAck(alert)">
+                                    Ack
+                                </button>
+                            </li>
+                        </t>
+                    </ul>
+                    <div t-if="alertsBlock.has_more" class="o_neon_alerts_more">
+                        <small class="text-muted">+ more alerts not shown</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_crew_equipment">
+        <div class="o_neon_block o_neon_block_crew_equipment widget--block_crew_equipment">
+            <div class="o_neon_block_header">
+                <h3>Crew &amp; Equipment</h3>
+            </div>
+            <div class="o_neon_block_body">
+                <div class="o_neon_crew_subwidget">
+                    <div t-if="crewEquipment.crew.empty" class="o_neon_block_empty">
+                        <p class="o_neon_block_empty_msg"
+                           t-esc="crewEquipment.crew.empty_message"/>
+                        <button class="btn btn-link"
+                                t-if="crewEquipment.crew.empty_cta_action"
+                                t-on-click="() => this.onCrewEmptyClick()">
+                            <t t-esc="crewEquipment.crew.empty_cta_label"/>
+                        </button>
+                    </div>
+                    <table t-if="!crewEquipment.crew.empty" class="o_neon_crew_table">
+                        <thead>
+                            <tr><th>Crew</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="crewEquipment.crew.rows"
+                               t-as="crewRow" t-key="crewRow.user_id">
+                                <tr class="o_neon_crew_row"
+                                    t-att-class="crewRow.deeplink_event_job_id ? 'o_neon_crew_row_clickable' : ''"
+                                    t-on-click="() => this.onCrewRowClick(crewRow)">
+                                    <td>
+                                        <div class="o_neon_crew_name" t-esc="crewRow.name"/>
+                                        <small class="text-muted" t-esc="crewRow.role_label"/>
+                                    </td>
+                                    <td>
+                                        <span class="o_neon_crew_status"
+                                              t-att-class="'o_neon_crew_status_' + crewRow.status"
+                                              t-esc="crewRow.booking_label"/>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                    <div t-if="crewEquipment.crew.gaps and crewEquipment.crew.gaps.length"
+                         class="o_neon_crew_gaps">
+                        <h4>Gaps</h4>
+                        <t t-foreach="crewEquipment.crew.gaps"
+                           t-as="gap" t-key="gap.event_job_id">
+                            <div class="o_neon_crew_gap_row"
+                                 t-on-click="() => this.onCrewGapClick(gap)">
+                                <span class="o_neon_crew_gap_badge">
+                                    Gap - <t t-esc="gap.gap_count"/> needed
+                                </span>
+                                <span class="o_neon_crew_gap_event">
+                                    <t t-esc="gap.event_name"/>
+                                    <small class="text-muted">
+                                        <t t-esc="gap.event_date"/>
+                                    </small>
+                                </span>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+                <div class="o_neon_equipment_subwidget">
+                    <div t-if="crewEquipment.equipment.empty" class="o_neon_block_empty">
+                        <p class="o_neon_block_empty_msg"
+                           t-esc="crewEquipment.equipment.empty_message"/>
+                        <button class="btn btn-link"
+                                t-if="crewEquipment.equipment.empty_cta_action"
+                                t-on-click="() => this.onEquipmentEmptyClick()">
+                            <t t-esc="crewEquipment.equipment.empty_cta_label"/>
+                        </button>
+                    </div>
+                    <div t-if="!crewEquipment.equipment.empty"
+                         class="o_neon_equipment_line">
+                        <h4>Equipment</h4>
+                        <t t-foreach="crewEquipment.equipment.categories"
+                           t-as="cat" t-key="cat.category_id || 'uncategorised'">
+                            <span class="o_neon_equipment_cat"
+                                  t-on-click="() => this.onEquipmentCatClick(cat)">
+                                <span class="o_neon_equipment_cat_name"
+                                      t-esc="cat.category_name"/>:
+                                <span class="o_neon_equipment_cat_count"
+                                      t-esc="cat.display"/>
+                            </span>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_tasks">
+        <div class="o_neon_block o_neon_block_tasks widget--block_tasks">
+            <div class="o_neon_block_header">
+                <h3>Tasks</h3>
+                <span class="o_neon_tasks_counts" t-if="!tasksBlock.empty">
+                    <span t-if="tasksBlock.overdue_count"
+                          class="o_neon_tasks_count_overdue">
+                        <t t-esc="tasksBlock.overdue_count"/> overdue
+                    </span>
+                    <span t-if="tasksBlock.today_count"
+                          class="o_neon_tasks_count_today">
+                        <t t-if="tasksBlock.overdue_count"> &#183; </t>
+                        <t t-esc="tasksBlock.today_count"/> today
+                    </span>
+                    <span t-if="tasksBlock.upcoming_count"
+                          class="o_neon_tasks_count_upcoming">
+                        <t t-if="tasksBlock.overdue_count or tasksBlock.today_count"> &#183; </t>
+                        <t t-esc="tasksBlock.upcoming_count"/> upcoming
+                    </span>
+                </span>
+            </div>
+            <div class="o_neon_block_body">
+                <div t-if="tasksBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg">
+                        <t t-esc="tasksBlock.empty_message"/> &#10003;
+                    </p>
+                </div>
+                <ul t-if="!tasksBlock.empty" class="o_neon_tasks_list">
+                    <t t-foreach="tasksBlock.tasks" t-as="task" t-key="task.id">
+                        <li class="o_neon_tasks_row"
+                            t-att-class="'o_neon_tasks_row_' + task.urgency">
+                            <i class="fa o_neon_tasks_icon"
+                               t-att-class="'fa ' + task.activity_icon"/>
+                            <div class="o_neon_tasks_body"
+                                 t-on-click="() => this.onTaskClick(task)">
+                                <div class="o_neon_tasks_summary" t-esc="task.summary"/>
+                                <small class="o_neon_tasks_source"
+                                       t-if="task.source_label"
+                                       t-esc="task.source_label"/>
+                            </div>
+                            <span class="o_neon_tasks_deadline"
+                                  t-att-class="'o_neon_tasks_deadline_' + task.urgency"
+                                  t-esc="task.deadline_display"/>
+                            <button class="btn btn-sm btn-link o_neon_tasks_done"
+                                    t-on-click="() => this.onTaskDone(task)">
+                                Done
+                            </button>
+                        </li>
+                    </t>
+                </ul>
+                <div t-if="!tasksBlock.empty and tasksBlock.has_more"
+                     class="o_neon_tasks_more">
+                    <small class="text-muted">
+                        View all (<t t-esc="tasksBlock.total_count"/>)
+                    </small>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_ai_insights">
+        <div class="o_neon_block o_neon_block_ai widget--block_ai_insights">
+            <div class="o_neon_block_header">
+                <h3>AI Insights</h3>
+                <span class="o_neon_ai_subtitle text-muted" t-if="aiInsights.id">
+                    <t t-if="aiInsights.is_fallback">
+                        AI provider unavailable. Rule-based fallback.
+                    </t>
+                    <t t-else="">
+                        Updated <t t-esc="aiInsights.age_display or 'just now'"/>
+                    </t>
+                </span>
+                <button t-if="canRefreshAi"
+                        class="btn btn-sm btn-link o_neon_ai_refresh"
+                        t-on-click="onAiRefresh"
+                        t-att-disabled="state.aiRefreshing"
+                        title="Refresh AI Insights">
+                    <i class="fa"
+                       t-att-class="state.aiRefreshing ? 'fa-spinner fa-spin' : 'fa-refresh'"/>
+                </button>
+            </div>
+            <div class="o_neon_block_body">
+                <div t-if="aiInsights.empty" class="o_neon_ai_empty text-muted">
+                    <p t-esc="aiInsights.empty_message"/>
+                </div>
+                <ul t-if="!aiInsights.empty and aiInsights.insights and aiInsights.insights.length"
+                    class="o_neon_ai_list">
+                    <li t-foreach="aiInsights.insights" t-as="ins" t-key="ins_index"
+                        class="o_neon_ai_item"
+                        t-att-class="'o_neon_ai_priority_' + (ins.priority or 9)"
+                        t-on-click="() => this.onAiInsightClick(ins)">
+                        <div class="o_neon_ai_title">
+                            <span class="o_neon_ai_priority_badge"
+                                  t-esc="ins.priority or '-'"/>
+                            <span t-esc="ins.title"/>
+                        </div>
+                        <p class="o_neon_ai_detail text-muted" t-esc="ins.detail"/>
+                    </li>
+                </ul>
+                <div t-if="!aiInsights.empty and !(aiInsights.insights and aiInsights.insights.length)"
+                     class="o_neon_ai_all_clear text-muted">
+                    <p>All clear — nothing flagged this cycle.</p>
+                </div>
+                <div t-if="aiInsights.error_message and !aiInsights.is_fallback"
+                     class="o_neon_ai_error text-danger small">
+                    <i class="fa fa-exclamation-circle me-1"/>
+                    <t t-esc="aiInsights.error_message"/>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_hot_deals">
+        <div class="o_neon_block o_neon_block_hot_deals widget--block_hot_deals">
+            <div class="o_neon_block_header"><h3>Hot Deals Watch</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="hotDealsBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="hotDealsBlock.empty_message"/>
+                </div>
+                <table t-if="!hotDealsBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Client</th><th>Quote</th><th>Stage</th>
+                            <th class="text-end">Value</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="hotDealsBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row"
+                                t-on-click="() => this.onQuoteRowClick(row)">
+                                <td t-esc="row.client_name"/>
+                                <td t-esc="row.quote_name"/>
+                                <td t-esc="row.stage_label"/>
+                                <td class="text-end" t-esc="row.value_display"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_aging_quotes">
+        <div class="o_neon_block o_neon_block_aging_quotes widget--block_aging_quotes">
+            <div class="o_neon_block_header"><h3>Aging Quotes</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="agingQuotesBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="agingQuotesBlock.empty_message"/>
+                </div>
+                <table t-if="!agingQuotesBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Client</th><th>Quote</th>
+                            <th class="text-end">Age</th>
+                            <th class="text-end">Value</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="agingQuotesBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row"
+                                t-on-click="() => this.onQuoteRowClick(row)">
+                                <td t-esc="row.client_name"/>
+                                <td t-esc="row.quote_name"/>
+                                <td class="text-end" t-esc="row.age_label"/>
+                                <td class="text-end" t-esc="row.value_display"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_budget_alerts">
+        <div class="o_neon_block o_neon_block_budget_alerts widget--block_budget_alerts">
+            <div class="o_neon_block_header"><h3>Budget Alerts</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="budgetAlertsBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg"
+                       t-esc="budgetAlertsBlock.empty_message"/>
+                </div>
+                <div t-if="!budgetAlertsBlock.empty" class="o_neon_budget_summary">
+                    <span class="o_neon_budget_pill o_neon_budget_ok">
+                        <t t-esc="budgetAlertsBlock.ok"/> OK
+                    </span>
+                    <span class="o_neon_budget_pill o_neon_budget_warn">
+                        <t t-esc="budgetAlertsBlock.warn"/> Warn
+                    </span>
+                    <span class="o_neon_budget_pill o_neon_budget_breach">
+                        <t t-esc="budgetAlertsBlock.breach"/> Breach
+                    </span>
+                    <span class="o_neon_budget_pill o_neon_budget_severe">
+                        <t t-esc="budgetAlertsBlock.severe"/> Severe
+                    </span>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_invoice_queue">
+        <div class="o_neon_block o_neon_block_invoice_queue widget--block_invoice_queue">
+            <div class="o_neon_block_header"><h3>Invoice Queue</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="invoiceQueueBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg"
+                       t-esc="invoiceQueueBlock.empty_message"/>
+                </div>
+                <table t-if="!invoiceQueueBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Invoice</th><th>Client</th><th>Date</th>
+                            <th class="text-end">Amount</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="invoiceQueueBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row"
+                                t-on-click="() => this.onInvoiceRowClick(row)">
+                                <td t-esc="row.name"/>
+                                <td t-esc="row.client_name"/>
+                                <td t-esc="row.date_display"/>
+                                <td class="text-end" t-esc="row.amount_display"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_zig_costs">
+        <div class="o_neon_block o_neon_block_zig_costs widget--block_zig_costs">
+            <div class="o_neon_block_header"><h3>ZiG Rate · Recent Costs</h3></div>
+            <div class="o_neon_block_body">
+                <div class="o_neon_zig_rate_line">
+                    <span class="o_neon_zig_rate_label">ZiG-USD rate:</span>
+                    <span class="o_neon_zig_rate_value"
+                          t-esc="zigCostsBlock.rate_display"/>
+                    <small class="text-muted ms-2" t-if="zigCostsBlock.rate_as_of">
+                        updated <t t-esc="zigCostsBlock.rate_as_of"/>
+                    </small>
+                </div>
+                <div t-if="zigCostsBlock.costs_empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg">No recent costs over $500</p>
+                </div>
+                <table t-if="!zigCostsBlock.costs_empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Cost</th><th>Date</th>
+                            <th class="text-end">Amount</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="zigCostsBlock.costs" t-as="cost" t-key="cost.id">
+                            <tr>
+                                <td t-esc="cost.label"/>
+                                <td t-esc="cost.date_display"/>
+                                <td class="text-end" t-esc="cost.amount_display"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_crew_gaps">
+        <div class="o_neon_block o_neon_block_crew_gaps widget--block_crew_gaps">
+            <div class="o_neon_block_header"><h3>Crew Gaps Watch</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="crewGapsBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="crewGapsBlock.empty_message"/>
+                </div>
+                <table t-if="!crewGapsBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Event</th><th>When</th>
+                            <th class="text-end">Crew</th>
+                            <th class="text-end">Gap</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="crewGapsBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row"
+                                t-on-click="() => this.onCrewGapsRowClick(row)">
+                                <td>
+                                    <div t-esc="row.event_name"/>
+                                    <small class="text-muted" t-esc="row.client_name"/>
+                                </td>
+                                <td t-esc="row.event_date_label"/>
+                                <td class="text-end">
+                                    <t t-esc="row.crew_confirmed"/>/<t t-esc="row.crew_required"/>
+                                </td>
+                                <td class="text-end">
+                                    <span class="o_neon_crew_gap_badge"
+                                          t-esc="'-' + row.gap_count"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_cert_expiry">
+        <div class="o_neon_block o_neon_block_cert_expiry widget--block_cert_expiry">
+            <div class="o_neon_block_header"><h3>Cert Expiry Watch</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="certExpiryBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="certExpiryBlock.empty_message"/>
+                </div>
+                <table t-if="!certExpiryBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Technician</th><th>Certification</th>
+                            <th class="text-end">Expires in</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="certExpiryBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row"
+                                t-att-class="row.critical ? 'o_neon_variant_row_critical' : ''"
+                                t-on-click="() => this.onCertRowClick(row)">
+                                <td t-esc="row.tech_name"/>
+                                <td t-esc="row.cert_type"/>
+                                <td class="text-end" t-esc="row.days_label"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <!-- ==================================================================== -->
+
     <t t-name="neon_dashboard.NeonDashboard">
         <div class="o_neon_dashboard"
-             t-att-class="'o_neon_dashboard__filter_' + state.activeFilter">
+             t-att-class="'o_neon_dashboard__filter_' + state.activeFilter + (state.editMode ? ' o_neon_dashboard_editing' : '')">
 
-            <!-- =====================================================
-                 Header row - brand block on the left, user-line
-                 + View-as dropdown + Edit Layout pencil on the right.
-                 ===================================================== -->
+            <!-- ===================================================== Header -->
             <div class="o_neon_dashboard_header">
                 <div class="o_neon_dashboard_brand">
                     <h1>
@@ -33,49 +758,77 @@
                         </small>
                     </div>
                     <div class="o_neon_dashboard_controls">
-                        <select t-if="isSuperuser"
-                                class="o_neon_dashboard_viewas"
-                                t-on-change="onViewAsChange">
-                            <option value="" disabled="disabled">
-                                View as...
-                            </option>
-                            <t t-foreach="availableTypes"
-                               t-as="opt" t-key="opt.value">
-                                <option t-att-value="opt.value"
-                                        t-att-selected="state.data and state.data.dashboard_type === opt.value">
-                                    <t t-esc="opt.label"/>
+                        <!-- Normal controls: hidden while editing. -->
+                        <t t-if="!state.editMode">
+                            <select t-if="isSuperuser"
+                                    class="o_neon_dashboard_viewas"
+                                    t-on-change="onViewAsChange">
+                                <option value="" disabled="disabled">
+                                    View as...
                                 </option>
-                            </t>
-                        </select>
-                        <button class="btn btn-sm btn-link o_neon_dashboard_edit_layout"
-                                t-on-click="onEditLayoutClick"
-                                title="Edit Layout">
-                            <i class="fa fa-pencil"/>
-                            <span class="d-none d-md-inline ms-1">EDIT LAYOUT</span>
-                        </button>
-                        <!-- M10: export buttons (PDF + Excel). -->
-                        <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_pdf"
-                                t-on-click="onExportPdf"
-                                t-att-disabled="state.exporting or state.loading"
-                                title="Download PDF snapshot">
-                            <i class="fa"
-                               t-att-class="state.exporting === 'pdf' ? 'fa-spinner fa-spin' : 'fa-file-pdf-o'"/>
-                            <span class="d-none d-md-inline ms-1">PDF</span>
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_xlsx"
-                                t-on-click="onExportXlsx"
-                                t-att-disabled="state.exporting or state.loading"
-                                title="Download Excel snapshot">
-                            <i class="fa"
-                               t-att-class="state.exporting === 'xlsx' ? 'fa-spinner fa-spin' : 'fa-file-excel-o'"/>
-                            <span class="d-none d-md-inline ms-1">Excel</span>
-                        </button>
-                        <button class="btn btn-sm btn-outline-primary o_neon_dashboard_refresh"
-                                t-on-click="onRefreshClick"
-                                t-att-disabled="state.loading">
-                            <i class="fa"
-                               t-att-class="state.loading ? 'fa-refresh fa-spin' : 'fa-refresh'"/>
-                        </button>
+                                <t t-foreach="availableTypes"
+                                   t-as="opt" t-key="opt.value">
+                                    <option t-att-value="opt.value"
+                                            t-att-selected="state.data and state.data.dashboard_type === opt.value">
+                                        <t t-esc="opt.label"/>
+                                    </option>
+                                </t>
+                            </select>
+                            <button class="btn btn-sm btn-link o_neon_dashboard_edit_layout"
+                                    t-on-click="onEditLayoutClick"
+                                    title="Edit Layout">
+                                <i class="fa fa-pencil"/>
+                                <span class="d-none d-md-inline ms-1">EDIT LAYOUT</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_pdf"
+                                    t-on-click="onExportPdf"
+                                    t-att-disabled="state.exporting or state.loading"
+                                    title="Download PDF snapshot">
+                                <i class="fa"
+                                   t-att-class="state.exporting === 'pdf' ? 'fa-spinner fa-spin' : 'fa-file-pdf-o'"/>
+                                <span class="d-none d-md-inline ms-1">PDF</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary o_neon_dashboard_export_xlsx"
+                                    t-on-click="onExportXlsx"
+                                    t-att-disabled="state.exporting or state.loading"
+                                    title="Download Excel snapshot">
+                                <i class="fa"
+                                   t-att-class="state.exporting === 'xlsx' ? 'fa-spinner fa-spin' : 'fa-file-excel-o'"/>
+                                <span class="d-none d-md-inline ms-1">Excel</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary o_neon_dashboard_refresh"
+                                    t-on-click="onRefreshClick"
+                                    t-att-disabled="state.loading">
+                                <i class="fa"
+                                   t-att-class="state.loading ? 'fa-refresh fa-spin' : 'fa-refresh'"/>
+                            </button>
+                        </t>
+                        <!-- Edit-mode action bar. -->
+                        <t t-else="">
+                            <button class="btn btn-sm btn-primary o_neon_edit_save"
+                                    t-on-click="onLayoutSave">
+                                <i class="fa fa-check me-1"/>
+                                <span class="d-none d-md-inline">Save</span>
+                            </button>
+                            <button class="btn btn-sm btn-secondary o_neon_edit_cancel"
+                                    t-on-click="onLayoutCancel">
+                                <i class="fa fa-times me-1"/>
+                                <span class="d-none d-md-inline">Cancel</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger o_neon_edit_reset"
+                                    t-on-click="onLayoutReset"
+                                    title="Reset to defaults">
+                                <i class="fa fa-undo me-1"/>
+                                <span class="d-none d-md-inline">Reset</span>
+                            </button>
+                            <button t-if="canApplyToAll"
+                                    class="btn btn-sm btn-outline-primary o_neon_edit_apply_all"
+                                    t-on-click="onLayoutApplyAll"
+                                    title="Apply this layout to all my dashboards">
+                                <i class="fa fa-clone me-1"/>
+                                <span class="d-none d-md-inline">Apply to all my variants</span>
+                            </button>
+                        </t>
                     </div>
                 </div>
             </div>
@@ -101,18 +854,12 @@
                 </div>
             </div>
 
-            <!-- ===================================================== -->
-            <!-- Rendered content (after first successful load).      -->
-            <!-- ===================================================== -->
+            <!-- ===================================================== Content -->
             <div t-if="state.data" class="o_neon_dashboard_content">
 
-                <!-- =================================================
-                     KPI strip - 7 tiles, grid-template-columns 7.
-                     ================================================= -->
+                <!-- KPI strip - always shown (KPIs are not personalisable). -->
                 <section class="o_neon_kpi_strip">
 
-                    <!-- Cash on Hand (mandatory; always visible per
-                         schema sketch §4.2). -->
                     <div class="o_neon_kpi_tile o_neon_kpi_tile_big widget--kpi_cash"
                          t-if="isWidgetVisible('kpi_cash')"
                          t-att-class="kpi.kpi_cash and kpi.kpi_cash.deeplink_action ? 'o_neon_kpi_clickable' : ''"
@@ -125,7 +872,6 @@
                              t-esc="kpi.kpi_cash and kpi.kpi_cash.subtitle"/>
                     </div>
 
-                    <!-- AR Overdue (mandatory) -->
                     <div class="o_neon_kpi_tile widget--kpi_ar_overdue"
                          t-if="isWidgetVisible('kpi_ar_overdue')"
                          t-att-class="kpi.kpi_ar_overdue and kpi.kpi_ar_overdue.deeplink_action ? 'o_neon_kpi_clickable' : ''"
@@ -197,9 +943,6 @@
                              t-esc="kpi.kpi_forecast and kpi.kpi_forecast.subtitle"/>
                     </div>
 
-                    <!-- ============================================
-                         P8B.M1 Sales variant KPI tiles.
-                         ============================================ -->
                     <div class="o_neon_kpi_tile widget--kpi_hot_deals"
                          t-if="isWidgetVisible('kpi_hot_deals')"
                          t-att-class="kpi.kpi_hot_deals and kpi.kpi_hot_deals.deeplink_action ? 'o_neon_kpi_clickable' : ''"
@@ -248,9 +991,6 @@
                              t-esc="kpi.kpi_win_rate and kpi.kpi_win_rate.subtitle"/>
                     </div>
 
-                    <!-- ============================================
-                         P8B.M2 Bookkeeper variant KPI tiles.
-                         ============================================ -->
                     <div class="o_neon_kpi_tile widget--kpi_overdue_60"
                          t-if="isWidgetVisible('kpi_overdue_60')"
                          t-att-class="kpi.kpi_overdue_60 and kpi.kpi_overdue_60.deeplink_action ? 'o_neon_kpi_clickable' : ''"
@@ -299,9 +1039,6 @@
                              t-esc="kpi.kpi_recent_costs and kpi.kpi_recent_costs.subtitle"/>
                     </div>
 
-                    <!-- ============================================
-                         P8B.M3 Lead Tech variant KPI tiles.
-                         ============================================ -->
                     <div class="o_neon_kpi_tile widget--kpi_crew_gaps"
                          t-if="isWidgetVisible('kpi_crew_gaps')"
                          t-att-class="kpi.kpi_crew_gaps and kpi.kpi_crew_gaps.deeplink_action ? 'o_neon_kpi_clickable' : ''"
@@ -327,10 +1064,8 @@
                     </div>
                 </section>
 
-                <!-- =================================================
-                     View filter chip row.
-                     ================================================= -->
-                <section class="o_neon_filter_chips">
+                <!-- Filter chips - hidden during edit mode (D4). -->
+                <section class="o_neon_filter_chips" t-if="!state.editMode">
                     <t t-foreach="filters" t-as="f" t-key="f.key">
                         <button class="o_neon_filter_chip"
                                 t-att-class="state.activeFilter === f.key ? 'o_neon_filter_chip_active' : ''"
@@ -340,815 +1075,92 @@
                     </t>
                 </section>
 
-                <!-- =================================================
-                     Row A - Jobs block (M3) + Sales placeholder.
-                     ================================================= -->
-                <section class="o_neon_row_a">
-
-                    <div class="o_neon_block o_neon_block_jobs widget--block_jobs"
-                         t-if="isWidgetVisible('block_jobs')">
-                        <div class="o_neon_block_header">
-                            <h3>Jobs &#183; Today + This Week</h3>
-                        </div>
-
-                        <div class="o_neon_block_body">
-                            <div t-if="jobsBlock.empty"
-                                 class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg"
-                                   t-esc="jobsBlock.empty_message"/>
-                                <button class="btn btn-link"
-                                        t-on-click="onEmptyJobsClick"
-                                        t-if="jobsBlock.empty_cta_action">
-                                    <t t-esc="jobsBlock.empty_cta_label"/>
-                                </button>
-                            </div>
-
-                            <table t-if="!jobsBlock.empty"
-                                   class="o_neon_jobs_table">
-                                <thead>
-                                    <tr>
-                                        <th>Client</th>
-                                        <th>Event</th>
-                                        <th>When</th>
-                                        <th>State</th>
-                                        <th class="text-end">Crew</th>
-                                        <th>Venue</th>
-                                        <th class="text-end">Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="jobsBlock.rows"
-                                       t-as="row" t-key="row.id">
-                                        <tr class="o_neon_jobs_row"
-                                            t-on-click="() => this.onJobClick(row)">
-                                            <td t-esc="row.client_name"/>
-                                            <td t-esc="row.event_name"/>
-                                            <td>
-                                                <div t-esc="row.event_label"/>
-                                                <small class="text-muted"
-                                                       t-esc="row.days_label"/>
-                                            </td>
-                                            <td>
-                                                <span class="o_neon_jobs_badge"
-                                                      t-att-class="'o_neon_jobs_badge_' + row.state_color"
-                                                      t-esc="row.state_label"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <span t-esc="row.crew_confirmed"/>
-                                                /
-                                                <span t-esc="row.crew_required"/>
-                                                <span t-if="row.crew_gap > 0"
-                                                      class="o_neon_jobs_gap"
-                                                      t-esc="' (-' + row.crew_gap + ')'"/>
-                                            </td>
-                                            <td t-esc="row.venue"/>
-                                            <td class="text-end"
-                                                t-esc="row.value_display"/>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- M5 - Sales block -->
-                    <div t-if="isWidgetVisible('block_sales')"
-                         class="o_neon_block o_neon_block_sales widget--block_sales">
-                        <div class="o_neon_block_header">
-                            <h3>Sales Pipeline</h3>
-                        </div>
-                        <div class="o_neon_block_body">
-
-                            <!-- Pipeline by stage -->
-                            <div class="o_neon_sales_subwidget">
-                                <h4>Pipeline by stage</h4>
-                                <div t-if="salesBlock.pipeline_by_stage.empty"
-                                     class="o_neon_block_empty">
-                                    <p class="o_neon_block_empty_msg"
-                                       t-esc="salesBlock.pipeline_by_stage.empty_message"/>
-                                </div>
-                                <table t-if="!salesBlock.pipeline_by_stage.empty"
-                                       class="o_neon_sales_table">
-                                    <thead>
-                                        <tr>
-                                            <th>Stage</th>
-                                            <th class="text-end">Count</th>
-                                            <th class="text-end">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <t t-foreach="salesBlock.pipeline_by_stage.stages"
-                                           t-as="stage" t-key="stage.state">
-                                            <tr class="o_neon_sales_row"
-                                                t-on-click="() => this.onPipelineStageClick(stage)">
-                                                <td t-esc="stage.label"/>
-                                                <td class="text-end"
-                                                    t-esc="stage.count"/>
-                                                <td class="text-end"
-                                                    t-esc="stage.value_display"/>
-                                            </tr>
-                                        </t>
-                                    </tbody>
-                                </table>
-                                <small class="text-muted o_neon_sales_currency_note"
-                                       t-esc="salesBlock.pipeline_by_stage.currency_note"/>
-                            </div>
-
-                            <!-- Win rate + lead sources two-up row -->
-                            <div class="o_neon_sales_subrow">
-
-                                <div class="o_neon_sales_subwidget">
-                                    <h4>Win rate</h4>
-                                    <div t-if="salesBlock.win_rate.empty"
-                                         class="text-muted small"
-                                         t-esc="salesBlock.win_rate.empty_message"/>
-                                    <div t-if="!salesBlock.win_rate.empty"
-                                         class="o_neon_sales_win_rate">
-                                        <div class="o_neon_sales_win_rate_value">
-                                            <t t-esc="salesBlock.win_rate.rate_pct"/>%
-                                        </div>
-                                        <small class="text-muted">
-                                            <t t-esc="salesBlock.win_rate.won_count"/>W /
-                                            <t t-esc="salesBlock.win_rate.lost_count"/>L
-                                            &#183;
-                                            <t t-esc="salesBlock.win_rate.window_label"/>
-                                        </small>
-                                    </div>
-                                </div>
-
-                                <div class="o_neon_sales_subwidget">
-                                    <h4>Lead sources</h4>
-                                    <div t-if="salesBlock.lead_sources.empty"
-                                         class="text-muted small"
-                                         t-esc="salesBlock.lead_sources.empty_message"/>
-                                    <table t-if="!salesBlock.lead_sources.empty"
-                                           class="o_neon_sales_lead_table">
-                                        <tbody>
-                                            <t t-foreach="salesBlock.lead_sources.sources"
-                                               t-as="src" t-key="src.source">
-                                                <tr>
-                                                    <td t-esc="src.source"/>
-                                                    <td class="text-end">
-                                                        <t t-esc="src.count"/>
-                                                        <small class="text-muted ms-1">
-                                                            (<t t-esc="src.pct"/>%)
-                                                        </small>
-                                                    </td>
-                                                </tr>
-                                            </t>
-                                        </tbody>
-                                    </table>
-                                    <small t-if="!salesBlock.lead_sources.empty"
-                                           class="text-muted"
-                                           t-esc="salesBlock.lead_sources.window_label"/>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- =================================================
-                     Row B - Finance + Alerts + Crew/Equipment.
-                     M4 / M6 / M7 placeholders.
-                     ================================================= -->
-                <section class="o_neon_row_b">
-                    <div t-if="isWidgetVisible('block_finance')"
-                         class="o_neon_block o_neon_block_finance widget--block_finance">
-                        <div class="o_neon_block_header">
-                            <h3>Finance &#183; AR &amp; Cash</h3>
-                            <button class="btn btn-sm btn-link o_neon_finance_manage_rate"
-                                    t-if="isSuperuser"
-                                    t-on-click="onManageRateClick">
-                                <i class="fa fa-pencil me-1"/>
-                                Manage ZiG rate
-                            </button>
-                        </div>
-                        <div class="o_neon_block_body">
-
-                            <!-- Cash detail card -->
-                            <div class="o_neon_finance_cash_card">
-                                <div t-if="financeBlock.cash.empty"
-                                     class="o_neon_block_empty">
-                                    <p class="o_neon_block_empty_msg">
-                                        No bank/cash journals configured yet
-                                    </p>
-                                </div>
-                                <div t-if="!financeBlock.cash.empty"
-                                     class="o_neon_finance_cash_inner">
-                                    <h4>Cash on Hand</h4>
-                                    <table class="o_neon_finance_cash_table">
-                                        <tr>
-                                            <td>USD journals</td>
-                                            <td class="text-end"
-                                                t-esc="formatUsd(financeBlock.cash.usd_total)"/>
-                                        </tr>
-                                        <tr>
-                                            <td>ZiG journals</td>
-                                            <td class="text-end">
-                                                <t t-esc="formatZwg(financeBlock.cash.zig_total)"/>
-                                                <small class="text-muted ms-2"
-                                                       t-if="financeBlock.cash.rate">
-                                                    @ <t t-esc="financeBlock.cash.rate.toFixed(2)"/>
-                                                </small>
-                                            </td>
-                                        </tr>
-                                        <tr t-if="financeBlock.cash.rate"
-                                            class="o_neon_finance_cash_zig_usd_row">
-                                            <td>
-                                                <small class="text-muted">ZiG in USD-equiv</small>
-                                            </td>
-                                            <td class="text-end">
-                                                <small class="text-muted"
-                                                       t-esc="formatUsd(financeBlock.cash.zig_in_usd)"/>
-                                            </td>
-                                        </tr>
-                                        <tr class="o_neon_finance_cash_total_row">
-                                            <td><strong>Total (USD-equiv)</strong></td>
-                                            <td class="text-end">
-                                                <strong t-esc="formatUsd(financeBlock.cash.usd_total + financeBlock.cash.zig_in_usd)"/>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                    <small class="text-muted o_neon_finance_rate_meta">
-                                        Rate source:
-                                        <t t-esc="financeBlock.cash.rate_source"/>
-                                        <t t-if="financeBlock.cash.rate_as_of">
-                                            &#183; updated
-                                            <t t-esc="financeBlock.cash.rate_as_of"/>
-                                        </t>
-                                    </small>
-                                </div>
-                            </div>
-
-                            <!-- AR Aging table -->
-                            <div class="o_neon_finance_ar_card">
-                                <h4>AR Aging</h4>
-                                <div t-if="financeBlock.ar_aging.empty"
-                                     class="o_neon_block_empty">
-                                    <p class="o_neon_block_empty_msg"
-                                       t-esc="financeBlock.ar_aging.empty_message"/>
-                                </div>
-                                <table t-if="!financeBlock.ar_aging.empty"
-                                       class="o_neon_finance_ar_table">
-                                    <thead>
-                                        <tr>
-                                            <th>Bucket</th>
-                                            <th class="text-end">#</th>
-                                            <th class="text-end">USD-equiv</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <t t-foreach="financeBlock.ar_aging.buckets"
-                                           t-as="bucket" t-key="bucket.key">
-                                            <tr class="o_neon_finance_ar_row"
-                                                t-att-class="bucket.critical ? 'o_neon_finance_ar_row_critical' : ''"
-                                                t-on-click="() => this.onAgingBucketClick(bucket)">
-                                                <td t-esc="bucket.label"/>
-                                                <td class="text-end" t-esc="bucket.count"/>
-                                                <td class="text-end" t-esc="bucket.amount_display"/>
-                                            </tr>
-                                        </t>
-                                        <tr class="o_neon_finance_ar_total_row">
-                                            <td><strong>Total</strong></td>
-                                            <td class="text-end">
-                                                <strong t-esc="financeBlock.ar_aging.total_count"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <strong t-esc="financeBlock.ar_aging.total_amount_display"/>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <small t-if="financeBlock.ar_aging.zig_excluded_count"
-                                       class="text-muted o_neon_finance_ar_excluded"
-                                       t-esc="financeBlock.ar_aging.zig_excluded_message"/>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div t-if="isWidgetVisible('block_alerts')"
-                         class="o_neon_block o_neon_block_alerts widget--block_alerts">
-                        <div class="o_neon_block_header">
-                            <h3>Alerts</h3>
-                            <span class="o_neon_alerts_total"
-                                  t-if="!alertsBlock.empty">
-                                <t t-esc="alertsBlock.total_count"/> active
-                            </span>
-                        </div>
-                        <div class="o_neon_block_body">
-                            <div t-if="alertsBlock.empty"
-                                 class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg">
-                                    <t t-esc="alertsBlock.empty_message"/> &#10003;
-                                </p>
-                            </div>
-
-                            <div t-if="!alertsBlock.empty"
-                                 class="o_neon_alerts_inner">
-                                <div class="o_neon_alerts_severity_row">
-                                    <span class="o_neon_alerts_pill o_neon_alerts_pill_critical"
-                                          t-if="alertsBlock.severity_counts.critical">
-                                        <t t-esc="alertsBlock.severity_counts.critical"/> critical
+                <!-- ============================================ Block area -->
+                <!-- D3 hybrid: rich 4-section layout for non-customised view;
+                     unified single-container grid for customised view AND
+                     while editing (so useSortable has one container).
+                     DECISION (M8B.4.1): edit mode always renders the unified
+                     grid even for not-yet-customised users, because a single
+                     container is required for cross-block drag; the literal
+                     "keep 4 sections during edit" in the prompt cannot support
+                     cross-section drag. First Save persists is_customized=True
+                     so the view stays unified; Cancel reverts to rich. -->
+                <t t-if="!useUnified">
+                    <section class="o_neon_row_a">
+                        <t t-if="isWidgetVisible('block_jobs')"
+                           t-call="neon_dashboard.block.block_jobs"/>
+                        <t t-if="isWidgetVisible('block_sales')"
+                           t-call="neon_dashboard.block.block_sales"/>
+                    </section>
+                    <section class="o_neon_row_b">
+                        <t t-if="isWidgetVisible('block_finance')"
+                           t-call="neon_dashboard.block.block_finance"/>
+                        <t t-if="isWidgetVisible('block_alerts')"
+                           t-call="neon_dashboard.block.block_alerts"/>
+                        <t t-if="isWidgetVisible('block_crew_equipment')"
+                           t-call="neon_dashboard.block.block_crew_equipment"/>
+                    </section>
+                    <section class="o_neon_row_variants">
+                        <t t-if="isWidgetVisible('block_hot_deals')"
+                           t-call="neon_dashboard.block.block_hot_deals"/>
+                        <t t-if="isWidgetVisible('block_aging_quotes')"
+                           t-call="neon_dashboard.block.block_aging_quotes"/>
+                        <t t-if="isWidgetVisible('block_budget_alerts')"
+                           t-call="neon_dashboard.block.block_budget_alerts"/>
+                        <t t-if="isWidgetVisible('block_invoice_queue')"
+                           t-call="neon_dashboard.block.block_invoice_queue"/>
+                        <t t-if="isWidgetVisible('block_zig_costs')"
+                           t-call="neon_dashboard.block.block_zig_costs"/>
+                        <t t-if="isWidgetVisible('block_crew_gaps')"
+                           t-call="neon_dashboard.block.block_crew_gaps"/>
+                        <t t-if="isWidgetVisible('block_cert_expiry')"
+                           t-call="neon_dashboard.block.block_cert_expiry"/>
+                    </section>
+                    <section class="o_neon_row_c">
+                        <t t-if="isWidgetVisible('block_tasks')"
+                           t-call="neon_dashboard.block.block_tasks"/>
+                        <t t-if="isWidgetVisible('block_ai_insights')"
+                           t-call="neon_dashboard.block.block_ai_insights"/>
+                    </section>
+                </t>
+                <t t-else="">
+                    <section class="o_neon_blocks_unified" t-ref="blocksContainer">
+                        <t t-foreach="orderedBlocks" t-as="block"
+                           t-key="block.widget_key">
+                            <div class="o_neon_block_slot"
+                                 t-att-class="(block.size === 'large' ? 'o_neon_block_size_large ' : '') + 'widget--' + block.widget_key + (block.visible ? '' : ' o_neon_block_slot_hidden')"
+                                 t-att-data-widget-key="block.widget_key"
+                                 t-attf-style="order: {{block.order_index}}">
+                                <div t-if="state.editMode"
+                                     class="o_neon_block_edit_bar">
+                                    <span class="o_neon_drag_handle"
+                                          title="Drag to reorder">
+                                        <i class="fa fa-arrows"/>
                                     </span>
-                                    <span class="o_neon_alerts_pill o_neon_alerts_pill_warning"
-                                          t-if="alertsBlock.severity_counts.warning">
-                                        <t t-esc="alertsBlock.severity_counts.warning"/> warning
+                                    <span t-if="isMandatoryBlock(block.widget_key)"
+                                          class="o_neon_always_shown_badge">
+                                        Always shown
                                     </span>
-                                    <span class="o_neon_alerts_pill o_neon_alerts_pill_info"
-                                          t-if="alertsBlock.severity_counts.info">
-                                        <t t-esc="alertsBlock.severity_counts.info"/> info
-                                    </span>
-                                </div>
-
-                                <ul class="o_neon_alerts_list">
-                                    <t t-foreach="alertsBlock.alerts"
-                                       t-as="alert" t-key="alert.fingerprint">
-                                        <li class="o_neon_alerts_row"
-                                            t-att-class="'o_neon_alerts_row_' + alert.severity">
-                                            <span class="o_neon_alerts_dot"
-                                                  t-att-class="'o_neon_alerts_dot_' + alert.severity"/>
-                                            <div class="o_neon_alerts_body"
-                                                 t-on-click="() => this.onAlertClick(alert)">
-                                                <div class="o_neon_alerts_title"
-                                                     t-esc="alert.title"/>
-                                                <small class="o_neon_alerts_subtitle"
-                                                       t-esc="alert.subtitle"/>
-                                            </div>
-                                            <button class="btn btn-sm btn-link o_neon_alerts_ack"
-                                                    t-if="alert.can_acknowledge"
-                                                    t-on-click="() => this.onAlertAck(alert)">
-                                                Ack
-                                            </button>
-                                        </li>
-                                    </t>
-                                </ul>
-
-                                <div t-if="alertsBlock.has_more"
-                                     class="o_neon_alerts_more">
-                                    <small class="text-muted">
-                                        + more alerts not shown
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div t-if="isWidgetVisible('block_crew_equipment')"
-                         class="o_neon_block o_neon_block_crew_equipment widget--block_crew_equipment">
-                        <div class="o_neon_block_header">
-                            <h3>Crew &amp; Equipment</h3>
-                        </div>
-                        <div class="o_neon_block_body">
-
-                            <!-- Crew sub-widget -->
-                            <div class="o_neon_crew_subwidget">
-                                <div t-if="crewEquipment.crew.empty"
-                                     class="o_neon_block_empty">
-                                    <p class="o_neon_block_empty_msg"
-                                       t-esc="crewEquipment.crew.empty_message"/>
-                                    <button class="btn btn-link"
-                                            t-if="crewEquipment.crew.empty_cta_action"
-                                            t-on-click="() => this.onCrewEmptyClick()">
-                                        <t t-esc="crewEquipment.crew.empty_cta_label"/>
+                                    <button t-else=""
+                                            class="btn btn-sm btn-link o_neon_block_hide_btn"
+                                            t-on-click="() => this.onBlockHide(block.widget_key)">
+                                        <i class="fa fa-eye-slash me-1"/>Hide
                                     </button>
                                 </div>
-
-                                <table t-if="!crewEquipment.crew.empty"
-                                       class="o_neon_crew_table">
-                                    <thead>
-                                        <tr>
-                                            <th>Crew</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <t t-foreach="crewEquipment.crew.rows"
-                                           t-as="crewRow" t-key="crewRow.user_id">
-                                            <tr class="o_neon_crew_row"
-                                                t-att-class="crewRow.deeplink_event_job_id ? 'o_neon_crew_row_clickable' : ''"
-                                                t-on-click="() => this.onCrewRowClick(crewRow)">
-                                                <td>
-                                                    <div class="o_neon_crew_name"
-                                                         t-esc="crewRow.name"/>
-                                                    <small class="text-muted"
-                                                           t-esc="crewRow.role_label"/>
-                                                </td>
-                                                <td>
-                                                    <span class="o_neon_crew_status"
-                                                          t-att-class="'o_neon_crew_status_' + crewRow.status"
-                                                          t-esc="crewRow.booking_label"/>
-                                                </td>
-                                            </tr>
-                                        </t>
-                                    </tbody>
-                                </table>
-
-                                <!-- Gap indicators (events with confirmed < required) -->
-                                <div t-if="crewEquipment.crew.gaps and crewEquipment.crew.gaps.length"
-                                     class="o_neon_crew_gaps">
-                                    <h4>Gaps</h4>
-                                    <t t-foreach="crewEquipment.crew.gaps"
-                                       t-as="gap" t-key="gap.event_job_id">
-                                        <div class="o_neon_crew_gap_row"
-                                             t-on-click="() => this.onCrewGapClick(gap)">
-                                            <span class="o_neon_crew_gap_badge">
-                                                Gap - <t t-esc="gap.gap_count"/> needed
-                                            </span>
-                                            <span class="o_neon_crew_gap_event">
-                                                <t t-esc="gap.event_name"/>
-                                                <small class="text-muted">
-                                                    <t t-esc="gap.event_date"/>
-                                                </small>
-                                            </span>
-                                        </div>
-                                    </t>
-                                </div>
-                            </div>
-
-                            <!-- Equipment sub-widget (one-liner per category) -->
-                            <div class="o_neon_equipment_subwidget">
-                                <div t-if="crewEquipment.equipment.empty"
-                                     class="o_neon_block_empty">
-                                    <p class="o_neon_block_empty_msg"
-                                       t-esc="crewEquipment.equipment.empty_message"/>
-                                    <button class="btn btn-link"
-                                            t-if="crewEquipment.equipment.empty_cta_action"
-                                            t-on-click="() => this.onEquipmentEmptyClick()">
-                                        <t t-esc="crewEquipment.equipment.empty_cta_label"/>
+                                <t t-if="block.visible"
+                                   t-call="{{getBlockTemplate(block.widget_key)}}"/>
+                                <div t-else="" class="o_neon_block_stub">
+                                    <span class="o_neon_block_stub_name"
+                                          t-esc="blockLabel(block.widget_key)"/>
+                                    <button class="btn btn-sm btn-link o_neon_block_show_btn"
+                                            t-on-click="() => this.onBlockShow(block.widget_key)">
+                                        <i class="fa fa-eye me-1"/>Show
                                     </button>
                                 </div>
-
-                                <div t-if="!crewEquipment.equipment.empty"
-                                     class="o_neon_equipment_line">
-                                    <h4>Equipment</h4>
-                                    <t t-foreach="crewEquipment.equipment.categories"
-                                       t-as="cat" t-key="cat.category_id || 'uncategorised'">
-                                        <span class="o_neon_equipment_cat"
-                                              t-on-click="() => this.onEquipmentCatClick(cat)">
-                                            <span class="o_neon_equipment_cat_name"
-                                                  t-esc="cat.category_name"/>:
-                                            <span class="o_neon_equipment_cat_count"
-                                                  t-esc="cat.display"/>
-                                        </span>
-                                    </t>
-                                </div>
                             </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- =================================================
-                     P8B variant blocks. Only the active variant's
-                     layout marks these visible; director/tech never
-                     render them.
-                     ================================================= -->
-                <section class="o_neon_row_variants">
-
-                    <!-- M8B.1 Hot Deals Watch -->
-                    <div t-if="isWidgetVisible('block_hot_deals')"
-                         class="o_neon_block o_neon_block_hot_deals widget--block_hot_deals">
-                        <div class="o_neon_block_header"><h3>Hot Deals Watch</h3></div>
-                        <div class="o_neon_block_body">
-                            <div t-if="hotDealsBlock.empty" class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg"
-                                   t-esc="hotDealsBlock.empty_message"/>
-                            </div>
-                            <table t-if="!hotDealsBlock.empty" class="o_neon_variant_table">
-                                <thead>
-                                    <tr><th>Client</th><th>Quote</th><th>Stage</th>
-                                        <th class="text-end">Value</th></tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="hotDealsBlock.rows" t-as="row" t-key="row.id">
-                                        <tr class="o_neon_variant_row"
-                                            t-on-click="() => this.onQuoteRowClick(row)">
-                                            <td t-esc="row.client_name"/>
-                                            <td t-esc="row.quote_name"/>
-                                            <td t-esc="row.stage_label"/>
-                                            <td class="text-end" t-esc="row.value_display"/>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- M8B.1 Aging Quotes -->
-                    <div t-if="isWidgetVisible('block_aging_quotes')"
-                         class="o_neon_block o_neon_block_aging_quotes widget--block_aging_quotes">
-                        <div class="o_neon_block_header"><h3>Aging Quotes</h3></div>
-                        <div class="o_neon_block_body">
-                            <div t-if="agingQuotesBlock.empty" class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg"
-                                   t-esc="agingQuotesBlock.empty_message"/>
-                            </div>
-                            <table t-if="!agingQuotesBlock.empty" class="o_neon_variant_table">
-                                <thead>
-                                    <tr><th>Client</th><th>Quote</th>
-                                        <th class="text-end">Age</th>
-                                        <th class="text-end">Value</th></tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="agingQuotesBlock.rows" t-as="row" t-key="row.id">
-                                        <tr class="o_neon_variant_row"
-                                            t-on-click="() => this.onQuoteRowClick(row)">
-                                            <td t-esc="row.client_name"/>
-                                            <td t-esc="row.quote_name"/>
-                                            <td class="text-end" t-esc="row.age_label"/>
-                                            <td class="text-end" t-esc="row.value_display"/>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- M8B.2 Budget Alerts -->
-                    <div t-if="isWidgetVisible('block_budget_alerts')"
-                         class="o_neon_block o_neon_block_budget_alerts widget--block_budget_alerts">
-                        <div class="o_neon_block_header"><h3>Budget Alerts</h3></div>
-                        <div class="o_neon_block_body">
-                            <div t-if="budgetAlertsBlock.empty" class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg"
-                                   t-esc="budgetAlertsBlock.empty_message"/>
-                            </div>
-                            <div t-if="!budgetAlertsBlock.empty"
-                                 class="o_neon_budget_summary">
-                                <span class="o_neon_budget_pill o_neon_budget_ok">
-                                    <t t-esc="budgetAlertsBlock.ok"/> OK
-                                </span>
-                                <span class="o_neon_budget_pill o_neon_budget_warn">
-                                    <t t-esc="budgetAlertsBlock.warn"/> Warn
-                                </span>
-                                <span class="o_neon_budget_pill o_neon_budget_breach">
-                                    <t t-esc="budgetAlertsBlock.breach"/> Breach
-                                </span>
-                                <span class="o_neon_budget_pill o_neon_budget_severe">
-                                    <t t-esc="budgetAlertsBlock.severe"/> Severe
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- M8B.2 Invoice Queue -->
-                    <div t-if="isWidgetVisible('block_invoice_queue')"
-                         class="o_neon_block o_neon_block_invoice_queue widget--block_invoice_queue">
-                        <div class="o_neon_block_header"><h3>Invoice Queue</h3></div>
-                        <div class="o_neon_block_body">
-                            <div t-if="invoiceQueueBlock.empty" class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg"
-                                   t-esc="invoiceQueueBlock.empty_message"/>
-                            </div>
-                            <table t-if="!invoiceQueueBlock.empty" class="o_neon_variant_table">
-                                <thead>
-                                    <tr><th>Invoice</th><th>Client</th><th>Date</th>
-                                        <th class="text-end">Amount</th></tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="invoiceQueueBlock.rows" t-as="row" t-key="row.id">
-                                        <tr class="o_neon_variant_row"
-                                            t-on-click="() => this.onInvoiceRowClick(row)">
-                                            <td t-esc="row.name"/>
-                                            <td t-esc="row.client_name"/>
-                                            <td t-esc="row.date_display"/>
-                                            <td class="text-end" t-esc="row.amount_display"/>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- M8B.2 ZiG Rate + Recent Costs -->
-                    <div t-if="isWidgetVisible('block_zig_costs')"
-                         class="o_neon_block o_neon_block_zig_costs widget--block_zig_costs">
-                        <div class="o_neon_block_header"><h3>ZiG Rate · Recent Costs</h3></div>
-                        <div class="o_neon_block_body">
-                            <div class="o_neon_zig_rate_line">
-                                <span class="o_neon_zig_rate_label">ZiG-USD rate:</span>
-                                <span class="o_neon_zig_rate_value"
-                                      t-esc="zigCostsBlock.rate_display"/>
-                                <small class="text-muted ms-2"
-                                       t-if="zigCostsBlock.rate_as_of">
-                                    updated <t t-esc="zigCostsBlock.rate_as_of"/>
-                                </small>
-                            </div>
-                            <div t-if="zigCostsBlock.costs_empty"
-                                 class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg">No recent costs over $500</p>
-                            </div>
-                            <table t-if="!zigCostsBlock.costs_empty"
-                                   class="o_neon_variant_table">
-                                <thead>
-                                    <tr><th>Cost</th><th>Date</th>
-                                        <th class="text-end">Amount</th></tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="zigCostsBlock.costs" t-as="cost" t-key="cost.id">
-                                        <tr>
-                                            <td t-esc="cost.label"/>
-                                            <td t-esc="cost.date_display"/>
-                                            <td class="text-end" t-esc="cost.amount_display"/>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- M8B.3 Crew Gaps Watch -->
-                    <div t-if="isWidgetVisible('block_crew_gaps')"
-                         class="o_neon_block o_neon_block_crew_gaps widget--block_crew_gaps">
-                        <div class="o_neon_block_header"><h3>Crew Gaps Watch</h3></div>
-                        <div class="o_neon_block_body">
-                            <div t-if="crewGapsBlock.empty" class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg"
-                                   t-esc="crewGapsBlock.empty_message"/>
-                            </div>
-                            <table t-if="!crewGapsBlock.empty" class="o_neon_variant_table">
-                                <thead>
-                                    <tr><th>Event</th><th>When</th>
-                                        <th class="text-end">Crew</th>
-                                        <th class="text-end">Gap</th></tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="crewGapsBlock.rows" t-as="row" t-key="row.id">
-                                        <tr class="o_neon_variant_row"
-                                            t-on-click="() => this.onCrewGapsRowClick(row)">
-                                            <td>
-                                                <div t-esc="row.event_name"/>
-                                                <small class="text-muted" t-esc="row.client_name"/>
-                                            </td>
-                                            <td t-esc="row.event_date_label"/>
-                                            <td class="text-end">
-                                                <t t-esc="row.crew_confirmed"/>/<t t-esc="row.crew_required"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <span class="o_neon_crew_gap_badge"
-                                                      t-esc="'-' + row.gap_count"/>
-                                            </td>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- M8B.3 Cert Expiry Watch -->
-                    <div t-if="isWidgetVisible('block_cert_expiry')"
-                         class="o_neon_block o_neon_block_cert_expiry widget--block_cert_expiry">
-                        <div class="o_neon_block_header"><h3>Cert Expiry Watch</h3></div>
-                        <div class="o_neon_block_body">
-                            <div t-if="certExpiryBlock.empty" class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg"
-                                   t-esc="certExpiryBlock.empty_message"/>
-                            </div>
-                            <table t-if="!certExpiryBlock.empty" class="o_neon_variant_table">
-                                <thead>
-                                    <tr><th>Technician</th><th>Certification</th>
-                                        <th class="text-end">Expires in</th></tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="certExpiryBlock.rows" t-as="row" t-key="row.id">
-                                        <tr class="o_neon_variant_row"
-                                            t-att-class="row.critical ? 'o_neon_variant_row_critical' : ''"
-                                            t-on-click="() => this.onCertRowClick(row)">
-                                            <td t-esc="row.tech_name"/>
-                                            <td t-esc="row.cert_type"/>
-                                            <td class="text-end" t-esc="row.days_label"/>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- =================================================
-                     Row C - Tasks + AI Insights placeholders.
-                     M8 / M11.
-                     ================================================= -->
-                <section class="o_neon_row_c">
-                    <div t-if="isWidgetVisible('block_tasks')"
-                         class="o_neon_block o_neon_block_tasks widget--block_tasks">
-                        <div class="o_neon_block_header">
-                            <h3>Tasks</h3>
-                            <span class="o_neon_tasks_counts"
-                                  t-if="!tasksBlock.empty">
-                                <span t-if="tasksBlock.overdue_count"
-                                      class="o_neon_tasks_count_overdue">
-                                    <t t-esc="tasksBlock.overdue_count"/> overdue
-                                </span>
-                                <span t-if="tasksBlock.today_count"
-                                      class="o_neon_tasks_count_today">
-                                    <t t-if="tasksBlock.overdue_count"> &#183; </t>
-                                    <t t-esc="tasksBlock.today_count"/> today
-                                </span>
-                                <span t-if="tasksBlock.upcoming_count"
-                                      class="o_neon_tasks_count_upcoming">
-                                    <t t-if="tasksBlock.overdue_count or tasksBlock.today_count"> &#183; </t>
-                                    <t t-esc="tasksBlock.upcoming_count"/> upcoming
-                                </span>
-                            </span>
-                        </div>
-                        <div class="o_neon_block_body">
-                            <div t-if="tasksBlock.empty"
-                                 class="o_neon_block_empty">
-                                <p class="o_neon_block_empty_msg">
-                                    <t t-esc="tasksBlock.empty_message"/> &#10003;
-                                </p>
-                            </div>
-
-                            <ul t-if="!tasksBlock.empty"
-                                class="o_neon_tasks_list">
-                                <t t-foreach="tasksBlock.tasks"
-                                   t-as="task" t-key="task.id">
-                                    <li class="o_neon_tasks_row"
-                                        t-att-class="'o_neon_tasks_row_' + task.urgency">
-                                        <i class="fa o_neon_tasks_icon"
-                                           t-att-class="'fa ' + task.activity_icon"/>
-                                        <div class="o_neon_tasks_body"
-                                             t-on-click="() => this.onTaskClick(task)">
-                                            <div class="o_neon_tasks_summary"
-                                                 t-esc="task.summary"/>
-                                            <small class="o_neon_tasks_source"
-                                                   t-if="task.source_label"
-                                                   t-esc="task.source_label"/>
-                                        </div>
-                                        <span class="o_neon_tasks_deadline"
-                                              t-att-class="'o_neon_tasks_deadline_' + task.urgency"
-                                              t-esc="task.deadline_display"/>
-                                        <button class="btn btn-sm btn-link o_neon_tasks_done"
-                                                t-on-click="() => this.onTaskDone(task)">
-                                            Done
-                                        </button>
-                                    </li>
-                                </t>
-                            </ul>
-
-                            <div t-if="!tasksBlock.empty and tasksBlock.has_more"
-                                 class="o_neon_tasks_more">
-                                <small class="text-muted">
-                                    View all (<t t-esc="tasksBlock.total_count"/>)
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                    <div t-if="isWidgetVisible('block_ai_insights')"
-                         class="o_neon_block o_neon_block_ai widget--block_ai_insights">
-                        <div class="o_neon_block_header">
-                            <h3>AI Insights</h3>
-                            <span class="o_neon_ai_subtitle text-muted"
-                                  t-if="aiInsights.id">
-                                <t t-if="aiInsights.is_fallback">
-                                    AI provider unavailable. Rule-based fallback.
-                                </t>
-                                <t t-else="">
-                                    Updated <t t-esc="aiInsights.age_display or 'just now'"/>
-                                </t>
-                            </span>
-                            <button t-if="canRefreshAi"
-                                    class="btn btn-sm btn-link o_neon_ai_refresh"
-                                    t-on-click="onAiRefresh"
-                                    t-att-disabled="state.aiRefreshing"
-                                    title="Refresh AI Insights">
-                                <i class="fa"
-                                   t-att-class="state.aiRefreshing ? 'fa-spinner fa-spin' : 'fa-refresh'"/>
-                            </button>
-                        </div>
-                        <div class="o_neon_block_body">
-                            <div t-if="aiInsights.empty"
-                                 class="o_neon_ai_empty text-muted">
-                                <p t-esc="aiInsights.empty_message"/>
-                            </div>
-                            <ul t-if="!aiInsights.empty and aiInsights.insights and aiInsights.insights.length"
-                                class="o_neon_ai_list">
-                                <li t-foreach="aiInsights.insights" t-as="ins"
-                                    t-key="ins_index"
-                                    class="o_neon_ai_item"
-                                    t-att-class="'o_neon_ai_priority_' + (ins.priority or 9)"
-                                    t-on-click="() => this.onAiInsightClick(ins)">
-                                    <div class="o_neon_ai_title">
-                                        <span class="o_neon_ai_priority_badge"
-                                              t-esc="ins.priority or '-'"/>
-                                        <span t-esc="ins.title"/>
-                                    </div>
-                                    <p class="o_neon_ai_detail text-muted"
-                                       t-esc="ins.detail"/>
-                                </li>
-                            </ul>
-                            <div t-if="!aiInsights.empty and !(aiInsights.insights and aiInsights.insights.length)"
-                                 class="o_neon_ai_all_clear text-muted">
-                                <p>All clear — nothing flagged this cycle.</p>
-                            </div>
-                            <div t-if="aiInsights.error_message and !aiInsights.is_fallback"
-                                 class="o_neon_ai_error text-danger small">
-                                <i class="fa fa-exclamation-circle me-1"/>
-                                <t t-esc="aiInsights.error_message"/>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                        </t>
+                    </section>
+                </t>
 
             </div>
         </div>
