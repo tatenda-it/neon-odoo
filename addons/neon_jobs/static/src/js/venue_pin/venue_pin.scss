@@ -1,0 +1,64 @@
+// P9.M9.1.1 -- Leaflet drop-pin widget on the venue partner form.
+.o_neon_venue_pin {
+    .o_neon_venue_pin_search {
+        position: relative;
+        margin-bottom: 6px;
+
+        .o_neon_venue_pin_searching {
+            position: absolute;
+            right: 8px;
+            top: 6px;
+            font-size: 0.8em;
+        }
+
+        .o_neon_venue_pin_results {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            position: absolute;
+            z-index: 1001;
+            width: 100%;
+            max-height: 160px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #E5E5EE;
+            border-radius: 4px;
+
+            li {
+                padding: 6px 10px;
+                font-size: 0.85em;
+                cursor: pointer;
+                border-bottom: 1px solid #F0F0F5;
+                &:hover { background: #F0E7FA; }
+            }
+        }
+    }
+
+    .o_neon_venue_pin_map_wrap {
+        position: relative;
+    }
+
+    .o_neon_venue_pin_map {
+        height: 320px;
+        border: 1px solid #E5E5EE;
+        border-radius: 4px;
+        z-index: 0;   // keep Leaflet panes below Odoo overlays
+
+        @media (max-width: 767.98px) {
+            height: 240px;
+        }
+    }
+
+    .o_neon_venue_pin_overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 400;            // above tiles (200), below markers (600)
+        pointer-events: none;    // clicks pass through to the map
+        text-align: center;
+        padding: 8px 14px;
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 4px;
+    }
+}

@@ -4,7 +4,8 @@
     # 17.0.4.1.0 = P9.M9.1 Venue Maps Step 1 (base_geolocalize + embedded
     # map on event-job form). Minor bump = new layer per CLAUDE.md.
     # (Prompt said "17.0.2.x"; actual live version was 17.0.4.0.15.)
-    "version": "17.0.4.1.0",
+    # 17.0.4.2.0 = P9.M9.1.1 Leaflet drop-pin (first vendored library).
+    "version": "17.0.4.2.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -128,6 +129,15 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
             "neon_jobs/static/src/js/venue_map/venue_map.js",
             "neon_jobs/static/src/js/venue_map/venue_map.xml",
             "neon_jobs/static/src/js/venue_map/venue_map.scss",
+            # P9.M9.1.1 -- vendored Leaflet (first static/lib/ precedent).
+            # leaflet.js MUST load before venue_pin_picker.js (which
+            # uses the global L); css order is cosmetic.
+            "neon_jobs/static/lib/leaflet/leaflet.css",
+            "neon_jobs/static/lib/leaflet/leaflet.js",
+            # P9.M9.1.1 -- interactive drop-pin widget (venue form).
+            "neon_jobs/static/src/js/venue_pin/venue_pin.js",
+            "neon_jobs/static/src/js/venue_pin/venue_pin.xml",
+            "neon_jobs/static/src/js/venue_pin/venue_pin.scss",
         ],
     },
     "installable": True,

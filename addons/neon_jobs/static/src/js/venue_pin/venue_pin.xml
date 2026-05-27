@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_jobs.NeonVenuePinPicker">
+        <div class="o_neon_venue_pin">
+            <div class="o_neon_venue_pin_search">
+                <input type="text"
+                       class="form-control form-control-sm"
+                       placeholder="Search an address to drop a pin…"
+                       t-att-value="state.query"
+                       t-on-input="onSearchInput"/>
+                <span t-if="state.searching"
+                      class="o_neon_venue_pin_searching text-muted">
+                    Searching…
+                </span>
+                <ul t-if="state.results.length"
+                    class="o_neon_venue_pin_results">
+                    <li t-foreach="state.results" t-as="r" t-key="r_index"
+                        t-on-click="() => this.onResultClick(r)">
+                        <t t-esc="r.label"/>
+                    </li>
+                </ul>
+            </div>
+            <div class="o_neon_venue_pin_map_wrap">
+                <div class="o_neon_venue_pin_map" t-ref="mapContainer"/>
+                <div t-if="!hasCoords and !state.interacted"
+                     class="o_neon_venue_pin_overlay text-muted">
+                    Click anywhere on the map or use the search box to
+                    drop a pin.
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>
