@@ -738,7 +738,7 @@
                 <div class="o_neon_dashboard_brand">
                     <h1>
                         Neon
-                        <span class="o_neon_dashboard_sep">--</span>
+                        <span class="o_neon_dashboard_sep">—</span>
                         <span t-esc="headlineLabel"/> Dashboard
                     </h1>
                     <p class="o_neon_dashboard_subtitle"

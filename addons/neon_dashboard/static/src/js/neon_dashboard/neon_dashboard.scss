@@ -47,6 +47,10 @@ $neon-bg:            #FAFAFC;
         .o_neon_dashboard_sep {
             color: $neon-muted;
             font-weight: 400;
+            // P8B.M5: breathing room around the em-dash so it doesn't
+            // crowd the brand label (the collapsed inline whitespace
+            // alone rendered it tight at mobile).
+            margin: 0 0.4em;
         }
         .o_neon_dashboard_subtitle {
             color: $neon-muted;

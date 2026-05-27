@@ -30,7 +30,7 @@ SMOKES=(
   p8a_m10_exports
   p8a_m11_insights
   p8b_m1_sales p8b_m2_bookkeeper p8b_m3_lead_tech
-  p8b_m4_edit_layout
+  p8b_m4_edit_layout p8b_m5_brand_separator
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

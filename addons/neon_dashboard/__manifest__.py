@@ -5,7 +5,8 @@
     # Per CLAUDE.md manifest versioning: 17.0.<phase>.<minor>.<patch>.
     # 8.10/8.11/8.12 = Phase 8B Sales / Bookkeeper / Lead Tech variants.
     # 8.13 = Phase 8B M4 Edit Layout (per-user hide/reorder).
-    "version": "17.0.8.13.0",
+    # 8.13.1 = Phase 8B M5 brand-separator polish + phase close.
+    "version": "17.0.8.13.1",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
