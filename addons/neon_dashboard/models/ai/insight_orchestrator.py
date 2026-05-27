@@ -137,15 +137,24 @@ class InsightOrchestrator:
     # Context build + token-budget truncation
     # ==============================================================
     def _build_context(self, dashboard):
-        """Build the dict the adapter feeds to the LLM. Reuses
-        the M10 snapshot payload for the director tier + filter=all
-        so the AI sees what Robin would see on the live dashboard."""
+        """Build the dict the adapter feeds to the LLM.
+
+        P8B: scopes the snapshot to the dashboard's OWN type (not a
+        hardcoded 'director') so a Sales / Bookkeeper / Lead Tech
+        dashboard's AI sees the data that variant actually shows. The
+        dashboard_type also flows into the context so the Groq system
+        prompt + rule-based fallback can frame insights for the right
+        audience (D6)."""
         Dashboard = self.env["neon.dashboard"].sudo()
+        dashboard_type = (dashboard.dashboard_type
+                          if dashboard and dashboard.dashboard_type
+                          else "director")
         payload = Dashboard._build_snapshot_payload(
-            "director", "all")
+            dashboard_type, "all")
         today = Dashboard._today_harare()
         context = {
             "today_date": today.isoformat(),
+            "dashboard_type": dashboard_type,
             "user_name": (dashboard.user_id.name
                           if dashboard and dashboard.user_id else ""),
             "business_currency": "USD",

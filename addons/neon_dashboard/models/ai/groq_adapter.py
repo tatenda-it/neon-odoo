@@ -30,11 +30,44 @@ _logger = logging.getLogger(__name__)
 # ⚠️ DECISION (M11, marker inline): default system prompt per
 # addendum §6.1. Stored as a module constant for easy tuning;
 # admin override path is provider.system_prompt_template field.
+# ⚠️ DECISION (P8B.M1, D6): role framing keyed by dashboard_type.
+# The system prompt carries a {role_framing} placeholder; the
+# orchestrator passes dashboard_type in the context and _system_prompt
+# substitutes the matching line. Same JSON output shape, same
+# drill-through source_ref, same rule-based fallback -- only the
+# audience framing changes per variant. An admin override
+# (provider.system_prompt_template) without the placeholder degrades
+# gracefully (the .replace is a no-op).
+_ROLE_FRAMING = {
+    "director": (
+        "You analyse the operations dashboard and produce daily "
+        "priority insights for the Operational Director."
+    ),
+    "sales": (
+        "You are reviewing the sales operations dashboard for the "
+        "Neon sales team. Focus on pipeline movement, hot deals, "
+        "quote aging, and conversion against target."
+    ),
+    "bookkeeper": (
+        "You are reviewing the finance & cash dashboard for the Neon "
+        "bookkeeper. Focus on overdue receivables, cash position, "
+        "pending invoices, recent payments/costs, and budget breaches."
+    ),
+    "lead_tech": (
+        "You are reviewing the operations & crew dashboard for the "
+        "Neon lead technician. Focus on upcoming jobs, crew gaps, and "
+        "certification expiries in the next 7-30 days."
+    ),
+    "tech": (
+        "You are reviewing the daily jobs dashboard for a Neon "
+        "technician. Focus on today's assignments and immediate tasks."
+    ),
+}
+
+
 DEFAULT_SYSTEM_PROMPT = """\
 You are the AI assistant for Neon Events Elements, a premium event \
-production company in Harare, Zimbabwe. You analyse the operations \
-dashboard and produce daily priority insights for the Operational \
-Director.
+production company in Harare, Zimbabwe. {role_framing}
 
 Your output must be:
 - Specific: name the client, the job, the number, the deadline
@@ -185,8 +218,11 @@ class GroqAdapter(BaseAdapter):
     def _system_prompt(self, dashboard_context):
         template = (self.provider.system_prompt_template
                     or DEFAULT_SYSTEM_PROMPT)
+        dtype = dashboard_context.get("dashboard_type") or "director"
+        framing = _ROLE_FRAMING.get(dtype, _ROLE_FRAMING["director"])
         return template.replace(
-            "{today_date}", str(dashboard_context.get("today_date") or ""))
+            "{today_date}", str(dashboard_context.get("today_date") or "")
+        ).replace("{role_framing}", framing)
 
     def _build_user_prompt(self, dashboard_context):
         ctx = dict(dashboard_context)

@@ -145,16 +145,17 @@ def run() -> int:
         # Scenario 2 -- Bookkeeper sees the bookkeeper layout.
         # ============================================================
         with smoke.scenario(
-                "p8a_book sees bookkeeper layout (3 KPI tiles)"):
+                "p8a_book sees bookkeeper layout (6 KPI tiles)"):
             smoke.login("p8a_book")
             smoke.assert_menu_visible(
                 "neon_dashboard.menu_neon_dashboard_root")
             smoke.open_action(
                 "neon_dashboard.action_neon_dashboard_server")
-            # Bookkeeper default has 3 KPI tiles: cash / ar_overdue /
-            # jobs_week (see default_layouts.xml).
+            # P8B.M2: bookkeeper default now has 6 KPI tiles: cash /
+            # ar_overdue / overdue_60 / pending_invoices /
+            # recent_payments / recent_costs (see default_layouts.xml).
             smoke.assert_count(
-                ".o_neon_kpi_tile", 3, "3 KPI tiles (bookkeeper)")
+                ".o_neon_kpi_tile", 6, "6 KPI tiles (bookkeeper)")
             # No View-as dropdown for non-superuser.
             # Use a direct count assertion -- 0 elements.
             smoke.assert_count(
@@ -166,14 +167,16 @@ def run() -> int:
         # Scenario 3 -- Sales sees sales layout.
         # ============================================================
         with smoke.scenario(
-                "p8a_sales sees sales layout (4 KPI tiles)"):
+                "p8a_sales sees sales layout (6 KPI tiles)"):
             smoke.login("p8a_sales")
             smoke.assert_menu_visible(
                 "neon_dashboard.menu_neon_dashboard_root")
             smoke.open_action(
                 "neon_dashboard.action_neon_dashboard_server")
+            # P8B.M1: sales default now has 6 KPI tiles: pipeline /
+            # leads / hot_deals / aging_quotes / won_mtd / win_rate.
             smoke.assert_count(
-                ".o_neon_kpi_tile", 4, "4 KPI tiles (sales)")
+                ".o_neon_kpi_tile", 6, "6 KPI tiles (sales)")
             smoke.screenshot("sales_dashboard")
 
         # ============================================================
@@ -191,10 +194,10 @@ def run() -> int:
             smoke.page.locator(
                 ".o_neon_dashboard_viewas").select_option("sales")
             # Re-render is async; wait for the post-flip KPI tile
-            # count to settle to 4 (sales layout).
+            # count to settle to 6 (P8B sales layout).
             smoke.assert_count(
-                ".o_neon_kpi_tile", 4,
-                "after View-as=sales: 4 KPI tiles")
+                ".o_neon_kpi_tile", 6,
+                "after View-as=sales: 6 KPI tiles")
             smoke.screenshot("director_viewas_sales")
 
         # ============================================================

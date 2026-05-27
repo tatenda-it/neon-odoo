@@ -14,11 +14,10 @@
                     <h1>
                         Neon
                         <span class="o_neon_dashboard_sep">--</span>
-                        <span t-esc="dashboardTypeLabel"/> Dashboard
+                        <span t-esc="headlineLabel"/> Dashboard
                     </h1>
-                    <p class="o_neon_dashboard_subtitle">
-                        Operations &#183; Sales &#183; Finance &#183; Alerts
-                    </p>
+                    <p class="o_neon_dashboard_subtitle"
+                       t-esc="subtitleText"/>
                 </div>
                 <div class="o_neon_dashboard_header_right">
                     <div class="o_neon_dashboard_user_line">
@@ -196,6 +195,135 @@
                              t-esc="kpi.kpi_forecast and kpi.kpi_forecast.value_display"/>
                         <div class="o_neon_kpi_subtitle"
                              t-esc="kpi.kpi_forecast and kpi.kpi_forecast.subtitle"/>
+                    </div>
+
+                    <!-- ============================================
+                         P8B.M1 Sales variant KPI tiles.
+                         ============================================ -->
+                    <div class="o_neon_kpi_tile widget--kpi_hot_deals"
+                         t-if="isWidgetVisible('kpi_hot_deals')"
+                         t-att-class="kpi.kpi_hot_deals and kpi.kpi_hot_deals.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hot_deals)">
+                        <div class="o_neon_kpi_label">Hot Deals</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hot_deals and kpi.kpi_hot_deals.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hot_deals and kpi.kpi_hot_deals.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hot_deals and kpi.kpi_hot_deals.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_aging_quotes"
+                         t-if="isWidgetVisible('kpi_aging_quotes')"
+                         t-att-class="kpi.kpi_aging_quotes and kpi.kpi_aging_quotes.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_aging_quotes)">
+                        <div class="o_neon_kpi_label">Aging Quotes</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_aging_quotes and kpi.kpi_aging_quotes.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_aging_quotes and kpi.kpi_aging_quotes.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_aging_quotes and kpi.kpi_aging_quotes.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_won_mtd"
+                         t-if="isWidgetVisible('kpi_won_mtd')"
+                         t-att-class="kpi.kpi_won_mtd and kpi.kpi_won_mtd.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_won_mtd)">
+                        <div class="o_neon_kpi_label">Won This Month</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_won_mtd and kpi.kpi_won_mtd.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_won_mtd and kpi.kpi_won_mtd.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_won_mtd and kpi.kpi_won_mtd.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_win_rate"
+                         t-if="isWidgetVisible('kpi_win_rate')"
+                         t-att-class="kpi.kpi_win_rate and kpi.kpi_win_rate.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_win_rate)">
+                        <div class="o_neon_kpi_label">Win Rate (90d)</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_win_rate and kpi.kpi_win_rate.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_win_rate and kpi.kpi_win_rate.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_win_rate and kpi.kpi_win_rate.subtitle"/>
+                    </div>
+
+                    <!-- ============================================
+                         P8B.M2 Bookkeeper variant KPI tiles.
+                         ============================================ -->
+                    <div class="o_neon_kpi_tile widget--kpi_overdue_60"
+                         t-if="isWidgetVisible('kpi_overdue_60')"
+                         t-att-class="kpi.kpi_overdue_60 and kpi.kpi_overdue_60.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_overdue_60)">
+                        <div class="o_neon_kpi_label">Overdue 60+ Days</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_overdue_60 and kpi.kpi_overdue_60.empty ? 'o_neon_kpi_empty' : 'o_neon_kpi_value_red'"
+                             t-esc="kpi.kpi_overdue_60 and kpi.kpi_overdue_60.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_overdue_60 and kpi.kpi_overdue_60.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_pending_invoices"
+                         t-if="isWidgetVisible('kpi_pending_invoices')"
+                         t-att-class="kpi.kpi_pending_invoices and kpi.kpi_pending_invoices.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_pending_invoices)">
+                        <div class="o_neon_kpi_label">Pending Invoices</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_pending_invoices and kpi.kpi_pending_invoices.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_pending_invoices and kpi.kpi_pending_invoices.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_pending_invoices and kpi.kpi_pending_invoices.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_recent_payments"
+                         t-if="isWidgetVisible('kpi_recent_payments')"
+                         t-att-class="kpi.kpi_recent_payments and kpi.kpi_recent_payments.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_recent_payments)">
+                        <div class="o_neon_kpi_label">Recent Payments</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_recent_payments and kpi.kpi_recent_payments.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_recent_payments and kpi.kpi_recent_payments.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_recent_payments and kpi.kpi_recent_payments.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_recent_costs"
+                         t-if="isWidgetVisible('kpi_recent_costs')"
+                         t-att-class="kpi.kpi_recent_costs and kpi.kpi_recent_costs.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_recent_costs)">
+                        <div class="o_neon_kpi_label">Recent Costs</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_recent_costs and kpi.kpi_recent_costs.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_recent_costs and kpi.kpi_recent_costs.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_recent_costs and kpi.kpi_recent_costs.subtitle"/>
+                    </div>
+
+                    <!-- ============================================
+                         P8B.M3 Lead Tech variant KPI tiles.
+                         ============================================ -->
+                    <div class="o_neon_kpi_tile widget--kpi_crew_gaps"
+                         t-if="isWidgetVisible('kpi_crew_gaps')"
+                         t-att-class="kpi.kpi_crew_gaps and kpi.kpi_crew_gaps.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_crew_gaps)">
+                        <div class="o_neon_kpi_label">Crew Gaps</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_crew_gaps and kpi.kpi_crew_gaps.empty ? 'o_neon_kpi_empty' : 'o_neon_kpi_value_red'"
+                             t-esc="kpi.kpi_crew_gaps and kpi.kpi_crew_gaps.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_crew_gaps and kpi.kpi_crew_gaps.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_certs_30"
+                         t-if="isWidgetVisible('kpi_certs_30')"
+                         t-att-class="kpi.kpi_certs_30 and kpi.kpi_certs_30.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_certs_30)">
+                        <div class="o_neon_kpi_label">Certs Expiring</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_certs_30 and kpi.kpi_certs_30.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_certs_30 and kpi.kpi_certs_30.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_certs_30 and kpi.kpi_certs_30.subtitle"/>
                     </div>
                 </section>
 
@@ -665,6 +793,233 @@
                                     </t>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =================================================
+                     P8B variant blocks. Only the active variant's
+                     layout marks these visible; director/tech never
+                     render them.
+                     ================================================= -->
+                <section class="o_neon_row_variants">
+
+                    <!-- M8B.1 Hot Deals Watch -->
+                    <div t-if="isWidgetVisible('block_hot_deals')"
+                         class="o_neon_block o_neon_block_hot_deals widget--block_hot_deals">
+                        <div class="o_neon_block_header"><h3>Hot Deals Watch</h3></div>
+                        <div class="o_neon_block_body">
+                            <div t-if="hotDealsBlock.empty" class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg"
+                                   t-esc="hotDealsBlock.empty_message"/>
+                            </div>
+                            <table t-if="!hotDealsBlock.empty" class="o_neon_variant_table">
+                                <thead>
+                                    <tr><th>Client</th><th>Quote</th><th>Stage</th>
+                                        <th class="text-end">Value</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="hotDealsBlock.rows" t-as="row" t-key="row.id">
+                                        <tr class="o_neon_variant_row"
+                                            t-on-click="() => this.onQuoteRowClick(row)">
+                                            <td t-esc="row.client_name"/>
+                                            <td t-esc="row.quote_name"/>
+                                            <td t-esc="row.stage_label"/>
+                                            <td class="text-end" t-esc="row.value_display"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- M8B.1 Aging Quotes -->
+                    <div t-if="isWidgetVisible('block_aging_quotes')"
+                         class="o_neon_block o_neon_block_aging_quotes widget--block_aging_quotes">
+                        <div class="o_neon_block_header"><h3>Aging Quotes</h3></div>
+                        <div class="o_neon_block_body">
+                            <div t-if="agingQuotesBlock.empty" class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg"
+                                   t-esc="agingQuotesBlock.empty_message"/>
+                            </div>
+                            <table t-if="!agingQuotesBlock.empty" class="o_neon_variant_table">
+                                <thead>
+                                    <tr><th>Client</th><th>Quote</th>
+                                        <th class="text-end">Age</th>
+                                        <th class="text-end">Value</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="agingQuotesBlock.rows" t-as="row" t-key="row.id">
+                                        <tr class="o_neon_variant_row"
+                                            t-on-click="() => this.onQuoteRowClick(row)">
+                                            <td t-esc="row.client_name"/>
+                                            <td t-esc="row.quote_name"/>
+                                            <td class="text-end" t-esc="row.age_label"/>
+                                            <td class="text-end" t-esc="row.value_display"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- M8B.2 Budget Alerts -->
+                    <div t-if="isWidgetVisible('block_budget_alerts')"
+                         class="o_neon_block o_neon_block_budget_alerts widget--block_budget_alerts">
+                        <div class="o_neon_block_header"><h3>Budget Alerts</h3></div>
+                        <div class="o_neon_block_body">
+                            <div t-if="budgetAlertsBlock.empty" class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg"
+                                   t-esc="budgetAlertsBlock.empty_message"/>
+                            </div>
+                            <div t-if="!budgetAlertsBlock.empty"
+                                 class="o_neon_budget_summary">
+                                <span class="o_neon_budget_pill o_neon_budget_ok">
+                                    <t t-esc="budgetAlertsBlock.ok"/> OK
+                                </span>
+                                <span class="o_neon_budget_pill o_neon_budget_warn">
+                                    <t t-esc="budgetAlertsBlock.warn"/> Warn
+                                </span>
+                                <span class="o_neon_budget_pill o_neon_budget_breach">
+                                    <t t-esc="budgetAlertsBlock.breach"/> Breach
+                                </span>
+                                <span class="o_neon_budget_pill o_neon_budget_severe">
+                                    <t t-esc="budgetAlertsBlock.severe"/> Severe
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- M8B.2 Invoice Queue -->
+                    <div t-if="isWidgetVisible('block_invoice_queue')"
+                         class="o_neon_block o_neon_block_invoice_queue widget--block_invoice_queue">
+                        <div class="o_neon_block_header"><h3>Invoice Queue</h3></div>
+                        <div class="o_neon_block_body">
+                            <div t-if="invoiceQueueBlock.empty" class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg"
+                                   t-esc="invoiceQueueBlock.empty_message"/>
+                            </div>
+                            <table t-if="!invoiceQueueBlock.empty" class="o_neon_variant_table">
+                                <thead>
+                                    <tr><th>Invoice</th><th>Client</th><th>Date</th>
+                                        <th class="text-end">Amount</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="invoiceQueueBlock.rows" t-as="row" t-key="row.id">
+                                        <tr class="o_neon_variant_row"
+                                            t-on-click="() => this.onInvoiceRowClick(row)">
+                                            <td t-esc="row.name"/>
+                                            <td t-esc="row.client_name"/>
+                                            <td t-esc="row.date_display"/>
+                                            <td class="text-end" t-esc="row.amount_display"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- M8B.2 ZiG Rate + Recent Costs -->
+                    <div t-if="isWidgetVisible('block_zig_costs')"
+                         class="o_neon_block o_neon_block_zig_costs widget--block_zig_costs">
+                        <div class="o_neon_block_header"><h3>ZiG Rate · Recent Costs</h3></div>
+                        <div class="o_neon_block_body">
+                            <div class="o_neon_zig_rate_line">
+                                <span class="o_neon_zig_rate_label">ZiG-USD rate:</span>
+                                <span class="o_neon_zig_rate_value"
+                                      t-esc="zigCostsBlock.rate_display"/>
+                                <small class="text-muted ms-2"
+                                       t-if="zigCostsBlock.rate_as_of">
+                                    updated <t t-esc="zigCostsBlock.rate_as_of"/>
+                                </small>
+                            </div>
+                            <div t-if="zigCostsBlock.costs_empty"
+                                 class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg">No recent costs over $500</p>
+                            </div>
+                            <table t-if="!zigCostsBlock.costs_empty"
+                                   class="o_neon_variant_table">
+                                <thead>
+                                    <tr><th>Cost</th><th>Date</th>
+                                        <th class="text-end">Amount</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="zigCostsBlock.costs" t-as="cost" t-key="cost.id">
+                                        <tr>
+                                            <td t-esc="cost.label"/>
+                                            <td t-esc="cost.date_display"/>
+                                            <td class="text-end" t-esc="cost.amount_display"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- M8B.3 Crew Gaps Watch -->
+                    <div t-if="isWidgetVisible('block_crew_gaps')"
+                         class="o_neon_block o_neon_block_crew_gaps widget--block_crew_gaps">
+                        <div class="o_neon_block_header"><h3>Crew Gaps Watch</h3></div>
+                        <div class="o_neon_block_body">
+                            <div t-if="crewGapsBlock.empty" class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg"
+                                   t-esc="crewGapsBlock.empty_message"/>
+                            </div>
+                            <table t-if="!crewGapsBlock.empty" class="o_neon_variant_table">
+                                <thead>
+                                    <tr><th>Event</th><th>When</th>
+                                        <th class="text-end">Crew</th>
+                                        <th class="text-end">Gap</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="crewGapsBlock.rows" t-as="row" t-key="row.id">
+                                        <tr class="o_neon_variant_row"
+                                            t-on-click="() => this.onCrewGapsRowClick(row)">
+                                            <td>
+                                                <div t-esc="row.event_name"/>
+                                                <small class="text-muted" t-esc="row.client_name"/>
+                                            </td>
+                                            <td t-esc="row.event_date_label"/>
+                                            <td class="text-end">
+                                                <t t-esc="row.crew_confirmed"/>/<t t-esc="row.crew_required"/>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="o_neon_crew_gap_badge"
+                                                      t-esc="'-' + row.gap_count"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- M8B.3 Cert Expiry Watch -->
+                    <div t-if="isWidgetVisible('block_cert_expiry')"
+                         class="o_neon_block o_neon_block_cert_expiry widget--block_cert_expiry">
+                        <div class="o_neon_block_header"><h3>Cert Expiry Watch</h3></div>
+                        <div class="o_neon_block_body">
+                            <div t-if="certExpiryBlock.empty" class="o_neon_block_empty">
+                                <p class="o_neon_block_empty_msg"
+                                   t-esc="certExpiryBlock.empty_message"/>
+                            </div>
+                            <table t-if="!certExpiryBlock.empty" class="o_neon_variant_table">
+                                <thead>
+                                    <tr><th>Technician</th><th>Certification</th>
+                                        <th class="text-end">Expires in</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="certExpiryBlock.rows" t-as="row" t-key="row.id">
+                                        <tr class="o_neon_variant_row"
+                                            t-att-class="row.critical ? 'o_neon_variant_row_critical' : ''"
+                                            t-on-click="() => this.onCertRowClick(row)">
+                                            <td t-esc="row.tech_name"/>
+                                            <td t-esc="row.cert_type"/>
+                                            <td class="text-end" t-esc="row.days_label"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>

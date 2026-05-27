@@ -3,12 +3,13 @@
     "name": "Neon Dashboard",
     # Phase 8 era opener -- new central pivot model (neon.dashboard).
     # Per CLAUDE.md manifest versioning: 17.0.<phase>.<minor>.<patch>.
-    "version": "17.0.8.9.2",
-    "summary": "Phase 8A -- unified role-aware Director Dashboard "
-               "framework + headline KPI strip + Jobs block. "
-               "Frames the Phase 8B role variants (Sales / "
-               "Bookkeeper / Lead Tech / Tech) without shipping "
-               "them yet.",
+    # 8.10/8.11/8.12 = Phase 8B Sales / Bookkeeper / Lead Tech variants.
+    "version": "17.0.8.12.0",
+    "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
+               "(Sales / Bookkeeper / Lead Tech) on the shared "
+               "neon.dashboard framework -- per-variant KPI strips, "
+               "filter chips, blocks, variant-aware AI Insights, and "
+               "MD-peek selector.",
     "description": """
 Neon Dashboard (Phase 8A)
 =========================

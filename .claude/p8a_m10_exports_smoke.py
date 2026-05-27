@@ -170,11 +170,16 @@ print("T8966 -- sales tier payload scope")
 print("=" * 72)
 pl_sales = Dashboard.with_user(u_sales)._build_snapshot_payload(
     "sales", "all")
-should_have = {"kpi_pipeline", "kpi_leads", "kpi_forecast",
-               "kpi_jobs_week", "jobs_block", "sales_block",
+# P8B.M1: sales layout reworked -- pipeline + leads reused (forecast +
+# jobs_week dropped, block_jobs dropped). The new variant widgets
+# (hot deals / aging / won / win-rate + their blocks) are NOT wired
+# into the export payload builder, so they degrade out of snapshots;
+# the reused director-keyed widgets remain.
+should_have = {"kpi_pipeline", "kpi_leads", "sales_block",
                "alerts_block", "tasks_block"}
-should_not = {"finance_block", "crew_equipment_block",
-              "kpi_cash", "kpi_ar_overdue", "kpi_jobs_today"}
+should_not = {"finance_block", "crew_equipment_block", "jobs_block",
+              "kpi_cash", "kpi_ar_overdue", "kpi_jobs_today",
+              "kpi_forecast", "kpi_jobs_week"}
 ok = (should_have.issubset(pl_sales.keys())
       and not (should_not & set(pl_sales.keys())))
 print(f"  sales has: {sorted(should_have & set(pl_sales.keys()))}")
@@ -189,10 +194,14 @@ print("T8967 -- bookkeeper tier payload scope")
 print("=" * 72)
 pl_book = Dashboard.with_user(u_book)._build_snapshot_payload(
     "bookkeeper", "all")
-should_have_b = {"kpi_cash", "kpi_ar_overdue", "kpi_jobs_week",
-                 "jobs_block", "finance_block", "alerts_block",
-                 "tasks_block"}
-should_not_b = {"sales_block"}
+# P8B.M2: bookkeeper layout reworked -- cash + AR reused (jobs_week +
+# block_jobs dropped). New variant widgets (overdue-60 / pending /
+# recent payments+costs + budget/invoice-queue/zig blocks) aren't
+# wired into the export builder, so they degrade out of snapshots.
+should_have_b = {"kpi_cash", "kpi_ar_overdue", "finance_block",
+                 "alerts_block", "tasks_block"}
+should_not_b = {"sales_block", "jobs_block", "crew_equipment_block",
+                "kpi_jobs_week"}
 ok = (should_have_b.issubset(pl_book.keys())
       and not (should_not_b & set(pl_book.keys())))
 print(f"  book has: {sorted(should_have_b & set(pl_book.keys()))}")

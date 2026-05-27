@@ -37,6 +37,19 @@ _WIDGET_KEYS = [
     ("kpi_pipeline", "KPI: Pipeline Value"),
     ("kpi_leads", "KPI: New Leads"),
     ("kpi_forecast", "KPI: Forecast vs Target"),
+    # P8B.M1 Sales-variant KPI tiles.
+    ("kpi_hot_deals", "KPI: Hot Deals"),
+    ("kpi_aging_quotes", "KPI: Aging Quotes"),
+    ("kpi_won_mtd", "KPI: Won This Month"),
+    ("kpi_win_rate", "KPI: Win Rate (90d)"),
+    # P8B.M2 Bookkeeper-variant KPI tiles.
+    ("kpi_overdue_60", "KPI: Overdue 60+ Days"),
+    ("kpi_pending_invoices", "KPI: Pending Invoices"),
+    ("kpi_recent_payments", "KPI: Recent Payments"),
+    ("kpi_recent_costs", "KPI: Recent Costs"),
+    # P8B.M3 Lead Tech-variant KPI tiles.
+    ("kpi_crew_gaps", "KPI: Crew Gaps"),
+    ("kpi_certs_30", "KPI: Certs Expiring (30d)"),
     # Block widgets (M3 ships block_jobs; M4-M11 ship the rest).
     ("block_jobs", "Block: Jobs"),
     ("block_sales", "Block: Sales Pipeline"),
@@ -45,6 +58,14 @@ _WIDGET_KEYS = [
     ("block_crew_equipment", "Block: Crew & Equipment"),
     ("block_tasks", "Block: Tasks"),
     ("block_ai_insights", "Block: AI Insights"),
+    # P8B variant blocks.
+    ("block_hot_deals", "Block: Hot Deals Watch"),
+    ("block_aging_quotes", "Block: Aging Quotes"),
+    ("block_budget_alerts", "Block: Budget Alerts"),
+    ("block_invoice_queue", "Block: Invoice Queue"),
+    ("block_zig_costs", "Block: ZiG Rate + Recent Costs"),
+    ("block_crew_gaps", "Block: Crew Gaps Watch"),
+    ("block_cert_expiry", "Block: Cert Expiry Watch"),
 ]
 
 # Schema sketch §4.2 -- not hide-able. Set in M1 so the API contract

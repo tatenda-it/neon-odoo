@@ -7,13 +7,25 @@
     Schema sketch §5.2 + §8.1 lock the widget lists below:
 
     director:    all 7 KPI tiles + all 7 blocks
-    sales:       4 KPI tiles (pipeline / leads / forecast / week) +
-                 jobs (my deals) / sales / alerts / tasks / ai
-    bookkeeper:  3 KPI tiles (cash / AR / week) + jobs / finance /
-                 alerts / tasks / ai
-    lead_tech:   2 KPI tiles (today / week) + jobs / alerts /
-                 crew_equipment / tasks / ai
+    sales:       6 KPI tiles (pipeline / leads / hot deals / aging
+                 quotes / won-mtd / win-rate) + sales / hot deals /
+                 aging quotes / alerts / tasks / ai      [P8B.M1]
+    bookkeeper:  6 KPI tiles (cash / AR / overdue-60 / pending inv /
+                 recent payments / recent costs) + finance / budget
+                 alerts / invoice queue / zig-costs / alerts / tasks /
+                 ai                                       [P8B.M2]
+    lead_tech:   4 KPI tiles (jobs today / jobs week / crew gaps /
+                 certs-30) + jobs / crew gaps / cert expiry /
+                 crew_equipment / alerts / tasks / ai     [P8B.M3]
     tech:        1 KPI tile (today) + jobs / alerts / tasks
+
+    P8B note: alerts + tasks are personal cross-cutting blocks kept on
+    every variant for UX consistency; §5's "5 blocks" per variant
+    enumerates the role-DISTINCTIVE blocks (these + AI). Equipment
+    Booked/Available KPI tiles deferred to Phase 9+ (need a unit-level
+    booking surface; carryover). noupdate=1 still holds: existing
+    installs pick these up via the P8B.M1-M3 post-migrate scripts,
+    which also reset already-seeded user layouts for each type.
 
     order_index convention: KPI tiles 1-7 (in mockup order), blocks
     10-16. Future widgets can slot between bands without renumbering.
@@ -52,15 +64,18 @@
                 model="neon.dashboard.default.layout">
             <field name="dashboard_type">sales</field>
             <field name="layout_line_ids" eval="[
-                (0, 0, {'widget_key': 'kpi_pipeline',     'order_index': 1}),
-                (0, 0, {'widget_key': 'kpi_leads',        'order_index': 2}),
-                (0, 0, {'widget_key': 'kpi_forecast',     'order_index': 3}),
-                (0, 0, {'widget_key': 'kpi_jobs_week',    'order_index': 4}),
-                (0, 0, {'widget_key': 'block_jobs',       'order_index': 10}),
-                (0, 0, {'widget_key': 'block_sales',      'order_index': 11}),
-                (0, 0, {'widget_key': 'block_alerts',     'order_index': 12}),
-                (0, 0, {'widget_key': 'block_tasks',      'order_index': 13}),
-                (0, 0, {'widget_key': 'block_ai_insights','order_index': 14}),
+                (0, 0, {'widget_key': 'kpi_pipeline',      'order_index': 1}),
+                (0, 0, {'widget_key': 'kpi_leads',         'order_index': 2}),
+                (0, 0, {'widget_key': 'kpi_hot_deals',     'order_index': 3}),
+                (0, 0, {'widget_key': 'kpi_aging_quotes',  'order_index': 4}),
+                (0, 0, {'widget_key': 'kpi_won_mtd',       'order_index': 5}),
+                (0, 0, {'widget_key': 'kpi_win_rate',      'order_index': 6}),
+                (0, 0, {'widget_key': 'block_sales',       'order_index': 10}),
+                (0, 0, {'widget_key': 'block_hot_deals',   'order_index': 11}),
+                (0, 0, {'widget_key': 'block_aging_quotes','order_index': 12}),
+                (0, 0, {'widget_key': 'block_alerts',      'order_index': 13}),
+                (0, 0, {'widget_key': 'block_tasks',       'order_index': 14}),
+                (0, 0, {'widget_key': 'block_ai_insights', 'order_index': 15}),
             ]"/>
         </record>
 
@@ -71,14 +86,19 @@
                 model="neon.dashboard.default.layout">
             <field name="dashboard_type">bookkeeper</field>
             <field name="layout_line_ids" eval="[
-                (0, 0, {'widget_key': 'kpi_cash',         'order_index': 1}),
-                (0, 0, {'widget_key': 'kpi_ar_overdue',   'order_index': 2}),
-                (0, 0, {'widget_key': 'kpi_jobs_week',    'order_index': 3}),
-                (0, 0, {'widget_key': 'block_jobs',       'order_index': 10}),
-                (0, 0, {'widget_key': 'block_finance',    'order_index': 11}),
-                (0, 0, {'widget_key': 'block_alerts',     'order_index': 12}),
-                (0, 0, {'widget_key': 'block_tasks',      'order_index': 13}),
-                (0, 0, {'widget_key': 'block_ai_insights','order_index': 14}),
+                (0, 0, {'widget_key': 'kpi_cash',            'order_index': 1}),
+                (0, 0, {'widget_key': 'kpi_ar_overdue',      'order_index': 2}),
+                (0, 0, {'widget_key': 'kpi_overdue_60',      'order_index': 3}),
+                (0, 0, {'widget_key': 'kpi_pending_invoices','order_index': 4}),
+                (0, 0, {'widget_key': 'kpi_recent_payments', 'order_index': 5}),
+                (0, 0, {'widget_key': 'kpi_recent_costs',    'order_index': 6}),
+                (0, 0, {'widget_key': 'block_finance',       'order_index': 10}),
+                (0, 0, {'widget_key': 'block_budget_alerts', 'order_index': 11}),
+                (0, 0, {'widget_key': 'block_invoice_queue', 'order_index': 12}),
+                (0, 0, {'widget_key': 'block_zig_costs',     'order_index': 13}),
+                (0, 0, {'widget_key': 'block_alerts',        'order_index': 14}),
+                (0, 0, {'widget_key': 'block_tasks',         'order_index': 15}),
+                (0, 0, {'widget_key': 'block_ai_insights',   'order_index': 16}),
             ]"/>
         </record>
 
@@ -89,13 +109,17 @@
                 model="neon.dashboard.default.layout">
             <field name="dashboard_type">lead_tech</field>
             <field name="layout_line_ids" eval="[
-                (0, 0, {'widget_key': 'kpi_jobs_week',    'order_index': 1}),
-                (0, 0, {'widget_key': 'kpi_jobs_today',   'order_index': 2}),
+                (0, 0, {'widget_key': 'kpi_jobs_today',   'order_index': 1}),
+                (0, 0, {'widget_key': 'kpi_jobs_week',    'order_index': 2}),
+                (0, 0, {'widget_key': 'kpi_crew_gaps',    'order_index': 3}),
+                (0, 0, {'widget_key': 'kpi_certs_30',     'order_index': 4}),
                 (0, 0, {'widget_key': 'block_jobs',       'order_index': 10}),
-                (0, 0, {'widget_key': 'block_alerts',     'order_index': 11}),
-                (0, 0, {'widget_key': 'block_crew_equipment','order_index': 12}),
-                (0, 0, {'widget_key': 'block_tasks',      'order_index': 13}),
-                (0, 0, {'widget_key': 'block_ai_insights','order_index': 14}),
+                (0, 0, {'widget_key': 'block_crew_gaps',  'order_index': 11}),
+                (0, 0, {'widget_key': 'block_cert_expiry','order_index': 12}),
+                (0, 0, {'widget_key': 'block_crew_equipment','order_index': 13}),
+                (0, 0, {'widget_key': 'block_alerts',     'order_index': 14}),
+                (0, 0, {'widget_key': 'block_tasks',      'order_index': 15}),
+                (0, 0, {'widget_key': 'block_ai_insights','order_index': 16}),
             ]"/>
         </record>
 

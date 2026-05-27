@@ -404,7 +404,7 @@ class NeonDashboard(models.Model):
         dashboard = self.get_or_create_for_user(
             user_id=self.env.user.id, dashboard_type=resolved_type,
         )
-        return {
+        payload = {
             "dashboard_id": dashboard.id,
             "dashboard_type": resolved_type,
             "user_name": self.env.user.name,
@@ -436,6 +436,20 @@ class NeonDashboard(models.Model):
             # Africa/Harare so Robin sees the operational TZ.
             "last_updated": self._format_harare_timestamp(),
         }
+        # P8B: variant-specific blocks. Computed only for the variant
+        # that renders them so director/tech don't pay for queries
+        # their layout never shows.
+        if resolved_type == "sales":
+            payload["hot_deals_block"] = self._compute_hot_deals_block()
+            payload["aging_quotes_block"] = self._compute_aging_quotes_block()
+        elif resolved_type == "bookkeeper":
+            payload["budget_alerts_block"] = self._compute_budget_alerts_block()
+            payload["invoice_queue_block"] = self._compute_invoice_queue_block()
+            payload["zig_costs_block"] = self._compute_zig_costs_block()
+        elif resolved_type == "lead_tech":
+            payload["crew_gaps_block"] = self._compute_crew_gaps_block()
+            payload["cert_expiry_block"] = self._compute_cert_expiry_block()
+        return payload
 
     def _user_role_label(self):
         """Human-readable role label for the header user-line."""
@@ -465,10 +479,29 @@ class NeonDashboard(models.Model):
     # ==================================================================
     @api.model
     def _compute_kpi(self, dashboard_type):
-        """All 7 KPI tile values. dashboard_type is reserved for tier
-        scoping (M5 sales variant filters Pipeline by salesperson;
-        M6 bookkeeper variant adds AP); for M1-M3 the tiles return
-        unfiltered values plus empty-state shape."""
+        """Dispatch KPI tile set by dashboard_type (Phase 8B).
+
+        Each variant returns ONLY its own tile keys; the OWL
+        ``isWidgetVisible`` gate (driven by the seeded layout) decides
+        which of those render. director + tech fall through to the
+        full 7-tile director set.
+
+        ⚠️ DECISION (P8B.M1, dispatch): flat getattr-free if/elif
+        dispatch per the revised Gate-1 D2 lock -- no dispatcher table,
+        no subclassing. Keeps every variant's tile assembly in one
+        readable place.
+        """
+        if dashboard_type == "sales":
+            return self._compute_kpi_sales()
+        if dashboard_type == "bookkeeper":
+            return self._compute_kpi_bookkeeper()
+        if dashboard_type == "lead_tech":
+            return self._compute_kpi_lead_tech()
+        return self._compute_kpi_director()
+
+    @api.model
+    def _compute_kpi_director(self):
+        """Director (+ tech fallback) -- the original 7-tile strip."""
         return {
             "kpi_cash": self._kpi_cash_on_hand(),
             "kpi_ar_overdue": self._kpi_ar_overdue(),
@@ -477,6 +510,55 @@ class NeonDashboard(models.Model):
             "kpi_pipeline": self._kpi_pipeline(),
             "kpi_leads": self._kpi_new_leads(),
             "kpi_forecast": self._kpi_forecast(),
+        }
+
+    # ==================================================================
+    # P8B.M1 -- Sales variant KPI set (6 tiles).
+    # Pipeline + New Leads reuse the director helpers; Hot Deals,
+    # Aging Quotes, Won-MTD, Win-Rate are new.
+    # ==================================================================
+    @api.model
+    def _compute_kpi_sales(self):
+        return {
+            "kpi_pipeline": self._kpi_pipeline(),
+            "kpi_leads": self._kpi_new_leads(),
+            "kpi_hot_deals": self._kpi_hot_deals(),
+            "kpi_aging_quotes": self._kpi_aging_quotes(),
+            "kpi_won_mtd": self._kpi_won_mtd(),
+            "kpi_win_rate": self._kpi_win_rate_tile(),
+        }
+
+    # ==================================================================
+    # P8B.M2 -- Bookkeeper variant KPI set (6 tiles).
+    # Cash + AR Overdue reuse director helpers; Overdue-60+, Pending
+    # Invoices are new; Recent Payments + Recent Costs reuse the
+    # Phase 6 Cash Flow Dashboard tile methods via sudo (single source
+    # of truth -- Director / Bookkeeper / Cash Flow never disagree).
+    # ==================================================================
+    @api.model
+    def _compute_kpi_bookkeeper(self):
+        return {
+            "kpi_cash": self._kpi_cash_on_hand(),
+            "kpi_ar_overdue": self._kpi_ar_overdue(),
+            "kpi_overdue_60": self._kpi_overdue_60(),
+            "kpi_pending_invoices": self._kpi_pending_invoices(),
+            "kpi_recent_payments": self._kpi_recent_payments(),
+            "kpi_recent_costs": self._kpi_recent_costs(),
+        }
+
+    # ==================================================================
+    # P8B.M3 -- Lead Tech variant KPI set (4 tiles).
+    # Jobs Today + Jobs Week reuse director helpers; Crew Gaps + Certs
+    # Expiring (30d) are new. Equipment Booked/Available deferred to
+    # Phase 9+ (needs a unit-level booking surface -- carryover).
+    # ==================================================================
+    @api.model
+    def _compute_kpi_lead_tech(self):
+        return {
+            "kpi_jobs_today": self._kpi_jobs_today(),
+            "kpi_jobs_week": self._kpi_jobs_week(),
+            "kpi_crew_gaps": self._kpi_crew_gaps(),
+            "kpi_certs_30": self._kpi_certs_30(),
         }
 
     # ⚠️ DECISION (M2, marker 3): Cash-on-Hand source is the standard
@@ -885,6 +967,271 @@ class NeonDashboard(models.Model):
         if abs(amount) >= 1000:
             return f"{prefix}{amount/1000:.1f}k"
         return f"{prefix}{amount:,.0f}"
+
+    # ==================================================================
+    # P8B.M1 -- Sales variant KPI helpers.
+    #
+    # ⚠️ DECISION (P8B.M1, won/win convention): won/lost measured via
+    # neon.finance.quote.state (won='accepted', lost='rejected'/
+    # 'expired'), NOT crm.lead stage_id.is_won. Locked at Gate 1 per
+    # M5 DECISION marker 7 -- single source of truth so the Sales tile,
+    # the Sales-block win-rate sub-widget and the Director dashboard
+    # never disagree. write_date is the accept/aging proxy (no
+    # dedicated state_changed_date field on the quote model).
+    # ==================================================================
+    def _kpi_hot_deals(self):
+        """Count of quotes in the hot pipeline stages -- Qualified
+        (pending_approval) + Proposal Sent (approved). Mirrors the
+        Sales-block pipeline-by-stage mapping."""
+        Quote = self.env["neon.finance.quote"].sudo()
+        hot = Quote.search_count([
+            ("state", "in", ("pending_approval", "approved")),
+        ])
+        if not hot:
+            return self._empty_kpi(
+                _("No hot deals"), value_display="0",
+                deeplink_action="neon_finance.action_dashboard_pipeline")
+        return {
+            "value": hot,
+            "value_display": str(hot),
+            "subtitle": _("Qualified + Proposal Sent"),
+            "empty": False,
+            "deeplink_action": "neon_finance.action_dashboard_pipeline",
+        }
+
+    def _kpi_aging_quotes(self):
+        """Count of open quotes (draft/sent) with no movement in >7
+        days. Ages on write_date per the won/win convention above."""
+        Quote = self.env["neon.finance.quote"].sudo()
+        cutoff = self._harare_date_to_utc_string(
+            self._today_harare() - timedelta(days=7))
+        aging = Quote.search_count([
+            ("state", "in", ("draft", "sent")),
+            ("write_date", "<", cutoff),
+        ])
+        if not aging:
+            return self._empty_kpi(
+                _("No aging quotes"), value_display="0",
+                deeplink_action="neon_finance.action_dashboard_pipeline")
+        return {
+            "value": aging,
+            "value_display": str(aging),
+            "subtitle": _(">7 days, no movement"),
+            "empty": False,
+            "deeplink_action": "neon_finance.action_dashboard_pipeline",
+        }
+
+    def _kpi_won_mtd(self):
+        """Count of quotes accepted in the current Harare calendar
+        month. write_date is the accept-transition proxy."""
+        Quote = self.env["neon.finance.quote"].sudo()
+        month_start = self._today_harare().replace(day=1)
+        cutoff = self._harare_date_to_utc_string(month_start)
+        won = Quote.search_count([
+            ("state", "=", "accepted"),
+            ("write_date", ">=", cutoff),
+        ])
+        if not won:
+            return self._empty_kpi(
+                _("None won yet this month"), value_display="0",
+                deeplink_action="neon_finance.action_dashboard_pipeline")
+        return {
+            "value": won,
+            "value_display": str(won),
+            "subtitle": month_start.strftime("%B"),
+            "empty": False,
+            "deeplink_action": "neon_finance.action_dashboard_pipeline",
+        }
+
+    def _kpi_win_rate_tile(self):
+        """KPI-tile wrapper over the Sales-block win-rate compute
+        (won / (won+lost) over the last 90 days)."""
+        wr = self._compute_win_rate()
+        if wr.get("empty") or wr.get("rate_pct") is None:
+            return self._empty_kpi(
+                _("No closed deals (90d)"), value_display="--")
+        return {
+            "value": wr["rate_pct"],
+            "value_display": f"{wr['rate_pct']:g}%",
+            "subtitle": _("%(w)dW / %(l)dL -- 90d") % {
+                "w": wr["won_count"], "l": wr["lost_count"]},
+            "empty": False,
+            "deeplink_action": "neon_finance.action_dashboard_pipeline",
+        }
+
+    # ==================================================================
+    # P8B.M2 -- Bookkeeper variant KPI helpers.
+    # ==================================================================
+    def _kpi_overdue_60(self):
+        """AR overdue by more than 60 days -- the critical bucket.
+        USD-equivalent (ZiG via manual rate; excluded if rate unset).
+        """
+        today = self._today_harare()
+        cutoff = today - timedelta(days=60)
+        Move = self.env["account.move"].sudo()
+        overdue = Move.search([
+            ("move_type", "=", "out_invoice"),
+            ("state", "=", "posted"),
+            ("payment_state", "in", ("not_paid", "partial", "in_payment")),
+            ("invoice_date_due", "<", cutoff),
+        ])
+        if not overdue:
+            return self._empty_kpi(
+                _("Nothing 60+ days overdue"), value_display="$0",
+                deeplink_action="neon_finance.action_dashboard_top_overdue")
+        rate = self._get_zig_usd_rate()
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        zwg = self.env.ref(
+            "neon_finance.currency_zwg", raise_if_not_found=False)
+        total = 0.0
+        for inv in overdue:
+            residual = inv.amount_residual or 0.0
+            if usd and inv.currency_id.id == usd.id:
+                total += residual
+            elif zwg and inv.currency_id.id == zwg.id and rate and rate > 0:
+                total += residual / rate
+            elif not (zwg and inv.currency_id.id == zwg.id):
+                total += residual
+        return {
+            "value": total,
+            "value_display": self._format_money(total, "USD"),
+            "count": len(overdue),
+            "subtitle": _("%d invoice(s) 60+ days") % len(overdue),
+            "empty": False,
+            "deeplink_action": "neon_finance.action_dashboard_top_overdue",
+        }
+
+    def _kpi_pending_invoices(self):
+        """Count of unposted (draft) customer invoices awaiting
+        posting/review."""
+        Move = self.env["account.move"].sudo()
+        pending = Move.search_count([
+            ("move_type", "=", "out_invoice"),
+            ("state", "=", "draft"),
+        ])
+        if not pending:
+            return self._empty_kpi(
+                _("No invoices pending"), value_display="0",
+                deeplink_action="account.action_move_out_invoice_type")
+        return {
+            "value": pending,
+            "value_display": str(pending),
+            "subtitle": _("Draft, awaiting posting"),
+            "empty": False,
+            "deeplink_action": "account.action_move_out_invoice_type",
+        }
+
+    def _kpi_recent_payments(self):
+        """Inbound payments in the last 30 days (USD). Reuses the
+        Phase 6 Cash Flow Dashboard tile via sudo -- single source of
+        truth. role='finance_all' so the variant shows the full
+        finance picture regardless of who is peeking."""
+        tile = self._finance_dashboard_tile("_tile_recent_payments")
+        usd = (tile or {}).get("usd") or {}
+        value = usd.get("value") or 0.0
+        if not value:
+            return self._empty_kpi(
+                _("No payments in 30 days"), value_display="$0",
+                deeplink_action="neon_finance.action_dashboard_recent_payments")
+        return {
+            "value": value,
+            "value_display": self._format_money(value, "USD"),
+            "count": usd.get("count") or 0,
+            "subtitle": _("%d received -- 30d") % (usd.get("count") or 0),
+            "empty": False,
+            "deeplink_action":
+                "neon_finance.action_dashboard_recent_payments",
+        }
+
+    def _kpi_recent_costs(self):
+        """Vendor costs in the last 30 days (USD). Reuses the Phase 6
+        Cash Flow Dashboard tile via sudo."""
+        tile = self._finance_dashboard_tile("_tile_recent_costs")
+        usd = (tile or {}).get("usd") or {}
+        value = usd.get("value") or 0.0
+        if not value:
+            return self._empty_kpi(
+                _("No costs in 30 days"), value_display="$0",
+                deeplink_action="neon_finance.action_dashboard_recent_costs")
+        return {
+            "value": value,
+            "value_display": self._format_money(value, "USD"),
+            "count": usd.get("count") or 0,
+            "subtitle": _("%d posted -- 30d") % (usd.get("count") or 0),
+            "empty": False,
+            "deeplink_action":
+                "neon_finance.action_dashboard_recent_costs",
+        }
+
+    @api.model
+    def _finance_dashboard_tile(self, method_name, role="finance_all"):
+        """Call a neon.finance.dashboard tile method via sudo, scoped
+        to the full finance view. neon_finance is a hard dependency so
+        the model is always present; the try/except guards only against
+        a cross-module action-ref drift inside the reused tile (which
+        we don't own) -- on failure the bookkeeper tile degrades to an
+        empty payload rather than 500-ing the whole dashboard."""
+        FinanceDash = self.env["neon.finance.dashboard"].sudo()
+        try:
+            return getattr(FinanceDash, method_name)(role) or {}
+        except Exception:  # noqa: BLE001
+            _logger.warning(
+                "Bookkeeper tile reuse failed for %s; degrading to "
+                "empty.", method_name, exc_info=True)
+            return {}
+
+    # ==================================================================
+    # P8B.M3 -- Lead Tech variant KPI helpers.
+    # ==================================================================
+    def _kpi_crew_gaps(self):
+        """Count of confirmed events within 7 days where assigned crew
+        is short of the required total."""
+        today = self._today_harare()
+        end = today + timedelta(days=7)
+        EventJob = self.env["commercial.event.job"].sudo()
+        jobs = EventJob.search([
+            ("event_date", ">=", today),
+            ("event_date", "<=", end),
+            ("state", "not in", ("cancelled", "released")),
+        ])
+        gap_jobs = jobs.filtered(
+            lambda j: (j.crew_total_count or 0) > (j.crew_confirmed_count or 0))
+        if not gap_jobs:
+            return self._empty_kpi(
+                _("All crew slots filled"), value_display="0",
+                deeplink_action="neon_jobs.commercial_event_job_action")
+        total_gap = sum(
+            (j.crew_total_count or 0) - (j.crew_confirmed_count or 0)
+            for j in gap_jobs)
+        return {
+            "value": len(gap_jobs),
+            "value_display": str(len(gap_jobs)),
+            "subtitle": _("%d crew slot(s) open -- 7d") % total_gap,
+            "empty": False,
+            "deeplink_action": "neon_jobs.commercial_event_job_action",
+        }
+
+    def _kpi_certs_30(self):
+        """Count of active certifications expiring within the next 30
+        days. Reads neon.training.certification via sudo (lead-tech-
+        tier users may lack direct ACL -- cross-module compute read)."""
+        today = self._today_harare()
+        end = today + timedelta(days=30)
+        Cert = self.env["neon.training.certification"].sudo()
+        certs = Cert.search_count([
+            ("state", "=", "active"),
+            ("date_expires", ">=", today),
+            ("date_expires", "<=", end),
+        ])
+        if not certs:
+            return self._empty_kpi(
+                _("No certs expiring (30d)"), value_display="0")
+        return {
+            "value": certs,
+            "value_display": str(certs),
+            "subtitle": _("Expiring within 30 days"),
+            "empty": False,
+        }
 
     # ==================================================================
     # Jobs block (M3) -- today + next 7 days, ordered date asc / value
@@ -1439,6 +1786,212 @@ class NeonDashboard(models.Model):
                 for name, count in ranked
             ],
         }
+
+    # ==================================================================
+    # P8B variant blocks -- assembly + filter over existing models.
+    # No new SQL patterns; reuses the quote / invoice / cost / cert /
+    # event_job sources already walked elsewhere in this file.
+    # ==================================================================
+    @api.model
+    def _compute_hot_deals_block(self):
+        """Sales: quotes in Qualified (pending_approval) / Proposal
+        Sent (approved), sorted by value desc. Top 10."""
+        Quote = self.env["neon.finance.quote"].sudo()
+        quotes = Quote.search([
+            ("state", "in", ("pending_approval", "approved")),
+        ], order="amount_total desc", limit=10)
+        if not quotes:
+            return {"empty": True,
+                    "empty_message": _("No hot deals in the pipeline"),
+                    "rows": []}
+        stage_label = {
+            "pending_approval": _("Qualified"),
+            "approved": _("Proposal Sent"),
+        }
+        rows = [{
+            "id": q.id,
+            "client_name": (q.partner_id and q.partner_id.name) or "",
+            "quote_name": q.name or f"#{q.id}",
+            "stage_label": stage_label.get(q.state, q.state),
+            "value_display": self._format_money(
+                q.amount_total, q.currency_id.name or "USD"),
+            "deeplink_action": "neon_finance.action_dashboard_pipeline",
+            "deeplink_id": q.id,
+        } for q in quotes]
+        return {"empty": False, "rows": rows}
+
+    @api.model
+    def _compute_aging_quotes_block(self):
+        """Sales: open quotes (draft/sent) with no movement in >7
+        days, oldest first. Top 10."""
+        Quote = self.env["neon.finance.quote"].sudo()
+        today = self._today_harare()
+        cutoff = self._harare_date_to_utc_string(today - timedelta(days=7))
+        quotes = Quote.search([
+            ("state", "in", ("draft", "sent")),
+            ("write_date", "<", cutoff),
+        ], order="write_date asc", limit=10)
+        if not quotes:
+            return {"empty": True,
+                    "empty_message": _("No aging quotes"),
+                    "rows": []}
+        now_h = self._now_harare()
+        rows = []
+        for q in quotes:
+            aware = pytz.utc.localize(q.write_date)
+            age_days = (now_h - aware).days
+            rows.append({
+                "id": q.id,
+                "client_name": (q.partner_id and q.partner_id.name) or "",
+                "quote_name": q.name or f"#{q.id}",
+                "state": q.state,
+                "age_days": age_days,
+                "age_label": _("%d days") % age_days,
+                "value_display": self._format_money(
+                    q.amount_total, q.currency_id.name or "USD"),
+                "deeplink_action": "neon_finance.action_dashboard_pipeline",
+                "deeplink_id": q.id,
+            })
+        return {"empty": False, "rows": rows}
+
+    @api.model
+    def _compute_budget_alerts_block(self):
+        """Bookkeeper: ok/warn/breach/severe event-budget counts.
+        Reuses the Phase 6 Cash Flow Dashboard tile via sudo."""
+        tile = self._finance_dashboard_tile("_tile_budget_alert_summary")
+        levels = (tile or {}).get("levels") or {}
+        ok = int(levels.get("ok", 0))
+        warn = int(levels.get("warn", 0))
+        breach = int(levels.get("breach", 0))
+        severe = int(levels.get("severe", 0))
+        return {
+            "empty": (ok + warn + breach + severe) == 0,
+            "empty_message": _("No event budgets tracked yet"),
+            "ok": ok, "warn": warn, "breach": breach, "severe": severe,
+            "has_issues": (warn + breach + severe) > 0,
+        }
+
+    @api.model
+    def _compute_invoice_queue_block(self):
+        """Bookkeeper: draft customer invoices awaiting posting,
+        oldest first. Top 10."""
+        Move = self.env["account.move"].sudo()
+        drafts = Move.search([
+            ("move_type", "=", "out_invoice"),
+            ("state", "=", "draft"),
+        ], order="invoice_date asc, create_date asc", limit=10)
+        if not drafts:
+            return {"empty": True,
+                    "empty_message": _("No invoices awaiting posting"),
+                    "rows": []}
+        rows = [{
+            "id": mv.id,
+            "name": mv.name or mv.ref or f"#{mv.id}",
+            "client_name": (mv.partner_id and mv.partner_id.name) or "",
+            "date_display": (mv.invoice_date.strftime("%d %b")
+                             if mv.invoice_date else _("No date")),
+            "amount_display": self._format_money(
+                mv.amount_total, mv.currency_id.name or "USD"),
+        } for mv in drafts]
+        return {"empty": False, "rows": rows}
+
+    @api.model
+    def _compute_zig_costs_block(self):
+        """Bookkeeper: current ZiG-USD rate + last 5 costs over $500."""
+        rate = self._get_zig_usd_rate()
+        block = {
+            "rate": rate,
+            "rate_display": (f"{rate:.2f}" if rate and rate > 0
+                             else _("Not set")),
+            "rate_source": self._zig_rate_source(),
+            "rate_as_of": self._zig_rate_timestamp_harare(),
+            "costs": [],
+        }
+        Cost = self.env["neon.finance.cost.line"].sudo()
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        domain = [("amount", ">", 500)]
+        if usd:
+            domain.append(("currency_id", "=", usd.id))
+        costs = Cost.search(domain, order="date_incurred desc", limit=5)
+        block["costs_empty"] = not costs
+        block["costs"] = [{
+            "id": c.id,
+            "label": (c.name or (c.event_job_id and c.event_job_id.name)
+                      or f"#{c.id}"),
+            "date_display": (c.date_incurred.strftime("%d %b")
+                             if c.date_incurred else ""),
+            "amount_display": self._format_money(
+                c.amount, c.currency_id.name or "USD"),
+        } for c in costs]
+        return block
+
+    @api.model
+    def _compute_crew_gaps_block(self):
+        """Lead Tech: upcoming events (next 7d) with unfilled crew
+        slots, soonest first."""
+        today = self._today_harare()
+        end = today + timedelta(days=7)
+        EventJob = self.env["commercial.event.job"].sudo()
+        jobs = EventJob.search([
+            ("event_date", ">=", today),
+            ("event_date", "<=", end),
+            ("state", "not in", ("cancelled", "released")),
+        ], order="event_date asc, id asc")
+        rows = []
+        for job in jobs:
+            total = job.crew_total_count or 0
+            confirmed = job.crew_confirmed_count or 0
+            gap = total - confirmed
+            if gap <= 0:
+                continue
+            days_out = (job.event_date - today).days
+            rows.append({
+                "id": job.id,
+                "event_name": job.name or "",
+                "client_name": (job.partner_id and job.partner_id.name) or "",
+                "event_date_label": (job.event_date.strftime("%a %d %b")
+                                     if job.event_date else ""),
+                "days_out": days_out,
+                "crew_confirmed": confirmed,
+                "crew_required": total,
+                "gap_count": gap,
+                "deeplink_id": job.id,
+            })
+        if not rows:
+            return {"empty": True,
+                    "empty_message": _("All upcoming crew slots filled"),
+                    "rows": []}
+        return {"empty": False, "rows": rows}
+
+    @api.model
+    def _compute_cert_expiry_block(self):
+        """Lead Tech: active certifications expiring in the next 30
+        days, soonest first. Reads via sudo (cross-module)."""
+        Cert = self.env["neon.training.certification"].sudo()
+        today = self._today_harare()
+        end = today + timedelta(days=30)
+        certs = Cert.search([
+            ("state", "=", "active"),
+            ("date_expires", ">=", today),
+            ("date_expires", "<=", end),
+        ], order="date_expires asc", limit=10)
+        if not certs:
+            return {"empty": True,
+                    "empty_message": _("No certifications expiring soon"),
+                    "rows": []}
+        rows = []
+        for c in certs:
+            days = (c.date_expires - today).days
+            rows.append({
+                "id": c.id,
+                "tech_name": (c.user_id and c.user_id.name) or "",
+                "cert_type": (c.type_id.name if c.type_id else ""),
+                "days_remaining": days,
+                "days_label": _("%d days") % days,
+                "expires_display": c.date_expires.strftime("%d %b %Y"),
+                "critical": days <= 14,
+            })
+        return {"empty": False, "rows": rows}
 
     # ==================================================================
     # M6 -- Finance block (AR aging + cash detail).
@@ -2416,6 +2969,16 @@ class NeonDashboard(models.Model):
     # asserts this dict agrees. If you change this dict, change the
     # SCSS too (or fix the SCSS to match -- it's the prior source of
     # truth, present since M5/M6 walkthroughs).
+    # ⚠️ DECISION (P8B, variant chip semantics): the per-variant chips
+    # (Sales: Hot/Aging/Won; Bookkeeper: Overdue/Due Soon/Recently
+    # Paid; Lead Tech: Today/Next 7d/Next 30d) are widget-visibility
+    # filters, consistent with the M5/M6 director chips -- they do NOT
+    # re-scope the underlying query windows. Re-scoping the data per
+    # chip is a Phase 9 enhancement (would require threading the
+    # window through every variant compute). Each chip's hide set is
+    # mirrored 1:1 in the SCSS .o_neon_dashboard__filter_<key> blocks;
+    # test T8974 enforces parity. 'next30' hides nothing (== the
+    # lead-tech default view) so it has no SCSS block.
     _FILTER_HIDE_RULES = {
         "all": frozenset(),
         "operations": frozenset({
@@ -2435,6 +2998,41 @@ class NeonDashboard(models.Model):
             "kpi_jobs_today", "kpi_jobs_week",
             "kpi_pipeline", "kpi_leads",
         }),
+        # --- Sales variant chips ---
+        "hot": frozenset({
+            "kpi_aging_quotes", "kpi_won_mtd", "kpi_win_rate",
+            "block_aging_quotes",
+        }),
+        "aging": frozenset({
+            "kpi_hot_deals", "kpi_won_mtd", "kpi_win_rate",
+            "block_hot_deals",
+        }),
+        "won": frozenset({
+            "kpi_hot_deals", "kpi_aging_quotes",
+            "block_hot_deals", "block_aging_quotes",
+        }),
+        # --- Bookkeeper variant chips ---
+        "overdue": frozenset({
+            "kpi_recent_payments", "kpi_recent_costs",
+            "kpi_pending_invoices",
+            "block_invoice_queue", "block_zig_costs",
+        }),
+        "due_soon": frozenset({
+            "kpi_recent_payments", "kpi_recent_costs", "kpi_overdue_60",
+            "block_budget_alerts", "block_zig_costs",
+        }),
+        "recently_paid": frozenset({
+            "kpi_overdue_60", "kpi_pending_invoices", "kpi_ar_overdue",
+            "block_invoice_queue",
+        }),
+        # --- Lead Tech variant chips ---
+        "today": frozenset({
+            "kpi_jobs_week", "kpi_certs_30", "block_cert_expiry",
+        }),
+        "next7": frozenset({
+            "kpi_certs_30", "block_cert_expiry",
+        }),
+        "next30": frozenset(),
     }
 
     @api.model

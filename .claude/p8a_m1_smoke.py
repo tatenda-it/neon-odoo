@@ -120,11 +120,13 @@ def _seed_count(dashboard_type):
     return len(seed.layout_line_ids)
 
 
+# P8B: sales 9->12, bookkeeper 8->13, lead_tech 7->11 (new variant
+# KPI tiles + blocks). Director (14) + tech (4) unchanged.
 for tnum, dtype, expected_count in [
     ("T8102", "director", 14),
-    ("T8103", "sales", 9),
-    ("T8104", "bookkeeper", 8),
-    ("T8105", "lead_tech", 7),
+    ("T8103", "sales", 12),
+    ("T8104", "bookkeeper", 13),
+    ("T8105", "lead_tech", 11),
     ("T8106", "tech", 4),
 ]:
     print()
@@ -190,16 +192,18 @@ results["T8109"] = ok
 print()
 print("T8110 -- _seed_default_layout materialises matching widget set")
 print("=" * 72)
-# Sales seed has 9 entries; create a fresh sales dashboard for u_sales
-# and check the layout_ids count matches.
+# P8B.M1: sales seed reworked to 12 entries (6 KPIs + 6 blocks).
+# Create a fresh sales dashboard for u_sales and check the materialised
+# layout matches the new widget set.
 Dashboard.sudo().search([
     ("user_id", "=", u_sales.id),
     ("dashboard_type", "=", "sales")]).unlink()
 d_sales = Dashboard.sudo().get_or_create_for_user(
     user_id=u_sales.id, dashboard_type="sales")
 layout_keys = set(d_sales.layout_ids.mapped("widget_key"))
-expected_sales = {"kpi_pipeline", "kpi_leads", "kpi_forecast",
-                  "kpi_jobs_week", "block_jobs", "block_sales",
+expected_sales = {"kpi_pipeline", "kpi_leads", "kpi_hot_deals",
+                  "kpi_aging_quotes", "kpi_won_mtd", "kpi_win_rate",
+                  "block_sales", "block_hot_deals", "block_aging_quotes",
                   "block_alerts", "block_tasks", "block_ai_insights"}
 ok = layout_keys == expected_sales
 print("  layout keys:", sorted(layout_keys))

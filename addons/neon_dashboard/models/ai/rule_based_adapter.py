@@ -47,15 +47,13 @@ class RuleBasedAdapter(BaseAdapter):
                 error_message="RuleBasedAdapter requires env handle.",
                 latency_ms=int((time.time() - start) * 1000),
             )
+        # ⚠️ DECISION (P8B.M1, D6): rule subset by dashboard_type so a
+        # variant's fallback only fires rules relevant to its data
+        # scope. Unknown / director types run the full set (original
+        # M11 behaviour, preserved).
         items = []
-        for rule in (
-            self._rule_overdue_invoices,
-            self._rule_crew_gaps,
-            self._rule_cert_expiry,
-            self._rule_pipeline_behind_target,
-            self._rule_cash_low,
-            self._rule_slow_lead_followup,
-        ):
+        for rule in self._rules_for_type(
+                dashboard_context.get("dashboard_type")):
             try:
                 rule(items, dashboard_context)
             except Exception as exc:  # noqa: BLE001
@@ -75,6 +73,38 @@ class RuleBasedAdapter(BaseAdapter):
 
     def health_check(self):
         return self.env is not None
+
+    def _rules_for_type(self, dashboard_type):
+        """Return the ordered rule subset for a dashboard_type.
+        Director (and any unknown type) gets the full six."""
+        all_rules = (
+            self._rule_overdue_invoices,
+            self._rule_crew_gaps,
+            self._rule_cert_expiry,
+            self._rule_pipeline_behind_target,
+            self._rule_cash_low,
+            self._rule_slow_lead_followup,
+        )
+        subsets = {
+            "sales": (
+                self._rule_pipeline_behind_target,
+                self._rule_slow_lead_followup,
+                self._rule_overdue_invoices,
+            ),
+            "bookkeeper": (
+                self._rule_overdue_invoices,
+                self._rule_cash_low,
+            ),
+            "lead_tech": (
+                self._rule_crew_gaps,
+                self._rule_cert_expiry,
+            ),
+            "tech": (
+                self._rule_crew_gaps,
+                self._rule_cert_expiry,
+            ),
+        }
+        return subsets.get(dashboard_type, all_rules)
 
     # ==============================================================
     # Six rules per addendum §8
@@ -128,8 +158,13 @@ class RuleBasedAdapter(BaseAdapter):
             ]),
         ], limit=10)
         for job in jobs:
-            required = getattr(job, "crew_required", 0) or 0
-            assigned = getattr(job, "crew_assigned", 0) or 0
+            # ⚠️ DECISION (P8B.M3, field-name fix): the M11 code read
+            # crew_required / crew_assigned, which DO NOT exist on
+            # commercial.event.job -- so this rule never fired. The
+            # real computed fields (confirmed at P8B Gate 1) are
+            # crew_total_count / crew_confirmed_count.
+            required = job.crew_total_count or 0
+            assigned = job.crew_confirmed_count or 0
             if required <= assigned:
                 continue
             days_notice = (job.event_date - today).days

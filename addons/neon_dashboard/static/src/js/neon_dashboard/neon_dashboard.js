@@ -67,7 +67,12 @@ export class NeonDashboard extends Component {
         this._visibilityHandler = null;
 
         onWillStart(async () => {
-            await this.loadData();
+            // P8B: honour ?dashboard_type=<type> for bookmarks /
+            // deep-links. Session-transient -- not persisted. The RPC
+            // only applies it for superusers (peek-ability); a non-
+            // superuser's requested type is ignored server-side and
+            // they get their own default. No ACL bypass.
+            await this.loadData(this._urlDashboardType());
             // M11: load latest AI insight in parallel-ish after
             // main data (non-blocking on dashboard render).
             this._loadAiInsight();
@@ -135,15 +140,44 @@ export class NeonDashboard extends Component {
     onViewAsChange(ev) {
         const newType = (ev && ev.target && ev.target.value) || null;
         if (!newType) return;
+        // Reset the active chip when switching variant -- the new
+        // variant has a different chip set, so the previous filter
+        // key may not apply.
+        this.state.activeFilter = "all";
         this.loadData(newType);
     }
 
     onFilterChange(filter) {
-        // M6: "all", "operations", "sales", "finance" all functional.
-        // The Finance chip drives a Bookkeeper-style view (Cash + AR
-        // + Forecast KPI + Finance block visible; Jobs/Sales/Crew
-        // hidden).
+        // M6 director chips: all / operations / sales / finance.
+        // P8B variant chips: sales (hot/aging/won), bookkeeper
+        // (overdue/due_soon/recently_paid), lead_tech (today/next7/
+        // next30). Each is a client-side widget-visibility filter via
+        // the o_neon_dashboard__filter_<key> body class + the SCSS
+        // .widget--<key> hide rules.
         this.state.activeFilter = filter;
+    }
+
+    _urlDashboardType() {
+        // Read dashboard_type from the action context/params first,
+        // then fall back to the URL (search or hash). Returns null
+        // when absent (auto-route fires server-side).
+        try {
+            const act = this.props && this.props.action;
+            const fromCtx = act && (
+                (act.context && act.context.dashboard_type)
+                || (act.params && act.params.dashboard_type));
+            if (fromCtx) return fromCtx;
+            const search = new URLSearchParams(
+                window.location.search || "");
+            if (search.get("dashboard_type")) {
+                return search.get("dashboard_type");
+            }
+            const hash = (window.location.hash || "").replace(/^#/, "");
+            const hashParams = new URLSearchParams(hash);
+            return hashParams.get("dashboard_type") || null;
+        } catch (e) {
+            return null;
+        }
     }
 
     onEditLayoutClick() {
@@ -530,8 +564,119 @@ export class NeonDashboard extends Component {
         await this.action.doAction(stage.deeplink_action);
     }
 
+    // ==============================================================
+    // P8B variant block getters + handlers.
+    // ==============================================================
+    get hotDealsBlock() {
+        return (this.state.data && this.state.data.hot_deals_block) || {
+            empty: true, rows: [],
+        };
+    }
+
+    get agingQuotesBlock() {
+        return (this.state.data && this.state.data.aging_quotes_block) || {
+            empty: true, rows: [],
+        };
+    }
+
+    get budgetAlertsBlock() {
+        return (this.state.data && this.state.data.budget_alerts_block) || {
+            empty: true, ok: 0, warn: 0, breach: 0, severe: 0,
+            has_issues: false,
+        };
+    }
+
+    get invoiceQueueBlock() {
+        return (this.state.data && this.state.data.invoice_queue_block) || {
+            empty: true, rows: [],
+        };
+    }
+
+    get zigCostsBlock() {
+        return (this.state.data && this.state.data.zig_costs_block) || {
+            rate: 0, rate_display: "", costs: [], costs_empty: true,
+        };
+    }
+
+    get crewGapsBlock() {
+        return (this.state.data && this.state.data.crew_gaps_block) || {
+            empty: true, rows: [],
+        };
+    }
+
+    get certExpiryBlock() {
+        return (this.state.data && this.state.data.cert_expiry_block) || {
+            empty: true, rows: [],
+        };
+    }
+
+    async onQuoteRowClick(row) {
+        // Hot Deals + Aging Quotes rows share the pipeline action.
+        if (!row || !row.deeplink_action) return;
+        await this.action.doAction(row.deeplink_action);
+    }
+
+    async onInvoiceRowClick(row) {
+        if (!row || !row.id) return;
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "account.move",
+            res_id: row.id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    async onCertRowClick(row) {
+        if (!row || !row.id) return;
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "neon.training.certification",
+            res_id: row.id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    async onCrewGapsRowClick(row) {
+        if (!row || !row.deeplink_id) return;
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "commercial.event.job",
+            res_id: row.deeplink_id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
     get availableTypes() {
-        return (this.state.data && this.state.data.available_types) || [];
+        // P8B: drop 'tech' from the View-as peek list (deferred to
+        // Phase 9+); keep Director / Sales / Bookkeeper / Lead Tech.
+        const opts = (this.state.data && this.state.data.available_types)
+            || [];
+        return opts.filter((o) => o.value !== "tech");
+    }
+
+    get subtitleText() {
+        const t = (this.state.data && this.state.data.dashboard_type)
+            || "director";
+        const map = {
+            director: "Operations · Sales · Finance · Alerts",
+            sales: "Pipeline · Quotes · Leads · Win Rate",
+            bookkeeper: "AR · Cash · ZiG · Compliance",
+            lead_tech: "Jobs · Crew · Equipment · Certifications",
+            tech: "Today's Jobs",
+        };
+        return map[t] || map.director;
+    }
+
+    get headlineLabel() {
+        // §5.C frames Lead Tech as the "Operations" dashboard in the
+        // headline while the tier label stays "Lead Tech" everywhere
+        // else (View-as, role line).
+        const t = this.state.data && this.state.data.dashboard_type;
+        if (t === "lead_tech") return "Operations";
+        return this.dashboardTypeLabel;
     }
 
     get isSuperuser() {
@@ -574,12 +719,38 @@ export class NeonDashboard extends Component {
     // Jobs block).
     // ------------------------------------------------------------------
     get filters() {
-        return [
-            { key: "all", label: "All" },
-            { key: "operations", label: "Operations" },
-            { key: "sales", label: "Sales" },
-            { key: "finance", label: "Finance" },
-        ];
+        // P8B: chip set per dashboard_type. Keys match the
+        // _FILTER_HIDE_RULES dict + the SCSS filter blocks.
+        const t = (this.state.data && this.state.data.dashboard_type)
+            || "director";
+        const sets = {
+            director: [
+                { key: "all", label: "All" },
+                { key: "operations", label: "Operations" },
+                { key: "sales", label: "Sales" },
+                { key: "finance", label: "Finance" },
+            ],
+            sales: [
+                { key: "all", label: "All" },
+                { key: "hot", label: "Hot" },
+                { key: "aging", label: "Aging" },
+                { key: "won", label: "Won" },
+            ],
+            bookkeeper: [
+                { key: "all", label: "All" },
+                { key: "overdue", label: "Overdue" },
+                { key: "due_soon", label: "Due Soon" },
+                { key: "recently_paid", label: "Recently Paid" },
+            ],
+            lead_tech: [
+                { key: "all", label: "All" },
+                { key: "today", label: "Today" },
+                { key: "next7", label: "Next 7 Days" },
+                { key: "next30", label: "Next 30 Days" },
+            ],
+            tech: [{ key: "all", label: "All" }],
+        };
+        return sets[t] || sets.director;
     }
 }
 

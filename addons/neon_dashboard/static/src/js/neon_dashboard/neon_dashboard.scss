@@ -528,6 +528,131 @@ $neon-bg:            #FAFAFC;
         }
     }
 
+    // -------- P8B variant filter-chip CSS rules --------
+    // Mirror Dashboard._FILTER_HIDE_RULES 1:1 (test T8974 enforces
+    // parity by parsing these blocks). 'next30' hides nothing so it
+    // has no block. Sales chips:
+    &.o_neon_dashboard__filter_hot {
+        .widget--kpi_aging_quotes,
+        .widget--kpi_won_mtd,
+        .widget--kpi_win_rate,
+        .widget--block_aging_quotes {
+            display: none;
+        }
+    }
+    &.o_neon_dashboard__filter_aging {
+        .widget--kpi_hot_deals,
+        .widget--kpi_won_mtd,
+        .widget--kpi_win_rate,
+        .widget--block_hot_deals {
+            display: none;
+        }
+    }
+    &.o_neon_dashboard__filter_won {
+        .widget--kpi_hot_deals,
+        .widget--kpi_aging_quotes,
+        .widget--block_hot_deals,
+        .widget--block_aging_quotes {
+            display: none;
+        }
+    }
+    // Bookkeeper chips:
+    &.o_neon_dashboard__filter_overdue {
+        .widget--kpi_recent_payments,
+        .widget--kpi_recent_costs,
+        .widget--kpi_pending_invoices,
+        .widget--block_invoice_queue,
+        .widget--block_zig_costs {
+            display: none;
+        }
+    }
+    &.o_neon_dashboard__filter_due_soon {
+        .widget--kpi_recent_payments,
+        .widget--kpi_recent_costs,
+        .widget--kpi_overdue_60,
+        .widget--block_budget_alerts,
+        .widget--block_zig_costs {
+            display: none;
+        }
+    }
+    &.o_neon_dashboard__filter_recently_paid {
+        .widget--kpi_overdue_60,
+        .widget--kpi_pending_invoices,
+        .widget--kpi_ar_overdue,
+        .widget--block_invoice_queue {
+            display: none;
+        }
+    }
+    // Lead Tech chips:
+    &.o_neon_dashboard__filter_today {
+        .widget--kpi_jobs_week,
+        .widget--kpi_certs_30,
+        .widget--block_cert_expiry {
+            display: none;
+        }
+    }
+    &.o_neon_dashboard__filter_next7 {
+        .widget--kpi_certs_30,
+        .widget--block_cert_expiry {
+            display: none;
+        }
+    }
+
+    // -------- P8B variant block styling --------
+    .o_neon_row_variants {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-top: 16px;
+        .o_neon_block {
+            flex: 1 1 320px;
+            min-width: 280px;
+        }
+    }
+    .o_neon_variant_table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85em;
+        th, td { padding: 4px 6px; }
+        thead th {
+            color: $neon-muted;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.03em;
+            border-bottom: 1px solid $neon-line;
+        }
+        .o_neon_variant_row {
+            cursor: pointer;
+            border-bottom: 1px solid $neon-line;
+            &:hover { background: $neon-purple-pale; }
+        }
+        .o_neon_variant_row_critical {
+            color: $neon-accent-red;
+            font-weight: 600;
+        }
+    }
+    .o_neon_budget_summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        .o_neon_budget_pill {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        .o_neon_budget_ok { background: #DCFCE7; color: #166534; }
+        .o_neon_budget_warn { background: #FEF9C3; color: #854D0E; }
+        .o_neon_budget_breach { background: #FFEDD5; color: #9A3412; }
+        .o_neon_budget_severe { background: #FEE2E2; color: #991B1B; }
+    }
+    .o_neon_zig_rate_line {
+        margin-bottom: 8px;
+        .o_neon_zig_rate_label { color: $neon-muted; margin-right: 6px; }
+        .o_neon_zig_rate_value { font-weight: 700; color: $neon-purple; }
+    }
+
     // -------- M6 Finance block --------
     .o_neon_block_finance {
         .o_neon_block_header {
