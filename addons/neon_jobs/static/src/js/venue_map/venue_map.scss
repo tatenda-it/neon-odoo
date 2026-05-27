@@ -1,0 +1,25 @@
+// P9.M9.1 -- venue map embed (D8: 320px desktop, 240px mobile).
+.o_neon_venue_map {
+    .o_neon_venue_map_iframe {
+        width: 100%;
+        height: 320px;
+        border: 1px solid #E5E5EE;
+        border-radius: 4px;
+
+        @media (max-width: 767.98px) {
+            height: 240px;
+        }
+    }
+
+    .o_neon_venue_map_placeholder {
+        padding: 24px;
+        border: 1px dashed #E5E5EE;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .o_neon_venue_directions {
+        display: inline-block;
+        margin-top: 6px;
+    }
+}

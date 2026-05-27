@@ -18,6 +18,37 @@
                 <field name="has_active_master_contract" invisible="1"/>
                 <field name="is_rapid_ops_eligible" widget="boolean_toggle"
                        readonly="1"/>
+                <!-- P9.M9.1 (D6/D9): venue coordinates. lat/long are
+                     plain editable base Floats; user can paste coords
+                     from Google Maps ("What's here?"). coords_source is
+                     readonly and auto-managed (manual on direct edit,
+                     geocoded after Geolocate). All venue-gated. -->
+                <field name="coords_source" invisible="not is_venue"
+                       readonly="1"/>
+                <field name="partner_latitude" invisible="not is_venue"/>
+                <field name="partner_longitude" invisible="not is_venue"/>
+            </xpath>
+
+            <!-- P9.M9.1: "Manually pinned" ribbon (top-right) when the
+                 coords were hand-entered rather than geocoded. -->
+            <xpath expr="//sheet" position="inside">
+                <widget name="web_ribbon" title="Manually pinned"
+                        bg_color="text-bg-warning"
+                        invisible="coords_source != 'manual'"/>
+            </xpath>
+
+            <!-- P9.M9.1 (D6): venue-gated Geolocate button. base partner
+                 form has no header, so we add one; button hidden unless
+                 is_venue. base_geolocalize also ships a generic geolocate
+                 button near the address (left in place; hiding the stock
+                 one is deferred cosmetic scope). -->
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="action_geolocate_venue" type="object"
+                            string="Geolocate venue" class="btn-secondary"
+                            icon="fa-map-marker"
+                            invisible="not is_venue"/>
+                </header>
             </xpath>
 
             <xpath expr="//notebook" position="inside">

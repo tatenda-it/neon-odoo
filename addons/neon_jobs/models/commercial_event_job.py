@@ -152,6 +152,42 @@ class CommercialEventJob(models.Model):
         readonly=True,
     )
 
+    # === P9.M9.1 Venue Maps — coordinates + display address ===
+    # Related (non-stored) to the venue partner's base_geolocalize
+    # fields; the OWL map widget reads these off the form datapoint to
+    # build the Google Maps embed URL (D5). venue_full_address is the
+    # address-query fallback when coords are 0.
+    venue_latitude = fields.Float(
+        related="venue_id.partner_latitude",
+        string="Venue Latitude", readonly=True, digits=(16, 7),
+    )
+    venue_longitude = fields.Float(
+        related="venue_id.partner_longitude",
+        string="Venue Longitude", readonly=True, digits=(16, 7),
+    )
+    venue_full_address = fields.Char(
+        string="Venue Address",
+        compute="_compute_venue_full_address",
+    )
+
+    @api.depends("venue_id", "venue_id.street", "venue_id.street2",
+                 "venue_id.city", "venue_id.zip",
+                 "venue_id.country_id.name")
+    def _compute_venue_full_address(self):
+        """Comma-join the venue's address parts, skipping empties.
+        Used as the Google Maps query fallback when coords are unset."""
+        for rec in self:
+            v = rec.venue_id
+            if not v:
+                rec.venue_full_address = ""
+                continue
+            parts = [
+                v.street, v.street2, v.city, v.zip,
+                v.country_id.name if v.country_id else "",
+            ]
+            rec.venue_full_address = ", ".join(p.strip() for p in parts
+                                               if p and p.strip())
+
     # === Operational state ===
     state = fields.Selection(
         _EVENT_JOB_STATES,

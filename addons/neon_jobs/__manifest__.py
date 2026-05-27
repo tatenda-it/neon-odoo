@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Jobs",
-    "version": "17.0.4.0.15",
+    # 17.0.4.1.0 = P9.M9.1 Venue Maps Step 1 (base_geolocalize + embedded
+    # map on event-job form). Minor bump = new layer per CLAUDE.md.
+    # (Prompt said "17.0.2.x"; actual live version was 17.0.4.0.15.)
+    "version": "17.0.4.1.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -36,6 +39,10 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "contacts",
         "account",
         "product",
+        # P9.M9.1 -- partner_latitude/partner_longitude + geo_localize()
+        # for venue mapping. Registers the geo fields the event-job map
+        # widget reads via the venue_id related chain.
+        "base_geolocalize",
     ],
     "data": [
         "security/security.xml",
@@ -116,6 +123,11 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
             "neon_jobs/static/src/js/workshop_dashboard/workshop_dashboard.js",
             "neon_jobs/static/src/js/workshop_dashboard/workshop_dashboard.xml",
             "neon_jobs/static/src/js/workshop_dashboard/workshop_dashboard.scss",
+            # P9.M9.1 -- venue map embed widget (view_widget on the
+            # event-job form's Venue page).
+            "neon_jobs/static/src/js/venue_map/venue_map.js",
+            "neon_jobs/static/src/js/venue_map/venue_map.xml",
+            "neon_jobs/static/src/js/venue_map/venue_map.scss",
         ],
     },
     "installable": True,

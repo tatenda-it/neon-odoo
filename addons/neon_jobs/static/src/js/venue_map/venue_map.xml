@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_jobs.NeonVenueMapIframe">
+        <div class="o_neon_venue_map">
+            <t t-if="hasLocation">
+                <iframe class="o_neon_venue_map_iframe"
+                        t-att-src="iframeUrl"
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade"
+                        title="Venue location map"/>
+                <a class="o_neon_venue_directions btn btn-sm btn-link"
+                   t-att-href="directionsUrl"
+                   target="_blank" rel="noreferrer">
+                    <i class="fa fa-location-arrow me-1"/>Get directions
+                </a>
+            </t>
+            <t t-else="">
+                <div class="o_neon_venue_map_placeholder text-muted">
+                    <i class="fa fa-map-marker me-2"/>
+                    Fill address or set coordinates manually to map this venue.
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>
