@@ -1,63 +1,37 @@
 /** @odoo-module **/
 
 /**
- * P9.M9.1 -- neon_venue_map_iframe view-widget.
+ * P9.M9.1 -- neon_venue_map_iframe view-widget (form widget).
  *
- * Embedded Google Maps iframe on the commercial.event.job Venue page.
- * Reads venue_latitude / venue_longitude / venue_full_address off the
- * form datapoint and builds the keyless Maps Embed URL client-side
- * (D5). No API key: the /maps?q=...&output=embed form is free.
+ * P9.M9.2 refactor: render logic lifted into NeonVenueMapView. This
+ * class now just resolves form-record fields into View props so the
+ * M9.2 dashboard modal can reuse the same view component without
+ * dragging a form record through.
  */
 import { Component } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
+import { NeonVenueMapView } from "@neon_jobs/js/venue_map/venue_map_view";
 
 export class NeonVenueMap extends Component {
     static template = "neon_jobs.NeonVenueMapIframe";
+    static components = { NeonVenueMapView };
     static props = { ...standardWidgetProps };
 
     get _data() {
         return (this.props.record && this.props.record.data) || {};
     }
 
-    get hasCoords() {
-        const d = this._data;
-        // D5: lat==0 && lng==0 means "unset" (Harare venues are nowhere
-        // near 0,0), so treat zero coords as no-fix and fall to address.
-        return !!(d.venue_latitude && d.venue_longitude);
+    get latitude() {
+        return this._data.venue_latitude || 0;
     }
 
-    get hasLocation() {
-        return this.hasCoords || !!this._data.venue_full_address;
+    get longitude() {
+        return this._data.venue_longitude || 0;
     }
 
-    get iframeUrl() {
-        const d = this._data;
-        if (this.hasCoords) {
-            return (
-                "https://www.google.com/maps?q=" +
-                d.venue_latitude + "," + d.venue_longitude +
-                "&z=15&output=embed"
-            );
-        }
-        const addr = d.venue_full_address || "";
-        return (
-            "https://www.google.com/maps?q=" +
-            encodeURIComponent(addr) + "&z=15&output=embed"
-        );
-    }
-
-    get directionsUrl() {
-        // D5/item7: "Get directions" deep-link. Prefer coords; else
-        // fall back to the address query. Keyless Maps URL.
-        const d = this._data;
-        const dest = this.hasCoords
-            ? d.venue_latitude + "," + d.venue_longitude
-            : (d.venue_full_address || "");
-        return (
-            "https://www.google.com/maps/dir/?api=1&destination=" +
-            encodeURIComponent(dest)
-        );
+    get fullAddress() {
+        return this._data.venue_full_address || "";
     }
 }
 

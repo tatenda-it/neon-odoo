@@ -20,6 +20,12 @@ suites below). All Phase 8B + affected dashboard suites green (Python +
 browser). Captured for future-regression diff comparison: any later run
 can diff against this file to answer "is this failure new or old?".
 
+**Update 2026-05-28 (P9.M9.2 close):** p6m1 added (same family —
+conversion_rate fixture unique-key violation accumulated since
+capture). p9m1_1_drop_pin T9111 was a stale literal-version
+assertion; fixed in-place to drop the hard-coded `"17.0.4.2.0"`
+match. Otherwise drift set unchanged.
+
 ---
 
 ## p2m2 — 7/11 (state-transition guards not blocking)
@@ -63,6 +69,23 @@ T36: FAIL
 T38: FAIL
 Total: 6/8 passed
 ```
+
+## p6m1 — NO SUMMARY (UniqueViolation on conversion_rate fixture, 2026-05-28)
+
+Surfaced during P9.M9.2 regression on 2026-05-28; not present at the
+2026-05-26 baseline capture but same family — accumulated fixture
+rows in the long-lived dev DB violating a unique index:
+
+```
+psycopg2.errors.UniqueViolation: duplicate key value violates unique
+  constraint "neon_finance_conversion_rate_unique_effective_date"
+DETAIL:  Key (effective_date)=(2026-05-18) already exists.
+```
+
+Setup-time crash; no assertions reached. Untouched by P9.M9.2 (which
+only edits `neon_dashboard` + `neon_jobs/static/src/js/venue_map`).
+Same triage trigger as the other p2/p6 entries — fixture cleanup
+debt that will resolve on next dev-DB rebuild.
 
 ## p6m3 — 18/28 (pricing day-multiplier mismatches)
 

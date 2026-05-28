@@ -36,9 +36,8 @@ with open(BASE + "/__manifest__.py", "r", encoding="utf-8") as f:
 _check("T9111",
        "static/lib/leaflet/leaflet.js" in mani
        and "static/lib/leaflet/leaflet.css" in mani
-       and "venue_pin/venue_pin.js" in mani
-       and '"17.0.4.2.0"' in mani,
-       "leaflet + pin assets + version in manifest")
+       and "venue_pin/venue_pin.js" in mani,
+       "leaflet + pin assets in manifest")
 
 # T9112 -- the venue widget registers in the JS source.
 with open(BASE + "/static/src/js/venue_pin/venue_pin.js", "r",

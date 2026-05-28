@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_dashboard.NeonVenueMapDialog">
+        <Dialog title="props.title" size="'md'"
+                contentClass="'o_neon_venue_modal'">
+            <NeonVenueMapView latitude="props.latitude"
+                              longitude="props.longitude"
+                              fullAddress="props.fullAddress"/>
+        </Dialog>
+    </t>
+
+</templates>

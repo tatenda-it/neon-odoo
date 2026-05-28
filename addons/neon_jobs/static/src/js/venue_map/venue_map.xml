@@ -1,7 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
+    <!--
+        P9.M9.2: the iframe + placeholder markup moved into the
+        reusable NeonVenueMapView template below. NeonVenueMapIframe
+        now wraps it for the form-widget consumer (M9.1) so existing
+        registry binding continues to render identical markup. The
+        M9.2 dashboard dialog mounts NeonVenueMapView directly.
+    -->
     <t t-name="neon_jobs.NeonVenueMapIframe">
+        <NeonVenueMapView latitude="latitude"
+                          longitude="longitude"
+                          fullAddress="fullAddress"/>
+    </t>
+
+    <t t-name="neon_jobs.NeonVenueMapView">
         <div class="o_neon_venue_map">
             <t t-if="hasLocation">
                 <iframe class="o_neon_venue_map_iframe"
@@ -18,7 +31,7 @@
             <t t-else="">
                 <div class="o_neon_venue_map_placeholder text-muted">
                     <i class="fa fa-map-marker me-2"/>
-                    Fill address or set coordinates manually to map this venue.
+                    No location set for this venue. Set coordinates or fill the address to enable the map.
                 </div>
             </t>
         </div>

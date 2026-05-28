@@ -1405,6 +1405,14 @@ class NeonDashboard(models.Model):
             crew_gap = max(crew_total - crew_confirmed, 0)
             badge, color = _STATE_BADGE.get(j.state, ("PENDING", "grey"))
             value, value_display = self._quote_value_for(j)
+            # ⚠️ DECISION (P9.M9.2, marker 1): four venue-coord keys
+            # added to power the dashboard pin modal (D6). venue_id /
+            # venue_latitude / venue_longitude are related fields off
+            # commercial.event.job (added P9.M9.1); venue_full_address
+            # is a non-stored compute. Reading them inside the existing
+            # loop costs ONE extra res_partner prefetch for the
+            # recordset -- no per-row query. Zero coords mean "unset"
+            # per the M9.1 hasCoords getter convention.
             rows.append({
                 "id": j.id,
                 "client_name":
@@ -1420,6 +1428,10 @@ class NeonDashboard(models.Model):
                 "crew_gap": crew_gap,
                 "venue":
                     (j.venue_id and j.venue_id.name) or "",
+                "venue_id": (j.venue_id and j.venue_id.id) or False,
+                "venue_latitude": j.venue_latitude or 0.0,
+                "venue_longitude": j.venue_longitude or 0.0,
+                "venue_full_address": j.venue_full_address or "",
                 "value": value,
                 "value_display": value_display,
                 "deeplink_action":

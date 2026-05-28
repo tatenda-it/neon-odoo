@@ -6,7 +6,10 @@
     # 8.10/8.11/8.12 = Phase 8B Sales / Bookkeeper / Lead Tech variants.
     # 8.13 = Phase 8B M4 Edit Layout (per-user hide/reorder).
     # 8.13.1 = Phase 8B M5 brand-separator polish + phase close.
-    "version": "17.0.8.13.1",
+    # 8.14.0 = P9.M9.2 dashboard Jobs-block venue pin + modal map
+    # (first Dialog-service consumer in neon_dashboard; reuses the
+    # M9.2 NeonVenueMapView from neon_jobs).
+    "version": "17.0.8.14.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
@@ -130,6 +133,14 @@ ranganai by login).
         "web.assets_backend": [
             # OWL bundle -- mirrors cash_flow_dashboard structure
             # (js + xml + scss in one directory).
+            # P9.M9.2 -- venue map dialog component must load BEFORE
+            # neon_dashboard.js (which imports NeonVenueMapDialog).
+            "neon_dashboard/static/src/js/neon_venue_map_dialog/"
+            "neon_venue_map_dialog.js",
+            "neon_dashboard/static/src/js/neon_venue_map_dialog/"
+            "neon_venue_map_dialog.xml",
+            "neon_dashboard/static/src/js/neon_venue_map_dialog/"
+            "neon_venue_map_dialog.scss",
             "neon_dashboard/static/src/js/neon_dashboard/"
             "neon_dashboard.js",
             "neon_dashboard/static/src/js/neon_dashboard/"

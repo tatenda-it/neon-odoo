@@ -52,7 +52,14 @@
                                           class="o_neon_jobs_gap"
                                           t-esc="' (-' + row.crew_gap + ')'"/>
                                 </td>
-                                <td t-esc="row.venue"/>
+                                <td class="o_neon_jobs_venue_cell">
+                                    <i class="fa fa-map-marker o_neon_jobs_venue_pin"
+                                       t-on-click.stop="(ev) => this.onVenuePinClick(ev, row)"
+                                       role="button"
+                                       aria-label="Open venue map"
+                                       title="Open venue map"/>
+                                    <span t-esc="row.venue"/>
+                                </td>
                                 <td class="text-end" t-esc="row.value_display"/>
                             </tr>
                         </t>

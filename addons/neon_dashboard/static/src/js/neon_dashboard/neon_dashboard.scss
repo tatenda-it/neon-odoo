@@ -305,6 +305,31 @@ $neon-bg:            #FAFAFC;
         margin-left: 4px;
     }
 
+    // P9.M9.2 -- venue pin icon inline-left of venue name (D2 / D9).
+    // The pin opens the mini-map modal; the venue text + the rest of
+    // the row still fall through to onJobClick (which opens the
+    // event_job form). t-on-click.stop on the <i> separates the two.
+    .o_neon_jobs_venue_cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .o_neon_jobs_venue_pin {
+        color: $neon-purple;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 3px;
+        line-height: 1;
+        &:hover {
+            background-color: rgba(91, 42, 138, 0.08);
+        }
+        @media (max-width: 767.98px) {
+            // iOS/Android 44px accessibility minimum (D9). Icon
+            // stays visually small; padding extends the hit area.
+            padding: 12px;
+        }
+    }
+
     // -------- M4 Crew & Equipment block --------
     .o_neon_block_crew_equipment {
         .o_neon_crew_subwidget {

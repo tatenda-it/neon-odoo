@@ -1,0 +1,23 @@
+// P9.M9.2 -- venue map modal scoped styling.
+//
+// The Dialog component wraps content in .modal-body inside .modal-
+// content. We zero the body padding so the iframe runs edge-to-edge
+// and the modal sizes naturally around the 320px iframe + Get
+// directions link from NeonVenueMapView (D8 of M9.1).
+.o_neon_venue_modal {
+    .modal-body {
+        padding: 0;
+    }
+
+    .o_neon_venue_map {
+        padding: 12px;
+
+        .o_neon_venue_map_iframe {
+            height: 320px;
+
+            @media (max-width: 767.98px) {
+                height: 240px;
+            }
+        }
+    }
+}

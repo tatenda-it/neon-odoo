@@ -5,7 +5,10 @@
     # map on event-job form). Minor bump = new layer per CLAUDE.md.
     # (Prompt said "17.0.2.x"; actual live version was 17.0.4.0.15.)
     # 17.0.4.2.0 = P9.M9.1.1 Leaflet drop-pin (first vendored library).
-    "version": "17.0.4.2.0",
+    # 17.0.4.3.0 = P9.M9.2 NeonVenueMapView refactor (render logic
+    # lifted out of NeonVenueMap form widget so neon_dashboard can
+    # mount the same view inside a Dialog).
+    "version": "17.0.4.3.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -126,6 +129,11 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
             "neon_jobs/static/src/js/workshop_dashboard/workshop_dashboard.scss",
             # P9.M9.1 -- venue map embed widget (view_widget on the
             # event-job form's Venue page).
+            # P9.M9.2 -- venue_map_view.js carries the presentational
+            # OWL component reused by both the form widget and the
+            # dashboard dialog; loaded first so venue_map.js can
+            # import it.
+            "neon_jobs/static/src/js/venue_map/venue_map_view.js",
             "neon_jobs/static/src/js/venue_map/venue_map.js",
             "neon_jobs/static/src/js/venue_map/venue_map.xml",
             "neon_jobs/static/src/js/venue_map/venue_map.scss",

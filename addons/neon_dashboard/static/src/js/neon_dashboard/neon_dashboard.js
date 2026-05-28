@@ -12,6 +12,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useSortable } from "@web/core/utils/sortable_owl";
 import { _t } from "@web/core/l10n/translation";
+import { NeonVenueMapDialog } from "@neon_dashboard/js/neon_venue_map_dialog/neon_venue_map_dialog";
 
 
 // P8B.M4: content blocks that may be hidden/reordered, with their
@@ -65,6 +66,7 @@ export class NeonDashboard extends Component {
         this.orm = useService("orm");
         this.action = useService("action");
         this.notification = useService("notification");
+        this.dialog = useService("dialog");
 
         this.state = useState({
             loading: true,
@@ -465,6 +467,17 @@ export class NeonDashboard extends Component {
         if (xmlid) {
             await this.action.doAction(xmlid);
         }
+    }
+
+    // P9.M9.2 -- venue pin opens the mini-map modal (D3 / D4 / D5).
+    // t-on-click.stop prevents the row's onJobClick from firing too.
+    onVenuePinClick(ev, row) {
+        this.dialog.add(NeonVenueMapDialog, {
+            title: row.venue || "Venue",
+            latitude: row.venue_latitude || 0,
+            longitude: row.venue_longitude || 0,
+            fullAddress: row.venue_full_address || "",
+        });
     }
 
     // ------------------------------------------------------------------
