@@ -108,6 +108,40 @@
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="38"/>
 
+    <!-- P9.M9.3 — Venues · Map (multi-pin client action). Sits at
+         sequence 36 between Closeout Queue (37) and earlier entries.
+         ⚠️ DECISION (M9.3, marker 1): operations menu placement, NOT
+         under Configuration. Geographic awareness is operational; the
+         CRUD venue editor remains under Configuration > Venues. ACL
+         mirrors existing menu_venues (manager + admin) PLUS Lead Tech
+         per D2; Sales/crew/bookkeeper out of scope. -->
+    <record id="action_neon_venue_multi_map_server" model="ir.actions.server">
+        <field name="name">Venues · Map</field>
+        <field name="model_id" ref="base.model_res_partner"/>
+        <field name="state">code</field>
+        <field name="code">action = {
+            "type": "ir.actions.client",
+            "tag": "neon_venue_multi_map",
+            "name": "Venues · Map",
+        }</field>
+        <!-- groups_id on the server-action wrapper is mandatory per
+             P5.M10 / P6.M10 / P8A.M1 precedent (without it Odoo falls
+             into the write-ACL branch and our res.partner reuse hits
+             the wrong code path). -->
+        <field name="groups_id" eval="[(6, 0, [
+            ref('base.group_system'),
+            ref('neon_jobs.group_neon_jobs_manager'),
+            ref('neon_jobs.group_neon_jobs_crew_leader'),
+        ])]"/>
+    </record>
+
+    <menuitem id="menu_neon_venue_multi_map"
+              name="Venues · Map"
+              parent="menu_operations_root"
+              action="action_neon_venue_multi_map_server"
+              sequence="36"
+              groups="base.group_system,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"/>
+
     <!-- P5.M1 — Workshop top-level navigation. Gated to manager +
          crew_leader (crew_leader added in P5.M10 hotfix so the
          dashboard Overview is reachable from the menu — the deeper

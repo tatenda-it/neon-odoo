@@ -1,0 +1,233 @@
+// P9.M9.3 -- Venues · Map two-pane client action.
+//
+// Mirrors neon_dashboard breakpoints (767.98px / 991.98px) and the
+// M9.1.1 map heights (320px desktop / 240px mobile). Chip styling
+// matches reference_owl_dashboard_pattern.
+.o_neon_venue_multi_map {
+    padding: 16px;
+
+    .o_neon_venue_multi_map__loading,
+    .o_neon_venue_multi_map__error {
+        padding: 24px;
+        text-align: center;
+    }
+
+    .o_neon_venue_multi_map__header {
+        margin-bottom: 12px;
+
+        h3 {
+            margin: 0 0 4px 0;
+            font-weight: 600;
+        }
+
+        .o_neon_venue_multi_map__summary {
+            font-size: 0.9em;
+            color: #6E6E80;
+        }
+
+        .o_neon_venue_multi_map__count_mapped {
+            color: #3FBF7F;
+            font-weight: 600;
+        }
+
+        .o_neon_venue_multi_map__count_unmapped {
+            color: #F5A623;
+            font-weight: 600;
+        }
+    }
+
+    .o_neon_venue_multi_map__grid {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 16px;
+        align-items: start;
+    }
+
+    .o_neon_venue_multi_map__list_pane {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .o_neon_venue_multi_map__chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .o_neon_venue_multi_map__chip {
+        background: white;
+        border: 1px solid #E5E5EE;
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 0.85em;
+        cursor: pointer;
+        color: #6E6E80;
+
+        &:hover {
+            background: #F0E7FA;
+            border-color: #9F7BD3;
+        }
+
+        &.o_neon_chip__active {
+            background: #5B2A8A;
+            color: white;
+            border-color: #5B2A8A;
+        }
+    }
+
+    .o_neon_venue_multi_map__list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .o_neon_venue_multi_map__card {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #E5E5EE;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        transition: background-color 0.1s ease;
+
+        &:hover {
+            background: #F8F4FC;
+            border-color: #9F7BD3;
+        }
+
+        &.o_neon_venue_multi_map__card_selected {
+            background: #F0E7FA;
+            border-color: #5B2A8A;
+        }
+    }
+
+    .o_neon_venue_multi_map__card_icon {
+        font-size: 1.2em;
+        margin-top: 2px;
+        flex-shrink: 0;
+
+        &.o_neon_venue_multi_map__icon_mapped { color: #3FBF7F; }
+        &.o_neon_venue_multi_map__icon_address { color: #F5A623; }
+        &.o_neon_venue_multi_map__icon_empty { color: #B0B0BE; }
+    }
+
+    .o_neon_venue_multi_map__card_body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .o_neon_venue_multi_map__card_name {
+        font-weight: 600;
+        color: #1F1F2E;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .o_neon_venue_multi_map__card_city {
+        font-size: 0.82em;
+        color: #6E6E80;
+        margin-top: 1px;
+    }
+
+    .o_neon_venue_multi_map__badge {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 0.72em;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+
+        &.o_neon_venue_multi_map__badge_mapped {
+            background: rgba(63, 191, 127, 0.15);
+            color: #2A8E5C;
+        }
+        &.o_neon_venue_multi_map__badge_address {
+            background: rgba(245, 166, 35, 0.15);
+            color: #B26F00;
+        }
+        &.o_neon_venue_multi_map__badge_empty {
+            background: rgba(176, 176, 190, 0.20);
+            color: #6E6E80;
+        }
+    }
+
+    .o_neon_venue_multi_map__empty {
+        padding: 12px;
+        text-align: center;
+        font-size: 0.9em;
+    }
+
+    .o_neon_venue_multi_map__map_pane {
+        position: relative;
+    }
+
+    .o_neon_venue_multi_map__map {
+        height: 480px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #E5E5EE;
+        z-index: 0;     // keep Leaflet panes below Odoo overlays
+    }
+
+    .o_neon_venue_multi_map__hint {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        padding: 10px 14px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #F5A623;
+        border-radius: 6px;
+        font-size: 0.9em;
+        color: #1F1F2E;
+        z-index: 500;       // above tiles (200), markers (600)
+
+        a {
+            color: #5B2A8A;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+    }
+
+    // -------- Leaflet popup contents (D3) --------
+    // Leaflet renders popups outside our component subtree so the
+    // class needs to be applied at the leaflet-popup-content level.
+    .o_neon_venue_popup {
+        strong { font-size: 1em; }
+        .o_neon_venue_popup_city {
+            font-size: 0.82em;
+            color: #6E6E80;
+            margin-top: 2px;
+        }
+        .o_neon_venue_popup_open {
+            display: inline-block;
+            margin-top: 6px;
+            font-weight: 600;
+            color: #5B2A8A;
+        }
+    }
+
+    // -------- Responsive --------
+    @media (max-width: 991.98px) {
+        .o_neon_venue_multi_map__grid {
+            grid-template-columns: 1fr;
+        }
+        .o_neon_venue_multi_map__list {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        padding: 10px;
+        .o_neon_venue_multi_map__map {
+            height: 240px;
+        }
+    }
+}

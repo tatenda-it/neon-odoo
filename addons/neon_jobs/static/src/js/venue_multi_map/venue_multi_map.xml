@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_jobs.NeonVenueMultiPinMap">
+        <div class="o_neon_venue_multi_map">
+
+            <div t-if="state.loading"
+                 class="o_neon_venue_multi_map__loading text-muted">
+                Loading venues…
+            </div>
+
+            <div t-if="state.error"
+                 class="o_neon_venue_multi_map__error alert alert-danger">
+                <t t-esc="state.error"/>
+            </div>
+
+            <t t-if="!state.loading and !state.error">
+                <div class="o_neon_venue_multi_map__header">
+                    <h3>Venues · Map</h3>
+                    <div class="o_neon_venue_multi_map__summary">
+                        <span t-esc="state.venues.length"/>
+                        venue<t t-if="state.venues.length != 1">s</t>
+                        ·
+                        <span class="o_neon_venue_multi_map__count_mapped"
+                              t-esc="mappedCount"/> mapped
+                        ·
+                        <span class="o_neon_venue_multi_map__count_unmapped"
+                              t-esc="unmappedCount"/> need coordinates
+                    </div>
+                </div>
+
+                <div class="o_neon_venue_multi_map__grid">
+
+                    <div class="o_neon_venue_multi_map__list_pane">
+                        <input type="text"
+                               class="form-control form-control-sm o_neon_venue_multi_map__search"
+                               placeholder="Search name or city…"
+                               t-on-input="onSearchInput"/>
+                        <div class="o_neon_venue_multi_map__chips">
+                            <button type="button"
+                                    class="o_neon_venue_multi_map__chip"
+                                    t-att-class="state.filter === 'all'
+                                        ? 'o_neon_chip__active' : ''"
+                                    t-on-click="() => this.onChipClick('all')">
+                                All
+                            </button>
+                            <button type="button"
+                                    class="o_neon_venue_multi_map__chip"
+                                    t-att-class="state.filter === 'mapped'
+                                        ? 'o_neon_chip__active' : ''"
+                                    t-on-click="() => this.onChipClick('mapped')">
+                                Mapped
+                            </button>
+                            <button type="button"
+                                    class="o_neon_venue_multi_map__chip"
+                                    t-att-class="state.filter === 'unmapped'
+                                        ? 'o_neon_chip__active' : ''"
+                                    t-on-click="() => this.onChipClick('unmapped')">
+                                Unmapped
+                            </button>
+                        </div>
+
+                        <div class="o_neon_venue_multi_map__list">
+                            <t t-foreach="getFilteredVenues()" t-as="v"
+                               t-key="v.id">
+                                <div class="o_neon_venue_multi_map__card"
+                                     t-att-class="state.selectedId === v.id
+                                         ? 'o_neon_venue_multi_map__card_selected' : ''"
+                                     t-on-click="() => this.onListRowClick(v)">
+                                    <i class="fa fa-map-marker o_neon_venue_multi_map__card_icon"
+                                       t-att-class="'o_neon_venue_multi_map__icon_' + coordState(v)"/>
+                                    <div class="o_neon_venue_multi_map__card_body">
+                                        <div class="o_neon_venue_multi_map__card_name"
+                                             t-esc="v.name"/>
+                                        <div t-if="cityCountry(v)"
+                                             class="o_neon_venue_multi_map__card_city"
+                                             t-esc="cityCountry(v)"/>
+                                        <span class="o_neon_venue_multi_map__badge"
+                                              t-att-class="'o_neon_venue_multi_map__badge_' + coordState(v)"
+                                              t-esc="coordBadgeLabel(v)"/>
+                                    </div>
+                                </div>
+                            </t>
+                            <div t-if="!getFilteredVenues().length"
+                                 class="o_neon_venue_multi_map__empty text-muted">
+                                No venues match the current filter.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_neon_venue_multi_map__map_pane">
+                        <div t-ref="map"
+                             class="o_neon_venue_multi_map__map"/>
+                        <div t-if="hasUnmappedSelection"
+                             class="o_neon_venue_multi_map__hint">
+                            <i class="fa fa-info-circle me-2"/>
+                            This venue has no coordinates.
+                            <a href="#" t-on-click.prevent="onOpenSelectedClick">
+                                Open to geocode →
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </t>
+
+        </div>
+    </t>
+
+</templates>

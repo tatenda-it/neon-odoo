@@ -8,7 +8,10 @@
     # 17.0.4.3.0 = P9.M9.2 NeonVenueMapView refactor (render logic
     # lifted out of NeonVenueMap form widget so neon_dashboard can
     # mount the same view inside a Dialog).
-    "version": "17.0.4.3.0",
+    # 17.0.4.4.0 = P9.M9.3 Venues · Map multi-pin client action
+    # (NeonVenueMultiPinMap; forked from M9.1.1 per D6, Leaflet
+    # bootstrap duplicated by ~30 LOC; consolidation deferred).
+    "version": "17.0.4.4.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -146,6 +149,13 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
             "neon_jobs/static/src/js/venue_pin/venue_pin.js",
             "neon_jobs/static/src/js/venue_pin/venue_pin.xml",
             "neon_jobs/static/src/js/venue_pin/venue_pin.scss",
+            # P9.M9.3 -- Venues · Map multi-pin client action. Loads
+            # AFTER venue_pin.js so the global L.Icon.Default.imagePath
+            # set there is in effect by the time we mount; the multi-
+            # map widget also sets it defensively in _initMap.
+            "neon_jobs/static/src/js/venue_multi_map/venue_multi_map.js",
+            "neon_jobs/static/src/js/venue_multi_map/venue_multi_map.xml",
+            "neon_jobs/static/src/js/venue_multi_map/venue_multi_map.scss",
         ],
     },
     "installable": True,
