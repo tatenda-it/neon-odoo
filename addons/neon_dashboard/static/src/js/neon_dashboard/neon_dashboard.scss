@@ -23,6 +23,49 @@ $neon-bg:            #FAFAFC;
     background: $neon-bg;
     min-height: 100vh;
     color: $neon-text;
+    position: relative;
+
+    // P12.M1 -- when the chat panel mounts, the .o_neon_ai_chat
+    // sibling lives inside .o_neon_dashboard. We position it fixed
+    // to the right edge and pad the dashboard body so the main
+    // grid reflows clear of it. At <992px (mobile) the chat goes
+    // full-screen overlay and we drop the padding.
+    > .o_neon_ai_chat {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 900;
+    }
+    &.o_neon_dashboard_chat_rail {
+        padding-right: 64px;
+    }
+    &.o_neon_dashboard_chat_expanded {
+        padding-right: 376px;
+    }
+    @media (max-width: 991.98px) {
+        &.o_neon_dashboard_chat_rail,
+        &.o_neon_dashboard_chat_expanded {
+            padding-right: 16px;
+        }
+        > .o_neon_ai_chat.o_neon_ai_chat_collapsed {
+            // Float a small FAB-style icon at the bottom-right so
+            // mobile users can summon the chat without losing main
+            // grid real estate.
+            top: auto;
+            bottom: 16px;
+            right: 16px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            .o_neon_ai_chat__rail {
+                border-radius: 50%;
+                border-left: none;
+                padding: 8px 0;
+            }
+        }
+    }
 
     // -------- Header --------
     .o_neon_dashboard_header {

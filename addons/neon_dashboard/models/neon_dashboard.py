@@ -442,6 +442,12 @@ class NeonDashboard(models.Model):
             # p8a-hygiene tz: render the refresh timestamp in
             # Africa/Harare so Robin sees the operational TZ.
             "last_updated": self._format_harare_timestamp(),
+            # P12.M1: meta the OWL client uses to hydrate the
+            # AI Sales Copilot chat-panel expand/collapse state.
+            "user_meta": {
+                "chat_panel_expanded":
+                    bool(self.env.user.chat_panel_expanded),
+            },
         }
         # P8B: variant-specific blocks. Computed only for the variant
         # that renders them so director/tech don't pay for queries

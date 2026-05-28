@@ -738,7 +738,7 @@
 
     <t t-name="neon_dashboard.NeonDashboard">
         <div class="o_neon_dashboard"
-             t-att-class="'o_neon_dashboard__filter_' + state.activeFilter + (state.editMode ? ' o_neon_dashboard_editing' : '')">
+             t-att-class="(isChatVisible ? (state.chatExpanded ? 'o_neon_dashboard_chat_expanded ' : 'o_neon_dashboard_chat_rail ') : '') + 'o_neon_dashboard__filter_' + state.activeFilter + (state.editMode ? ' o_neon_dashboard_editing' : '')">
 
             <!-- ===================================================== Header -->
             <div class="o_neon_dashboard_header">
@@ -1170,6 +1170,13 @@
                 </t>
 
             </div>
+
+            <!-- P12.M1 AI Sales Copilot chat panel. Only mounts for
+                 Director + Sales variants AND for users in the sales
+                 group set (server-enforced via /neon/ai_chat ACL). -->
+            <NeonAiChat t-if="isChatVisible"
+                        expanded="state.chatExpanded"
+                        onToggle="(v) => this.onChatToggle(v)"/>
         </div>
     </t>
 

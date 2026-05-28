@@ -13,6 +13,7 @@ import { useService } from "@web/core/utils/hooks";
 import { useSortable } from "@web/core/utils/sortable_owl";
 import { _t } from "@web/core/l10n/translation";
 import { NeonVenueMapDialog } from "@neon_dashboard/js/neon_venue_map_dialog/neon_venue_map_dialog";
+import { NeonAiChat } from "@neon_dashboard/js/ai_chat/ai_chat";
 
 
 // P8B.M4: content blocks that may be hidden/reordered, with their
@@ -61,12 +62,14 @@ const MANDATORY_BLOCKS = new Set(["block_alerts"]);
 export class NeonDashboard extends Component {
     static template = "neon_dashboard.NeonDashboard";
     static props = { "*": true };
+    static components = { NeonAiChat };
 
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
         this.notification = useService("notification");
         this.dialog = useService("dialog");
+        this.rpc = useService("rpc");
 
         this.state = useState({
             loading: true,
@@ -94,6 +97,11 @@ export class NeonDashboard extends Component {
             // Cancel discards it.
             editMode: false,
             layoutDraft: [],
+            // P12.M1 AI Sales Copilot chat panel state. Hydrated
+            // from res.users.chat_panel_expanded on first load;
+            // mutated via the panel's collapse button which echoes
+            // back to the server via /neon/ai_chat/toggle.
+            chatExpanded: false,
         });
 
         // P8B.M4: useSortable wires onto the unified block container
@@ -161,10 +169,41 @@ export class NeonDashboard extends Component {
                 [],
                 { dashboard_type: dashboardType },
             );
+            // P12.M1: hydrate chat-panel state from the user record
+            // returned in the dashboard payload. The dashboard's
+            // own user_meta block carries it.
+            const meta = (this.state.data && this.state.data.user_meta)
+                || null;
+            if (meta && typeof meta.chat_panel_expanded === "boolean") {
+                this.state.chatExpanded = meta.chat_panel_expanded;
+            }
             this.state.loading = false;
         } catch (e) {
             this.state.error = (e && e.message) || String(e);
             this.state.loading = false;
+        }
+    }
+
+    // P12.M1 AI Sales Copilot ----------------------------------
+    get isChatVisible() {
+        // Show only on Director + Sales variants (D1). Server also
+        // enforces via /neon/ai_chat ACL (D11) so a Bookkeeper or
+        // Lead Tech user peeking at Sales via View-as gets denied
+        // at the API layer even if the panel renders.
+        const dtype = this.state.data && this.state.data.dashboard_type;
+        return dtype === "director" || dtype === "sales";
+    }
+
+    async onChatToggle(nextExpanded) {
+        this.state.chatExpanded = !!nextExpanded;
+        try {
+            await this.rpc(
+                "/neon/ai_chat/toggle",
+                { expanded: this.state.chatExpanded });
+        } catch (e) {
+            // Best-effort persistence; UI state is the source of
+            // truth in-session. Surface to console only.
+            console.warn("chat toggle persistence failed", e);
         }
     }
 

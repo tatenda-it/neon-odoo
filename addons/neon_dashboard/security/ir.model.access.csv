@@ -26,3 +26,9 @@ access_neon_dashboard_send_digest_wizard_superuser,send digest wizard / superuse
 access_neon_dashboard_ai_provider_superuser,ai provider / superuser RW,model_neon_dashboard_ai_provider,neon_core.group_neon_superuser,1,1,1,0
 access_neon_dashboard_ai_insight_internal,ai insight / internal users read,model_neon_dashboard_ai_insight,base.group_user,1,0,0,0
 access_neon_dashboard_ai_insight_superuser,ai insight / superuser RW append-only,model_neon_dashboard_ai_insight,neon_core.group_neon_superuser,1,1,1,0
+access_neon_finance_ai_chat_session_sales,ai chat session / sales,model_neon_finance_ai_chat_session,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_neon_finance_ai_chat_session_manager,ai chat session / manager,model_neon_finance_ai_chat_session,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_finance_ai_chat_session_superuser,ai chat session / superuser,model_neon_finance_ai_chat_session,neon_core.group_neon_superuser,1,1,1,0
+access_neon_finance_ai_chat_message_sales,ai chat message / sales,model_neon_finance_ai_chat_message,neon_jobs.group_neon_jobs_user,1,1,1,0
+access_neon_finance_ai_chat_message_manager,ai chat message / manager,model_neon_finance_ai_chat_message,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_finance_ai_chat_message_superuser,ai chat message / superuser,model_neon_finance_ai_chat_message,neon_core.group_neon_superuser,1,1,1,0

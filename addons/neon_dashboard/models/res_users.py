@@ -30,3 +30,10 @@ class ResUsersDashboard(models.Model):
         help="Overrides the group-derived default landing dashboard. "
         "Leave blank to fall back to the tier-mapped default.",
     )
+    # P12.M1 -- per-user persistence of the AI Sales Copilot chat
+    # panel expand/collapse state. Defaults to collapsed (False) so
+    # the chat panel doesn't intrude on first dashboard load.
+    chat_panel_expanded = fields.Boolean(
+        string="Chat Panel Expanded",
+        default=False,
+    )

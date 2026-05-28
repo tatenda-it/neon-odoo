@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_dashboard.NeonAiChat">
+        <div class="o_neon_ai_chat"
+             t-att-class="props.expanded ? 'o_neon_ai_chat_expanded' : 'o_neon_ai_chat_collapsed'">
+
+            <!-- Collapsed view: vertical rail with the chat icon -->
+            <div t-if="!props.expanded"
+                 class="o_neon_ai_chat__rail"
+                 t-on-click="onToggleClick"
+                 role="button"
+                 aria-label="Open AI Sales Copilot">
+                <i class="fa fa-comments o_neon_ai_chat__rail_icon"/>
+                <div class="o_neon_ai_chat__rail_label">AI</div>
+            </div>
+
+            <!-- Expanded view: header + messages + input -->
+            <div t-if="props.expanded" class="o_neon_ai_chat__panel">
+                <div class="o_neon_ai_chat__header">
+                    <div class="o_neon_ai_chat__header_title">
+                        <i class="fa fa-comments me-2"/>
+                        Sales Copilot
+                    </div>
+                    <button type="button"
+                            class="btn btn-sm btn-link o_neon_ai_chat__collapse"
+                            t-on-click="onToggleClick"
+                            aria-label="Collapse">
+                        <i class="fa fa-chevron-right"/>
+                    </button>
+                </div>
+
+                <div class="o_neon_ai_chat__messages"
+                     t-ref="messageList">
+
+                    <div t-if="state.loadingHistory"
+                         class="o_neon_ai_chat__empty text-muted">
+                        Loading history…
+                    </div>
+
+                    <div t-if="!state.loadingHistory and !state.messages.length"
+                         class="o_neon_ai_chat__empty text-muted">
+                        Ask me about your open quotes, pipeline,
+                        stock availability, crew, or partner history.
+                    </div>
+
+                    <t t-foreach="state.messages" t-as="m"
+                       t-key="m.id">
+
+                        <!-- User bubble -->
+                        <div t-if="m.role === 'user'"
+                             class="o_neon_ai_chat__bubble o_neon_ai_chat__bubble_user">
+                            <div class="o_neon_ai_chat__bubble_body"
+                                 t-esc="m.content"/>
+                        </div>
+
+                        <!-- Assistant bubble -->
+                        <div t-if="m.role === 'assistant' and m.content"
+                             class="o_neon_ai_chat__bubble o_neon_ai_chat__bubble_assistant"
+                             t-att-class="m.is_fallback ? 'o_neon_ai_chat__bubble_fallback' : ''">
+                            <div class="o_neon_ai_chat__bubble_body"
+                                 t-esc="m.content"/>
+                        </div>
+
+                        <!-- Tool result cards -->
+                        <div t-if="m.role === 'tool' and m.tool_result"
+                             class="o_neon_ai_chat__tool_card">
+
+                            <!-- get_open_quotes / get_pending_deposits / get_partner_history quotes -->
+                            <t t-if="(m.tool_name === 'get_open_quotes' or m.tool_name === 'get_pending_deposits') and m.tool_result.rows">
+                                <div class="o_neon_ai_chat__tool_card_title">
+                                    <i class="fa fa-file-text-o me-2"/>
+                                    <t t-if="m.tool_name === 'get_open_quotes'">
+                                        Open quotes (<t t-esc="m.tool_result.count"/>)
+                                    </t>
+                                    <t t-if="m.tool_name === 'get_pending_deposits'">
+                                        Pending deposits (<t t-esc="m.tool_result.count"/>)
+                                    </t>
+                                </div>
+                                <table class="o_neon_ai_chat__table">
+                                    <tbody>
+                                        <t t-foreach="m.tool_result.rows" t-as="row"
+                                           t-key="row.id || row.quote_id">
+                                            <tr t-on-click="() => this.openQuote(row.id || row.quote_id)">
+                                                <td t-esc="row.partner_name || row.name"/>
+                                                <td t-if="row.amount_total" class="text-end"
+                                                    t-esc="this.formatMoney(row.amount_total, row.currency)"/>
+                                                <td t-if="row.amount" class="text-end"
+                                                    t-esc="this.formatMoney(row.amount, row.currency)"/>
+                                                <td class="text-end o_neon_ai_chat__meta"
+                                                    t-if="row.days_old !== undefined">
+                                                    <t t-esc="row.days_old"/>d
+                                                </td>
+                                                <td class="text-end o_neon_ai_chat__meta"
+                                                    t-if="row.days_since_sent !== undefined">
+                                                    <t t-esc="row.days_since_sent"/>d
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+
+                            <!-- check_stock_availability -->
+                            <t t-if="m.tool_name === 'check_stock_availability'">
+                                <div class="o_neon_ai_chat__tool_card_title">
+                                    <i class="fa fa-cube me-2"/>
+                                    Stock — <t t-esc="m.tool_result.category"/>
+                                </div>
+                                <div t-if="m.tool_result.ok"
+                                     class="o_neon_ai_chat__stock_summary">
+                                    <span class="o_neon_ai_chat__badge"
+                                          t-att-class="m.tool_result.available_count > 0
+                                              ? 'o_neon_ai_chat__badge_green'
+                                              : 'o_neon_ai_chat__badge_red'">
+                                        <t t-esc="m.tool_result.available_count"/> /
+                                        <t t-esc="m.tool_result.total_units"/> available
+                                    </span>
+                                    <div t-if="m.tool_result.conflicting_jobs.length"
+                                         class="o_neon_ai_chat__conflicts">
+                                        <div class="o_neon_ai_chat__conflicts_title">
+                                            Conflicts:
+                                        </div>
+                                        <t t-foreach="m.tool_result.conflicting_jobs"
+                                           t-as="c" t-key="c.event_job_id">
+                                            <div class="o_neon_ai_chat__conflict_row">
+                                                <t t-esc="c.event_job_name"/>
+                                                · <t t-esc="c.event_date"/>
+                                                · <t t-esc="c.qty_held"/> units
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <!-- get_crew_availability -->
+                            <t t-if="m.tool_name === 'get_crew_availability'">
+                                <div class="o_neon_ai_chat__tool_card_title">
+                                    <i class="fa fa-users me-2"/>
+                                    Crew —
+                                    <t t-esc="m.tool_result.start_date"/>
+                                    →
+                                    <t t-esc="m.tool_result.end_date"/>
+                                </div>
+                                <div t-if="m.tool_result.free and m.tool_result.free.length"
+                                     class="o_neon_ai_chat__crew_block">
+                                    <div class="o_neon_ai_chat__crew_label">
+                                        Free (<t t-esc="m.tool_result.free_count"/>):
+                                    </div>
+                                    <t t-foreach="m.tool_result.free" t-as="u"
+                                       t-key="u.user_id">
+                                        <span class="o_neon_ai_chat__chip_neutral"
+                                              t-esc="u.name"/>
+                                    </t>
+                                </div>
+                                <div t-if="m.tool_result.busy and m.tool_result.busy.length"
+                                     class="o_neon_ai_chat__crew_block">
+                                    <div class="o_neon_ai_chat__crew_label">
+                                        Booked (<t t-esc="m.tool_result.busy_count"/>):
+                                    </div>
+                                    <t t-foreach="m.tool_result.busy" t-as="u"
+                                       t-key="u.user_id">
+                                        <span class="o_neon_ai_chat__chip_amber"
+                                              t-esc="u.name + ' · ' + (u.role || '')"/>
+                                    </t>
+                                </div>
+                            </t>
+
+                            <!-- get_my_pipeline -->
+                            <t t-if="m.tool_name === 'get_my_pipeline' and m.tool_result.stages">
+                                <div class="o_neon_ai_chat__tool_card_title">
+                                    <i class="fa fa-th-list me-2"/>
+                                    Pipeline (<t t-esc="m.tool_result.total_count"/>)
+                                </div>
+                                <table class="o_neon_ai_chat__table">
+                                    <thead>
+                                        <tr>
+                                            <th>Stage</th>
+                                            <th class="text-end">Count</th>
+                                            <th class="text-end">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="m.tool_result.stages" t-as="s"
+                                           t-key="s.stage">
+                                            <tr>
+                                                <td t-esc="s.stage"/>
+                                                <td class="text-end" t-esc="s.count"/>
+                                                <td class="text-end"
+                                                    t-esc="this.formatMoney(s.expected_revenue_total, 'USD')"/>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+
+                            <!-- get_partner_history -->
+                            <t t-if="m.tool_name === 'get_partner_history' and m.tool_result.partner">
+                                <div class="o_neon_ai_chat__tool_card_title"
+                                     t-on-click="() => this.openPartner(m.tool_result.partner.id)">
+                                    <i class="fa fa-building-o me-2"/>
+                                    <t t-esc="m.tool_result.partner.name"/>
+                                </div>
+                                <div t-if="m.tool_result.quotes and m.tool_result.quotes.length"
+                                     class="o_neon_ai_chat__history_section">
+                                    <div class="o_neon_ai_chat__history_label">Recent quotes:</div>
+                                    <t t-foreach="m.tool_result.quotes" t-as="q"
+                                       t-key="q.id">
+                                        <div class="o_neon_ai_chat__history_row"
+                                             t-on-click="() => this.openQuote(q.id)">
+                                            <t t-esc="q.name"/>
+                                            · <t t-esc="this.formatMoney(q.amount_total, q.currency)"/>
+                                            · <t t-esc="q.state"/>
+                                        </div>
+                                    </t>
+                                </div>
+                            </t>
+
+                            <!-- get_cert_expiry -->
+                            <t t-if="m.tool_name === 'get_cert_expiry' and m.tool_result.rows">
+                                <div class="o_neon_ai_chat__tool_card_title">
+                                    <i class="fa fa-id-badge me-2"/>
+                                    Certs expiring (<t t-esc="m.tool_result.count"/>)
+                                </div>
+                                <table class="o_neon_ai_chat__table">
+                                    <tbody>
+                                        <t t-foreach="m.tool_result.rows" t-as="c"
+                                           t-key="c.id">
+                                            <tr>
+                                                <td t-esc="c.user_name"/>
+                                                <td t-esc="c.cert_name"/>
+                                                <td class="text-end o_neon_ai_chat__meta"
+                                                    t-att-class="c.is_overdue ? 'o_neon_ai_chat__meta_red' : ''">
+                                                    <t t-esc="c.days_remaining"/>d
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+
+                            <!-- Fallback / error / quote_details / dashboard_summary -->
+                            <div t-if="!m.tool_result.ok"
+                                 class="o_neon_ai_chat__tool_error">
+                                <i class="fa fa-exclamation-triangle me-2"/>
+                                <t t-esc="m.tool_result.error || 'Tool error'"/>
+                            </div>
+                        </div>
+                    </t>
+
+                    <div t-if="state.sending"
+                         class="o_neon_ai_chat__sending text-muted">
+                        <i class="fa fa-circle-o-notch fa-spin me-2"/>
+                        Searching…
+                    </div>
+                </div>
+
+                <div class="o_neon_ai_chat__input_wrap">
+                    <textarea class="o_neon_ai_chat__input form-control"
+                              t-ref="inputBox"
+                              t-att-value="state.input"
+                              t-on-input="onInputChange"
+                              t-on-keydown="onInputKeydown"
+                              placeholder="Ask about quotes, stock, crew…"
+                              rows="2"/>
+                    <button type="button"
+                            class="btn btn-primary btn-sm o_neon_ai_chat__send"
+                            t-att-disabled="state.sending or !state.input.trim()"
+                            t-on-click="onSend">
+                        Send
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </t>
+
+</templates>

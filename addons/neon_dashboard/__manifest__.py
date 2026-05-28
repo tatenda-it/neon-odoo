@@ -9,7 +9,11 @@
     # 8.14.0 = P9.M9.2 dashboard Jobs-block venue pin + modal map
     # (first Dialog-service consumer in neon_dashboard; reuses the
     # M9.2 NeonVenueMapView from neon_jobs).
-    "version": "17.0.8.14.0",
+    # 8.15.0 = P12.M1 AI Sales Copilot — chat session + message
+    # audit models, tool registry + 9 READ tools, Groq tool-calling
+    # adapter, chat orchestrator, /neon/ai_chat HTTP endpoints, OWL
+    # chat panel mounted on director + sales variants.
+    "version": "17.0.8.15.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
@@ -147,6 +151,10 @@ ranganai by login).
             "neon_dashboard.xml",
             "neon_dashboard/static/src/js/neon_dashboard/"
             "neon_dashboard.scss",
+            # P12.M1 -- AI Sales Copilot chat panel.
+            "neon_dashboard/static/src/js/ai_chat/ai_chat.js",
+            "neon_dashboard/static/src/js/ai_chat/ai_chat.xml",
+            "neon_dashboard/static/src/js/ai_chat/ai_chat.scss",
         ],
     },
     "installable": True,

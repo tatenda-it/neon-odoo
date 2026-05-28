@@ -20,3 +20,9 @@ from . import base_adapter
 from . import groq_adapter
 from . import rule_based_adapter
 from . import insight_orchestrator
+# P12.M1 -- AI Sales Copilot
+from . import chat_session_message
+from . import tool_registry
+from . import tools                  # registers @ai_tool decorators
+from . import groq_chat_adapter
+from . import chat_orchestrator
