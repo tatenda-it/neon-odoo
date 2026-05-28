@@ -20,6 +20,7 @@ export class NeonAiChat extends Component {
     static props = {
         expanded: { type: Boolean, optional: true },
         onToggle: { type: Function, optional: true },
+        activeVariant: { type: String, optional: true },
     };
 
     setup() {
@@ -28,9 +29,14 @@ export class NeonAiChat extends Component {
         this.notification = useService("notification");
 
         this.state = useState({
-            messages: [],       // {id, role, content, tool_result, tool_name, created_at, is_fallback}
+            messages: [],
             input: "",
             sending: false,
+            // D19 — thinking-dots placeholder bubble flag. True
+            // while the /neon/ai_chat/send round-trip is in
+            // flight (independent of `sending` so we keep the
+            // send button disabled separately).
+            pending: false,
             loadingHistory: true,
             error: null,
         });
@@ -95,12 +101,36 @@ export class NeonAiChat extends Component {
         this.state.messages.push(userMsg);
         this.state.input = "";
         this.state.sending = true;
+        this.state.pending = true;     // D19 thinking-dots bubble
         this._scrollToBottom();
 
-        let res = null;
         try {
-            res = await this.rpc(
-                "/neon/ai_chat/send", { message: text });
+            const res = await this.rpc(
+                "/neon/ai_chat/send",
+                {
+                    message: text,
+                    active_variant: this.props.activeVariant || "",
+                });
+            if (res) {
+                for (const card of (res.tool_cards || [])) {
+                    this.state.messages.push({
+                        id: `tool-${Date.now()}-${Math.random()}`,
+                        role: "tool",
+                        tool_name: card.tool,
+                        tool_result: card.result,
+                        created_at: new Date().toISOString(),
+                    });
+                }
+                if (res.assistant_message) {
+                    this.state.messages.push({
+                        id: `asst-${Date.now()}`,
+                        role: "assistant",
+                        content: res.assistant_message,
+                        is_fallback: !!res.is_fallback,
+                        created_at: new Date().toISOString(),
+                    });
+                }
+            }
         } catch (e) {
             this.state.messages.push({
                 id: `err-${Date.now()}`,
@@ -110,33 +140,11 @@ export class NeonAiChat extends Component {
                 is_fallback: true,
                 created_at: new Date().toISOString(),
             });
+        } finally {
             this.state.sending = false;
+            this.state.pending = false;
             this._scrollToBottom();
-            return;
         }
-
-        if (res) {
-            for (const card of (res.tool_cards || [])) {
-                this.state.messages.push({
-                    id: `tool-${Date.now()}-${Math.random()}`,
-                    role: "tool",
-                    tool_name: card.tool,
-                    tool_result: card.result,
-                    created_at: new Date().toISOString(),
-                });
-            }
-            if (res.assistant_message) {
-                this.state.messages.push({
-                    id: `asst-${Date.now()}`,
-                    role: "assistant",
-                    content: res.assistant_message,
-                    is_fallback: !!res.is_fallback,
-                    created_at: new Date().toISOString(),
-                });
-            }
-        }
-        this.state.sending = false;
-        this._scrollToBottom();
     }
 
     onToggleClick() {

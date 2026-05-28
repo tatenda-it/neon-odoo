@@ -28,6 +28,11 @@ from ..tool_registry import ai_tool
         },
     },
     category="read",
+    groups=[
+        "neon_jobs.group_neon_jobs_user",
+        "neon_core.group_neon_bookkeeper",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_partner_history(env, user, partner_id=None,
                               partner_name=None, **_):

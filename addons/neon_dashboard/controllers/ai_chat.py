@@ -25,9 +25,14 @@ from ..models.ai.chat_orchestrator import ChatOrchestrator
 _logger = logging.getLogger(__name__)
 
 
+# P12.M1.1 (D22) -- widened the chat ACL: Bookkeeper + Lead Tech
+# tiers now see the panel alongside Sales + MD/OD. Crew tier stays
+# excluded (no dashboard variant for them).
 _CHAT_GROUPS = (
     "neon_jobs.group_neon_jobs_user",
     "neon_jobs.group_neon_jobs_manager",
+    "neon_jobs.group_neon_jobs_crew_leader",
+    "neon_core.group_neon_bookkeeper",
 )
 
 
@@ -41,7 +46,7 @@ class NeonAiChatController(http.Controller):
     @http.route(
         "/neon/ai_chat/send", type="json", auth="user", methods=["POST"],
     )
-    def send(self, message=None, **kw):
+    def send(self, message=None, active_variant=None, **kw):
         if not _user_has_chat_access():
             return {"ok": False, "error": "access_denied"}
         text = (message or "").strip()
@@ -51,7 +56,8 @@ class NeonAiChatController(http.Controller):
         Session = request.env["neon.finance.ai.chat.session"].sudo()
         session = Session.get_or_create_for_user(user.id)
         orch = ChatOrchestrator(request.env)
-        return orch.handle_user_message(user, session, text)
+        return orch.handle_user_message(
+            user, session, text, active_variant=active_variant)
 
     @http.route(
         "/neon/ai_chat/history", type="json", auth="user",

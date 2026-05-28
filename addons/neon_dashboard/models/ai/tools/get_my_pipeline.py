@@ -23,6 +23,16 @@ from ..tool_registry import ai_tool
         },
     },
     category="read",
+    # ⚠️ DECISION (M12.1.1, marker inline): use the
+    # neon_core.group_neon_sales_rep cross-module tier rather than
+    # the broader neon_jobs.group_neon_jobs_user, because the
+    # bookkeeper tier implies group_neon_jobs_user (cascades up the
+    # neon_core meta-group chain). Sales-only tools must gate on
+    # the more specific neon_core.group_neon_sales_rep.
+    groups=[
+        "neon_core.group_neon_sales_rep",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_my_pipeline(env, user, stage_filter=None, **_):
     Lead = env["crm.lead"]

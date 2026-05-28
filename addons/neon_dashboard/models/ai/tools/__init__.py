@@ -15,3 +15,9 @@ from . import get_partner_history
 from . import get_pending_deposits
 from . import get_quote_details
 from . import check_stock_availability
+# P12.M1.1 — additional READ tools for Bookkeeper + Lead Tech.
+from . import get_overdue_invoices
+from . import get_zig_rate
+from . import get_budget_status
+from . import get_jobs_this_week
+from . import get_readiness_gates

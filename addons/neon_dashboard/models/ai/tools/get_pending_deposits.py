@@ -25,6 +25,11 @@ from ..tool_registry import ai_tool
         },
     },
     category="read",
+    groups=[
+        "neon_jobs.group_neon_jobs_user",
+        "neon_core.group_neon_bookkeeper",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_pending_deposits(env, user, days_overdue_min=None, **_):
     Quote = env["neon.finance.quote"]

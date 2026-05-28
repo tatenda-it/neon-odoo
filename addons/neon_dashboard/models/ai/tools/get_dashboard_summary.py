@@ -15,6 +15,12 @@ from ..tool_registry import ai_tool
         "properties": {},
     },
     category="read",
+    groups=[
+        "neon_jobs.group_neon_jobs_user",
+        "neon_core.group_neon_bookkeeper",
+        "neon_jobs.group_neon_jobs_crew_leader",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_dashboard_summary(env, user, **_):
     Dashboard = env["neon.dashboard"]

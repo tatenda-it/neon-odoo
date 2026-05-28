@@ -248,10 +248,14 @@
                         </div>
                     </t>
 
-                    <div t-if="state.sending"
-                         class="o_neon_ai_chat__sending text-muted">
-                        <i class="fa fa-circle-o-notch fa-spin me-2"/>
-                        Searching…
+                    <!-- D19 — pulsing thinking-dots while the
+                         /neon/ai_chat/send round-trip is in flight.
+                         Replaces the M12.1 spinner. -->
+                    <div t-if="state.pending"
+                         class="o_neon_ai_chat__bubble o_neon_ai_chat__bubble_assistant o_neon_ai_chat__thinking">
+                        <span class="o_neon_ai_chat__dot"/>
+                        <span class="o_neon_ai_chat__dot"/>
+                        <span class="o_neon_ai_chat__dot"/>
                     </div>
                 </div>
 

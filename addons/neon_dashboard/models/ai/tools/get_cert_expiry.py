@@ -24,6 +24,10 @@ from ..tool_registry import ai_tool
         },
     },
     category="read",
+    groups=[
+        "neon_jobs.group_neon_jobs_crew_leader",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_cert_expiry(env, user, days_ahead=None, **_):
     Cert = env["neon.training.certification"]

@@ -29,6 +29,10 @@ access_neon_dashboard_ai_insight_superuser,ai insight / superuser RW append-only
 access_neon_finance_ai_chat_session_sales,ai chat session / sales,model_neon_finance_ai_chat_session,neon_jobs.group_neon_jobs_user,1,1,1,0
 access_neon_finance_ai_chat_session_manager,ai chat session / manager,model_neon_finance_ai_chat_session,neon_jobs.group_neon_jobs_manager,1,1,1,0
 access_neon_finance_ai_chat_session_superuser,ai chat session / superuser,model_neon_finance_ai_chat_session,neon_core.group_neon_superuser,1,1,1,0
+access_neon_finance_ai_chat_session_bookkeeper,ai chat session / bookkeeper,model_neon_finance_ai_chat_session,neon_core.group_neon_bookkeeper,1,1,1,0
+access_neon_finance_ai_chat_session_lead_tech,ai chat session / lead tech,model_neon_finance_ai_chat_session,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
 access_neon_finance_ai_chat_message_sales,ai chat message / sales,model_neon_finance_ai_chat_message,neon_jobs.group_neon_jobs_user,1,1,1,0
 access_neon_finance_ai_chat_message_manager,ai chat message / manager,model_neon_finance_ai_chat_message,neon_jobs.group_neon_jobs_manager,1,1,1,0
 access_neon_finance_ai_chat_message_superuser,ai chat message / superuser,model_neon_finance_ai_chat_message,neon_core.group_neon_superuser,1,1,1,0
+access_neon_finance_ai_chat_message_bookkeeper,ai chat message / bookkeeper,model_neon_finance_ai_chat_message,neon_core.group_neon_bookkeeper,1,1,1,0
+access_neon_finance_ai_chat_message_lead_tech,ai chat message / lead tech,model_neon_finance_ai_chat_message,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0

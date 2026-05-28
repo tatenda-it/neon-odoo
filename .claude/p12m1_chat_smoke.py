@@ -88,21 +88,24 @@ s2 = Session.sudo().get_or_create_for_user(sales_user.id)
 _check("T12102", s1.id == s2.id, f"s1={s1.id} s2={s2.id}")
 
 
-# T12103 -- tool registry has 9 read tools registered
+# T12103 -- the original 9 M12.1 tools are still registered
+# (M12.1.1 added more; this test asserts the M12.1 baseline is
+# intact, not the exact count).
 read_tools = tool_registry.tool_names(category="read")
 EXPECTED = {
     "get_open_quotes", "get_quote_details", "check_stock_availability",
     "get_crew_availability", "get_pending_deposits", "get_my_pipeline",
     "get_partner_history", "get_cert_expiry", "get_dashboard_summary",
 }
-_check("T12103", set(read_tools) == EXPECTED,
+_check("T12103", EXPECTED.issubset(set(read_tools)),
        f"got={sorted(read_tools)}")
 
 
-# T12104 -- groq_tool_schemas returns OpenAI/Groq-shaped entries
+# T12104 -- groq_tool_schemas returns OpenAI/Groq-shaped entries.
+# M12.1.1 added more tools so >=9 is the post-M12.1 invariant.
 schemas = tool_registry.groq_tool_schemas(category="read")
 ok = (
-    len(schemas) == 9
+    len(schemas) >= 9
     and all(s.get("type") == "function" for s in schemas)
     and all("function" in s and "name" in s["function"]
             and "parameters" in s["function"] for s in schemas)
@@ -191,9 +194,11 @@ _check("T12113",
        f"matched={res.get('partner') is not None}")
 
 
-# T12114 -- get_cert_expiry default window
+# T12114 -- get_cert_expiry default window. M12.1.1 narrowed the
+# tool's groups list to lead_tech + manager; call as the director
+# (manager-tier) fixture user to exercise the happy path.
 res = tool_registry.dispatch(
-    "get_cert_expiry", env, sales_user, {})
+    "get_cert_expiry", env, director, {})
 _check("T12114",
        res.get("ok") is True
        and "rows" in res and "days_ahead" in res,

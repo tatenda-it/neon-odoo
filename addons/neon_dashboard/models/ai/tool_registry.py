@@ -1,28 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Phase 12.1 — AI Sales Copilot tool registry.
+"""Phase 12.1 / 12.1.1 — AI Sales Copilot tool registry.
 
-Singleton dict + ``@ai_tool`` decorator. Tools register on module
-import via side effect; the orchestrator dispatches by name.
+Singleton dict + ``@ai_tool`` decorator + per-user group filter +
+variant-scoped advertisement.
 
 ⚠️ DECISION (M12.1, marker inline): plain-Python registry, NOT an
 Odoo Model. Tools are stateless functions taking (env, user, **kw)
-and returning a JSON-serialisable dict. Keeping them out of the
-registry-as-model space means hot-swap via module reload + no
-ir.actions/ACL overhead.
+and returning a JSON-serialisable dict.
 
-⚠️ DECISION (M12.1, marker inline): tool execution wraps the env
-in user.sudo() — RLS (Phase 2 ir.rule + ACL) handles row-level
-visibility. A sales rep calling get_open_quotes sees only their own
-quotes because the existing rules already scope by user_id. The
-``user`` arg passed in is the live env.user; tools that need
-self-scoping (mine vs others) consult it directly.
+⚠️ DECISION (M12.1, marker inline): tool execution elevates env
+to SUPERUSER_ID so cross-module reads bypass row-level ACL; the
+``user`` arg is passed through so tool bodies can scope by user_id.
+
+⚠️ DECISION (M12.1.1, D23): every @ai_tool registers with a
+``groups`` list. dispatch + schema generation filter against the
+calling user's group membership; tools the user can't call are
+never exposed to the LLM.
+
+⚠️ DECISION (M12.1.1, D24): variant scope wins over group scope
+for tool advertisement. A Director peeking the Bookkeeper variant
+sees bookkeeper tools only, even though their group set permits
+every tool. Exception: manager+director combo sees ALL tools.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from odoo import SUPERUSER_ID
+
+
+# Manager tier — used in two places: the per-tool group check
+# (manager is an automatic superset) and the variant-intersection
+# exception (manager + director sees all tools).
+_MANAGER_GROUP = "neon_jobs.group_neon_jobs_manager"
 
 
 @dataclass
@@ -32,10 +43,36 @@ class ToolSpec:
     params_schema: Dict[str, Any]
     category: str = "read"            # "read" | "write"
     requires_confirmation: bool = False
+    groups: List[str] = field(default_factory=list)
     fn: Optional[Callable[..., Dict[str, Any]]] = None
 
 
 _AI_TOOLS: Dict[str, ToolSpec] = {}
+
+
+# ⚠️ DECISION (M12.1.1, D27): variant-scoped tool sets. Sentinel
+# value "*" means "all registered tools" (director sees the union).
+# The actual resolution happens in filter_tools_for_variant_and_user.
+TOOLS_BY_VARIANT: Dict[str, List[str]] = {
+    "director": ["*"],
+    "sales": [
+        "get_open_quotes", "get_quote_details",
+        "check_stock_availability", "get_crew_availability",
+        "get_pending_deposits", "get_my_pipeline",
+        "get_partner_history", "get_dashboard_summary",
+    ],
+    "bookkeeper": [
+        "get_overdue_invoices", "get_zig_rate",
+        "get_budget_status", "get_pending_deposits",
+        "get_open_quotes", "get_quote_details",
+        "get_partner_history", "get_dashboard_summary",
+    ],
+    "lead_tech": [
+        "get_jobs_this_week", "get_readiness_gates",
+        "get_crew_availability", "get_cert_expiry",
+        "check_stock_availability", "get_dashboard_summary",
+    ],
+}
 
 
 def ai_tool(
@@ -45,21 +82,21 @@ def ai_tool(
     params_schema: Dict[str, Any],
     category: str = "read",
     requires_confirmation: bool = False,
+    groups: Optional[Iterable[str]] = None,
 ):
-    """Register a tool with the singleton registry. Decorator
-    pattern; the decorated function is called via dispatch()."""
+    """Register a tool with the singleton registry. ``groups`` is
+    the list of xmlids that grant permission to call this tool. A
+    user who holds ANY of the listed groups (or the manager group
+    by D23 superset rule) can invoke it."""
 
     def wrap(fn):
-        if name in _AI_TOOLS:
-            # Idempotent re-registration (module reload during dev).
-            # Overwrite is intentional; don't raise.
-            pass
         _AI_TOOLS[name] = ToolSpec(
             name=name,
             description=description,
             params_schema=params_schema,
             category=category,
             requires_confirmation=requires_confirmation,
+            groups=list(groups or []),
             fn=fn,
         )
         return fn
@@ -72,7 +109,6 @@ def get_tool(name: str) -> Optional[ToolSpec]:
 
 
 def list_tools(category: Optional[str] = None) -> List[ToolSpec]:
-    """All registered tools, optionally filtered by category."""
     tools = list(_AI_TOOLS.values())
     if category:
         tools = [t for t in tools if t.category == category]
@@ -83,11 +119,64 @@ def tool_names(category: Optional[str] = None) -> List[str]:
     return [t.name for t in list_tools(category)]
 
 
-def groq_tool_schemas(category: Optional[str] = None) -> List[Dict]:
-    """Format the registry as the Groq /chat/completions ``tools``
-    parameter expects (OpenAI-compatible JSON Schema)."""
+def user_can_call(user, tool: ToolSpec) -> bool:
+    """True if ``user`` (res.users record) is entitled to call
+    ``tool``. Manager group is automatic superset."""
+    if not tool.groups:
+        # Tool without explicit groups is open to any chat-eligible
+        # user (defensive default for tools authored before the
+        # groups field landed).
+        return True
+    try:
+        if user.has_group(_MANAGER_GROUP):
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+    for g in tool.groups:
+        try:
+            if user.has_group(g):
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
+def filter_tools_for_variant_and_user(
+    user, variant: Optional[str], category: Optional[str] = "read",
+) -> List[ToolSpec]:
+    """Resolution per D24:
+    1. base = tools the user is entitled to (group filter)
+    2. variant_set = TOOLS_BY_VARIANT[variant] (or all for director)
+    3. result = base ∩ variant_set, EXCEPT manager+director keeps
+       all (no intersection).
+    """
+    base = [t for t in list_tools(category=category)
+            if user_can_call(user, t)]
+    variant = (variant or "director").lower()
+    variant_list = TOOLS_BY_VARIANT.get(variant) or ["*"]
+    # Manager + director exception — no intersection.
+    try:
+        is_manager = user.has_group(_MANAGER_GROUP)
+    except Exception:  # noqa: BLE001
+        is_manager = False
+    if variant == "director" and is_manager:
+        return base
+    if "*" in variant_list:
+        return base
+    allowed = set(variant_list)
+    return [t for t in base if t.name in allowed]
+
+
+def groq_tool_schemas(
+    tools: Optional[Iterable[ToolSpec]] = None,
+    category: Optional[str] = None,
+) -> List[Dict]:
+    """Format the registry (or a filtered subset) as the Groq
+    /chat/completions ``tools`` parameter expects."""
+    if tools is None:
+        tools = list_tools(category=category)
     schemas = []
-    for tool in list_tools(category):
+    for tool in tools:
         schemas.append({
             "type": "function",
             "function": {
@@ -101,22 +190,22 @@ def groq_tool_schemas(category: Optional[str] = None) -> List[Dict]:
 
 def dispatch(name: str, env, user, params: Dict[str, Any]
              ) -> Dict[str, Any]:
-    """Execute the named tool and return its dict result. Wraps
-    every error so the orchestrator can record it as a tool turn
-    without crashing the chat loop."""
+    """Execute the named tool. Wraps every error so the
+    orchestrator can record it as a tool turn without crashing
+    the chat loop. Enforces the per-tool group ACL: if the user
+    is not entitled to the tool, returns ok=False without running
+    the body."""
     tool = get_tool(name)
     if not tool or not tool.fn:
+        return {"ok": False, "error": f"Unknown tool: {name!r}"}
+    if not user_can_call(user, tool):
         return {
             "ok": False,
-            "error": f"Unknown tool: {name!r}",
+            "error": ("access_denied: this tool is not available "
+                      "for your role."),
+            "tool": name,
         }
     try:
-        # All tool executions run with an env elevated to
-        # SUPERUSER_ID (bypasses record rules + ACL across the
-        # cross-module reads tools need). Row-level scoping is
-        # performed by each tool body via the ``user`` arg
-        # (typically ``salesperson_id == user.id`` or similar).
-        # The calling user is still passed in for that filtering.
         sudo_env = env(user=SUPERUSER_ID)
         result = tool.fn(env=sudo_env, user=user, **(params or {}))
     except Exception as exc:  # noqa: BLE001
@@ -132,7 +221,5 @@ def dispatch(name: str, env, user, params: Dict[str, Any]
                 "expected dict."
             ),
         }
-    # Tag every result with the tool name so the UI card-router
-    # knows what shape to render.
     result.setdefault("tool", name)
     return result

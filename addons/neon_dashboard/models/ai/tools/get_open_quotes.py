@@ -40,6 +40,11 @@ _OPEN_STATES = ("draft", "pending_approval", "approved", "sent")
         },
     },
     category="read",
+    groups=[
+        "neon_jobs.group_neon_jobs_user",
+        "neon_core.group_neon_bookkeeper",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_open_quotes(env, user, state_filter=None,
                         value_min=None, days_old_min=None, **_):

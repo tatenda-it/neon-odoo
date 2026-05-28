@@ -20,6 +20,11 @@ from ..tool_registry import ai_tool
         "required": ["quote_id"],
     },
     category="read",
+    groups=[
+        "neon_jobs.group_neon_jobs_user",
+        "neon_core.group_neon_bookkeeper",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_quote_details(env, user, quote_id=None, **_):
     if not quote_id:

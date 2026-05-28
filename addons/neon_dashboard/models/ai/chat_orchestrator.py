@@ -1,20 +1,34 @@
 # -*- coding: utf-8 -*-
-"""Phase 12.1 — Chat orchestrator.
+"""Phase 12.1 / 12.1.1 — Chat orchestrator.
 
 Drives the multi-turn LLM<->tool-call loop. Persists every turn to
 neon.finance.ai.chat.message as an audit log.
 
 ⚠️ DECISION (M12.1, marker inline): rate limit lives at module
-scope as an in-memory dict keyed on user_id. Same pattern as M11's
-manual-refresh rate limit. Restart clears it (acceptable; a chat
-user who hits the cap can retry after process restart, and the dict
-re-populates organically). 30 req / hour / user. Sliding 1-hour
-window via timestamp list per user.
+scope as an in-memory dict keyed on user_id. 30 req / hour / user.
+Sliding 1-hour window via timestamp list per user.
 
 ⚠️ DECISION (M12.1, marker inline): max 3 tool-call iterations
 per user turn. After the 3rd iteration we return the partial
-output with a guardrail message. Prevents runaway loops where the
-model keeps requesting tool calls.
+output with a guardrail message.
+
+⚠️ DECISION (M12.1.1, D17): tool-call deduplication within one
+user turn. A duplicate (tool_name + normalised params) reuses the
+prior result instead of re-running + re-rendering.
+
+⚠️ DECISION (M12.1.1, D18): history pruning counts ALL message
+roles (user / assistant / tool), but never splits an assistant
+tool-emit from its matching tool responses. Walk backwards from
+the end; if the cutoff lands mid-pairing, extend back to the
+preceding assistant turn.
+
+⚠️ DECISION (M12.1.1, D24): tool advertisement intersects user
+groups with the variant's TOOLS_BY_VARIANT set. Manager+director
+sees all tools (no intersection).
+
+⚠️ DECISION (M12.1.1, D25): role_label in system prompt derives
+from the active variant, not the user's primary group. Director
+peeking Bookkeeper variant gets "Finance Copilot" framing.
 """
 import json
 import logging
@@ -23,7 +37,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from odoo import _, fields
+from odoo import fields
 
 from .groq_chat_adapter import GroqChatAdapter, ChatTurnResult
 from . import tool_registry
@@ -37,18 +51,28 @@ _RATE_LIMIT_WINDOW_SECONDS = 3600
 _RATE_LIMIT_BY_USER: dict = defaultdict(list)
 
 _MAX_TOOL_ITERATIONS = 3
-_HISTORY_TURN_LIMIT = 10
+# D18 — count ALL message rows, not just user+assistant turns.
+_HISTORY_MESSAGE_LIMIT = 10
+
+# D25 — variant → "Copilot" role label mapping.
+_ROLE_LABELS = {
+    "director": "Director",
+    "sales": "Sales",
+    "bookkeeper": "Finance",
+    "lead_tech": "Operations",
+}
 
 _DEFAULT_SYSTEM_PROMPT = (
-    "You are the Neon Events Sales Copilot. You help sales reps "
-    "at Neon Events Elements (event production company in Harare, "
-    "Zimbabwe) with their quotes, leads, stock, and crew. You have "
-    "tools to read data. Use tools to answer factual questions -- "
-    "never guess or invent numbers, dates, or names. When you "
-    "don't have a tool for something, say so. Keep responses "
-    "concise (2-3 sentences max unless asked for detail). Currency "
-    "is USD or ZiG (Zimbabwe Gold). VAT is 15%. Today's date is "
-    "{today_date}."
+    "You are the Neon Events {role_label} Copilot. You help "
+    "{user_name} at Neon Events Elements (event production "
+    "company in Harare, Zimbabwe). Their role is {role_label}. "
+    "You have tools relevant to their work -- never suggest "
+    "actions outside this role. Use tools to answer factual "
+    "questions -- never guess or invent numbers, dates, or "
+    "names. When you don't have a tool, say so. Keep responses "
+    "concise (2-3 sentences max unless asked for detail). "
+    "Currency: USD or ZiG (Zimbabwe Gold). VAT: 15%. Today's "
+    "date is {today_date}."
 )
 
 _SYSTEM_PROMPT_CONFIG_KEY = "neon_finance.ai_chat_system_prompt"
@@ -56,9 +80,6 @@ _SYSTEM_PROMPT_CONFIG_KEY = "neon_finance.ai_chat_system_prompt"
 
 @dataclass
 class OrchestratorResponse:
-    """Wraps everything the controller needs to return to the
-    OWL UI: the final assistant text, the structured tool result
-    cards, and meta (provider, tokens, latency, fallback)."""
     success: bool
     assistant_message: str = ""
     tool_cards: List[dict] = field(default_factory=list)
@@ -88,7 +109,6 @@ class OrchestratorResponse:
 def _check_rate_limit(user_id):
     now = time.time()
     bucket = _RATE_LIMIT_BY_USER[user_id]
-    # Drop timestamps outside the window.
     fresh = [t for t in bucket
              if now - t < _RATE_LIMIT_WINDOW_SECONDS]
     _RATE_LIMIT_BY_USER[user_id] = fresh
@@ -96,6 +116,22 @@ def _check_rate_limit(user_id):
         return False
     fresh.append(now)
     return True
+
+
+def _dedup_key(tool_name, params):
+    """Stable canonical key for D17 dedup. Sort dict keys, coerce
+    string values to lowercase, leave numerics/dates alone."""
+    canonical = []
+    for k in sorted((params or {}).keys()):
+        v = (params or {})[k]
+        if isinstance(v, str):
+            canonical.append((k, v.strip().lower()))
+        elif isinstance(v, (int, float, bool)) or v is None:
+            canonical.append((k, v))
+        else:
+            canonical.append((k, json.dumps(v, sort_keys=True,
+                                              default=str)))
+    return (tool_name, tuple(canonical))
 
 
 class ChatOrchestrator:
@@ -109,9 +145,15 @@ class ChatOrchestrator:
     # ==============================================================
     # Public entry
     # ==============================================================
-    def handle_user_message(self, user, session, text):
+    def handle_user_message(self, user, session, text,
+                             active_variant=None):
         """Append the user turn, call the LLM, dispatch tools,
-        persist intermediate turns, return the final response."""
+        persist intermediate turns, return the final response.
+
+        ``active_variant`` is the dashboard variant the user is
+        currently looking at — drives tool advertisement (D24) and
+        the system prompt's role label (D25).
+        """
         if not _check_rate_limit(user.id):
             return OrchestratorResponse(
                 success=False, is_fallback=True,
@@ -121,7 +163,6 @@ class ChatOrchestrator:
                 error_message="rate_limit_exceeded",
             ).to_dict()
 
-        # Persist the user turn.
         self._append(session, role="user", content=text or "")
 
         provider = self._active_provider()
@@ -141,10 +182,18 @@ class ChatOrchestrator:
 
         adapter = GroqChatAdapter(provider)
         history = self._load_history(session)
-        messages = self._build_messages(history, text)
-        tools_schema = tool_registry.groq_tool_schemas(category="read")
+        messages = self._build_messages(
+            history, text, user=user, variant=active_variant)
+        # D24 — variant ∩ groups filter for the tool schemas the
+        # LLM sees this turn. dispatch() also enforces the group
+        # filter defensively.
+        tools = tool_registry.filter_tools_for_variant_and_user(
+            user, active_variant, category="read")
+        tools_schema = tool_registry.groq_tool_schemas(tools=tools)
 
         tool_cards: List[dict] = []
+        # D17 — dedup cache per user turn. Key: (tool_name, params).
+        dedup_cache: dict = {}
         last_result: Optional[ChatTurnResult] = None
         total_prompt = 0
         total_completion = 0
@@ -159,10 +208,17 @@ class ChatOrchestrator:
 
             if not result.success:
                 msg = result.error_message or "Chat failed."
+                # D18 — log diagnostic metrics on 4xx-class errors
+                # (payload size + message count) so we can tune the
+                # history limit if Groq starts rejecting again.
+                diag = (
+                    f"messages_sent={len(messages)} "
+                    f"payload_chars={len(json.dumps(messages, default=str))}"
+                )
                 self._append(
                     session, role="assistant",
                     content=msg, is_fallback=True,
-                    error_message=msg,
+                    error_message=f"{msg} | {diag}",
                     provider_key=provider.provider_key,
                     model_version=provider.model_id,
                     prompt_tokens=result.prompt_tokens,
@@ -182,8 +238,7 @@ class ChatOrchestrator:
                     latency_ms=total_latency,
                 ).to_dict()
 
-            # Persist this assistant turn (content may be empty if
-            # the model only emitted tool_calls).
+            # Persist this assistant turn.
             self._append(
                 session,
                 role="assistant",
@@ -199,7 +254,6 @@ class ChatOrchestrator:
             )
 
             if not result.tool_calls:
-                # Done — model produced a final assistant answer.
                 return OrchestratorResponse(
                     success=True,
                     assistant_message=result.assistant_message or "",
@@ -211,10 +265,6 @@ class ChatOrchestrator:
                     latency_ms=total_latency,
                 ).to_dict()
 
-            # Append the assistant tool_calls turn to the message
-            # array Groq sees on the next call. OpenAI/Groq format
-            # requires the original assistant message + each tool
-            # response keyed by tool_call_id.
             messages.append({
                 "role": "assistant",
                 "content": result.assistant_message or "",
@@ -230,21 +280,38 @@ class ChatOrchestrator:
                 ],
             })
 
-            # Dispatch each tool call.
+            # Dispatch each tool call with D17 dedup.
             for tc in result.tool_calls:
-                tool_result = tool_registry.dispatch(
-                    tc["tool_name"], self.env, user, tc["params"])
-                tool_cards.append({
-                    "tool": tc["tool_name"],
-                    "tool_call_id": tc["tool_call_id"],
-                    "params": tc["params"],
-                    "result": tool_result,
-                })
-                # Persist + feed back into messages.
+                key = _dedup_key(tc["tool_name"], tc["params"])
+                cached = dedup_cache.get(key)
+                if cached is not None:
+                    # D17 — Groq re-emitted an identical call. Reuse
+                    # the prior result without dispatching again
+                    # AND without pushing a second tool_card. The
+                    # tool-role message in `messages` still needs to
+                    # be present (Groq protocol requires one tool
+                    # response per tool_call_id).
+                    tool_result = cached
+                    # Annotate so audit log can see this was a dedup
+                    # reuse rather than a fresh tool execution.
+                    tool_result_for_msg = dict(tool_result)
+                    tool_result_for_msg["_dedup_reused"] = True
+                else:
+                    tool_result = tool_registry.dispatch(
+                        tc["tool_name"], self.env, user,
+                        tc["params"])
+                    dedup_cache[key] = tool_result
+                    tool_cards.append({
+                        "tool": tc["tool_name"],
+                        "tool_call_id": tc["tool_call_id"],
+                        "params": tc["params"],
+                        "result": tool_result,
+                    })
+                    tool_result_for_msg = tool_result
                 self._append(
                     session,
                     role="tool",
-                    content=json.dumps(tool_result),
+                    content=json.dumps(tool_result_for_msg),
                     tool_call_id=tc["tool_call_id"],
                     tool_name=tc["tool_name"],
                 )
@@ -252,11 +319,10 @@ class ChatOrchestrator:
                     "role": "tool",
                     "tool_call_id": tc["tool_call_id"],
                     "name": tc["tool_name"],
-                    "content": json.dumps(tool_result),
+                    "content": json.dumps(tool_result_for_msg),
                 })
 
-        # If we exit the loop without a tool-call-free response,
-        # the model is iterating. Return graceful fallback.
+        # Loop exhausted -- graceful exit message.
         guard_msg = (
             "I've gathered some information but need your guidance "
             "to proceed.")
@@ -291,19 +357,38 @@ class ChatOrchestrator:
         ], limit=1)
 
     def _load_history(self, session):
-        """Last N (user/assistant/tool) turns ordered oldest-first.
-        Excludes the system message (we re-inject it) and the just-
-        appended user turn (we re-inject that as the trailing
-        message in _build_messages)."""
-        return self.Message.search(
+        """D18: count ALL message rows (user / assistant / tool),
+        keep the last _HISTORY_MESSAGE_LIMIT, never split an
+        assistant turn from its tool replies. Returns rows in
+        chronological order (oldest first)."""
+        # Fetch ALL non-system messages oldest-first; the slice +
+        # tool-pairing fixup happens in memory below.
+        rows = self.Message.search(
             [("session_id", "=", session.id),
              ("role", "!=", "system")],
-            order="created_at desc, id desc",
-            limit=_HISTORY_TURN_LIMIT,
-        ).sorted("created_at")
+            order="created_at, id",
+        )
+        if len(rows) <= _HISTORY_MESSAGE_LIMIT:
+            return rows
+        # Take the last N rows; then walk backwards to find a safe
+        # cutoff that doesn't strand a tool message from its
+        # parent assistant turn.
+        cut_index = len(rows) - _HISTORY_MESSAGE_LIMIT
+        # If rows[cut_index] is a tool-role message, we need to
+        # back the cut up to the assistant turn that emitted it.
+        while (cut_index > 0
+               and rows[cut_index].role == "tool"):
+            cut_index -= 1
+        # If the new cut points AT an assistant turn carrying
+        # tool_calls, include that assistant turn (the loop above
+        # left us pointing at the assistant). If by chance it is
+        # an assistant with NO tool_calls, that's fine — still
+        # include it.
+        return rows[cut_index:]
 
-    def _build_messages(self, history, latest_user_text):
-        sys_prompt = self._system_prompt()
+    def _build_messages(self, history, latest_user_text,
+                         user=None, variant=None):
+        sys_prompt = self._system_prompt(user=user, variant=variant)
         messages = [{"role": "system", "content": sys_prompt}]
         for m in history:
             if m.role == "user":
@@ -336,9 +421,7 @@ class ChatOrchestrator:
                     "name": m.tool_name or "",
                     "content": m.content or "",
                 })
-        # The just-appended user turn is in the history; if the
-        # last entry is NOT the user turn (race-y on rare cases),
-        # append explicitly.
+        # Ensure the just-appended user turn is the trailing entry.
         if not (messages and messages[-1].get("role") == "user"
                 and (messages[-1].get("content") or "")
                 == (latest_user_text or "")):
@@ -346,13 +429,20 @@ class ChatOrchestrator:
                              "content": latest_user_text or ""})
         return messages
 
-    def _system_prompt(self):
+    def _system_prompt(self, user=None, variant=None):
         Config = self.env["ir.config_parameter"].sudo()
         template = (Config.get_param(_SYSTEM_PROMPT_CONFIG_KEY, "")
                     or _DEFAULT_SYSTEM_PROMPT)
         today = fields.Date.context_today(
             self.env["res.users"].browse(self.env.uid))
-        return template.replace("{today_date}", today.isoformat())
+        role_label = _ROLE_LABELS.get(
+            (variant or "director").lower(), "Sales")
+        user_name = (user.name if user else
+                      self.env.user.name) or ""
+        return (template
+                .replace("{today_date}", today.isoformat())
+                .replace("{role_label}", role_label)
+                .replace("{user_name}", user_name))
 
     def _append(self, session, role, content="", **kw):
         vals = {
@@ -360,7 +450,6 @@ class ChatOrchestrator:
             "role": role,
             "content": content,
         }
-        # Pass-through optional fields.
         for k in ("tool_calls_json", "tool_call_id", "tool_name",
                   "provider_key", "model_version", "prompt_tokens",
                   "completion_tokens", "latency_ms", "is_fallback",

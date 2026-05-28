@@ -34,6 +34,11 @@ from ..tool_registry import ai_tool
         "required": ["start_date", "end_date"],
     },
     category="read",
+    groups=[
+        "neon_jobs.group_neon_jobs_user",
+        "neon_jobs.group_neon_jobs_crew_leader",
+        "neon_jobs.group_neon_jobs_manager",
+    ],
 )
 def tool_get_crew_availability(env, user, start_date=None,
                                 end_date=None, role_filter=None,

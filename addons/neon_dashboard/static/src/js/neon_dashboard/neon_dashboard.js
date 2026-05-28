@@ -186,12 +186,17 @@ export class NeonDashboard extends Component {
 
     // P12.M1 AI Sales Copilot ----------------------------------
     get isChatVisible() {
-        // Show only on Director + Sales variants (D1). Server also
-        // enforces via /neon/ai_chat ACL (D11) so a Bookkeeper or
-        // Lead Tech user peeking at Sales via View-as gets denied
-        // at the API layer even if the panel renders.
+        // P12.M1.1 (D21) — visible on all four dashboard variants.
+        // Server-side /neon/ai_chat ACL (D22) is the authoritative
+        // gate; this is just the client render condition.
         const dtype = this.state.data && this.state.data.dashboard_type;
-        return dtype === "director" || dtype === "sales";
+        return ["director", "sales", "bookkeeper",
+                "lead_tech"].includes(dtype);
+    }
+
+    get activeVariant() {
+        return (this.state.data && this.state.data.dashboard_type)
+            || "";
     }
 
     async onChatToggle(nextExpanded) {

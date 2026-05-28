@@ -1176,6 +1176,7 @@
                  group set (server-enforced via /neon/ai_chat ACL). -->
             <NeonAiChat t-if="isChatVisible"
                         expanded="state.chatExpanded"
+                        activeVariant="activeVariant"
                         onToggle="(v) => this.onChatToggle(v)"/>
         </div>
     </t>
