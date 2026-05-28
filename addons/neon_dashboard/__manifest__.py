@@ -16,7 +16,10 @@
     # 8.16.0 = P12.M1.1 multi-variant chat (Bookkeeper + Lead Tech)
     # + 5 new READ tools + 4 hotfixes (dedup, history pruning,
     # thinking-dots, variant-scoped tool advertisement).
-    "version": "17.0.8.16.0",
+    # 8.17.0 = P12.M1.1.1 UI header role label per variant +
+    # 4xx outgoing-body capture (request_body_snapshot) +
+    # 14-schema audit (all clean).
+    "version": "17.0.8.17.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

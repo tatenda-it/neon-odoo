@@ -36,6 +36,7 @@ SMOKES=(
   p9m3_multi_map
   p12m1_chat
   p12m1_1_chat
+  p12m1_1_1_chat
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

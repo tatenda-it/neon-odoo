@@ -20,7 +20,7 @@
                 <div class="o_neon_ai_chat__header">
                     <div class="o_neon_ai_chat__header_title">
                         <i class="fa fa-comments me-2"/>
-                        Sales Copilot
+                        <t t-esc="headerLabel"/>
                     </div>
                     <button type="button"
                             class="btn btn-sm btn-link o_neon_ai_chat__collapse"

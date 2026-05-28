@@ -30,12 +30,31 @@ _TIMEOUT_SECONDS = 15
 _HEALTH_TIMEOUT_SECONDS = 5
 
 
+_REQUEST_SNAPSHOT_MAX_CHARS = 10_000
+
+
+def _snapshot_request(payload):
+    """JSON-stringify the outgoing payload and cap to
+    _REQUEST_SNAPSHOT_MAX_CHARS so we can attach it to the chat
+    message audit row on error. The payload carries messages +
+    tools + model params — no headers / no API key (those live
+    on the Authorization header, never in the body)."""
+    try:
+        s = json.dumps(payload, default=str)
+    except Exception:  # noqa: BLE001
+        return ""
+    if len(s) > _REQUEST_SNAPSHOT_MAX_CHARS:
+        return s[:_REQUEST_SNAPSHOT_MAX_CHARS] + "...[truncated]"
+    return s
+
+
 @dataclass
 class ChatTurnResult:
     """One LLM chat() call's result. Either the assistant text
     landed in `assistant_message` (final answer), or one or more
     tool_calls fired which the orchestrator must dispatch and feed
-    back."""
+    back. On error the outgoing request body lands in
+    request_body_snapshot for post-hoc inspection."""
     success: bool
     assistant_message: str = ""
     tool_calls: List[dict] = field(default_factory=list)
@@ -45,6 +64,7 @@ class ChatTurnResult:
     latency_ms: int = 0
     is_fallback: bool = False
     error_message: str = ""
+    request_body_snapshot: str = ""
 
 
 class GroqChatAdapter:
@@ -96,7 +116,24 @@ class GroqChatAdapter:
                 json=payload,
                 timeout=_TIMEOUT_SECONDS,
             )
-            response.raise_for_status()
+            if not response.ok:
+                # 4xx / 5xx -- capture the OUTGOING payload so the
+                # orchestrator can persist it for forensics. Body
+                # only: headers/API key never travel through here.
+                err_body = ""
+                try:
+                    err_body = (response.json() if response.content
+                                else {}).get("error", {})
+                except Exception:  # noqa: BLE001
+                    err_body = (response.text or "")[:1000]
+                return ChatTurnResult(
+                    success=False, is_fallback=True,
+                    error_message=(
+                        f"Groq HTTP {response.status_code}: "
+                        f"{err_body}"),
+                    request_body_snapshot=_snapshot_request(payload),
+                    latency_ms=int((time.time() - start) * 1000),
+                )
             data = response.json()
             choice = (data.get("choices") or [{}])[0]
             message = choice.get("message") or {}

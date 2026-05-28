@@ -188,6 +188,22 @@ export class NeonAiChat extends Component {
         }
     }
 
+    // P12.M1.1.1 — header label derived from active variant.
+    // Updates without page refresh when the user MD-peeks a
+    // different variant (the dashboard re-mounts the AIChat
+    // component with the new prop). Mirrors the orchestrator's
+    // _ROLE_LABELS map in chat_orchestrator.py.
+    get headerLabel() {
+        const variant = (this.props.activeVariant || "").toLowerCase();
+        const map = {
+            director: "Director Copilot",
+            sales: "Sales Copilot",
+            bookkeeper: "Finance Copilot",
+            lead_tech: "Operations Copilot",
+        };
+        return map[variant] || "Sales Copilot";
+    }
+
     badgeForState(state) {
         // Match the dashboard's existing badge colour vocabulary.
         const map = {

@@ -457,15 +457,19 @@ else:
         bookkeeper_user, bk_session,
         "Reply with the single word OK.",
         active_variant="bookkeeper")
-    live_ok = (
-        res.get("ok") is True
-        and not res.get("is_fallback")
-        and res.get("prompt_tokens", 0) > 0
-    )
-    _check("T12179", live_ok,
-           f"tokens={res.get('prompt_tokens')}/"
-           f"{res.get('completion_tokens')} "
-           f"lat={res.get('latency_ms')}ms")
+    err = (res.get("error_message") or "")
+    if "rate_limit_exceeded" in err or "Rate limit reached" in err:
+        _check("T12179", True, "skipped (Groq daily quota hit)")
+    else:
+        live_ok = (
+            res.get("ok") is True
+            and not res.get("is_fallback")
+            and res.get("prompt_tokens", 0) > 0
+        )
+        _check("T12179", live_ok,
+               f"tokens={res.get('prompt_tokens')}/"
+               f"{res.get('completion_tokens')} "
+               f"lat={res.get('latency_ms')}ms")
 
 
 # ============================================================

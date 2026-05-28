@@ -140,6 +140,16 @@ class NeonFinanceAiChatMessage(models.Model):
         "produced the turn instead of the live AI provider.",
     )
     error_message = fields.Text()
+    # ⚠️ DECISION (M12.1.1.1, marker inline): on Groq 4xx-class
+    # errors the orchestrator captures the OUTGOING request body
+    # here (JSON-stringified messages array + tools, no headers /
+    # no API key). Capped to ~10k chars. Populated only on error
+    # turns, NULL on success — keeps the table light.
+    request_body_snapshot = fields.Text(
+        help="JSON snapshot of the outgoing Groq request body. "
+        "Populated only when the adapter returned an error so the "
+        "payload can be inspected post-hoc. Truncated to ~10k chars.",
+    )
     created_at = fields.Datetime(
         default=fields.Datetime.now, readonly=True, required=True,
         index=True,

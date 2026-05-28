@@ -224,6 +224,10 @@ class ChatOrchestrator:
                     prompt_tokens=result.prompt_tokens,
                     completion_tokens=result.completion_tokens,
                     latency_ms=result.latency_ms,
+                    # P12.M1.1.1 — capture the outgoing payload
+                    # for forensic inspection. Adapter already
+                    # truncated to 10k chars.
+                    request_body_snapshot=result.request_body_snapshot,
                 )
                 return OrchestratorResponse(
                     success=False, is_fallback=True,
@@ -453,7 +457,7 @@ class ChatOrchestrator:
         for k in ("tool_calls_json", "tool_call_id", "tool_name",
                   "provider_key", "model_version", "prompt_tokens",
                   "completion_tokens", "latency_ms", "is_fallback",
-                  "error_message"):
+                  "error_message", "request_body_snapshot"):
             if k in kw and kw[k] is not None:
                 vals[k] = kw[k]
         msg = self.Message.create(vals)
