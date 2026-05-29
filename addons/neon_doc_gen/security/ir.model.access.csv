@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_doc_gen_provider_superuser,neon.doc.gen.provider superuser (R/W/C; no unlink — audit),model_neon_doc_gen_provider,neon_core.group_neon_superuser,1,1,1,0
+access_neon_doc_gen_set_key_wizard_superuser,neon.doc.gen.set.key.wizard superuser,model_neon_doc_gen_set_key_wizard,neon_core.group_neon_superuser,1,1,1,1

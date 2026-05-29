@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- P-B13 — under Settings, gated to neon_core superuser group.
+         Lives at the top of the Settings sidebar because doc-gen
+         is config-only (no per-record interaction here). -->
+    <menuitem id="menu_neon_doc_gen_root"
+              name="Doc-Gen"
+              parent="base.menu_administration"
+              sequence="80"
+              groups="neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_neon_doc_gen_provider"
+              name="Providers"
+              parent="menu_neon_doc_gen_root"
+              action="action_neon_doc_gen_provider"
+              sequence="10"
+              groups="neon_core.group_neon_superuser"/>
+
+</odoo>

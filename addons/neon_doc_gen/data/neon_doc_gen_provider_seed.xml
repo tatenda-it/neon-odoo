@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- P-B13 — single Anthropic doc-gen provider seed.
+             noupdate=1 so administrator edits (model swap, max_tokens
+             tune) survive module upgrades. The api_key_encrypted
+             field stays blank until a superuser pastes a key via
+             the Set-API-Key wizard. -->
+        <record id="doc_gen_provider_anthropic"
+                model="neon.doc.gen.provider">
+            <field name="name">Anthropic Claude (doc-gen)</field>
+            <field name="provider_key">anthropic</field>
+            <field name="endpoint_url">https://api.anthropic.com/v1/messages</field>
+            <field name="model">claude-sonnet-4-6</field>
+            <field name="max_tokens">4096</field>
+            <field name="timeout_seconds">30</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="sequence">10</field>
+        </record>
+    </data>
+</odoo>

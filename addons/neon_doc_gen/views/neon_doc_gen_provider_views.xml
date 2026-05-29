@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_doc_gen_provider_tree" model="ir.ui.view">
+        <field name="name">neon.doc.gen.provider.tree</field>
+        <field name="model">neon.doc.gen.provider</field>
+        <field name="arch" type="xml">
+            <tree string="Doc-Gen Providers"
+                  decoration-success="last_health_status == 'ok'"
+                  decoration-danger="last_health_status == 'error'"
+                  decoration-muted="not is_enabled">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="provider_key" widget="badge"/>
+                <field name="model"/>
+                <field name="is_enabled" widget="boolean_toggle"/>
+                <field name="has_api_key"
+                       string="Key"
+                       widget="boolean_toggle"
+                       readonly="1"/>
+                <field name="last_health_status" widget="badge"
+                       decoration-success="last_health_status == 'ok'"
+                       decoration-danger="last_health_status == 'error'"
+                       decoration-muted="last_health_status == 'untested'"/>
+                <field name="last_health_check" optional="show"/>
+                <field name="last_call_at" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_doc_gen_provider_form" model="ir.ui.view">
+        <field name="name">neon.doc.gen.provider.form</field>
+        <field name="model">neon.doc.gen.provider</field>
+        <field name="arch" type="xml">
+            <form string="Doc-Gen Provider">
+                <header>
+                    <button name="action_open_set_key_wizard"
+                            type="object"
+                            string="Set API Key"
+                            class="btn-primary"/>
+                    <button name="action_test_connection"
+                            type="object"
+                            string="Test Connection"
+                            class="btn-secondary"
+                            invisible="not has_api_key"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                        <p class="text-muted">
+                            <field name="provider_key" readonly="1"/>
+                        </p>
+                    </div>
+                    <group>
+                        <group string="Configuration">
+                            <field name="endpoint_url"/>
+                            <field name="model"
+                                   help="Default 'claude-sonnet-4-6'. Per-call override via the calling code; this is the fallback."/>
+                            <field name="api_key_encrypted"
+                                   string="Key Reference"
+                                   readonly="1"
+                                   help="Non-secret marker. Click 'Set API Key' to paste the real key (masked input, never logged)."/>
+                            <field name="has_api_key" invisible="1"/>
+                            <field name="is_enabled"/>
+                        </group>
+                        <group string="Tuning">
+                            <field name="max_tokens"/>
+                            <field name="timeout_seconds"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                    <group string="Health">
+                        <group>
+                            <field name="last_health_check" readonly="1"/>
+                            <field name="last_health_status" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Latest call (snapshot)">
+                        <group>
+                            <field name="last_call_at" readonly="1"/>
+                            <field name="last_call_prompt_tokens"
+                                   readonly="1"/>
+                            <field name="last_call_completion_tokens"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_doc_gen_provider"
+            model="ir.actions.act_window">
+        <field name="name">Doc-Gen Providers</field>
+        <field name="res_model">neon.doc.gen.provider</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure the Claude doc-gen provider
+            </p>
+            <p>
+                One row per high-value document-generation engine.
+                B3 / B4 / B5 import the ClaudeDocGenAdapter and
+                pass the active provider record.
+            </p>
+        </field>
+    </record>
+
+</odoo>
