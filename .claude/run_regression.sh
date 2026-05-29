@@ -42,6 +42,7 @@ SMOKES=(
   pb2_conflict
   pb13_docgen
   phr_r1a
+  phr_r1b_1
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

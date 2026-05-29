@@ -11,3 +11,6 @@ access_neon_hr_document_super,neon.hr.document superuser,model_neon_hr_document,
 access_neon_hr_contract_template_user,neon.hr.contract.template read (all internal),model_neon_hr_contract_template,base.group_user,1,0,0,0
 access_neon_hr_contract_template_admin,neon.hr.contract.template HR admin,model_neon_hr_contract_template,neon_hr.group_neon_hr_admin,1,1,1,0
 access_neon_hr_contract_template_super,neon.hr.contract.template superuser,model_neon_hr_contract_template,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_availability_user,neon.hr.availability read (operations),model_neon_hr_availability,base.group_user,1,0,0,0
+access_neon_hr_availability_admin,neon.hr.availability HR admin,model_neon_hr_availability,neon_hr.group_neon_hr_admin,1,0,0,0
+access_neon_hr_availability_super,neon.hr.availability superuser,model_neon_hr_availability,neon_core.group_neon_superuser,1,0,0,0

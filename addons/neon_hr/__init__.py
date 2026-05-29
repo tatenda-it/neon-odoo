@@ -33,29 +33,40 @@ def _enforce_hr_confidentiality(env):
         "neon_core.group_neon_superuser", raise_if_not_found=False)
     hr_admin = env.ref(
         "neon_hr.group_neon_hr_admin", raise_if_not_found=False)
-    hr_user = env.ref("hr.group_hr_user", raise_if_not_found=False)
-    hr_manager = env.ref("hr.group_hr_manager", raise_if_not_found=False)
 
     # 1) Grant HR management to OD/MD. hr.group_hr_manager cascades to
-    #    the contract manager via hr_contract; add it explicitly too.
+    #    the contract manager via hr_contract; add it + the Time Off
+    #    manager (R1b) explicitly. neon_core loads first so its
+    #    implied_ids cannot reference hr.* from XML — hence this hook.
     if superuser:
         grant = []
         for xmlid in ("hr.group_hr_manager",
-                      "hr_contract.group_hr_contract_manager"):
+                      "hr_contract.group_hr_contract_manager",
+                      "hr_holidays.group_hr_holidays_manager"):
             grp = env.ref(xmlid, raise_if_not_found=False)
             if grp:
                 grant.append((4, grp.id))
         if grant:
             superuser.sudo().write({"implied_ids": grant})
             _logger.info(
-                "neon_hr: granted %d HR group(s) to "
+                "neon_hr: granted %d HR manager group(s) to "
                 "neon_core.group_neon_superuser.", len(grant))
 
-    # 2) Strip the auto-granted hr access from everyone else (Q28).
-    if not (hr_user and hr_manager):
+    # 2) Strip the auto-granted privileged HR groups from everyone
+    #    else. hr_user/hr_manager (Q28 salary/personal confidentiality)
+    #    + hr_holidays_manager (R1b: only OD/MD/Admin may override-
+    #    approve leave; ordinary leave routes via leave_manager_id).
+    #    hr_holidays_user/_responsible are LEFT broad so staff can
+    #    request + see their own leave.
+    strip_groups = env["res.groups"]
+    for xmlid in ("hr.group_hr_user", "hr.group_hr_manager",
+                  "hr_holidays.group_hr_holidays_manager"):
+        grp = env.ref(xmlid, raise_if_not_found=False)
+        if grp:
+            strip_groups |= grp
+    if not strip_groups:
         _logger.warning(
-            "neon_hr: hr groups not found — confidentiality strip "
-            "skipped.")
+            "neon_hr: privileged HR groups not found — strip skipped.")
         return
     keep_uids = set()
     for grp in filter(None, (superuser, hr_admin)):
@@ -64,19 +75,16 @@ def _enforce_hr_confidentiality(env):
         u = env.ref(xmlid, raise_if_not_found=False)
         if u:
             keep_uids.add(u.id)
-    strip = env["res.users"].sudo().search([
-        ("share", "=", False),
-        ("id", "not in", list(keep_uids)),
-        "|",
-        ("groups_id", "in", hr_user.id),
-        ("groups_id", "in", hr_manager.id),
-    ])
+    domain = [("share", "=", False), ("id", "not in", list(keep_uids))]
+    domain += ["|"] * (len(strip_groups) - 1)
+    domain += [("groups_id", "in", g.id) for g in strip_groups]
+    strip = env["res.users"].sudo().search(domain)
     if strip:
-        strip.write({"groups_id": [(3, hr_user.id), (3, hr_manager.id)]})
+        strip.write({"groups_id": [(3, g.id) for g in strip_groups]})
         _logger.info(
-            "neon_hr: stripped hr_user/hr_manager from %d non-HR "
-            "users (Q28 confidentiality). Kept %d HR-authorised users.",
-            len(strip), len(keep_uids))
+            "neon_hr: stripped %s from %d non-HR users (Q28 + leave "
+            "approval control). Kept %d HR-authorised users.",
+            strip_groups.mapped("name"), len(strip), len(keep_uids))
 
 
 def post_init_hook(env):

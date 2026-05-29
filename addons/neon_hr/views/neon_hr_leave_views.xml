@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ===== Crew availability (read-only signal from approved leave) ===== -->
+    <record id="view_neon_hr_availability_tree" model="ir.ui.view">
+        <field name="model">neon.hr.availability</field>
+        <field name="arch" type="xml">
+            <tree string="Crew Unavailability (Approved Leave)"
+                  create="false" edit="false" delete="false">
+                <field name="employee_name"/>
+                <field name="neon_category_id"/>
+                <field name="holiday_status_id"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="number_of_days" sum="Days"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_hr_availability_search" model="ir.ui.view">
+        <field name="model">neon.hr.availability</field>
+        <field name="arch" type="xml">
+            <search string="Crew Availability">
+                <field name="employee_name"/>
+                <field name="neon_category_id"/>
+                <filter name="current" string="Active Today"
+                        domain="[('date_from', '&lt;=', context_today().strftime('%Y-%m-%d')), ('date_to', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_emp" string="Employee"
+                            context="{'group_by': 'employee_name'}"/>
+                    <filter name="g_cat" string="Category"
+                            context="{'group_by': 'neon_category_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_hr_availability" model="ir.actions.act_window">
+        <field name="name">Crew Availability</field>
+        <field name="res_model">neon.hr.availability</field>
+        <field name="view_mode">tree</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No one is on approved leave.</p>
+            <p>Each row is a window during which a crew member is unavailable
+               (from approved leave). Operations and scheduling consume this signal.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_neon_hr_availability"
+              name="Crew Availability (Leave)"
+              parent="menu_neon_hr_root"
+              action="action_neon_hr_availability"
+              sequence="25"/>
+
+    <!-- ===== Category: configurable leave approver (Q12) ===== -->
+    <record id="view_neon_hr_category_form_leave" model="ir.ui.view">
+        <field name="model">neon.hr.category</field>
+        <field name="inherit_id" ref="neon_hr.view_neon_hr_category_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='default_pay_type']" position="after">
+                <field name="leave_approver_id"/>
+                <field name="leave_approver_flagged"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ===== Leave type: Neon entitlement/cap rules (R1b) ===== -->
+    <record id="view_hr_leave_type_form_neon" model="ir.ui.view">
+        <field name="model">hr.leave.type</field>
+        <field name="inherit_id" ref="hr_holidays.edit_holiday_status_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Neon Rules (R1b — configurable, some pending legal)">
+                    <field name="neon_statutory_days"/>
+                    <field name="neon_accrual_cap_days"/>
+                    <field name="neon_requires_medical_cert"/>
+                    <field name="neon_permanent_only"/>
+                    <field name="neon_flagged_for_legal"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
