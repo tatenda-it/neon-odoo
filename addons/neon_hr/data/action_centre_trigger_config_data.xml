@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Trigger config for the contract-expiry alert. Reuses the
+        neon_jobs Action Centre (action.centre.trigger.config). The
+        trigger_type value 'contract_expiry_30days' is contributed by
+        neon_hr via selection_add (models/action_centre_ext.py) so no
+        neon_jobs file is touched. noupdate="1" so director edits to
+        enable/role/priority survive upgrades — mirrors the neon_jobs
+        seed pattern.
+
+        primary_role = manager surfaces the item to OD/MD (the
+        neon_jobs manager group is implied by neon_core superuser); the
+        cron additionally sets primary_assignee_id to the HR Admin so
+        the item reaches HR + OD/MD (Q7-9).
+    -->
+    <record id="trigger_config_contract_expiry_30days"
+            model="action.centre.trigger.config">
+        <field name="trigger_type">contract_expiry_30days</field>
+        <field name="is_enabled" eval="True"/>
+        <field name="item_type">task</field>
+        <field name="primary_role">manager</field>
+        <field name="priority">high</field>
+        <field name="escalation_minutes">1440</field>
+        <field name="escalated_to_role">manager</field>
+        <field name="description">Raised 30 days before a contract end date (and for contracts already past end date while still Active). Assigned to HR Admin, visible to OD/MD.</field>
+    </record>
+</odoo>

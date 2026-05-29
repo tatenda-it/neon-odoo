@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Confidentiality (Q28): personal documents are visible only to
+        OD/MD (neon_core.group_neon_superuser), HR Admin
+        (neon_hr.group_neon_hr_admin) and the RECORD OWNER (the
+        employee themselves). Salary lives on hr.contract, which Odoo's
+        native ACL already locks to contract managers — no neon tier
+        outside OD/MD/Admin holds an hr group, so salary is already
+        confidential without a custom rule.
+
+        Combination semantics: rules attached to a user's groups are
+        OR-ed. Superuser/HR Admin are ALSO base.group_user, so they
+        match BOTH the own-rule and the see-all rule -> union = all.
+        A plain internal user (crew/sales/bookkeeper) matches only the
+        own-rule -> sees their own documents and nobody else's.
+
+        perm_unlink = 0 everywhere (audit-trail discipline).
+    -->
+
+    <!-- Owner: each internal user sees only their own documents. -->
+    <record id="rule_neon_hr_document_own" model="ir.rule">
+        <field name="name">HR Document: owner sees own</field>
+        <field name="model_id" ref="model_neon_hr_document"/>
+        <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- OD/MD + HR Admin: full visibility of every document. -->
+    <record id="rule_neon_hr_document_confidential_all" model="ir.rule">
+        <field name="name">HR Document: OD/MD/Admin see all</field>
+        <field name="model_id" ref="model_neon_hr_document"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(6, 0, [
+            ref('neon_core.group_neon_superuser'),
+            ref('neon_hr.group_neon_hr_admin'),
+        ])]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+</odoo>
