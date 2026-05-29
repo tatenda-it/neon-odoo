@@ -36,6 +36,9 @@ TRIGGER_TYPE_SELECTION = [
     ("incident_open", "Equipment Incident Open"),
     ("repair_stalled", "Repair Order Stalled"),
     ("stock_take_unresolved", "Stock Take Discrepancy Unresolved"),
+    # P-B2 -- data-quality nudge when an event job moves out of
+    # draft without precise load-in/out windows set.
+    ("load_window_missing", "Load-in/out Window Missing"),
     ("manual", "Manual"),
 ]
 

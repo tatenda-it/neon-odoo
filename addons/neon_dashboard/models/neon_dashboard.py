@@ -462,7 +462,77 @@ class NeonDashboard(models.Model):
         elif resolved_type == "lead_tech":
             payload["crew_gaps_block"] = self._compute_crew_gaps_block()
             payload["cert_expiry_block"] = self._compute_cert_expiry_block()
+            # P-B2 D7 -- conflicts block on the Operations variant.
+            payload["conflicts_block"] = self._compute_conflicts_block()
         return payload
+
+    # ==================================================================
+    # P-B2 -- conflicts_block payload
+    # ==================================================================
+    def _compute_conflicts_block(self):
+        """Read the most-recent non-clear conflict run and surface its
+        deficit + zero_margin + below_threshold lines for the
+        Operations panel. NO recompute here -- panel is read-only.
+        Engine runs are triggered by event confirms + line edits +
+        the daily cron."""
+        Conflict = self.env["neon.equipment.conflict"].sudo()
+        latest = Conflict.search(
+            [("overall_status", "in",
+              ("deficit", "zero_margin"))],
+            order="triggered_at desc", limit=1)
+        if not latest:
+            return {
+                "ok": True, "has_conflicts": False,
+                "lines": [], "header_id": 0,
+                "header_name": "", "triggered_at": "",
+                "overall_status": "clear",
+            }
+        lines = []
+        for ln in latest.line_ids.sorted("sub_hire_priority"):
+            if ln.status == "surplus":
+                continue
+            lines.append({
+                "id": ln.id,
+                "product_id": ln.product_template_id.id,
+                "product_name": (
+                    ln.product_template_id.workshop_name
+                    or ln.product_template_id.name),
+                "category_name": (ln.category_id.name
+                                   if ln.category_id else ""),
+                "required": int(ln.required_qty),
+                "available": int(ln.available_qty),
+                "margin": int(ln.margin),
+                "deficit": int(ln.deficit_qty),
+                "status": ln.status,
+                "sub_hire_priority": int(ln.sub_hire_priority),
+                "competing_events": [{
+                    "id": e.id, "name": e.name,
+                    "event_date": (
+                        e.event_date.isoformat()
+                        if e.event_date else ""),
+                } for e in ln.competing_event_ids[:5]],
+                "competing_count": len(ln.competing_event_ids),
+            })
+        return {
+            "ok": True,
+            "has_conflicts": bool(lines),
+            "lines": lines,
+            "header_id": latest.id,
+            "header_name": latest.name,
+            "triggered_at": (
+                latest.triggered_at.isoformat()
+                if latest.triggered_at else ""),
+            "overall_status": latest.overall_status,
+            "data_quality_note": (
+                "Equipment conflicts are detected at calendar-day "
+                "granularity until the team starts filling in event-"
+                "job load-in/out (or dispatch/return) datetimes. "
+                "Setting precise windows gives precise conflict "
+                "detection; until then the engine uses a "
+                "conservative same-day-overnight window which "
+                "favours over-counting (safer) over under-counting."
+            ),
+        }
 
     def _user_role_label(self):
         """Human-readable role label for the header user-line."""

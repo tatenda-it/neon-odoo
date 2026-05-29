@@ -25,7 +25,12 @@
     # + /neon/ai_chat/confirm,cancel endpoints + variant-persistence
     # fix (D33). Minor-major bump: first milestone where the LLM
     # can change prod data.
-    "version": "17.0.9.0.0",
+    # 10.0.0 = P-B2 Equipment Conflicts panel on Operations variant.
+    # New block_conflicts widget + conflicts_block server payload
+    # reading from neon.equipment.conflict (the new pivot model
+    # added in neon_jobs 17.0.5.0.0). Read-only panel; engine runs
+    # are triggered server-side.
+    "version": "17.0.10.0.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

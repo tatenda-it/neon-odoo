@@ -411,6 +411,98 @@
         </div>
     </t>
 
+    <!-- P-B2 — Equipment conflicts panel (Operations variant
+         only, per D7-trim; MD peeks Operations for the live view).
+         Read-only: shows the latest non-clear run's deficit +
+         zero-margin lines with the prioritised sub-hire qty and
+         the specific competing event jobs. Recomputes happen via
+         confirm-trigger / requirement-edit-trigger / daily cron;
+         the panel only renders what's already persisted. -->
+    <t t-name="neon_dashboard.block.block_conflicts">
+        <div class="o_neon_block o_neon_block_conflicts widget--block_conflicts">
+            <div class="o_neon_block_header">
+                <h3>Equipment Conflicts</h3>
+                <span t-if="conflictsBlock.has_conflicts"
+                      class="o_neon_conflicts_status_badge"
+                      t-att-class="'o_neon_conflicts_status_' + conflictsBlock.overall_status"
+                      t-esc="conflictsBlock.overall_status === 'deficit' ? 'Deficit' : 'Zero margin'"/>
+            </div>
+            <div class="o_neon_block_body">
+                <div t-if="!conflictsBlock.has_conflicts"
+                     class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg">
+                        No live equipment conflicts.
+                    </p>
+                    <small class="text-muted">
+                        Run automatically on event confirm + requirement
+                        change + daily 06:00 backstop.
+                    </small>
+                </div>
+                <t t-if="conflictsBlock.has_conflicts">
+                    <table class="o_neon_conflicts_table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Item</th>
+                                <th class="text-end">Need</th>
+                                <th class="text-end">Have</th>
+                                <th class="text-end">Short by</th>
+                                <th>Competing events</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="conflictsBlock.lines.slice(0, 5)"
+                               t-as="line" t-key="line.id">
+                                <tr class="o_neon_conflicts_row"
+                                    t-att-class="'o_neon_conflicts_row_' + line.status"
+                                    t-on-click="() => this.onConflictRowClick(line.id)">
+                                    <td>
+                                        <span class="o_neon_conflicts_prio"
+                                              t-esc="line.sub_hire_priority"/>
+                                    </td>
+                                    <td>
+                                        <div class="o_neon_conflicts_prod"
+                                             t-esc="line.product_name"/>
+                                        <small class="text-muted"
+                                               t-esc="line.category_name"/>
+                                    </td>
+                                    <td class="text-end"
+                                        t-esc="line.required"/>
+                                    <td class="text-end"
+                                        t-esc="line.available"/>
+                                    <td class="text-end o_neon_conflicts_short"
+                                        t-esc="line.deficit"/>
+                                    <td>
+                                        <t t-foreach="line.competing_events"
+                                           t-as="ev" t-key="ev.id">
+                                            <span class="o_neon_conflicts_event_chip"
+                                                  t-on-click.stop="() => this.onConflictEventClick(ev.id)"
+                                                  t-esc="ev.name"/>
+                                        </t>
+                                        <span t-if="line.competing_count > line.competing_events.length"
+                                              class="o_neon_conflicts_event_more"
+                                              t-esc="'+' + (line.competing_count - line.competing_events.length)"/>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                    <div t-if="conflictsBlock.lines.length > 5"
+                         class="o_neon_conflicts_more">
+                        <span class="text-muted">
+                            +<t t-esc="conflictsBlock.lines.length - 5"/>
+                            more items
+                        </span>
+                    </div>
+                    <div class="o_neon_conflicts_data_quality">
+                        <small class="text-muted"
+                               t-esc="conflictsBlock.data_quality_note"/>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+
     <t t-name="neon_dashboard.block.block_tasks">
         <div class="o_neon_block o_neon_block_tasks widget--block_tasks">
             <div class="o_neon_block_header">
@@ -1122,6 +1214,8 @@
                            t-call="neon_dashboard.block.block_crew_gaps"/>
                         <t t-if="isWidgetVisible('block_cert_expiry')"
                            t-call="neon_dashboard.block.block_cert_expiry"/>
+                        <t t-if="isWidgetVisible('block_conflicts')"
+                           t-call="neon_dashboard.block.block_conflicts"/>
                     </section>
                     <section class="o_neon_row_c">
                         <t t-if="isWidgetVisible('block_tasks')"

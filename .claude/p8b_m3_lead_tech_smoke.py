@@ -95,7 +95,9 @@ expected_layout = {
     "kpi_jobs_today", "kpi_jobs_week", "kpi_crew_gaps", "kpi_certs_30",
     "block_jobs", "block_crew_gaps", "block_cert_expiry",
     "block_crew_equipment", "block_alerts", "block_tasks",
-    "block_ai_insights"}
+    "block_ai_insights",
+    # P-B2 -- Equipment Conflicts panel added to lead_tech variant.
+    "block_conflicts"}
 _check("T8B58", keys == expected_layout, f"n={len(keys)}")
 
 # T8B59-T8B61 -- filter scoping.

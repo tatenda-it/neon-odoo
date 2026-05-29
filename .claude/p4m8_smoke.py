@@ -278,20 +278,24 @@ print()
 print("=" * 72)
 print("T240 - Trigger config escalation_minutes coverage")
 print("=" * 72)
-# Per M8 clarification A: sla_passed and manual both legitimately
-# carry escalation_minutes=0 (the alert IS the SLA breach, the
-# manual config has no trigger-side timing). All other configs
-# must be > 0 and not NULL.
+# Per M8 clarification A: sla_passed, manual, and (P-B2) the
+# load_window_missing nudge all legitimately carry
+# escalation_minutes=0 — the alert IS the SLA breach for sla_passed,
+# manual has no trigger-side timing, and load_window_missing
+# auto-closes when the precise window gets set so no escalation
+# is needed. All other configs must be > 0 and not NULL.
 cfgs = env["action.centre.trigger.config"].search([])
-zero_allowed = {"sla_passed", "manual"}
+zero_allowed = {"sla_passed", "manual", "load_window_missing"}
 problems = []
 for c in cfgs:
     if c.escalation_minutes is False or c.escalation_minutes is None:
         problems.append((c.trigger_type, "NULL"))
     elif c.escalation_minutes <= 0 and c.trigger_type not in zero_allowed:
         problems.append((c.trigger_type, c.escalation_minutes))
-ok = len(problems) == 0 and len(cfgs) == 16
-print("  total configs:", len(cfgs), "(want 16)")
+# Downstream modules (neon_hr etc.) add more trigger configs; assert
+# B2-and-earlier minimum of 17 rather than exact 17.
+ok = len(problems) == 0 and len(cfgs) >= 17
+print("  total configs:", len(cfgs), "(>= 17 expected)")
 print("  problematic configs:", problems, "(want [])")
 print("T240:", "PASS" if ok else "FAIL")
 results["T240"] = ok

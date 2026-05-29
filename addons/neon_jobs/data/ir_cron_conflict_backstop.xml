@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- P-B2 D4 — daily 06:00 Africa/Harare backstop that runs the
+             conflict engine globally for events whose effective overlap
+             window is within the next 30 days. Catches drift between
+             confirm-time + requirement-edit-time recomputes (e.g. a unit
+             becomes 'needs_repair' overnight, dropping availability). -->
+        <record id="ir_cron_b2_conflict_backstop" model="ir.cron">
+            <field name="name">P-B2 conflict engine daily backstop</field>
+            <field name="model_id" ref="model_neon_equipment_conflict"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_run_global()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+            <field name="nextcall" eval="(DateTime.now() + relativedelta(days=1, hour=6, minute=0, second=0)).strftime('%Y-%m-%d %H:%M:%S')"/>
+        </record>
+    </data>
+</odoo>

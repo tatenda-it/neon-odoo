@@ -474,6 +474,54 @@ class CommercialEventJob(models.Model):
         "overlap engine reads.",
     )
 
+    # ============================================================
+    # B2 -- effective_overlap_start / effective_overlap_end.
+    # Distinct from B1's occupation_start/end. occupation_* is the
+    # "physical unavailability" envelope widened by workshop transit
+    # (dispatch + return). effective_overlap_* is what B2's conflict
+    # engine reads:
+    #   - if load_in_start AND load_out_end are both set -> trust
+    #     them exactly (precise window from the team);
+    #   - else fall back to a conservative same-day-overnight window
+    #     (event_date 00:00 -> (event_end_date or event_date) + 1d
+    #     06:00), so overlap detection over-counts safely until the
+    #     team starts filling in precise windows.
+    # ============================================================
+    effective_overlap_start = fields.Datetime(
+        string="Effective Overlap Start (B2)",
+        compute="_compute_effective_overlap_window",
+        store=True, index=True, readonly=True,
+        help="Window start the B2 conflict engine reads. Trusts "
+        "precise load_in_start/load_out_end when both are set; "
+        "otherwise falls back to a conservative event_date-anchored "
+        "window.",
+    )
+    effective_overlap_end = fields.Datetime(
+        string="Effective Overlap End (B2)",
+        compute="_compute_effective_overlap_window",
+        store=True, index=True, readonly=True,
+    )
+
+    @api.depends(
+        "load_in_start", "load_out_end",
+        "event_date", "event_end_date",
+    )
+    def _compute_effective_overlap_window(self):
+        from datetime import datetime as _dt, time as _t, timedelta as _td
+        for rec in self:
+            if rec.load_in_start and rec.load_out_end:
+                rec.effective_overlap_start = rec.load_in_start
+                rec.effective_overlap_end = rec.load_out_end
+                continue
+            if not rec.event_date:
+                rec.effective_overlap_start = False
+                rec.effective_overlap_end = False
+                continue
+            rec.effective_overlap_start = _dt.combine(
+                rec.event_date, _t(0, 0))
+            upper = (rec.event_end_date or rec.event_date) + _td(days=1)
+            rec.effective_overlap_end = _dt.combine(upper, _t(6, 0))
+
     @api.depends(
         "dispatch_datetime", "return_eta_datetime",
         "load_in_start", "load_in_end",
@@ -1702,6 +1750,39 @@ class CommercialEventJob(models.Model):
             ) % {"old": old, "new": target, "user": user_name},
             author_id=user_partner_id,
         )
+        # B2 D4 -- recompute the conflict engine when an event job
+        # transitions into a CONFIRMED-equivalent state. Mapping:
+        # the event has real equipment demand once it leaves
+        # planning, so re-evaluate from 'prep' onwards. Wrapped in
+        # try/except so a recompute failure doesn't roll back the
+        # transition.
+        if target in ("prep", "ready_for_dispatch", "dispatched",
+                       "in_progress"):
+            try:
+                from .neon_equipment_conflict import ConflictEngine
+                ConflictEngine(self.env).run_for_event(
+                    self, trigger_reason="event_confirmed")
+            except Exception:  # noqa: BLE001
+                _logger.exception(
+                    "B2 conflict engine failed on transition "
+                    "%(evt)s -> %(state)s; transition kept, "
+                    "alert skipped.",
+                    {"evt": self.name, "state": target})
+        # B2 D8 -- soft data-quality nudge. When an event job
+        # transitions out of draft AND has no precise load-in/out
+        # window, raise a low-priority Action Centre task so the
+        # team is reminded to fill in the precise window (which
+        # collapses the conservative same-day fallback in D2).
+        if (target not in ("draft",)
+                and not (self.load_in_start and self.load_out_end)):
+            try:
+                self._action_centre_create_item("load_window_missing")
+            except Exception:  # noqa: BLE001
+                # Trigger config may not be seeded yet on a fresh
+                # install -- log and continue.
+                _logger.info(
+                    "load_window_missing trigger not configured "
+                    "yet; nudge skipped for %s.", self.name)
 
     @api.depends("state", "lead_tech_id", "crew_chief_id",
                  "gear_reconciled", "finance_handoff_complete",

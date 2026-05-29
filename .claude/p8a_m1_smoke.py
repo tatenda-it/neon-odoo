@@ -126,7 +126,7 @@ for tnum, dtype, expected_count in [
     ("T8102", "director", 14),
     ("T8103", "sales", 12),
     ("T8104", "bookkeeper", 13),
-    ("T8105", "lead_tech", 11),
+    ("T8105", "lead_tech", 12),  # P-B2 added block_conflicts
     ("T8106", "tech", 4),
 ]:
     print()

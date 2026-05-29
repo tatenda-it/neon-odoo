@@ -1368,4 +1368,109 @@ $neon-bg:            #FAFAFC;
             grid-template-columns: 1fr;
         }
     }
+
+    // ============================================================
+    // P-B2 -- Equipment conflicts panel (Operations variant).
+    // ============================================================
+    .o_neon_block_conflicts {
+        .o_neon_block_header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .o_neon_conflicts_status_badge {
+            font-size: 0.75em;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .o_neon_conflicts_status_deficit {
+            background: rgba(233, 79, 79, 0.18);
+            color: #B92929;
+        }
+        .o_neon_conflicts_status_zero_margin {
+            background: rgba(245, 166, 35, 0.20);
+            color: #B26F00;
+        }
+        .o_neon_conflicts_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        .o_neon_conflicts_table thead th {
+            text-align: left;
+            font-weight: 600;
+            color: #6E6E80;
+            font-size: 0.78em;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-bottom: 1px solid #E5E5EE;
+        }
+        .o_neon_conflicts_table tbody tr {
+            cursor: pointer;
+        }
+        .o_neon_conflicts_table tbody tr:hover {
+            background: #F8F4FC;
+        }
+        .o_neon_conflicts_table tbody td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #F0F0F5;
+            vertical-align: top;
+        }
+        .o_neon_conflicts_row_deficit .o_neon_conflicts_short {
+            color: #C13838;
+            font-weight: 700;
+        }
+        .o_neon_conflicts_row_zero_margin .o_neon_conflicts_short {
+            color: #B26F00;
+            font-weight: 600;
+        }
+        .o_neon_conflicts_prio {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            text-align: center;
+            border-radius: 50%;
+            background: #5B2A8A;
+            color: white;
+            font-weight: 700;
+            font-size: 0.85em;
+        }
+        .o_neon_conflicts_prod {
+            font-weight: 600;
+            color: #1F1F2E;
+        }
+        .o_neon_conflicts_event_chip {
+            display: inline-block;
+            margin: 1px 3px 1px 0;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #F0E7FA;
+            color: #5B2A8A;
+            font-size: 0.78em;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .o_neon_conflicts_event_chip:hover {
+            background: #E0CBF5;
+        }
+        .o_neon_conflicts_event_more {
+            color: #6E6E80;
+            font-size: 0.78em;
+            font-style: italic;
+        }
+        .o_neon_conflicts_more {
+            text-align: right;
+            padding: 4px 8px;
+            font-size: 0.85em;
+        }
+        .o_neon_conflicts_data_quality {
+            padding: 8px 4px 0;
+            line-height: 1.4;
+        }
+    }
 }

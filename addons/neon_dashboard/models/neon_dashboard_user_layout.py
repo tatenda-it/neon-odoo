@@ -66,6 +66,9 @@ _WIDGET_KEYS = [
     ("block_zig_costs", "Block: ZiG Rate + Recent Costs"),
     ("block_crew_gaps", "Block: Crew Gaps Watch"),
     ("block_cert_expiry", "Block: Cert Expiry Watch"),
+    # P-B2 -- Equipment Conflicts panel (Operations variant only,
+    # per D7-trim. Director MD-peeks Operations to see it).
+    ("block_conflicts", "Block: Equipment Conflicts"),
 ]
 
 # Schema sketch §4.2 -- not hide-able. Set in M1 so the API contract

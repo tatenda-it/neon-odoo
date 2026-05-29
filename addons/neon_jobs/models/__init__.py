@@ -41,3 +41,5 @@ from . import neon_equipment_repair_order
 from . import neon_equipment_incident
 # P5.M10 — Workshop Dashboard (virtual model + OWL client action)
 from . import neon_equipment_dashboard
+# P-B2 — Conflict Detection Engine (header + line + engine service)
+from . import neon_equipment_conflict

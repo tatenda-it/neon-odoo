@@ -65,13 +65,16 @@ expected = {
     "incident_open",            # P5.M9
     "repair_stalled",           # P5.M9
     "stock_take_unresolved",    # P5.M9
+    "load_window_missing",      # P-B2 (data-quality nudge)
     "manual",
 }
 configs = env["action.centre.trigger.config"].sudo().search([])
 got = set(configs.mapped("trigger_type"))
-print("  total configs:", len(configs), "(want 16)")
+# Downstream modules (e.g. neon_hr) add more trigger types, so we
+# assert the B2-and-earlier set is a SUBSET, not an exact match.
+print("  total configs:", len(configs), "(>= 17 expected)")
 print("  trigger types covered:", sorted(got))
-ok = len(configs) == 16 and got == expected
+ok = len(configs) >= 17 and expected.issubset(got)
 print("T170:", "PASS" if ok else "FAIL")
 results["T170"] = ok
 
@@ -329,7 +332,7 @@ results["T177"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T178 - trigger_type Selection extended to all 16 values")
+print("T178 - trigger_type Selection extended to all 17 values")
 print("=" * 72)
 fdef = env["action.centre.item"].fields_get(
     ["trigger_type"])["trigger_type"]
@@ -344,9 +347,10 @@ expected_values = {
     "incident_open",           # P5.M9
     "repair_stalled",          # P5.M9
     "stock_take_unresolved",   # P5.M9
+    "load_window_missing",     # P-B2
     "manual",
 }
-ok = sel_values == expected_values
+ok = expected_values.issubset(sel_values)
 # Also: manual item default still 'manual'
 fresh_manual = env["action.centre.item"].with_user(sales).create({
     "title": "P4M2FIX T178_manual_default",

@@ -20,7 +20,16 @@
     # (write-on-attest hook), parent_id + low_stock_threshold on
     # the category. B2's overlap engine reads occupation_start/end
     # and category.low_stock_threshold as its inputs.
-    "version": "17.0.4.5.0",
+    # 17.0.5.0.0 = P-B2 Conflict Detection Engine. NEW central
+    # pivot models neon.equipment.conflict (header) +
+    # neon.equipment.conflict.line (detail) + the rules-based
+    # engine that flags products whose aggregated demand across
+    # overlapping events exceeds the available pool. Per
+    # CLAUDE.md, a new central pivot model triggers a MAJOR bump.
+    # Reuses the existing 'equipment_conflict' AC trigger; adds a
+    # new 'load_window_missing' nudge trigger; adds a daily 06:00
+    # backstop cron.
+    "version": "17.0.5.0.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -132,6 +141,10 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         # P5.M10 — Workshop Dashboard. Loads after menu.xml so the
         # menuitem can resolve menu_workshop_root as its parent.
         "views/neon_equipment_dashboard_views.xml",
+        # P-B2 — Conflict Detection Engine views + menu. Loads after
+        # the dashboard so menu_workshop_overview resolves.
+        "views/neon_equipment_conflict_views.xml",
+        "data/ir_cron_conflict_backstop.xml",
     ],
     "assets": {
         "web.assets_backend": [

@@ -138,6 +138,14 @@ class CommercialEventJobEquipmentLine(models.Model):
                     "(event_job %s): %s",
                     line.id, line.event_job_id.name, e,
                 )
+        # B2 D4 -- recompute the conflict engine once per event_job
+        # the new lines belong to (debounce the per-line creates
+        # within a single multi-create).
+        affected_event_ids = set(l.event_job_id.id for l in lines
+                                  if l.event_job_id)
+        if affected_event_ids:
+            lines._b2_recompute_for_events(affected_event_ids,
+                                             "requirement_changed")
         return lines
 
     def write(self, vals):
@@ -165,7 +173,49 @@ class CommercialEventJobEquipmentLine(models.Model):
         if "quantity_planned" in vals:
             for line in self:
                 line._reconcile_reservations_to_quantity()
+        # B2 D4 -- recompute conflicts when demand-relevant fields
+        # change (quantity, product, or explicit cancel flip).
+        b2_trigger_keys = {"quantity_planned", "product_template_id",
+                            "cancelled_explicit"}
+        if b2_trigger_keys & set(vals.keys()):
+            affected = set(l.event_job_id.id for l in self
+                            if l.event_job_id)
+            if affected:
+                self._b2_recompute_for_events(
+                    affected, "requirement_changed")
         return res
+
+    def unlink(self):
+        # Snapshot affected event_jobs BEFORE the rows go away so the
+        # B2 recompute can target the right cluster after delete.
+        affected = set(l.event_job_id.id for l in self
+                        if l.event_job_id)
+        res = super().unlink()
+        if affected:
+            self._b2_recompute_for_events(
+                affected, "requirement_changed")
+        return res
+
+    def _b2_recompute_for_events(self, event_ids, trigger_reason):
+        """Run the B2 conflict engine for each affected event_job.
+        Wrapped so a recompute failure never rolls back the demand
+        edit that triggered it."""
+        try:
+            from .neon_equipment_conflict import ConflictEngine
+        except Exception:  # noqa: BLE001
+            return
+        engine = ConflictEngine(self.env)
+        EvJ = self.env["commercial.event.job"].sudo()
+        for eid in event_ids:
+            ev = EvJ.browse(eid).exists()
+            if not ev:
+                continue
+            try:
+                engine.run_for_event(ev, trigger_reason=trigger_reason)
+            except Exception:  # noqa: BLE001
+                _logger.exception(
+                    "B2 conflict engine failed on requirement "
+                    "change for event %s; alert skipped.", ev.name)
 
     def _reconcile_reservations_to_quantity(self):
         """Bring the soft_hold reservation count in line with

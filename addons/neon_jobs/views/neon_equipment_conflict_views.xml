@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- B2 — Conflict run tree -->
+    <record id="neon_equipment_conflict_view_tree" model="ir.ui.view">
+        <field name="name">neon.equipment.conflict.tree</field>
+        <field name="model">neon.equipment.conflict</field>
+        <field name="arch" type="xml">
+            <tree string="Equipment Conflict Runs"
+                  decoration-success="overall_status == 'clear'"
+                  decoration-warning="overall_status == 'zero_margin'"
+                  decoration-danger="overall_status == 'deficit'">
+                <header>
+                    <button name="action_recompute_global"
+                            type="object"
+                            string="Recompute All"
+                            class="oe_highlight"/>
+                </header>
+                <field name="name"/>
+                <field name="triggered_at"/>
+                <field name="trigger_reason" widget="badge"/>
+                <field name="triggered_by_event_id" optional="show"/>
+                <field name="window_start" optional="show"/>
+                <field name="window_end" optional="show"/>
+                <field name="line_count" optional="show"/>
+                <field name="deficit_count" widget="badge"
+                       decoration-danger="deficit_count > 0"/>
+                <field name="zero_margin_count" widget="badge"
+                       decoration-warning="zero_margin_count > 0"/>
+                <field name="overall_status" widget="badge"
+                       decoration-success="overall_status == 'clear'"
+                       decoration-warning="overall_status == 'zero_margin'"
+                       decoration-danger="overall_status == 'deficit'"/>
+                <field name="alert_dispatched_at" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="neon_equipment_conflict_view_form" model="ir.ui.view">
+        <field name="name">neon.equipment.conflict.form</field>
+        <field name="model">neon.equipment.conflict</field>
+        <field name="arch" type="xml">
+            <form string="Equipment Conflict Run">
+                <header>
+                    <button name="action_recompute_around_trigger"
+                            type="object"
+                            string="Recompute"
+                            class="oe_highlight"/>
+                    <field name="overall_status" widget="statusbar"
+                           statusbar_visible="clear,zero_margin,deficit"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Run metadata">
+                            <field name="triggered_at" readonly="1"/>
+                            <field name="trigger_reason" readonly="1"/>
+                            <field name="triggered_by_event_id"
+                                   readonly="1"/>
+                            <field name="alert_dispatched_at"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Window covered">
+                            <field name="window_start" readonly="1"/>
+                            <field name="window_end" readonly="1"/>
+                            <field name="line_count" readonly="1"/>
+                            <field name="deficit_count" readonly="1"/>
+                            <field name="zero_margin_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Conflict lines"
+                              name="page_lines">
+                            <field name="line_ids" nolabel="1">
+                                <tree string="Conflict Lines"
+                                      decoration-success="status == 'surplus'"
+                                      decoration-warning="status in ('zero_margin', 'below_threshold')"
+                                      decoration-danger="status == 'deficit'">
+                                    <field name="sub_hire_priority"/>
+                                    <field name="product_template_id"/>
+                                    <field name="category_id"/>
+                                    <field name="required_qty"/>
+                                    <field name="available_qty"/>
+                                    <field name="margin"/>
+                                    <field name="deficit_qty"/>
+                                    <field name="status" widget="badge"
+                                           decoration-success="status == 'surplus'"
+                                           decoration-warning="status in ('zero_margin', 'below_threshold')"
+                                           decoration-danger="status == 'deficit'"/>
+                                    <field name="competing_event_count"/>
+                                    <field name="competing_event_ids"
+                                           widget="many2many_tags"
+                                           optional="show"/>
+                                    <field name="earliest_competing_start"
+                                           optional="hide"/>
+                                </tree>
+                                <form string="Conflict Line">
+                                    <group>
+                                        <group>
+                                            <field name="product_template_id"
+                                                   readonly="1"/>
+                                            <field name="category_id"
+                                                   readonly="1"/>
+                                            <field name="required_qty"
+                                                   readonly="1"/>
+                                            <field name="available_qty"
+                                                   readonly="1"/>
+                                        </group>
+                                        <group>
+                                            <field name="margin"
+                                                   readonly="1"/>
+                                            <field name="deficit_qty"
+                                                   readonly="1"/>
+                                            <field name="status"
+                                                   readonly="1"/>
+                                            <field name="sub_hire_priority"
+                                                   readonly="1"/>
+                                        </group>
+                                    </group>
+                                    <separator string="Competing events"/>
+                                    <field name="competing_event_ids"
+                                           nolabel="1" readonly="1"/>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="neon_equipment_conflict_view_search" model="ir.ui.view">
+        <field name="name">neon.equipment.conflict.search</field>
+        <field name="model">neon.equipment.conflict</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="triggered_by_event_id"/>
+                <separator/>
+                <filter name="filter_deficit"
+                        string="Deficit"
+                        domain="[('overall_status', '=', 'deficit')]"/>
+                <filter name="filter_zero_margin"
+                        string="Zero margin"
+                        domain="[('overall_status', '=', 'zero_margin')]"/>
+                <filter name="filter_clear"
+                        string="Clear"
+                        domain="[('overall_status', '=', 'clear')]"/>
+                <separator/>
+                <filter name="filter_today"
+                        string="Today"
+                        domain="[('triggered_at', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_status"
+                            string="Overall status"
+                            context="{'group_by': 'overall_status'}"/>
+                    <filter name="group_reason"
+                            string="Trigger reason"
+                            context="{'group_by': 'trigger_reason'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="neon_equipment_conflict_action" model="ir.actions.act_window">
+        <field name="name">Equipment Conflicts</field>
+        <field name="res_model">neon.equipment.conflict</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id"
+               ref="neon_equipment_conflict_view_search"/>
+        <field name="context">{'search_default_filter_deficit': 1, 'search_default_filter_zero_margin': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No equipment conflicts yet
+            </p>
+            <p>
+                The Conflict Detection Engine flags products whose
+                aggregated demand across overlapping event jobs
+                exceeds the available pool. Confirm an event to
+                trigger a run, or use the "Recompute All" button.
+            </p>
+        </field>
+    </record>
+
+    <!-- B2 — menu entry under Operations. Manager + lead-tech see
+         the action; the ACL CSV controls read/write below. -->
+    <menuitem id="menu_neon_equipment_conflict"
+              name="Equipment Conflicts"
+              parent="menu_workshop_overview"
+              action="neon_equipment_conflict_action"
+              sequence="60"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"/>
+
+</odoo>

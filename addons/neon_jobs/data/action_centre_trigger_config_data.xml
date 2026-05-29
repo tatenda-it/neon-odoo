@@ -142,7 +142,22 @@
             <field name="escalation_minutes">240</field>
             <field name="escalated_to_role">manager</field>
             <field name="auto_close_when_condition_clears" eval="True"/>
-            <field name="description">Alert: two open reservations (soft_hold or confirmed) overlap on the same equipment unit. Auto-closes when the conflict clears (one side cancelled, dates moved apart, or one fulfilled).</field>
+            <field name="description">Alert: equipment shortfall -- either two reservations overlap on the same unit (P5.M4 per-unit) OR aggregated demand across overlapping events exceeds the available pool (P-B2 per-product). Auto-closes when the conflict clears.</field>
+        </record>
+
+        <!-- P-B2 — load-window-missing data quality nudge.
+             Low-priority TASK; lead_tech-assigned; auto-closes when
+             load_in_start AND load_out_end are set on the event. -->
+        <record id="trigger_config_load_window_missing" model="action.centre.trigger.config">
+            <field name="trigger_type">load_window_missing</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="item_type">task</field>
+            <field name="primary_role">lead_tech</field>
+            <field name="priority">low</field>
+            <field name="escalation_minutes">0</field>
+            <field name="escalated_to_role">lead_tech</field>
+            <field name="auto_close_when_condition_clears" eval="True"/>
+            <field name="description">Set the venue load-in and load-out windows on this event so the conflict engine can detect equipment overlaps precisely (rather than the conservative same-day-overnight fallback).</field>
         </record>
 
         <record id="trigger_config_transfer_pending" model="action.centre.trigger.config">

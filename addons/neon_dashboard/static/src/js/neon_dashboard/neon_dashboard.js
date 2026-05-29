@@ -34,6 +34,7 @@ const BLOCK_LABELS = {
     block_zig_costs: "ZiG Rate · Recent Costs",
     block_crew_gaps: "Crew Gaps Watch",
     block_cert_expiry: "Cert Expiry Watch",
+    block_conflicts: "Equipment Conflicts",
 };
 
 // block_alerts is the only mandatory CONTENT block (D6); the UI never
@@ -665,6 +666,46 @@ export class NeonDashboard extends Component {
                 has_more: false,
             }
         );
+    }
+
+    // P-B2 D7 -- Operations conflicts panel block. Server hydrates
+    // conflicts_block via _compute_conflicts_block (NOT recomputed
+    // here -- the engine writes to the persisted conflict tables
+    // on confirm + requirement-change + daily 06:00 cron).
+    get conflictsBlock() {
+        return (
+            (this.state.data && this.state.data.conflicts_block) || {
+                ok: true,
+                has_conflicts: false,
+                overall_status: "clear",
+                lines: [],
+                header_id: 0,
+                header_name: "",
+                data_quality_note: "",
+            }
+        );
+    }
+
+    async onConflictRowClick(lineId) {
+        if (!lineId) return;
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "neon.equipment.conflict.line",
+            res_id: lineId,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    async onConflictEventClick(eventId) {
+        if (!eventId) return;
+        await this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "commercial.event.job",
+            res_id: eventId,
+            views: [[false, "form"]],
+            target: "current",
+        });
     }
 
     async onTaskClick(task) {

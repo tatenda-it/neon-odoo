@@ -133,3 +133,11 @@ access_neon_equipment_incident_crew,neon.equipment.incident crew (read-only),mod
 access_neon_equipment_incident_manager,neon.equipment.incident manager (full),model_neon_equipment_incident,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_neon_equipment_dashboard_manager,neon.equipment.dashboard manager (read-only — virtual model),model_neon_equipment_dashboard,neon_jobs.group_neon_jobs_manager,1,0,0,0
 access_neon_equipment_dashboard_crew_leader,neon.equipment.dashboard crew_leader (read-only — virtual model),model_neon_equipment_dashboard,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_equipment_conflict_user,neon.equipment.conflict user (read-only),model_neon_equipment_conflict,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_conflict_crew_leader,neon.equipment.conflict crew_leader (read-only),model_neon_equipment_conflict,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_equipment_conflict_manager,neon.equipment.conflict manager (R/W/C; no unlink — audit),model_neon_equipment_conflict,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_equipment_conflict_superuser,neon.equipment.conflict superuser (R/W/C; no unlink — audit),model_neon_equipment_conflict,neon_core.group_neon_superuser,1,1,1,0
+access_neon_equipment_conflict_line_user,neon.equipment.conflict.line user (read-only),model_neon_equipment_conflict_line,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_conflict_line_crew_leader,neon.equipment.conflict.line crew_leader (read-only),model_neon_equipment_conflict_line,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_equipment_conflict_line_manager,neon.equipment.conflict.line manager (R/W/C; no unlink — audit),model_neon_equipment_conflict_line,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_equipment_conflict_line_superuser,neon.equipment.conflict.line superuser (R/W/C; no unlink — audit),model_neon_equipment_conflict_line,neon_core.group_neon_superuser,1,1,1,0
