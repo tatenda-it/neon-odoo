@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Menus live under the native HR app root (hr.menu_hr_root),
+        which is itself gated by hr groups — so only HR Admin / OD/MD
+        (the holders of an hr group) reach them. Confidentiality of
+        record CONTENT is enforced by record rules, not by these menus
+        (Q28).
+    -->
+    <menuitem id="menu_neon_hr_root"
+              name="Neon HR"
+              parent="hr.menu_hr_root"
+              sequence="90"/>
+
+    <menuitem id="menu_neon_hr_contracts_expiring"
+              name="Contracts Expiring / Expired"
+              parent="menu_neon_hr_root"
+              action="action_neon_hr_contracts_expiring"
+              sequence="10"/>
+
+    <menuitem id="menu_neon_hr_documents"
+              name="Employee Documents"
+              parent="menu_neon_hr_root"
+              action="action_neon_hr_document"
+              sequence="20"/>
+
+    <menuitem id="menu_neon_hr_config"
+              name="Configuration"
+              parent="menu_neon_hr_root"
+              sequence="90"/>
+
+    <menuitem id="menu_neon_hr_categories"
+              name="Employee Categories"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_category"
+              sequence="10"/>
+
+    <menuitem id="menu_neon_hr_document_types"
+              name="Document Types"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_document_type"
+              sequence="20"/>
+
+    <menuitem id="menu_neon_hr_contract_templates"
+              name="Contract Templates"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_contract_template"
+              sequence="30"/>
+</odoo>

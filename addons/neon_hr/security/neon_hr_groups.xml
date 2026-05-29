@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Neon HR Admin — the single Admin/HR person (per Q1).
+        Implies full Odoo HR management (employees + contracts) so the
+        HR admin can run the whole employee master. OD/MD authority
+        stays in neon_core.group_neon_superuser, which the post_init
+        hook grants hr.group_hr_manager to (neon_core loads before
+        neon_hr, so its implied_ids cannot reference hr.* from XML).
+
+        Confidentiality (Q28) is enforced by RECORD RULES + ACLs, not
+        by hiding this group — per the spec, menu hiding is NOT the
+        mechanism.
+    -->
+    <record id="group_neon_hr_admin" model="res.groups">
+        <field name="name">Neon HR Admin</field>
+        <field name="category_id" ref="neon_core.module_category_neon_core"/>
+        <field name="comment">
+            Administration / HR. Full management of the employee
+            master: categories, contracts, document compliance,
+            renewal workflow. Sees salary + personal documents
+            (confidential tier alongside OD/MD).
+        </field>
+        <field name="implied_ids" eval="[(6, 0, [
+            ref('base.group_user'),
+            ref('hr.group_hr_manager'),
+            ref('hr_contract.group_hr_contract_manager'),
+        ])]"/>
+    </record>
+</odoo>

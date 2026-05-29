@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        7 confirmed employee categories. Each carries a DISTINCT
+        required-document set (acceptance #3). Notice period: permanent
+        = 30 days, settled. Every other category is flagged for legal
+        sign-off with notice_period_days left at 0 (a placeholder, NOT
+        an invented 3-month default) per Q/S6.
+
+        Baseline doc set B (most categories): signed_contract,
+        code_of_conduct, id_passport, emergency_contact,
+        banking_details, tax_statutory, conflict_of_interest,
+        confidentiality_ack. Differentiators: nssa_registration,
+        competency_record, work_permit.
+    -->
+
+    <record id="category_permanent" model="neon.hr.category">
+        <field name="name">Permanent</field>
+        <field name="code">permanent</field>
+        <field name="sequence">10</field>
+        <field name="default_pay_type">salary</field>
+        <field name="notice_period_days">30</field>
+        <field name="notice_flagged_for_legal" eval="False"/>
+        <field name="required_document_type_ids" eval="[(6, 0, [
+            ref('doctype_signed_contract'),
+            ref('doctype_code_of_conduct'),
+            ref('doctype_id_passport'),
+            ref('doctype_emergency_contact'),
+            ref('doctype_banking_details'),
+            ref('doctype_tax_statutory'),
+            ref('doctype_conflict_of_interest'),
+            ref('doctype_confidentiality_ack'),
+            ref('doctype_nssa_registration'),
+        ])]"/>
+    </record>
+
+    <record id="category_fixed_term" model="neon.hr.category">
+        <field name="name">Fixed Term</field>
+        <field name="code">fixed_term</field>
+        <field name="sequence">20</field>
+        <field name="default_pay_type">salary</field>
+        <field name="notice_period_days">0</field>
+        <field name="notice_flagged_for_legal" eval="True"/>
+        <field name="required_document_type_ids" eval="[(6, 0, [
+            ref('doctype_signed_contract'),
+            ref('doctype_code_of_conduct'),
+            ref('doctype_id_passport'),
+            ref('doctype_emergency_contact'),
+            ref('doctype_banking_details'),
+            ref('doctype_tax_statutory'),
+            ref('doctype_conflict_of_interest'),
+            ref('doctype_confidentiality_ack'),
+            ref('doctype_work_permit'),
+        ])]"/>
+    </record>
+
+    <record id="category_employed_technician" model="neon.hr.category">
+        <field name="name">Employed Technician</field>
+        <field name="code">employed_technician</field>
+        <field name="sequence">30</field>
+        <field name="default_pay_type">salary</field>
+        <field name="notice_period_days">0</field>
+        <field name="notice_flagged_for_legal" eval="True"/>
+        <field name="required_document_type_ids" eval="[(6, 0, [
+            ref('doctype_signed_contract'),
+            ref('doctype_code_of_conduct'),
+            ref('doctype_id_passport'),
+            ref('doctype_emergency_contact'),
+            ref('doctype_banking_details'),
+            ref('doctype_tax_statutory'),
+            ref('doctype_conflict_of_interest'),
+            ref('doctype_confidentiality_ack'),
+            ref('doctype_nssa_registration'),
+            ref('doctype_competency_record'),
+        ])]"/>
+    </record>
+
+    <record id="category_freelance_technician" model="neon.hr.category">
+        <field name="name">Freelance Technician</field>
+        <field name="code">freelance_technician</field>
+        <field name="sequence">40</field>
+        <field name="default_pay_type">per_job</field>
+        <field name="notice_period_days">0</field>
+        <field name="notice_flagged_for_legal" eval="True"/>
+        <field name="required_document_type_ids" eval="[(6, 0, [
+            ref('doctype_signed_contract'),
+            ref('doctype_code_of_conduct'),
+            ref('doctype_id_passport'),
+            ref('doctype_emergency_contact'),
+            ref('doctype_banking_details'),
+            ref('doctype_tax_statutory'),
+            ref('doctype_conflict_of_interest'),
+            ref('doctype_confidentiality_ack'),
+            ref('doctype_competency_record'),
+        ])]"/>
+    </record>
+
+    <record id="category_casual_crew" model="neon.hr.category">
+        <field name="name">Casual Crew</field>
+        <field name="code">casual_crew</field>
+        <field name="sequence">50</field>
+        <field name="default_pay_type">hourly</field>
+        <field name="notice_period_days">0</field>
+        <field name="notice_flagged_for_legal" eval="True"/>
+        <field name="required_document_type_ids" eval="[(6, 0, [
+            ref('doctype_signed_contract'),
+            ref('doctype_code_of_conduct'),
+            ref('doctype_id_passport'),
+            ref('doctype_emergency_contact'),
+            ref('doctype_banking_details'),
+            ref('doctype_tax_statutory'),
+            ref('doctype_conflict_of_interest'),
+            ref('doctype_confidentiality_ack'),
+        ])]"/>
+    </record>
+
+    <record id="category_contractor" model="neon.hr.category">
+        <field name="name">Contractor</field>
+        <field name="code">contractor</field>
+        <field name="sequence">60</field>
+        <field name="default_pay_type">per_job</field>
+        <field name="notice_period_days">0</field>
+        <field name="notice_flagged_for_legal" eval="True"/>
+        <field name="required_document_type_ids" eval="[(6, 0, [
+            ref('doctype_signed_contract'),
+            ref('doctype_id_passport'),
+            ref('doctype_banking_details'),
+            ref('doctype_tax_statutory'),
+            ref('doctype_conflict_of_interest'),
+            ref('doctype_confidentiality_ack'),
+        ])]"/>
+    </record>
+
+    <record id="category_driver" model="neon.hr.category">
+        <field name="name">Driver</field>
+        <field name="code">driver</field>
+        <field name="sequence">70</field>
+        <field name="default_pay_type">salary</field>
+        <field name="notice_period_days">0</field>
+        <field name="notice_flagged_for_legal" eval="True"/>
+        <field name="required_document_type_ids" eval="[(6, 0, [
+            ref('doctype_signed_contract'),
+            ref('doctype_code_of_conduct'),
+            ref('doctype_id_passport'),
+            ref('doctype_emergency_contact'),
+            ref('doctype_banking_details'),
+            ref('doctype_tax_statutory'),
+            ref('doctype_conflict_of_interest'),
+            ref('doctype_confidentiality_ack'),
+            ref('doctype_competency_record'),
+            ref('doctype_work_permit'),
+        ])]"/>
+    </record>
+</odoo>
