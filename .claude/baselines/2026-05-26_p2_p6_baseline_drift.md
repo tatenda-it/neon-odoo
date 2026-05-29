@@ -105,3 +105,46 @@ drift on the dev DB. Untouched by Phase 8B.
 Tracked in `carryover_phase_9_kickoff.md`. Re-evaluate when the dev DB
 gets a refresh cycle during Phase 9 production hardening — several of
 these likely resolve when fixtures are rebuilt from clean seed.
+
+---
+
+## Update 2026-05-29 (P-HR-R1a close) — regression 2056/2073
+
+Five suites NEW vs the 2026-05-26 set surfaced during the P-HR-R1a
+(neon_hr) regression. NONE are neon_hr functional regressions — root
+causes below. Captured so the next run can diff cleanly.
+
+### p4m2 — 7/9 (T170, T178) + p4m8 — 9/10 (T240)
+Action Centre trigger-config COUNT tests assert exactly 16
+(`len(configs) == 16`, selection == 16 values). The shared registry
+has since grown to **18** by two legitimate module extensions:
+- `load_window_missing` — **B-B2** (already in the working tree, comment-
+  tagged "P-B2"; B2 added the trigger + config but did not update these
+  count tests). This alone makes the count 17 → the tests were ALREADY
+  red before neon_hr.
+- `contract_expiry_30days` — **P-HR-R1a** (neon_hr reuses the Action
+  Centre per spec via `selection_add`, +1 → 18).
+These are stale exact-count assertions, not functional failures. Fix at
+B2/neon_hr merge: change `== 16` to `base16.issubset(got)` + `>= 16`
+(assert the 16 neon_jobs triggers are present, allow module extensions).
+Not edited here to avoid colliding with the parallel B2 session.
+
+### p2m7 — 16/17 (T2)
+"All 5 dashboard counts compute to 0 on empty DB" — the long-lived dev
+DB is not empty: `gate_issues_count=1`, `cash_flow_count=2` from data
+accumulated since the 2026-05-26 capture (p12/b1/regression commits).
+Same family as p2m2/p2m4 (data-dependent computation drift). neon_hr's
+browser smoke briefly added to `needs_attention_count` via committed
+cron items; that is now cleaned at smoke setup-start, so neon_hr no
+longer contributes (verified: after cleanup, the two non-zero counts
+are unrelated to HR).
+
+### pb1_datamodel — 29/30 (T-B1-28)
+`low_stock_threshold < 0` not rejected by the SQL CHECK on
+`neon.equipment.category` — B1 constraint/fixture drift on the dev DB.
+Untouched by neon_hr (equipment, not HR).
+
+### p9m1_venue_geocode — crash
+`ValidationError: The selected Room does not belong to the selected
+Venue` in `commercial_job._check_room_belongs_to_venue` — venue/room
+fixture drift (b1/p9). Untouched by neon_hr.

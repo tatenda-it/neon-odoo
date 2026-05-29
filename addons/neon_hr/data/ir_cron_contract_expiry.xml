@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Daily 30-day contract-expiry scan (Q7-9). Raises/refreshes an
+        Action Centre item for contracts expiring within 30 days and
+        for contracts already past end date while still Active. Also
+        refreshes document expiry states in the same pass. Runs as
+        OdooBot. nextcall set to tomorrow 02:00 so installing the
+        module does not spawn items mid-install/smoke.
+    -->
+    <record id="ir_cron_contract_expiry" model="ir.cron">
+        <field name="name">Neon HR: Contract Expiry &amp; Document Refresh</field>
+        <field name="model_id" ref="hr_contract.model_hr_contract"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_contract_expiry_scan()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="nextcall"
+               eval="(DateTime.now().replace(hour=2, minute=0, second=0, microsecond=0) + relativedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
+    </record>
+</odoo>

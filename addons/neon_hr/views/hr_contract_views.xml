@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Contract form: renewal state machine in the header + a
+         Neon HR page for type/template/pay/notice/renewal fields. -->
+    <record id="hr_contract_view_form_neon_hr" model="ir.ui.view">
+        <field name="model">hr.contract</field>
+        <field name="inherit_id" ref="hr_contract.hr_contract_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_renewal_start_review" type="object"
+                        string="Start Renewal Review" class="btn-primary"
+                        invisible="renewal_state != 'not_reviewed'"/>
+                <button name="action_renewal_decide_renew" type="object"
+                        string="Decide: Renew" class="btn-primary"
+                        invisible="renewal_state != 'renewal_under_review'"/>
+                <button name="action_renewal_decide_not_renew" type="object"
+                        string="Decide: Do Not Renew"
+                        invisible="renewal_state != 'renewal_under_review'"/>
+                <button name="action_renewal_issue_letter" type="object"
+                        string="Issue Renewal Letter"
+                        invisible="renewal_state != 'renew'"/>
+                <button name="action_renewal_issue_non_renewal" type="object"
+                        string="Issue Non-Renewal Notice"
+                        invisible="renewal_state != 'do_not_renew'"/>
+                <button name="action_renewal_new_contract_signed" type="object"
+                        string="New Contract Signed" class="btn-primary"
+                        invisible="renewal_state != 'renewal_letter_issued'"/>
+                <button name="action_renewal_mark_expired" type="object"
+                        string="Mark Expired"
+                        invisible="renewal_state not in ('renewal_letter_issued','non_renewal_notice_issued')"/>
+                <field name="renewal_state" widget="statusbar"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Neon HR" name="neon_hr_contract">
+                    <group>
+                        <group string="Type &amp; Template">
+                            <field name="neon_contract_type"/>
+                            <field name="template_id"/>
+                            <field name="neon_expiry_state"/>
+                        </group>
+                        <group string="Notice (Q/S6)">
+                            <field name="notice_period_days"/>
+                            <field name="notice_period_flagged_for_legal"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Pay (per-contract — Q5)">
+                            <field name="per_job_amount"/>
+                            <field name="commission_percent"/>
+                        </group>
+                        <group string="Renewal Ownership">
+                            <field name="renewal_owner_id"/>
+                        </group>
+                    </group>
+                    <group string="Renewal Recommendation &amp; Evidence">
+                        <field name="renewal_recommendation" nolabel="1"
+                               placeholder="Recommendation and supporting evidence. Structured per-role criteria deferred (Q10/S5)."/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Contract templates ===== -->
+    <record id="view_neon_hr_contract_template_tree" model="ir.ui.view">
+        <field name="model">neon.hr.contract.template</field>
+        <field name="arch" type="xml">
+            <tree string="Contract Templates">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="neon_contract_type"/>
+                <field name="category_id"/>
+                <field name="default_notice_days"/>
+                <field name="notice_flagged"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_hr_contract_template_form" model="ir.ui.view">
+        <field name="model">neon.hr.contract.template</field>
+        <field name="arch" type="xml">
+            <form string="Contract Template">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <field name="currency_id" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="neon_contract_type"/>
+                            <field name="category_id"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="default_wage"/>
+                            <field name="default_per_job_amount"/>
+                            <field name="default_commission_percent"/>
+                            <field name="default_notice_days"/>
+                            <field name="notice_flagged"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_hr_contract_template" model="ir.actions.act_window">
+        <field name="name">Contract Templates</field>
+        <field name="res_model">neon.hr.contract.template</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- Expiry surfacing: contracts expiring within 30 days OR expired
+         but still Active (Q7-9 dashboard surfacing, reusing native
+         contract views). -->
+    <record id="action_neon_hr_contracts_expiring" model="ir.actions.act_window">
+        <field name="name">Contracts Expiring / Expired</field>
+        <field name="res_model">hr.contract</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('neon_expiry_state', 'in', ['expiring', 'expired_active'])]</field>
+        <field name="context">{'search_default_group_by_state': 0}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No contracts expiring in the next 30 days.</p>
+            <p>Contracts within 30 days of their end date — and contracts past their end date still marked Active — appear here.</p>
+        </field>
+    </record>
+</odoo>

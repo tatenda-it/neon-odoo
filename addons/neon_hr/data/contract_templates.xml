@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        3 contract templates (Q4). They carry STARTING defaults only.
+        Salary / per-job amount / commission % are deliberately left at
+        0 here because they vary by person and grade (Q5) — they are
+        per-contract fields, never global constants. Notice days = 0 +
+        flagged for every non-permanent template (Q/S6: do not invent a
+        3-month default).
+    -->
+    <record id="tpl_employed_technician" model="neon.hr.contract.template">
+        <field name="name">Employed Technician (Sound &amp; LED default)</field>
+        <field name="sequence">10</field>
+        <field name="neon_contract_type">employed_technician</field>
+        <field name="category_id" ref="category_employed_technician"/>
+        <field name="default_wage">0.0</field>
+        <field name="default_notice_days">0</field>
+        <field name="notice_flagged" eval="True"/>
+        <field name="description">Current default for employed Sound &amp; LED technicians. Enter the wage per person/grade (Q5).</field>
+    </record>
+
+    <record id="tpl_casual" model="neon.hr.contract.template">
+        <field name="name">Casual</field>
+        <field name="sequence">20</field>
+        <field name="neon_contract_type">casual_crew</field>
+        <field name="category_id" ref="category_casual_crew"/>
+        <field name="default_per_job_amount">0.0</field>
+        <field name="default_notice_days">0</field>
+        <field name="notice_flagged" eval="True"/>
+        <field name="description">Casual crew engagement. Enter the day/hourly or per-job amount per person.</field>
+    </record>
+
+    <record id="tpl_freelance" model="neon.hr.contract.template">
+        <field name="name">Freelance</field>
+        <field name="sequence">30</field>
+        <field name="neon_contract_type">freelance_technician</field>
+        <field name="category_id" ref="category_freelance_technician"/>
+        <field name="default_per_job_amount">0.0</field>
+        <field name="default_commission_percent">0.0</field>
+        <field name="default_notice_days">0</field>
+        <field name="notice_flagged" eval="True"/>
+        <field name="description">Freelance technician. Enter per-job amount and any commission per person/grade.</field>
+    </record>
+</odoo>

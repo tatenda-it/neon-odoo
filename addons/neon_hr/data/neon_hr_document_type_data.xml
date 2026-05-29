@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Mandatory document catalog (Q3 / Appendix B7). noupdate="1" so
+        HR edits survive module upgrades. requires_expiry marks the
+        kinds that lapse and break compliance until renewed.
+    -->
+    <record id="doctype_signed_contract" model="neon.hr.document.type">
+        <field name="name">Signed Contract</field>
+        <field name="code">signed_contract</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="doctype_code_of_conduct" model="neon.hr.document.type">
+        <field name="name">Code of Conduct Acknowledgement</field>
+        <field name="code">code_of_conduct</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="doctype_id_passport" model="neon.hr.document.type">
+        <field name="name">National ID / Passport</field>
+        <field name="code">id_passport</field>
+        <field name="sequence">30</field>
+        <field name="requires_expiry" eval="True"/>
+    </record>
+    <record id="doctype_work_permit" model="neon.hr.document.type">
+        <field name="name">Work / Residence Permit</field>
+        <field name="code">work_permit</field>
+        <field name="sequence">40</field>
+        <field name="requires_expiry" eval="True"/>
+    </record>
+    <record id="doctype_emergency_contact" model="neon.hr.document.type">
+        <field name="name">Emergency Contact Details</field>
+        <field name="code">emergency_contact</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="doctype_banking_details" model="neon.hr.document.type">
+        <field name="name">Banking Details</field>
+        <field name="code">banking_details</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="doctype_tax_statutory" model="neon.hr.document.type">
+        <field name="name">Tax / Statutory Registration (ZIMRA)</field>
+        <field name="code">tax_statutory</field>
+        <field name="sequence">70</field>
+    </record>
+    <record id="doctype_conflict_of_interest" model="neon.hr.document.type">
+        <field name="name">Conflict of Interest Declaration</field>
+        <field name="code">conflict_of_interest</field>
+        <field name="sequence">80</field>
+    </record>
+    <record id="doctype_confidentiality_ack" model="neon.hr.document.type">
+        <field name="name">Confidentiality Acknowledgement</field>
+        <field name="code">confidentiality_ack</field>
+        <field name="sequence">90</field>
+    </record>
+    <record id="doctype_competency_record" model="neon.hr.document.type">
+        <field name="name">Competency Record</field>
+        <field name="code">competency_record</field>
+        <field name="sequence">100</field>
+        <field name="requires_expiry" eval="True"/>
+    </record>
+    <record id="doctype_nssa_registration" model="neon.hr.document.type">
+        <field name="name">NSSA Registration</field>
+        <field name="code">nssa_registration</field>
+        <field name="sequence">110</field>
+    </record>
+</odoo>
