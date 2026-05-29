@@ -406,6 +406,112 @@ class CommercialEventJob(models.Model):
         help="Expected arrival back at the workshop.",
     )
 
+    # ============================================================
+    # B1 -- Venue-side logistics windows.
+    # Describes when gear is physically AT the venue (load-in /
+    # load-out brackets); distinct from prep/dispatch/strike/return
+    # which describe the WORKSHOP side. B2's conflict engine reads
+    # `occupation_start` / `occupation_end` (computed below) to
+    # decide which events compete for the same units.
+    # ============================================================
+    load_in_start = fields.Datetime(
+        string="Load-in Start",
+        help="When the load-in convoy is scheduled to arrive at "
+        "the venue. Start of the venue-side occupation window.",
+    )
+    load_in_end = fields.Datetime(
+        string="Load-in End",
+        help="When load-in is expected to finish at the venue.",
+    )
+    load_out_start = fields.Datetime(
+        string="Load-out Start",
+        help="When load-out is scheduled to begin at the venue.",
+    )
+    load_out_end = fields.Datetime(
+        string="Load-out End",
+        help="When the team leaves the venue with the gear; end "
+        "of the venue-side occupation window.",
+    )
+
+    # ============================================================
+    # B1 -- occupation_start / occupation_end.
+    # Single stored span B2's overlap detector reads. Widened per
+    # gate-1 D2: the unavailability envelope includes WORKSHOP
+    # transit timestamps (dispatch_datetime + return_eta_datetime)
+    # because a unit dispatched before the venue window and
+    # returning after it is unavailable for the WHOLE transit, not
+    # just the load-in/out brackets. Under-counting is the
+    # dangerous direction for a conflict engine.
+    #
+    # ⚠️ DECISION (B1, D2 widened): the compute reads, in priority
+    # order (and takes the extrema):
+    #   - dispatch_datetime, load_in_start, load_in_end, event_date @ 08:00
+    #   - return_eta_datetime, load_out_start, load_out_end,
+    #     (event_end_date or event_date) @ 22:00
+    # prep_start_datetime and strike_start_datetime are deliberately
+    # OMITTED -- they're not reliably populated in prod (0/10 today),
+    # and adding them would just expand the event_date fallback
+    # window without changing the resulting envelope.
+    #
+    # ⚠️ DECISION (B1, D2 fallback): if every input is NULL, the
+    # event_date 08:00 -> event_date 22:00 backstop guarantees a
+    # non-NULL span for every existing record. event_end_date is
+    # 0% populated in prod today (10 records), so the backstop uses
+    # event_date when event_end_date is missing.
+    # ============================================================
+    occupation_start = fields.Datetime(
+        string="Occupation Start",
+        compute="_compute_occupation_window",
+        store=True, index=True, readonly=True,
+        help="Earliest unavailability instant -- the input B2's "
+        "overlap engine reads.",
+    )
+    occupation_end = fields.Datetime(
+        string="Occupation End",
+        compute="_compute_occupation_window",
+        store=True, index=True, readonly=True,
+        help="Latest unavailability instant -- the input B2's "
+        "overlap engine reads.",
+    )
+
+    @api.depends(
+        "dispatch_datetime", "return_eta_datetime",
+        "load_in_start", "load_in_end",
+        "load_out_start", "load_out_end",
+        "event_date", "event_end_date",
+    )
+    def _compute_occupation_window(self):
+        from datetime import datetime as _dt, time as _time
+        for rec in self:
+            start_inputs = []
+            if rec.dispatch_datetime:
+                start_inputs.append(rec.dispatch_datetime)
+            if rec.load_in_start:
+                start_inputs.append(rec.load_in_start)
+            if rec.load_in_end:
+                start_inputs.append(rec.load_in_end)
+            end_inputs = []
+            if rec.return_eta_datetime:
+                end_inputs.append(rec.return_eta_datetime)
+            if rec.load_out_start:
+                end_inputs.append(rec.load_out_start)
+            if rec.load_out_end:
+                end_inputs.append(rec.load_out_end)
+            # Event-date backstop -- guarantees non-NULL spans on
+            # existing records. event_end_date is 0% populated today
+            # (probed 2026-05-29) so we fall back to event_date for
+            # the upper bound when end_date is missing.
+            if rec.event_date:
+                start_inputs.append(
+                    _dt.combine(rec.event_date, _time(8, 0)))
+                upper_day = rec.event_end_date or rec.event_date
+                end_inputs.append(
+                    _dt.combine(upper_day, _time(22, 0)))
+            rec.occupation_start = (min(start_inputs)
+                                    if start_inputs else False)
+            rec.occupation_end = (max(end_inputs)
+                                  if end_inputs else False)
+
     # Scope tab
     expected_attendee_count = fields.Integer(
         string="Expected Attendees",

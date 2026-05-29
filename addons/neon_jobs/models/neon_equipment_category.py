@@ -11,7 +11,8 @@ Each category carries a default tracking mode (serial vs quantity)
 per D4. product.template instances inherit the category's
 default_tracking unless overridden explicitly on the product.
 """
-from odoo import _, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 _TRACKING_MODES = [
@@ -25,6 +26,14 @@ class NeonEquipmentCategory(models.Model):
     _name = "neon.equipment.category"
     _description = "Workshop Equipment Category"
     _order = "sequence, name"
+    # ⚠️ DECISION (B1, D3): hierarchical categories (Selection
+    # rejected -- can't grow without code change). Standard Odoo
+    # parent_store pattern: parent_id + parent_path + child_ids.
+    # A unit's "subcategory" is implicit -- if its
+    # equipment_category_id.parent_id is set, the unit is in a
+    # sub-category of the root.
+    _parent_name = "parent_id"
+    _parent_store = True
 
     name = fields.Char(string="Category", required=True, translate=True)
     code = fields.Char(
@@ -59,6 +68,34 @@ class NeonEquipmentCategory(models.Model):
     description = fields.Text()
     active = fields.Boolean(default=True)
 
+    # B1 (D3) -- hierarchy plumbing. parent_path is indexed by Odoo's
+    # parent_store machinery; do NOT set it manually.
+    parent_id = fields.Many2one(
+        "neon.equipment.category",
+        string="Parent Category",
+        ondelete="restrict",
+        index=True,
+        help="When set, this category is a sub-category of the "
+        "parent. Read by B2's conflict engine to widen the unit "
+        "match net (sub-category of Sound -> Wireless mics will "
+        "still count against the Sound population).",
+    )
+    parent_path = fields.Char(index=True)
+    child_ids = fields.One2many(
+        "neon.equipment.category", "parent_id",
+        string="Sub-categories",
+    )
+
+    # B1 (D6) -- low_stock_threshold lives on category, NOT on unit.
+    # Per-product-template override deferred to B14.
+    low_stock_threshold = fields.Integer(
+        string="Low Stock Threshold",
+        default=0,
+        help="Alert when the count of available units in this "
+        "category drops to or below this value. 0 = no alert. "
+        "Read by B2 deficit logic and the dashboards.",
+    )
+
     # Reverse pointer to products in this category
     product_template_ids = fields.One2many(
         "product.template",
@@ -73,7 +110,30 @@ class NeonEquipmentCategory(models.Model):
     _sql_constraints = [
         ("unique_code", "UNIQUE (code)",
          "Equipment category codes must be unique."),
+        # B1 -- a category cannot be its own ancestor. parent_store
+        # enforces the tree shape but does not prevent depth-1
+        # self-references at write time without a CHECK.
+        ("low_stock_threshold_nonneg",
+         "CHECK (low_stock_threshold >= 0)",
+         "Low stock threshold cannot be negative."),
     ]
+
+    @api.constrains("parent_id")
+    def _check_category_recursion(self):
+        # Explicit walk of the parent chain. Odoo's _check_recursion
+        # helper depends on parent_path being consistent at constraint
+        # time, which is unreliable from an odoo shell write path.
+        for rec in self:
+            seen = set()
+            cur = rec.parent_id
+            while cur:
+                if cur.id == rec.id or cur.id in seen:
+                    raise ValidationError(_(
+                        "Recursive equipment category hierarchy not "
+                        "allowed (cycle detected at %(name)s)."
+                    ) % {"name": rec.display_name})
+                seen.add(cur.id)
+                cur = cur.parent_id
 
     def _compute_product_count(self):
         for rec in self:

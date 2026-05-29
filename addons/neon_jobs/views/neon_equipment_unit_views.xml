@@ -20,6 +20,15 @@
                 <field name="tracking_mode" optional="hide"/>
                 <field name="purchase_date" optional="hide"/>
                 <field name="purchase_price" optional="hide"/>
+                <!-- B1 — condition rollup + last-checked rendered
+                     in the list. Default 'good', hidden by default
+                     but exposed in the column toggle. -->
+                <field name="condition_status" widget="badge"
+                       decoration-success="condition_status == 'good'"
+                       decoration-warning="condition_status == 'needs_repair'"
+                       decoration-danger="condition_status == 'written_off'"
+                       optional="show"/>
+                <field name="last_checked_at" optional="hide"/>
             </tree>
         </field>
     </record>
@@ -134,6 +143,19 @@
                                    readonly="1"/>
                             <field name="tracking_mode" readonly="1"/>
                             <field name="active" widget="boolean_toggle"/>
+                            <!-- B1 — condition rollup + last-checked
+                                 read by B2 deficit engine + the
+                                 dashboards. last_checked_at is set
+                                 by the stock-take-line attestation
+                                 hook (False -> True transition). -->
+                            <field name="condition_status"
+                                   widget="badge"
+                                   decoration-success="condition_status == 'good'"
+                                   decoration-warning="condition_status == 'needs_repair'"
+                                   decoration-danger="condition_status == 'written_off'"/>
+                            <field name="last_checked_at"
+                                   readonly="1"
+                                   placeholder="never checked"/>
                         </group>
                     </group>
                     <notebook>

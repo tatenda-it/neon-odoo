@@ -274,6 +274,30 @@
                                     <field name="return_eta_datetime"/>
                                 </group>
                             </group>
+                            <!-- B1 — Logistics window. Venue-side
+                                 unavailability brackets B2's overlap
+                                 engine reads. The computed
+                                 occupation_start/end span widens to
+                                 cover dispatch + return when set. -->
+                            <group string="Logistics window"
+                                   name="group_logistics_window">
+                                <group string="Load-in">
+                                    <field name="load_in_start"/>
+                                    <field name="load_in_end"/>
+                                </group>
+                                <group string="Load-out">
+                                    <field name="load_out_start"/>
+                                    <field name="load_out_end"/>
+                                </group>
+                            </group>
+                            <group string="Occupation span (computed)"
+                                   name="group_occupation_span"
+                                   help="Earliest-to-latest unavailability used by B2's conflict engine.">
+                                <field name="occupation_start"
+                                       readonly="1"/>
+                                <field name="occupation_end"
+                                       readonly="1"/>
+                            </group>
                         </page>
 
                         <!-- Tab 5 — Scope -->

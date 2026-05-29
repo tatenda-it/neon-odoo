@@ -322,8 +322,26 @@ class NeonEquipmentStockTakeLine(models.Model):
     # === write() — re-run high-impact sync on attestation /
     # resolution-relevant edits. Keeps the Action Centre item in
     # sync if a user edits found_state etc. after first attestation.
+    #
+    # B1 (D5) -- batch-safe last_checked_at hook. When a line flips
+    # attested False -> True (the only meaningful transition), we
+    # write the matching attested_at onto the linked unit. Edge
+    # cases:
+    #   - batch write of many lines is supported (we walk self,
+    #     not write() vals);
+    #   - already-attested lines are skipped (transition guard);
+    #   - amendments of an attested line do not bump the unit's
+    #     last_checked_at (B1 wants the FIRST-attest timestamp);
+    #   - attested_at may be NULL at the moment of the True flip
+    #     in some edge sequences (write({'attested': True}) without
+    #     attested_at). We fall back to fields.Datetime.now() in
+    #     that case so we never leave last_checked_at empty when
+    #     attested has flipped True.
     # ============================================================
     def write(self, vals):
+        # Snapshot pre-write attested state so the transition
+        # detection is reliable for batch writes too.
+        pre = {r.id: r.attested for r in self}
         res = super().write(vals)
         sync_triggers = {
             "attested", "found_state", "found_location",
@@ -331,4 +349,16 @@ class NeonEquipmentStockTakeLine(models.Model):
         if sync_triggers & set(vals.keys()):
             for rec in self.filtered(lambda l: l.attested):
                 rec._sync_high_impact_action_item()
+        # B1 D5 -- propagate the FIRST-attestation timestamp to the
+        # unit. Only on False -> True; idempotent for re-saves.
+        if "attested" in vals and vals.get("attested"):
+            now = fields.Datetime.now()
+            for rec in self:
+                if pre.get(rec.id) or not rec.attested:
+                    continue
+                if not rec.unit_id:
+                    continue
+                stamp = rec.attested_at or now
+                rec.unit_id.sudo().write(
+                    {"last_checked_at": stamp})
         return res

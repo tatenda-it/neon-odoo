@@ -171,6 +171,45 @@ class NeonEquipmentUnit(models.Model):
     notes = fields.Text()
     active = fields.Boolean(default=True, tracking=True)
 
+    # ============================================================
+    # B1 -- long-running unit-level condition rollup.
+    # Distinct from neon.equipment.stock.take.line.physical_condition,
+    # which is a per-audit snapshot (5 levels: excellent/good/fair/
+    # poor/damaged). This unit-level field is the human-maintained
+    # rollup the dashboards + B2 deficit logic read.
+    #
+    # ⚠️ DECISION (B1, D4): we do NOT auto-derive condition_status
+    # from the line snapshot in this milestone -- that's business
+    # logic for B2/B14. B1 ships the field + default + view only.
+    # ============================================================
+    condition_status = fields.Selection(
+        [
+            ("good", "Good"),
+            ("needs_repair", "Needs Repair"),
+            ("written_off", "Written Off"),
+        ],
+        string="Condition",
+        default="good",
+        required=True,
+        tracking=True,
+        help="Long-running unit condition rollup. Updated by the "
+        "team when a unit's state warrants it; B2's deficit engine "
+        "treats anything other than 'good' as unavailable.",
+    )
+
+    # ⚠️ DECISION (B1, D5): write-on-attestation hook lives on
+    # neon.equipment.stock.take.line.write() -- when a line flips
+    # attested False->True, the line's write() sets the linked
+    # unit's last_checked_at = attested_at. NULL here means
+    # "never checked" (rendered as a placeholder in the form).
+    last_checked_at = fields.Datetime(
+        string="Last Checked",
+        readonly=True, index=True,
+        help="When this unit was last attested by a stock take. "
+        "NULL = never checked. Updated automatically by the "
+        "stock-take-line attestation flow.",
+    )
+
     _sql_constraints = [
         ("unique_serial_per_product",
          "UNIQUE (product_template_id, serial_number)",

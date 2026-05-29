@@ -9,10 +9,14 @@
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="code"/>
+                <!-- B1 D3 — parent_id renders the subcategory chain. -->
+                <field name="parent_id" optional="show"/>
                 <field name="default_tracking" widget="badge"/>
                 <field name="icon"/>
                 <field name="is_high_impact" widget="boolean_toggle"
                        optional="show"/>
+                <!-- B1 D6 — low stock threshold, default 0 (no alert). -->
+                <field name="low_stock_threshold" optional="show"/>
                 <field name="product_count"/>
                 <field name="active" widget="boolean_toggle"/>
             </tree>
@@ -42,6 +46,13 @@
                             <field name="code"/>
                             <field name="sequence"/>
                             <field name="default_tracking"/>
+                            <!-- B1 D3 — parent_id for subcategory
+                                 taxonomy. Restrict to a top-level
+                                 category to avoid 3-deep trees by
+                                 accident (a manager can still pick
+                                 a leaf if needed). -->
+                            <field name="parent_id"
+                                   options="{'no_create': True}"/>
                         </group>
                         <group>
                             <field name="icon"/>
@@ -49,7 +60,19 @@
                             <field name="is_high_impact"
                                    widget="boolean_toggle"
                                    help="Stock take discrepancies on units in this category fire an immediate manager alert."/>
+                            <!-- B1 D6 — low_stock_threshold (0 = off). -->
+                            <field name="low_stock_threshold"/>
                         </group>
+                    </group>
+                    <group string="Sub-categories" name="group_subcategories">
+                        <field name="child_ids" nolabel="1">
+                            <tree>
+                                <field name="name"/>
+                                <field name="code"/>
+                                <field name="low_stock_threshold"/>
+                                <field name="product_count"/>
+                            </tree>
+                        </field>
                     </group>
                     <group string="Description">
                         <field name="description" nolabel="1"/>

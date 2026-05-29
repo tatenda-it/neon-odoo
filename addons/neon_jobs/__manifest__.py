@@ -11,7 +11,16 @@
     # 17.0.4.4.0 = P9.M9.3 Venues · Map multi-pin client action
     # (NeonVenueMultiPinMap; forked from M9.1.1 per D6, Leaflet
     # bootstrap duplicated by ~30 LOC; consolidation deferred).
-    "version": "17.0.4.4.0",
+    # 17.0.4.5.0 = P-B1 Data-model completion (Conflict-Engine
+    # foundation). commercial.event.job gets 4 venue-side
+    # load-in/out Datetime fields + a stored compute
+    # (occupation_start / occupation_end) widened per D2 to
+    # include dispatch_datetime + return_eta_datetime. Equipment
+    # gets condition_status + last_checked_at on the unit
+    # (write-on-attest hook), parent_id + low_stock_threshold on
+    # the category. B2's overlap engine reads occupation_start/end
+    # and category.low_stock_threshold as its inputs.
+    "version": "17.0.4.5.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
