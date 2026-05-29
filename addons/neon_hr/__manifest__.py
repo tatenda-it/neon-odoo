@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon HR",
-    "version": "17.0.2.0.0",
+    "version": "17.0.3.0.0",
     "summary": "People & Payroll R1a/R1b — employee master, contracts, "
-               "documents + leave & crew availability",
+               "documents, leave, payroll, wages, commission, loans",
     "description": """
 Neon HR — Release 1a (Employee Foundation)
 ===========================================
@@ -36,17 +36,20 @@ Gate-2 summary.
         "security/neon_hr_groups.xml",
         "security/ir.model.access.csv",
         "security/neon_hr_record_rules.xml",
+        "security/neon_hr_payroll_rules.xml",
         "data/neon_hr_document_type_data.xml",
         "data/neon_hr_category_data.xml",
         "data/contract_templates.xml",
         "data/action_centre_trigger_config_data.xml",
         "data/ir_cron_contract_expiry.xml",
         "data/neon_hr_leave_types.xml",
+        "data/neon_hr_payroll_config.xml",
         "views/neon_hr_category_views.xml",
         "views/neon_hr_document_views.xml",
         "views/hr_employee_views.xml",
         "views/hr_contract_views.xml",
         "views/neon_hr_leave_views.xml",
+        "views/neon_hr_payroll_views.xml",
         "views/neon_hr_menus.xml",
     ],
     "installable": True,

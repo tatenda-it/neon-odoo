@@ -45,11 +45,9 @@
         </field>
     </record>
 
-    <menuitem id="menu_neon_hr_availability"
-              name="Crew Availability (Leave)"
-              parent="menu_neon_hr_root"
-              action="action_neon_hr_availability"
-              sequence="25"/>
+    <!-- (menu_neon_hr_availability lives in neon_hr_menus.xml — loaded
+         last so menu_neon_hr_root + the action both already exist,
+         avoiding a fresh-install forward-reference.) -->
 
     <!-- ===== Category: configurable leave approver (Q12) ===== -->
     <record id="view_neon_hr_category_form_leave" model="ir.ui.view">

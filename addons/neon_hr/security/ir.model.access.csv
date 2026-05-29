@@ -14,3 +14,27 @@ access_neon_hr_contract_template_super,neon.hr.contract.template superuser,model
 access_neon_hr_availability_user,neon.hr.availability read (operations),model_neon_hr_availability,base.group_user,1,0,0,0
 access_neon_hr_availability_admin,neon.hr.availability HR admin,model_neon_hr_availability,neon_hr.group_neon_hr_admin,1,0,0,0
 access_neon_hr_availability_super,neon.hr.availability superuser,model_neon_hr_availability,neon_core.group_neon_superuser,1,0,0,0
+access_neon_hr_statutory_user,neon.hr.statutory.rule read,model_neon_hr_statutory_rule,base.group_user,1,0,0,0
+access_neon_hr_statutory_admin,neon.hr.statutory.rule HR admin,model_neon_hr_statutory_rule,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_statutory_super,neon.hr.statutory.rule superuser,model_neon_hr_statutory_rule,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_wage_grade_user,neon.hr.wage.grade read,model_neon_hr_wage_grade,base.group_user,1,0,0,0
+access_neon_hr_wage_grade_admin,neon.hr.wage.grade HR admin,model_neon_hr_wage_grade,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_wage_grade_super,neon.hr.wage.grade superuser,model_neon_hr_wage_grade,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_payslip_user,neon.hr.payslip read (own via rule),model_neon_hr_payslip,base.group_user,1,0,0,0
+access_neon_hr_payslip_admin,neon.hr.payslip HR admin,model_neon_hr_payslip,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_payslip_super,neon.hr.payslip superuser,model_neon_hr_payslip,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_payslip_line_user,neon.hr.payslip.line read (own via rule),model_neon_hr_payslip_line,base.group_user,1,0,0,0
+access_neon_hr_payslip_line_admin,neon.hr.payslip.line HR admin,model_neon_hr_payslip_line,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_payslip_line_super,neon.hr.payslip.line superuser,model_neon_hr_payslip_line,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_event_wage_user,neon.hr.event.wage read (own via rule),model_neon_hr_event_wage,base.group_user,1,0,0,0
+access_neon_hr_event_wage_admin,neon.hr.event.wage HR admin,model_neon_hr_event_wage,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_event_wage_super,neon.hr.event.wage superuser,model_neon_hr_event_wage,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_commission_user,neon.hr.commission read (own via rule),model_neon_hr_commission,base.group_user,1,0,0,0
+access_neon_hr_commission_admin,neon.hr.commission HR admin,model_neon_hr_commission,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_commission_super,neon.hr.commission superuser,model_neon_hr_commission,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_loan_user,neon.hr.loan read (own via rule),model_neon_hr_loan,base.group_user,1,0,0,0
+access_neon_hr_loan_admin,neon.hr.loan HR admin,model_neon_hr_loan,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_loan_super,neon.hr.loan superuser,model_neon_hr_loan,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_loan_repayment_user,neon.hr.loan.repayment read (own via rule),model_neon_hr_loan_repayment,base.group_user,1,0,0,0
+access_neon_hr_loan_repayment_admin,neon.hr.loan.repayment HR admin,model_neon_hr_loan_repayment,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_loan_repayment_super,neon.hr.loan.repayment superuser,model_neon_hr_loan_repayment,neon_core.group_neon_superuser,1,1,1,0

@@ -46,4 +46,33 @@
               parent="menu_neon_hr_config"
               action="action_neon_hr_contract_template"
               sequence="30"/>
+
+    <!-- ===== R1b-1: leave / availability ===== -->
+    <menuitem id="menu_neon_hr_availability"
+              name="Crew Availability (Leave)"
+              parent="menu_neon_hr_root"
+              action="action_neon_hr_availability"
+              sequence="25"/>
+
+    <!-- ===== R1b-2: payroll ===== -->
+    <menuitem id="menu_neon_hr_payroll" name="Payroll"
+              parent="menu_neon_hr_root" sequence="40"/>
+    <menuitem id="menu_neon_hr_payslips" name="Payslips"
+              parent="menu_neon_hr_payroll"
+              action="action_neon_hr_payslip" sequence="10"/>
+    <menuitem id="menu_neon_hr_event_wages" name="Event Wages"
+              parent="menu_neon_hr_payroll"
+              action="action_neon_hr_event_wage" sequence="20"/>
+    <menuitem id="menu_neon_hr_commissions" name="Commissions"
+              parent="menu_neon_hr_payroll"
+              action="action_neon_hr_commission" sequence="30"/>
+    <menuitem id="menu_neon_hr_loans" name="Staff Loans"
+              parent="menu_neon_hr_payroll"
+              action="action_neon_hr_loan" sequence="40"/>
+    <menuitem id="menu_neon_hr_statutory" name="Statutory Rules"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_statutory" sequence="40"/>
+    <menuitem id="menu_neon_hr_wage_grades" name="Freelance Wage Grades"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_wage_grade" sequence="50"/>
 </odoo>

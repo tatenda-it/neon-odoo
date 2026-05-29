@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Confidentiality (Q28) for R1b-2: payslips, event wages,
+        commission and loans are visible to OD/MD (group_neon_superuser),
+        HR Admin (group_neon_hr_admin) and the RECORD OWNER only.
+        Same OR-combination as R1a: superuser/HR-admin are also
+        base.group_user, so they match BOTH the own-rule and the
+        see-all rule -> union = all. Everyone else sees only their own.
+        perm_unlink = 0 everywhere (append-only audit discipline).
+    -->
+    <data>
+        <!-- Owner-only read rules (base.group_user) -->
+        <record id="rule_payslip_own" model="ir.rule">
+            <field name="name">Payslip: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_payslip"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_payslip_line_own" model="ir.rule">
+            <field name="name">Payslip line: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_payslip_line"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_event_wage_own" model="ir.rule">
+            <field name="name">Event wage: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_event_wage"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_commission_own" model="ir.rule">
+            <field name="name">Commission: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_commission"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_loan_own" model="ir.rule">
+            <field name="name">Loan: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_loan"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_loan_repayment_own" model="ir.rule">
+            <field name="name">Loan repayment: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_loan_repayment"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- OD/MD + HR Admin: full visibility (read/write/create, no unlink) -->
+        <record id="rule_payslip_all" model="ir.rule">
+            <field name="name">Payslip: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_payslip"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_payslip_line_all" model="ir.rule">
+            <field name="name">Payslip line: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_payslip_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_event_wage_all" model="ir.rule">
+            <field name="name">Event wage: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_event_wage"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_commission_all" model="ir.rule">
+            <field name="name">Commission: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_commission"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_loan_all" model="ir.rule">
+            <field name="name">Loan: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_loan"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_loan_repayment_all" model="ir.rule">
+            <field name="name">Loan repayment: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_loan_repayment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+    </data>
+</odoo>
