@@ -21,6 +21,16 @@ never exposed to the LLM.
 for tool advertisement. A Director peeking the Bookkeeper variant
 sees bookkeeper tools only, even though their group set permits
 every tool. Exception: manager+director combo sees ALL tools.
+
+⚠️ DECISION (M12.2, D28+D34): writes are two-phase. A category="write"
+tool's @ai_tool-decorated function is the PROPOSE step (returns a
+structured proposal, never mutates). The matching execute()
+function is registered via register_executor(action_type, fn) and
+called only by the /neon/ai_chat/confirm endpoint after the user
+clicks Confirm in the UI card. dispatch() of a write tool returns
+a result tagged is_proposal=True; the orchestrator persists it as
+a pending action and ends the LLM turn there (no further iteration
+on that tool_call).
 """
 from __future__ import annotations
 
@@ -49,10 +59,21 @@ class ToolSpec:
 
 _AI_TOOLS: Dict[str, ToolSpec] = {}
 
+# D28 — executor registry for write-category tools. The decorator
+# binds the PROPOSE function; this dict binds the matching EXECUTE
+# function. /neon/ai_chat/confirm dispatches the executor by
+# action_type.
+_AI_WRITE_EXECUTORS: Dict[str, Callable[..., Dict[str, Any]]] = {}
+
 
 # ⚠️ DECISION (M12.1.1, D27): variant-scoped tool sets. Sentinel
 # value "*" means "all registered tools" (director sees the union).
 # The actual resolution happens in filter_tools_for_variant_and_user.
+#
+# ⚠️ DECISION (M12.2, D30): write tools layer on top of the read
+# tool sets. log_lead / move_stage / update_deal_value sit on the
+# sales surface; post_chatter_note is generic so it lands on every
+# tier that has chat access.
 TOOLS_BY_VARIANT: Dict[str, List[str]] = {
     "director": ["*"],
     "sales": [
@@ -60,17 +81,24 @@ TOOLS_BY_VARIANT: Dict[str, List[str]] = {
         "check_stock_availability", "get_crew_availability",
         "get_pending_deposits", "get_my_pipeline",
         "get_partner_history", "get_dashboard_summary",
+        # P12.M2 -- writes
+        "log_lead", "move_stage", "update_deal_value",
+        "post_chatter_note",
     ],
     "bookkeeper": [
         "get_overdue_invoices", "get_zig_rate",
         "get_budget_status", "get_pending_deposits",
         "get_open_quotes", "get_quote_details",
         "get_partner_history", "get_dashboard_summary",
+        # P12.M2 -- writes (chatter note only on finance surface)
+        "post_chatter_note",
     ],
     "lead_tech": [
         "get_jobs_this_week", "get_readiness_gates",
         "get_crew_availability", "get_cert_expiry",
         "check_stock_availability", "get_dashboard_summary",
+        # P12.M2 -- writes (chatter note only on ops surface)
+        "post_chatter_note",
     ],
 }
 
@@ -106,6 +134,18 @@ def ai_tool(
 
 def get_tool(name: str) -> Optional[ToolSpec]:
     return _AI_TOOLS.get(name)
+
+
+def register_executor(action_type: str, fn: Callable[..., Dict[str, Any]]):
+    """Wire a write tool's EXECUTE function. Called from each
+    write_tools/<tool>.py at import time. The action_type matches
+    the proposal's action_type emitted by propose()."""
+    _AI_WRITE_EXECUTORS[action_type] = fn
+
+
+def get_executor(action_type: str
+                 ) -> Optional[Callable[..., Dict[str, Any]]]:
+    return _AI_WRITE_EXECUTORS.get(action_type)
 
 
 def list_tools(category: Optional[str] = None) -> List[ToolSpec]:
@@ -149,6 +189,10 @@ def filter_tools_for_variant_and_user(
     2. variant_set = TOOLS_BY_VARIANT[variant] (or all for director)
     3. result = base ∩ variant_set, EXCEPT manager+director keeps
        all (no intersection).
+
+    ``category`` defaults to "read" for backward compat; pass None to
+    include BOTH read + write tools (the orchestrator does this so
+    the LLM sees write tools alongside reads on each turn).
     """
     base = [t for t in list_tools(category=category)
             if user_can_call(user, t)]
@@ -222,4 +266,9 @@ def dispatch(name: str, env, user, params: Dict[str, Any]
             ),
         }
     result.setdefault("tool", name)
+    # D28/D34 — for write tools, surface is_proposal so the
+    # orchestrator routes the result through pending_action.propose()
+    # instead of feeding it back to the LLM.
+    if tool.category == "write" and result.get("ok"):
+        result.setdefault("is_proposal", True)
     return result

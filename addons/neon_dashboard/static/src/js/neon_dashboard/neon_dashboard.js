@@ -214,8 +214,15 @@ export class NeonDashboard extends Component {
 
     _startAutoRefresh() {
         this._stopAutoRefresh();
+        // P12.M2 / D33 -- preserve the currently active variant
+        // across the 5-minute auto-refresh. Without this the server
+        // re-derives dashboard_type from the user's stored variant
+        // on every poll, silently reverting any active MD-peek.
         this._refreshInterval = setInterval(
-            () => this.loadData(), this.REFRESH_MS);
+            () => this.loadData(
+                (this.state.data && this.state.data.dashboard_type)
+                    || null),
+            this.REFRESH_MS);
     }
 
     _stopAutoRefresh() {

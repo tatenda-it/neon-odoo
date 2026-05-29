@@ -23,6 +23,9 @@ from . import insight_orchestrator
 # P12.M1 -- AI Sales Copilot
 from . import chat_session_message
 from . import tool_registry
-from . import tools                  # registers @ai_tool decorators
+from . import tools                  # registers READ @ai_tool decorators
+# P12.M2 -- WRITE tools + pending-action audit model
+from . import pending_action
+from . import write_tools             # registers WRITE @ai_tool decorators
 from . import groq_chat_adapter
 from . import chat_orchestrator

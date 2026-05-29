@@ -273,6 +273,100 @@
         align-self: flex-end;
     }
 
+    // P12.M2 -- confirmation card for write proposals.
+    .o_neon_ai_chat__confirm_card {
+        align-self: stretch;
+        background: white;
+        border: 1px solid #C9A8E8;
+        border-radius: 10px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 2px rgba(91, 42, 138, 0.06);
+
+        &.o_neon_ai_chat__confirm_card_confirmed {
+            border-color: #3FBF7F;
+            background: rgba(63, 191, 127, 0.06);
+        }
+        &.o_neon_ai_chat__confirm_card_cancelled {
+            border-color: #C0C0CC;
+            background: rgba(192, 192, 204, 0.08);
+        }
+        &.o_neon_ai_chat__confirm_card_error,
+        &.o_neon_ai_chat__confirm_card_expired {
+            border-color: #E94F4F;
+            background: rgba(233, 79, 79, 0.05);
+        }
+    }
+    .o_neon_ai_chat__confirm_header {
+        font-weight: 700;
+        color: #5B2A8A;
+        margin-bottom: 6px;
+        font-size: 0.92em;
+    }
+    .o_neon_ai_chat__confirm_title {
+        font-weight: 700;
+    }
+    .o_neon_ai_chat__confirm_body {
+        font-size: 0.9em;
+        color: #1F1F2E;
+    }
+    .o_neon_ai_chat__confirm_summary {
+        line-height: 1.4;
+    }
+    .o_neon_ai_chat__confirm_diff {
+        margin-top: 8px;
+        padding: 6px 8px;
+        background: #F8F4FC;
+        border-radius: 6px;
+        font-size: 0.85em;
+    }
+    .o_neon_ai_chat__confirm_diff_row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .o_neon_ai_chat__confirm_diff_label {
+        color: #6E6E80;
+        font-weight: 600;
+        min-width: 70px;
+    }
+    .o_neon_ai_chat__confirm_diff_before {
+        color: #6E6E80;
+        text-decoration: line-through;
+    }
+    .o_neon_ai_chat__confirm_diff_after {
+        color: #5B2A8A;
+        font-weight: 600;
+    }
+    .o_neon_ai_chat__confirm_actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .o_neon_ai_chat__confirm_done {
+        color: #2A8E5C;
+        font-weight: 500;
+    }
+    .o_neon_ai_chat__confirm_muted {
+        color: #6E6E80;
+        font-style: italic;
+    }
+    .o_neon_ai_chat__confirm_error_msg {
+        color: #C13838;
+        margin-top: 6px;
+        font-size: 0.85em;
+    }
+    .o_neon_ai_chat__confirm_open {
+        padding: 0 0 0 6px;
+        color: #5B2A8A;
+        font-weight: 600;
+    }
+    .o_neon_ai_chat__confirm_replay {
+        margin-left: 6px;
+        font-size: 0.8em;
+    }
+
     // Mobile / tablet -- full-screen overlay drawer
     @media (max-width: 991.98px) {
         &.o_neon_ai_chat_expanded {

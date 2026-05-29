@@ -110,3 +110,43 @@ class NeonAiChatController(http.Controller):
             {"chat_panel_expanded": bool(expanded)})
         return {"ok": True,
                 "chat_panel_expanded": bool(expanded)}
+
+    # ==============================================================
+    # P12.M2 -- two-phase write endpoints (D28).
+    # ==============================================================
+    @http.route(
+        "/neon/ai_chat/confirm", type="json", auth="user",
+        methods=["POST"],
+    )
+    def confirm(self, confirmation_token=None,
+                active_variant=None, **kw):
+        """Phase 2 -- execute the proposed write. Returns a result
+        card payload (or an error card) the OWL component renders
+        in place of the original confirmation card."""
+        if not _user_has_chat_access():
+            return {"ok": False, "error_code": "access_denied",
+                    "error": "access_denied"}
+        if not confirmation_token:
+            return {"ok": False, "error_code": "missing_token",
+                    "error": "confirmation_token is required."}
+        user = request.env.user
+        orch = ChatOrchestrator(request.env)
+        return orch.confirm_pending_action(
+            user, confirmation_token,
+            active_variant=active_variant)
+
+    @http.route(
+        "/neon/ai_chat/cancel", type="json", auth="user",
+        methods=["POST"],
+    )
+    def cancel(self, confirmation_token=None, **kw):
+        """Phase 2 cancel path -- void the token, no execution."""
+        if not _user_has_chat_access():
+            return {"ok": False, "error_code": "access_denied",
+                    "error": "access_denied"}
+        if not confirmation_token:
+            return {"ok": False, "error_code": "missing_token",
+                    "error": "confirmation_token is required."}
+        user = request.env.user
+        orch = ChatOrchestrator(request.env)
+        return orch.cancel_pending_action(user, confirmation_token)

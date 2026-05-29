@@ -134,13 +134,18 @@ else:
            f"{len(last.request_body_snapshot or '') if last else 0}")
 
 
-# === T12205 -- manifest version ===
+# === T12205 -- manifest version (>= 17.0.8.17.0; bumps roll
+# forward as later milestones land on the same addon -- M12.2
+# moves it to 17.0.9.0.0) ===
+import re as _re
 manifest_path = os.path.join(
     get_module_path("neon_dashboard"), "__manifest__.py")
 with open(manifest_path, "r", encoding="utf-8") as f:
     manifest_src = f.read()
-_check("T12205", '17.0.8.17.0' in manifest_src,
-       "version=17.0.8.17.0")
+m = _re.search(r'"version":\s*"([\d.]+)"', manifest_src)
+ver = tuple(int(x) for x in (m.group(1) if m else "0").split("."))
+_check("T12205", ver >= (17, 0, 8, 17, 0),
+       f"version={m.group(1) if m else '?'}")
 
 
 # === T12206 -- JS headerLabel covers 4 variants ===

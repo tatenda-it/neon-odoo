@@ -157,9 +157,14 @@ _check("T12158", mgr_ok, "manager passes group check on new tools")
 
 # === variant filter ===
 
+# P12.M2 -- filter calls now use category=None so they include
+# writes too (post_chatter_note lands on bookkeeper + lead_tech;
+# sales gets all 4 writes). The TOOLS_BY_VARIANT lists are the
+# authoritative expectation either way.
+
 # T12159 -- sales variant gives sales tools only
 sales_visible = tool_registry.filter_tools_for_variant_and_user(
-    sales_user, "sales")
+    sales_user, "sales", category=None)
 sales_names = {t.name for t in sales_visible}
 expected_sales = set(tool_registry.TOOLS_BY_VARIANT["sales"])
 _check("T12159",
@@ -169,7 +174,7 @@ _check("T12159",
 
 # T12160 -- bookkeeper variant gives bookkeeper tools
 bk_visible = tool_registry.filter_tools_for_variant_and_user(
-    bookkeeper_user, "bookkeeper")
+    bookkeeper_user, "bookkeeper", category=None)
 bk_names = {t.name for t in bk_visible}
 expected_bk = set(tool_registry.TOOLS_BY_VARIANT["bookkeeper"])
 _check("T12160",
@@ -179,7 +184,7 @@ _check("T12160",
 
 # T12161 -- lead_tech variant -- intersection of groups + variant
 lt_visible = tool_registry.filter_tools_for_variant_and_user(
-    lead_tech_user, "lead_tech")
+    lead_tech_user, "lead_tech", category=None)
 lt_names = {t.name for t in lt_visible}
 expected_lt = set(tool_registry.TOOLS_BY_VARIANT["lead_tech"])
 _check("T12161",
@@ -189,17 +194,18 @@ _check("T12161",
 
 # T12162 -- D24 manager+director sees ALL tools (no intersection)
 mgr_dir = tool_registry.filter_tools_for_variant_and_user(
-    director_user, "director")
+    director_user, "director", category=None)
 mgr_dir_names = {t.name for t in mgr_dir}
+all_tool_names = {t.name for t in tool_registry.list_tools()}
 _check("T12162",
-       mgr_dir_names == set(all_tools),
-       f"missing={set(all_tools) - mgr_dir_names}")
+       mgr_dir_names == all_tool_names,
+       f"missing={all_tool_names - mgr_dir_names}")
 
 
 # T12163 -- D24 manager peeking bookkeeper variant gets bookkeeper
-# tools only (NOT all 14). Intersection IS applied for non-director.
+# tools only (NOT all 18). Intersection IS applied for non-director.
 mgr_peek_bk = tool_registry.filter_tools_for_variant_and_user(
-    director_user, "bookkeeper")
+    director_user, "bookkeeper", category=None)
 mgr_peek_names = {t.name for t in mgr_peek_bk}
 _check("T12163",
        mgr_peek_names == expected_bk,

@@ -47,6 +47,15 @@
                     <t t-foreach="state.messages" t-as="m"
                        t-key="m.id">
 
+                        <!-- P12.M2: confirmation card for write
+                             proposals. Rendered as its own card row
+                             between user and tool bubbles. -->
+                        <NeonAiConfirmationCard
+                            t-if="m.role === 'confirmation' and m.confirmation_card"
+                            card="m.confirmation_card"
+                            activeVariant="state.activeVariant"
+                            onResolved.bind="onCardResolved"/>
+
                         <!-- User bubble -->
                         <div t-if="m.role === 'user'"
                              class="o_neon_ai_chat__bubble o_neon_ai_chat__bubble_user">

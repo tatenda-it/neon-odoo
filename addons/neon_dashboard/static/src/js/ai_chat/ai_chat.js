@@ -11,12 +11,15 @@
  * RPC service (type='json' Odoo controller routes).
  */
 import {
-    Component, onMounted, onWillUnmount, useRef, useState,
+    Component, onMounted, onWillUnmount, onWillUpdateProps,
+    useRef, useState,
 } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { NeonAiConfirmationCard } from "./confirmation_card";
 
 export class NeonAiChat extends Component {
     static template = "neon_dashboard.NeonAiChat";
+    static components = { NeonAiConfirmationCard };
     static props = {
         expanded: { type: Boolean, optional: true },
         onToggle: { type: Function, optional: true },
@@ -39,6 +42,25 @@ export class NeonAiChat extends Component {
             pending: false,
             loadingHistory: true,
             error: null,
+            // D33 — hold the active variant inside the chat's own
+            // state. Parent re-renders (auto-refresh, layout edits)
+            // don't reset this; only an EXPLICIT prop change does.
+            // Send + confirm endpoints read state.activeVariant,
+            // not props.activeVariant.
+            activeVariant: this.props.activeVariant || "",
+        });
+
+        // D33 — when the user explicitly switches variant via the
+        // dashboard's View-as dropdown, the parent's prop will
+        // change; mirror it into state so the chat keeps up. When
+        // the parent re-renders with the SAME prop (auto-refresh),
+        // no-op.
+        onWillUpdateProps((nextProps) => {
+            const next = nextProps.activeVariant || "";
+            const cur = this.props.activeVariant || "";
+            if (next && next !== cur) {
+                this.state.activeVariant = next;
+            }
         });
 
         this.listRef = useRef("messageList");
@@ -46,6 +68,14 @@ export class NeonAiChat extends Component {
 
         onMounted(async () => {
             await this._loadHistory();
+            // P12.M2 -- expose the component on window for browser
+            // smokes so they can inject test cards without needing
+            // a live LLM round-trip. Production OWL bundles don't
+            // expose component refs through DOM, so without this
+            // the test surface is otherwise unreachable.
+            try {
+                window.__neonAiChat = this;
+            } catch (e) { /* sandbox */ }
         });
 
         onWillUnmount(() => {});
@@ -109,17 +139,28 @@ export class NeonAiChat extends Component {
                 "/neon/ai_chat/send",
                 {
                     message: text,
-                    active_variant: this.props.activeVariant || "",
+                    active_variant: this.state.activeVariant || "",
                 });
             if (res) {
                 for (const card of (res.tool_cards || [])) {
-                    this.state.messages.push({
-                        id: `tool-${Date.now()}-${Math.random()}`,
-                        role: "tool",
-                        tool_name: card.tool,
-                        tool_result: card.result,
-                        created_at: new Date().toISOString(),
-                    });
+                    if (card.is_confirmation_card) {
+                        // P12.M2 — write proposal lands as a
+                        // dedicated confirmation card row.
+                        this.state.messages.push({
+                            id: `confirm-${card.write_log_id}`,
+                            role: "confirmation",
+                            confirmation_card: card,
+                            created_at: new Date().toISOString(),
+                        });
+                    } else {
+                        this.state.messages.push({
+                            id: `tool-${Date.now()}-${Math.random()}`,
+                            role: "tool",
+                            tool_name: card.tool,
+                            tool_result: card.result,
+                            created_at: new Date().toISOString(),
+                        });
+                    }
                 }
                 if (res.assistant_message) {
                     this.state.messages.push({
@@ -188,13 +229,11 @@ export class NeonAiChat extends Component {
         }
     }
 
-    // P12.M1.1.1 — header label derived from active variant.
-    // Updates without page refresh when the user MD-peeks a
-    // different variant (the dashboard re-mounts the AIChat
-    // component with the new prop). Mirrors the orchestrator's
-    // _ROLE_LABELS map in chat_orchestrator.py.
+    // P12.M1.1.1 / D33 — header label derived from the chat's
+    // OWN active variant (state.activeVariant), not props. Parent
+    // re-renders don't reset the header label.
     get headerLabel() {
-        const variant = (this.props.activeVariant || "").toLowerCase();
+        const variant = (this.state.activeVariant || "").toLowerCase();
         const map = {
             director: "Director Copilot",
             sales: "Sales Copilot",
@@ -202,6 +241,15 @@ export class NeonAiChat extends Component {
             lead_tech: "Operations Copilot",
         };
         return map[variant] || "Sales Copilot";
+    }
+
+    // P12.M2 — callback the confirmation card uses to tell us its
+    // resolution. We don't need to remove the card from messages
+    // (the card itself transitions to its terminal state); we just
+    // scroll back to the bottom so the user sees any follow-up
+    // assistant message lined up below.
+    onCardResolved() {
+        this._scrollToBottom();
     }
 
     badgeForState(state) {

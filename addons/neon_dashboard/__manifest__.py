@@ -19,7 +19,13 @@
     # 8.17.0 = P12.M1.1.1 UI header role label per variant +
     # 4xx outgoing-body capture (request_body_snapshot) +
     # 14-schema audit (all clean).
-    "version": "17.0.8.17.0",
+    # 9.0.0  = P12.M2 AI Copilot WRITE tools (log_lead, move_stage,
+    # update_deal_value, post_chatter_note) with two-phase commit
+    # (propose -> confirm card -> execute) + write.log audit model
+    # + /neon/ai_chat/confirm,cancel endpoints + variant-persistence
+    # fix (D33). Minor-major bump: first milestone where the LLM
+    # can change prod data.
+    "version": "17.0.9.0.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
@@ -158,6 +164,10 @@ ranganai by login).
             "neon_dashboard/static/src/js/neon_dashboard/"
             "neon_dashboard.scss",
             # P12.M1 -- AI Sales Copilot chat panel.
+            # P12.M2 -- confirmation_card MUST load BEFORE ai_chat.js
+            # (ai_chat.js imports NeonAiConfirmationCard).
+            "neon_dashboard/static/src/js/ai_chat/confirmation_card.js",
+            "neon_dashboard/static/src/js/ai_chat/confirmation_card.xml",
             "neon_dashboard/static/src/js/ai_chat/ai_chat.js",
             "neon_dashboard/static/src/js/ai_chat/ai_chat.xml",
             "neon_dashboard/static/src/js/ai_chat/ai_chat.scss",

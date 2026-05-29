@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_dashboard.NeonAiConfirmationCard">
+        <div class="o_neon_ai_chat__confirm_card"
+             t-att-class="'o_neon_ai_chat__confirm_card_' + state.status">
+
+            <!-- Header (always visible) -->
+            <div class="o_neon_ai_chat__confirm_header">
+                <i class="fa me-2"
+                   t-att-class="actionIcon"/>
+                <span class="o_neon_ai_chat__confirm_title"
+                      t-esc="actionTitle"/>
+            </div>
+
+            <!-- Body: proposed / error / expired states show the
+                 human_summary + diff. Confirmed shows a success
+                 string. Cancelled shows a muted line. -->
+            <div t-if="state.status === 'proposed'
+                       or state.status === 'confirming'
+                       or state.status === 'error'
+                       or state.status === 'expired'"
+                 class="o_neon_ai_chat__confirm_body">
+                <div class="o_neon_ai_chat__confirm_summary"
+                     t-esc="props.card.human_summary"/>
+                <t t-if="diffPairs.length">
+                    <div class="o_neon_ai_chat__confirm_diff">
+                        <t t-foreach="diffPairs" t-as="p"
+                           t-key="p.label">
+                            <div class="o_neon_ai_chat__confirm_diff_row">
+                                <span class="o_neon_ai_chat__confirm_diff_label"
+                                      t-esc="p.label"/>
+                                <span class="o_neon_ai_chat__confirm_diff_before"
+                                      t-esc="p.before"/>
+                                <i class="fa fa-long-arrow-right mx-2"/>
+                                <span class="o_neon_ai_chat__confirm_diff_after"
+                                      t-esc="p.after"/>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+                <div t-if="state.error"
+                     class="o_neon_ai_chat__confirm_error_msg">
+                    <i class="fa fa-exclamation-triangle me-1"/>
+                    <t t-esc="state.error"/>
+                </div>
+            </div>
+
+            <!-- Confirmed state -->
+            <div t-if="state.status === 'confirmed'"
+                 class="o_neon_ai_chat__confirm_body o_neon_ai_chat__confirm_done">
+                <i class="fa fa-check-circle me-2"/>
+                <span>Done — </span>
+                <span class="o_neon_ai_chat__confirm_summary"
+                      t-esc="(state.result and state.result.human_summary) or props.card.human_summary"/>
+                <button t-if="state.result and (state.result.created_target_id or state.result.target_id)"
+                        type="button"
+                        class="btn btn-link btn-sm o_neon_ai_chat__confirm_open"
+                        t-on-click="openResult">
+                    Open record
+                </button>
+                <span t-if="state.replay"
+                      class="o_neon_ai_chat__confirm_replay text-muted">
+                    (replay)
+                </span>
+            </div>
+
+            <!-- Cancelled state -->
+            <div t-if="state.status === 'cancelled'"
+                 class="o_neon_ai_chat__confirm_body o_neon_ai_chat__confirm_muted">
+                <i class="fa fa-ban me-2"/>
+                Cancelled.
+            </div>
+
+            <!-- Buttons row: only on proposed + confirming states.
+                 D32: Cancel is the first button (tab order safe).
+                 D32: Confirm is NOT auto-focused. -->
+            <div t-if="state.status === 'proposed'
+                       or state.status === 'confirming'"
+                 class="o_neon_ai_chat__confirm_actions">
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary o_neon_ai_chat__confirm_cancel"
+                        t-att-disabled="state.status === 'confirming'"
+                        t-on-click="onCancelClick">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="btn btn-sm btn-primary o_neon_ai_chat__confirm_btn"
+                        t-att-disabled="state.status === 'confirming'"
+                        t-on-click="onConfirmClick">
+                    <t t-if="state.status === 'confirming'">
+                        <i class="fa fa-circle-o-notch fa-spin me-1"/>
+                        Working…
+                    </t>
+                    <t t-else="">Confirm</t>
+                </button>
+            </div>
+        </div>
+    </t>
+
+</templates>
