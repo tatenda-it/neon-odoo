@@ -29,7 +29,13 @@
     # Reuses the existing 'equipment_conflict' AC trigger; adds a
     # new 'load_window_missing' nudge trigger; adds a daily 06:00
     # backstop cron.
-    "version": "17.0.5.0.0",
+    # 17.0.6.0.0 = P-B3 AI Deployment Plan Generation. NEW
+    # central pivot model neon.deployment.plan + the fact-gather /
+    # Claude-via-B13 / strict-validator orchestrator. Major bump
+    # per CLAUDE.md (new pivot model). Adds neon_doc_gen as a
+    # depends. PDF render deferred (D10 trim); on-screen HTML
+    # render only this milestone.
+    "version": "17.0.6.0.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -69,6 +75,12 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         # widget reads via the venue_id related chain.
         "base_geolocalize",
     ],
+    # P-B3 NOTE: neon_doc_gen is NOT a hard depends here because
+    # neon_core -> neon_jobs (group cascade) + neon_doc_gen ->
+    # neon_core would create a cycle. The adapter is imported
+    # LAZILY inside DeploymentPlanGenerator._call_claude with an
+    # ImportError -> UserError surface so the user sees a clear
+    # "install neon_doc_gen" message rather than a load failure.
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
@@ -145,6 +157,12 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         # the dashboard so menu_workshop_overview resolves.
         "views/neon_equipment_conflict_views.xml",
         "data/ir_cron_conflict_backstop.xml",
+        # P-B3 -- Deployment Plan model + views + Lisa-tunable
+        # call-time policy config. Loads after the dashboard so
+        # the Operations submenu parent resolves.
+        "data/neon_deployment_plan_config_seed.xml",
+        "views/neon_deployment_plan_call_time_config_views.xml",
+        "views/neon_deployment_plan_views.xml",
     ],
     "assets": {
         "web.assets_backend": [
