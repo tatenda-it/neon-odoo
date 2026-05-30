@@ -42,6 +42,7 @@ SMOKES=(
   pb2_conflict
   pb13_docgen
   pb3_deployment_plan
+  pb14_inventory_load
   phr_r1a
 )
 SCRIPT_DIR="$(dirname "$0")"
