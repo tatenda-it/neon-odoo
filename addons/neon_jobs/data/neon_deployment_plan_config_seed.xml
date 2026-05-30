@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- P-B3 (gate-1 (c)) — singleton seed for the
+             configurable call-time policy. Defaults match the
+             gate-1 recommendation: chief 30m before anchor; lead
+             tech 60m before; rest 15m before dispatch. Lisa edits
+             via Settings -> Operations -> Call-Time Policy and
+             ticks "Ops signed off" once she's reviewed. -->
+        <record id="deployment_plan_call_time_config_default"
+                model="neon.deployment.plan.call.time.config">
+            <field name="crew_chief_offset_minutes">30</field>
+            <field name="lead_tech_offset_minutes">60</field>
+            <field name="rest_offset_minutes">15</field>
+            <field name="anchor_policy">max_prep_dispatch</field>
+            <field name="is_ops_signed_off" eval="False"/>
+        </record>
+    </data>
+</odoo>
