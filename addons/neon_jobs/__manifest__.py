@@ -35,7 +35,12 @@
     # per CLAUDE.md (new pivot model). Adds neon_doc_gen as a
     # depends. PDF render deferred (D10 trim); on-screen HTML
     # render only this milestone.
-    "version": "17.0.6.0.0",
+    # 17.0.6.1.0 = P-B14 Equipment Inventory CSV loader. Standalone
+    # script (scripts/load_inventory.py) + @api.model wrapper on
+    # neon.equipment.unit. asset_tag-only idempotency key
+    # (gate-1 D3 confirmed). Patch bump -- no schema change, no
+    # new pivot model; pure additive feature.
+    "version": "17.0.6.1.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
