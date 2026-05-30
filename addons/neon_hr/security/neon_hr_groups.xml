@@ -25,6 +25,7 @@
             ref('base.group_user'),
             ref('hr.group_hr_manager'),
             ref('hr_contract.group_hr_contract_manager'),
+            ref('hr_holidays.group_hr_holidays_manager'),
         ])]"/>
     </record>
 </odoo>

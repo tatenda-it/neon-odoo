@@ -1,0 +1,78 @@
+feat(b13): claude doc-gen engine -- shared adapter for document generation
+
+P-B13 -- shared ClaudeDocGenAdapter that B3 (deployment plans),
+B4 (sub-hire drafts), and B5 (reconciliation) all call for
+high-value structured-JSON document generation. Routes through
+the Anthropic Messages API, separate from the Groq chat path
+which is rate-capped and tuned for tool-calling.
+
+Per gate-1 D1 (Q2): standalone module neon_doc_gen (NOT extended
+into neon_dashboard) so future B3/B4/B5 callers in neon_jobs +
+neon_finance import a clean adapter without pulling the full
+dashboard stack. The Phase 8A encryption helper lives only in
+neon_dashboard; rather than depend on the whole dashboard, the
+thin helper (~30 LOC: _config_key / _get_decrypted_api_key /
+_set_api_key reading ir.config_parameter under
+neon_doc_gen.api_key_anthropic) is copied inline.
+
+Per gate-1 D2: direct requests.post -- no anthropic SDK
+dependency. Mirrors GroqAdapter precedent.
+
+Per gate-1 D3+D4 (strict-JSON): the adapter signature is
+generate(system_prompt, facts, json_schema=None) -> dict. System
+prompt has the locked suffix "Respond with ONLY a single JSON
+object." JSON parse failure triggers ONE re-prompt with a
+corrective user turn; persistent malformed raises
+DocGenJSONError -- never silent.
+
+Per gate-1 D5 (typed exceptions): six exceptions inherit a single
+base (DocGenError) so callers catch the family with one except.
+  DocGenConfigError       missing/blank key, disabled, no model
+  DocGenAPIError          4xx (other than 429) + connection
+  DocGenRateLimitError    HTTP 429
+  DocGenTimeoutError      requests.Timeout
+  DocGenServerError       HTTP 5xx
+  DocGenJSONError         malformed twice
+
+Per gate-1 D6 (Q4): default model claude-sonnet-4-6
+(configurable per-doc-type via the provider's model field).
+
+Per gate-1 D7 (Q3): API key paste flow via a TransientModel
+wizard with password=True masked input. Key written to
+ir.config_parameter then wizard row unlinked immediately so
+plaintext sits on the DB for at most one transaction. ACL: only
+neon_core.group_neon_superuser can spawn the wizard or read the
+provider config. Never logged, never echoed back. The
+api_key_encrypted field on the provider is a non-secret
+reference marker.
+
+Per gate-1 D8: lightweight action_test_connection() health-check
+that asserts the model returns ok=true, stamps last_health_check
+and last_health_status. Surfaces as a green/red toast.
+
+Per gate-1 D9: per-call usage snapshot on the provider
+(last_call_prompt_tokens, last_call_completion_tokens,
+last_call_at). Per-call history persistence deferred to callers.
+
+Tests:
+  .claude/pb13_docgen_smoke.py            25/25 PASS
+  .claude/pb13_docgen_browser_smoke.py    2/2 scenarios PASS
+
+Output contract for B3/B4/B5:
+  from odoo.addons.neon_doc_gen.models.ai_doc_gen \
+      .claude_docgen_adapter import (
+          ClaudeDocGenAdapter, DocGenError, ...)
+  provider = env["neon.doc.gen.provider"].sudo().search(
+      [("provider_key", "=", "anthropic"),
+       ("is_enabled", "=", True)], limit=1)
+  out = ClaudeDocGenAdapter(provider).generate(
+      system_prompt=..., facts={...}, json_schema={...})
+  # out -> {"result": dict, "usage": {...}, "model": str,
+  #         "latency_ms": int}
+
+Regression: 2046/2060. 14 failures = 12 baselined p2/p6 drift
+unchanged + pb1 T-B1-28 known smoke ordering + 1 p2m7 transient
+(upstream sequence-job pollution, not a B13 regression).
+ZERO new failures from B13.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

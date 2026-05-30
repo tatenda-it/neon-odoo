@@ -1,0 +1,491 @@
+NEON EVENTS ELEMENTS
+Odoo Build Programme
+Phase 7a — Schema Sketch
+Training System: Core Foundation
+Working document — 20 May 2026
+## 1. Overview
+Phase 7a is the foundation of Phase 7. It delivers the core certifications model, equipment competency tracking, cross-competency capture, audit-trail discipline, and layered event_job assignment gating. Onboarding (7b), external training (7c), and the Knowledge Base (7d) build on top.
+Module name: neon_training. Manifest version: 17.0.7.0.0 (first release). Depends on: neon_jobs, neon_crm_extensions, neon_finance (for audit-trail pattern reuse). License: same as the rest of the Neon code.
+Discipline carried from Phase 6:
+Append-only on certification records (no perm_unlink for any group, per H3=A)
+Corrections via new records with later effective_date — same as M5/M9 cost lines
+ACL definitions in CSV with explicit per-group rows; ir.rule for record-level scope
+Mid-build process: design pause → gate 1 approval → build → browser smoke → commit → gate 2
+## 2. Core models
+### 2.1 neon.training.certification.category
+Taxonomy at the top of the model tree. Defines the four categories Robin chose (B1=D): Equipment, Role Tier, Safety, Soft Skill.
+Field
+Type
+Description
+name
+Char (required, unique)
+e.g. 'Equipment', 'Role Tier', 'Safety', 'Soft Skill'
+code
+Char (required, unique, ascii)
+e.g. 'equipment', 'role', 'safety', 'soft'
+sequence
+Integer
+Display order
+audit_track
+Boolean (default True)
+Whether records in this category enforce append-only / no-delete
+requires_external_trainer
+Boolean
+True for Safety (external certifier); False for Equipment (internal sign-off OK)
+skill_level_mode
+Selection
+binary / tiered_3 / custom — per C2=C, configurable per category
+expiry_required
+Boolean (default True)
+Some categories never expire (e.g. Role Tier doesn't); most do
+default_validity_months
+Integer (default 12)
+Default expiry per Robin's B2 note ('certs valid for a year or set by admin')
+icon
+Char
+FontAwesome icon for UI
+active
+Boolean (default True)
+Standard Odoo soft-delete
+
+Seeded on -u: four standard categories (Equipment, Role Tier, Safety, Soft Skill) with sensible defaults. New categories can be added later via Configuration menu (approver tier).
+### 2.2 neon.training.certification.type
+Specific certification types within a category. This is the model that gets seeded heavily with real Neon data — e.g. 'MA3 Console', 'Work at Heights', 'Shona Language', 'MC Presentation', 'Driving Class 4'.
+Field
+Type
+Description
+name
+Char (required)
+e.g. 'MA3 Console', 'Work at Heights'
+code
+Char (required, unique)
+Short identifier
+category_id
+Many2one (required)
+neon.training.certification.category
+equipment_category_id
+Many2one
+Reference to equipment category (when category=Equipment), e.g. 'Lighting Consoles'
+equipment_model_id
+Many2one
+Reference to specific equipment model (per C3=C — both category + model tracking)
+validity_months
+Integer
+Overrides category default; 0 = never expires
+skill_level_mode
+Selection
+Inherits from category; can override
+sign_off_authority
+Selection (required)
+lead_tech / od_md / external_trainer / self_with_peer / mixed — per C1=D
+regulatory_body
+Char
+If category=Safety — e.g. 'NSSA', 'St John Ambulance'. Else empty
+regulatory_code
+Char
+Reference number for compliance reports (per A3=C mixed compliance)
+description
+Text
+What this certification means
+active
+Boolean (default True)
+Soft-delete via Robin/Munashe
+
+Seeded: starter set of ~15–20 common Neon certification types (the ones Ranganai knows are needed). Refined post-deploy.
+### 2.3 neon.training.certification
+The actual certification record — 'Ranganai holds MA3 Standard, obtained 2024-03-15, expires 2026-03-15.' One of the most-written-to models in Phase 7. APPEND-ONLY (no perm_unlink for any group per H3=A).
+Field
+Type
+Description
+user_id
+Many2one (required)
+res.users — the certified person. Org-wide per A2=B
+type_id
+Many2one (required)
+neon.training.certification.type
+category_id
+Many2one (related)
+Roll-up for filtering
+level
+Selection
+Binary or tiered — depends on type_id.skill_level_mode
+state
+Selection
+draft / pending_verification / active / expired / suspended
+date_obtained
+Date (required)
+When the cert was earned
+date_expires
+Date (computed)
+From date_obtained + type.validity_months; 0 months = no expiry
+signed_off_by_id
+Many2one
+res.users who verified — e.g. Ranganai for equipment, Robin for role tier
+external_trainer_name
+Char
+If signed off externally, the trainer/institution name
+certificate_attachment_ids
+Many2many
+ir.attachment — PDF/photo of the certificate (B3=C self-upload + admin verify)
+verified
+Boolean (default False)
+Admin verification flag; only True after Lead Tech / Robin confirms attachment is real
+verified_by_id
+Many2one
+Who verified
+verified_at
+Datetime
+When
+notes
+Text
+Free-form notes
+regulatory_reference
+Char
+If applicable — link to compliance reference (A3=C)
+
+State transitions: draft (initial) → pending_verification (after self-upload with attachment) → active (after admin verifies) → expired (auto at date_expires) or suspended (manual override by admin). No state EVER deletes a record.
+### 2.4 neon.training.cross_competency
+Robin's A4 note: 'Data analytics should also record if someone has been tested in other field and has done job successfully.' This is the model that captures real-world competency demonstrated through actual event work — even when a formal certification is missing.
+Example: Bob doesn't have an MA3 cert on paper. But he ran the MA3 console at the corporate event on May 15. Ranganai observed and confirms. That's a cross-competency record.
+Field
+Type
+Description
+user_id
+Many2one (required)
+The person who demonstrated competency
+certification_type_id
+Many2one (required)
+What they're claiming competency on (despite no formal cert)
+demonstrated_through_event_id
+Many2one (required)
+commercial.event.job — the actual event where competency was shown
+demonstrated_at
+Date (required)
+When
+observed_by_id
+Many2one (required)
+res.users — typically Lead Tech (Ranganai) or production manager
+performance_rating
+Selection
+below_expectation / met_expectation / exceeded_expectation
+notes
+Text (required)
+Specifics — what was the task, what's their level of comfort
+leads_to_certification
+Boolean
+Whether this should trigger a draft certification record for review
+
+This model is what powers Robin's 'data analytics' angle. Reports like "Who has demonstrated MA3 competency in real events, even without formal cert" become possible. Also feeds the gating logic in section 4 — a cross-competency record can downgrade an unqualified-block to a warn-with-track.
+### 2.5 neon.training.assignment_gate_log
+Every assignment-gate firing is logged for audit and analytics. Layered per G2=D — three tiers (informational at assignment, warning at quote-acceptance, blocking at event-start). Append-only.
+Field
+Type
+Description
+event_job_id
+Many2one (required)
+commercial.event.job
+role_line_id
+Many2one (required)
+event.job.role.line (if model exists; otherwise key+name)
+user_id
+Many2one (required)
+The crew member being assigned
+gate_tier
+Selection (required)
+tier_1_assignment / tier_2_quote_accept / tier_3_event_start
+severity
+Selection (required)
+info / warn / block (computed from tier)
+missing_qualifications
+Many2many
+neon.training.certification.type — what's missing
+cross_competency_id
+Many2one
+If a cross-competency record downgrades the gate
+override_reason
+Text
+Required for warn/block tier when override is invoked
+overridden_by_id
+Many2one
+Who chose to override
+overridden_at
+Datetime
+When
+fired_at
+Datetime (default now)
+When gate triggered
+
+## 3. Extensions to existing models
+### 3.1 res.users _inherit
+Field
+Type
+Purpose
+training_certification_ids
+One2many
+All certifications held by this user
+active_certifications_count
+Integer (computed)
+Roll-up for kanban / dashboard
+expiring_soon_count
+Integer (computed)
+Certs in the next 90 days; used for the user kanban warning badge
+training_role_tier
+Selection (computed)
+Highest Role-Tier-category active cert — e.g. 'Lead Tech' / 'Tech' / 'Runner' / 'Driver'
+
+### 3.2 commercial.event.job _inherit
+Field
+Type
+Purpose
+training_gate_status
+Selection (computed)
+all_qualified / partial / unqualified — overall state across role lines
+assignment_gate_log_ids
+One2many
+All gate firings for this event_job
+_action_check_training_gate()
+Method
+Fires gate evaluation at relevant lifecycle points (quote_accept / event_start)
+
+### 3.3 event.job.role.line _inherit (or new model if absent)
+Per G1=B — required qualifications inferred from role + equipment context, not declared by sales rep.
+Field
+Type
+Purpose
+required_certification_type_ids
+Many2many (computed)
+Inferred from role tier + equipment line context
+required_role_tier
+Selection (computed)
+From role name (Lead Tech / Tech / Runner / Driver)
+assigned_user_id
+Many2one (existing)
+The crew member; the gating logic checks against this
+gate_status
+Selection (computed)
+qualified / needs_cross_competency / unqualified
+
+### 3.4 Equipment model extension (if needed)
+Per C3=C — both category and model tracked. Equipment records gain a link to which certification is required.
+Field
+Type
+Purpose
+required_certification_type_id
+Many2one
+neon.training.certification.type — what cert this equipment requires (e.g. MA3 console requires 'MA3 Console' cert at Standard level)
+required_level
+Selection
+Minimum level (binary/tiered)
+## 4. Key workflows
+### 4.1 Certification acquisition (self-upload + admin verify)
+Per B3=C. Two paths:
+Path A: Ranganai records a cert directly for a crew member (admin-record-and-verify in one step). Common for internal equipment sign-offs.
+Path B: Crew member self-uploads their certificate via portal (state=pending_verification). Admin (Robin / Ranganai / designated owner) reviews the attachment, confirms it's authentic, sets verified=True → state=active.
+
+State machine:
+draft → pending_verification → active → expired / suspended
+'expired' happens automatically when date_expires passes (cron at midnight).
+'suspended' is admin-driven (e.g. cert is revoked because original course turned out to be a fake).
+### 4.2 Expiry tracking & reminders
+Per B2=B (auto-expire with warning period) and B4=B (90/30/7 day reminders). Daily cron checks active certs:
+90 days before expiry: WhatsApp + email + in-app TODO to the cert holder + Robin/Munashe + designated owner
+30 days before: same channels, escalated tone ('renewal action needed within 30 days')
+7 days before: final warning, daily TODO until expiry
+On expiry date: state transitions active → expired, all assignment gates that depend on this cert recompute
+### 4.3 Cross-competency capture
+Per Robin's A4 note. After an event_job is closed (state=done), the system surfaces a TODO to the Lead Tech (Ranganai):
+“Record any cross-competency demonstrations from this event. Was a crew member observed performing competently in a role outside their formal certifications?”
+Ranganai logs cross-competency records as needed. These appear in 'Who can do X' queries with a different visual marker (cross-competency vs formal cert).
+### 4.4 Layered assignment gating (the heart of 7a)
+Per G2=D — three tiers, increasing severity. Each tier is its own milestone (M9/M10/M11).
+Tier
+When fires
+Severity
+Behavior
+Tier 1: Assignment
+Sales rep assigns user_id to role_line
+Informational
+Toast notification: '{User} lacks {cert(s)} for this role. Continue?' No block, but logged.
+Tier 2: Quote acceptance
+Quote moves to accepted state
+Warning + override
+If any role line has gate_status != qualified, the action_accept method shows a wizard requiring override_reason text before continuing. Reason is logged.
+Tier 3: Event start
+event_job.state → in_progress
+Block + override
+UserError unless an explicit override_reason has been recorded on the gate log within the prior 24h. Forces conscious decision-making at the critical moment.
+
+Cross-competency records soften the gate: if a user has a relevant cross-competency record demonstrating competence in the missing area, the gate downgrades by one tier (block → warn, warn → info, info → pass). This makes Robin's A4 'data analytics' angle directly actionable.
+## 5. ACL & RBAC
+Per H1=D (shared ownership) and H2=A (crew read-only own records). Initial groups:
+Group
+Membership
+Read
+Write
+Create
+Delete
+group_neon_training_user
+All employees and regular crew with Odoo logins
+Own records only
+—
+Own (draft, pending verification)
+— (audit)
+group_neon_training_signoff
+Ranganai (Lead Tech), other senior crew designated by Robin
+All cert records
+Verify own-signed certs
+Records for any crew member
+— (audit)
+group_neon_training_admin
+Robin / Munashe + shared owners per H1=D
+All records
+All records
+All records
+— (audit — even admin cannot perm_unlink)
+
+ir.rules:
+Cert records: training_user sees only where user_id = current user
+Cross-competency: training_user sees only where user_id = current user; signoff/admin sees all
+Assignment gate logs: training_user sees own gate logs only; admin sees all
+
+Full-union groups from Phase 6 (superuser / Robin / Munashe) automatically gain training_admin membership during group assignment at deploy.
+## 6. Notification dispatch
+Reuses Phase 6's three-channel pattern (WhatsApp + email + in-app TODO). Defined as mail.template + mail.activity records.
+Trigger
+Channel(s)
+Recipient(s)
+Cert expiring in 90 days
+WhatsApp + TODO
+Cert holder + designated owner
+Cert expiring in 30 days
+WhatsApp + email + TODO
+Cert holder + designated owner + Robin/Munashe
+Cert expiring in 7 days
+WhatsApp + email + TODO (daily)
+All of above
+Cert pending verification > 7 days
+TODO
+Designated owner
+Cross-competency observed at event-close
+TODO
+Lead Tech (Ranganai)
+Tier 2 quote-accept override invoked
+Email + TODO
+Robin/Munashe (visibility)
+Tier 3 event-start override invoked
+Email + TODO + WhatsApp
+Robin/Munashe + designated owner
+## 7. Views & UI surfaces
+Backend list / kanban / form / search for: certification.category, certification.type, certification, cross_competency, assignment_gate_log
+User-form extension: 'Training' tab on res.users showing all certs (kanban) + cross-competencies + active gate logs
+event_job form: 'Training Gate' tab showing per-role-line gate status, override-reason capture wizard, gate log history
+Dashboard for Ranganai/training_admin: certification roster, expiring soon panel, cross-competency demonstrated panel, gate-trigger summary (last 30 days)
+Search query: 'Who can do X?' interface — filter by certification type + level, optionally include cross-competency demonstrators
+## 8. Reports (Phase 7a only — expanded in Phase 8)
+Certification roster: full list of who-holds-what-and-when-expires (CSV/PDF export)
+Expiring soon: 30/60/90 day rolling forecast of upcoming expiries by category
+Compliance roster: filtered to category=Safety with regulatory_body group-by (for A3=C mixed compliance)
+Cross-competency log: events where competency was demonstrated outside formal certs
+Gate-trigger summary: which event_jobs hit which gate tiers, override reasons captured
+## 9. Migration & seeding
+No pre-existing training data to migrate — this is a greenfield module. Seeding at -u time:
+4 categories (Equipment, Role Tier, Safety, Soft Skill)
+~15–20 starter certification types based on Ranganai's knowledge — e.g. MA3 Console, DiGiCo Quantum 5, ChamSys MagicQ, Work at Heights, First Aid, Class 4 Driver Licence, Shona, Ndebele, MC Presentation, etc.
+noupdate=1 on all seed records so they survive future module updates without resetting
+Initial certifications for permanent crew (~10–15 users) populated manually via Ranganai/Robin during the first week of 7a production. NOT seeded via XML — too brittle
+## 10. Audit trail discipline
+Following Phase 6's pattern (H3=A confirmed):
+No perm_unlink on certification, cross_competency, assignment_gate_log models — for ANY group including training_admin
+Corrections via new records with later effective_date (the existing record's state changes to 'suspended' with a notes entry; new record carries the corrected data)
+All state transitions recorded in chatter (mail.thread on all main models)
+create_uid / write_uid / create_date / write_date all preserved (Odoo default)
+## 11. Phase 7a milestone roll-out
+M#
+Scope
+Est. LOC
+Tests
+M1
+Category + type models, admin views, audit-trail setup, ACL/RBAC scaffolding
+~800
+~20 Py + 3 browser
+M2
+Certification record model, file attachments, admin verification workflow, state machine
+~1200
+~30 Py + 4 browser
+M3
+Per-category configurable skill levels (binary / 3-tier / category-configurable)
+~400
+~12 Py + 2 browser
+M4
+Expiry tracking, computed states, cron for state transitions, mail templates
+~700
+~25 Py + 3 browser
+M5
+Notification dispatch (90/30/7 day reminders, WhatsApp + email + TODO)
+~600
+~18 Py + 3 browser
+M6
+Cross-competency model (Robin's A4 "demonstrated through event" workflow)
+~900
+~22 Py + 3 browser
+M7
+Sign-off authority workflow (Lead Tech / OD-MD / external trainer routing per C1=D)
+~500
+~15 Py + 2 browser
+M8
+event_job role line extensions, required_certifications computed inference (G1=B)
+~700
+~20 Py + 3 browser
+M9
+Layered gating tier 1: informational warning at crew assignment
+~400
+~12 Py + 2 browser
+M10
+Layered gating tier 2: warning + override-reason at quote acceptance
+~600
+~18 Py + 3 browser
+M11
+Layered gating tier 3: blocking gate at event_start with override capture
+~700
+~22 Py + 3 browser
+M12
+"Who can do X" query interface for Ranganai, dashboard, reports, post-deploy verification
+~900
+~25 Py + 4 browser
+Total
+Phase 7a
+~8400
+~239 Py + 35 browser
+
+LOC estimate is rough — Phase 6 ran ~1500 LOC per milestone average, so Phase 7a should fall in that range. Test counts assume the same density as Phase 6's 317 Phase 6-specific Python tests across 10 milestones (~32/milestone).
+## 12. Open design questions
+Items that need decisions during 7a build, not blockers but worth surfacing now:
+Q1: Equipment model extension — do we extend the existing equipment model (from Phase 4 / Workshop) or create a new neon.training.equipment.requirement model that links? Cleaner separation favours the latter. Performance favours the former. Defer to M8.
+Q2: Soft skill 'level' interpretation — e.g. 'Computer literacy: Basic / Standard / Expert' uses the same skill_level_mode as equipment competency. But 'Languages spoken' is more about presence/absence + comfort level. Some soft skills want a different model. Defer to M3 design pause.
+Q3: Cross-competency → cert promotion — if Bob demonstrates MA3 competency 3 times via cross-competency records, should the system suggest creating a formal cert? Defer to M6 design pause (could be a future Phase 7.x feature).
+Q4: Gate override visibility — should override-reason captures be surfaced in the Cash Flow Dashboard from Phase 6 (visibility for finance team), or only in the training_admin dashboard? Defer to M11 design pause.
+Q5: Mobile UX for self-upload (B3=C) — crew use phones primarily. Should the portal be PWA-optimised? Defer to 7b (the portal lives there, not 7a).
+## 13. Glossary
+Term
+Meaning
+Certification
+A formal record of qualification — paper certificate, internal sign-off, etc.
+Cross-competency
+Real-world demonstrated competency without formal certification (Robin's A4 angle)
+Gate tier
+Which of the three layered checks fired (assignment / quote-accept / event-start)
+Sign-off authority
+Who can confirm a cert is real — varies by category (Lead Tech / OD-MD / external)
+Skill level mode
+Whether a cert is binary (yes/no) or tiered (Basic/Standard/Expert)
+Override reason
+Free-text justification logged when an assignment gate is bypassed
+Designated owner
+The H1=D "shared ownership" model — Robin assigns specific people to own specific cert types
+## 14. Next steps after this sketch is approved
+Tatenda reviews this schema sketch end-to-end
+Open design questions Q1-Q5 reviewed and either resolved or formally deferred
+If any model needs reshaping, this document gets revised before any code is written
+On approval: Phase 7a M1 begins (category + type models + admin views)
+Master plan + project_phase6_status.md updated to mark Phase 7a as 'in build'
+project_phase7_status.md created as the parallel tracking document

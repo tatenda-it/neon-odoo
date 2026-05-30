@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Leave types (Q11). Entitlements that are legally settled carry a
+        value; per-Zimbabwe-law types whose exact figures need legal
+        confirmation are seeded with neon_flagged_for_legal=True and a
+        placeholder (NOT an invented number). leave_validation_type =
+        'manager' so approval routes to the employee's leave_manager_id
+        (synced from the category's OD/MD approver, Q12). Medical aid is
+        DEFERRED/disabled — no leave type seeded for it.
+    -->
+    <record id="leave_type_annual" model="hr.leave.type">
+        <field name="name">Annual Leave</field>
+        <field name="requires_allocation">yes</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">22</field>
+        <field name="neon_accrual_cap_days">22</field>
+        <field name="neon_flagged_for_legal" eval="True"/>
+    </record>
+
+    <record id="leave_type_sick" model="hr.leave.type">
+        <field name="name">Sick Leave</field>
+        <field name="requires_allocation">no</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">14</field>
+        <field name="neon_requires_medical_cert" eval="True"/>
+    </record>
+
+    <record id="leave_type_compassionate" model="hr.leave.type">
+        <field name="name">Compassionate / Family Leave</field>
+        <field name="requires_allocation">no</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">7</field>
+    </record>
+
+    <record id="leave_type_maternity" model="hr.leave.type">
+        <field name="name">Maternity Leave</field>
+        <field name="requires_allocation">no</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">98</field>
+        <field name="neon_flagged_for_legal" eval="True"/>
+    </record>
+
+    <record id="leave_type_paternity" model="hr.leave.type">
+        <field name="name">Paternity Leave</field>
+        <field name="requires_allocation">no</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">0</field>
+        <field name="neon_flagged_for_legal" eval="True"/>
+    </record>
+
+    <record id="leave_type_adoption" model="hr.leave.type">
+        <field name="name">Adoption Leave</field>
+        <field name="requires_allocation">no</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">0</field>
+        <field name="neon_flagged_for_legal" eval="True"/>
+    </record>
+
+    <record id="leave_type_miscarriage" model="hr.leave.type">
+        <field name="name">Miscarriage Leave</field>
+        <field name="requires_allocation">no</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">0</field>
+        <field name="neon_flagged_for_legal" eval="True"/>
+    </record>
+
+    <record id="leave_type_study" model="hr.leave.type">
+        <field name="name">Study Leave</field>
+        <field name="requires_allocation">no</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">0</field>
+        <field name="neon_permanent_only" eval="True"/>
+        <field name="neon_flagged_for_legal" eval="True"/>
+    </record>
+</odoo>

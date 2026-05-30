@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============ PAYSLIP ============ -->
+    <record id="view_neon_hr_payslip_tree" model="ir.ui.view">
+        <field name="model">neon.hr.payslip</field>
+        <field name="arch" type="xml">
+            <tree string="Payslips" decoration-success="state == 'paid'"
+                  decoration-info="state == 'confirmed'">
+                <field name="employee_id"/>
+                <field name="period_start"/>
+                <field name="period_end"/>
+                <field name="gross_amount" sum="Gross"/>
+                <field name="total_deductions" sum="Deductions"/>
+                <field name="net_amount" sum="Net"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_neon_hr_payslip_form" model="ir.ui.view">
+        <field name="model">neon.hr.payslip</field>
+        <field name="arch" type="xml">
+            <form string="Payslip">
+                <header>
+                    <button name="action_compute" type="object" string="Compute"
+                            class="btn-primary" invisible="state not in ('draft','computed')"/>
+                    <button name="action_confirm" type="object" string="Confirm"
+                            class="btn-primary" invisible="state != 'computed'"/>
+                    <button name="action_mark_paid" type="object" string="Mark Paid"
+                            class="btn-primary" invisible="state != 'confirmed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="contract_id"/>
+                            <field name="is_final_pay"/>
+                        </group>
+                        <group>
+                            <field name="period_start"/>
+                            <field name="period_end"/>
+                            <field name="currency_id"/>
+                        </group>
+                    </group>
+                    <field name="line_ids">
+                        <tree editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="name"/>
+                            <field name="category"/>
+                            <field name="is_deduction"/>
+                            <field name="amount"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </tree>
+                    </field>
+                    <group class="oe_subtotal_footer">
+                        <field name="gross_amount"/>
+                        <field name="total_deductions"/>
+                        <field name="net_amount"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter"><field name="message_ids"/></div>
+            </form>
+        </field>
+    </record>
+    <record id="action_neon_hr_payslip" model="ir.actions.act_window">
+        <field name="name">Payslips</field>
+        <field name="res_model">neon.hr.payslip</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============ EVENT WAGE ============ -->
+    <record id="view_neon_hr_event_wage_tree" model="ir.ui.view">
+        <field name="model">neon.hr.event.wage</field>
+        <field name="arch" type="xml">
+            <tree string="Event Wages" decoration-success="state == 'paid'">
+                <field name="employee_id"/>
+                <field name="event_job_id"/>
+                <field name="wage_type"/>
+                <field name="grade_id"/>
+                <field name="amount" sum="Total"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="date"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_neon_hr_event_wage_form" model="ir.ui.view">
+        <field name="model">neon.hr.event.wage</field>
+        <field name="arch" type="xml">
+            <form string="Event Wage">
+                <header>
+                    <button name="action_review" type="object" string="Review"
+                            invisible="state != 'draft'"/>
+                    <button name="action_approve" type="object" string="Approve"
+                            class="btn-primary" invisible="state != 'reviewed'"/>
+                    <button name="action_pay" type="object" string="Mark Paid"
+                            class="btn-primary" invisible="state != 'approved'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="event_job_id"/>
+                            <field name="date"/>
+                        </group>
+                        <group>
+                            <field name="wage_type"/>
+                            <field name="grade_id" invisible="wage_type != 'freelance_grade'"/>
+                            <field name="amount"/>
+                            <field name="currency_id"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Notes..."/>
+                </sheet>
+                <div class="oe_chatter"><field name="message_ids"/></div>
+            </form>
+        </field>
+    </record>
+    <record id="action_neon_hr_event_wage" model="ir.actions.act_window">
+        <field name="name">Event Wages</field>
+        <field name="res_model">neon.hr.event.wage</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============ COMMISSION ============ -->
+    <record id="view_neon_hr_commission_tree" model="ir.ui.view">
+        <field name="model">neon.hr.commission</field>
+        <field name="arch" type="xml">
+            <tree string="Commissions" decoration-success="state == 'paid'"
+                  decoration-warning="state == 'proposed'">
+                <field name="employee_id"/>
+                <field name="commercial_job_id"/>
+                <field name="base_amount"/>
+                <field name="rate_percent"/>
+                <field name="proposed_amount"/>
+                <field name="approved_amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_neon_hr_commission_form" model="ir.ui.view">
+        <field name="model">neon.hr.commission</field>
+        <field name="arch" type="xml">
+            <form string="Commission">
+                <header>
+                    <button name="action_submit" type="object" string="Submit for Review"
+                            invisible="state != 'proposed'"/>
+                    <button name="action_approve" type="object" string="Approve"
+                            class="btn-primary" invisible="state not in ('proposed','under_review')"
+                            confirm="Approve this commission? Evidence is required and it is never auto-paid."/>
+                    <button name="action_reject" type="object" string="Reject"
+                            invisible="state not in ('proposed','under_review')"/>
+                    <button name="action_pay" type="object" string="Mark Paid"
+                            class="btn-primary" invisible="state != 'approved'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="commercial_job_id"/>
+                            <field name="sale_order_id"/>
+                        </group>
+                        <group>
+                            <field name="base_amount"/>
+                            <field name="rate_percent"/>
+                            <field name="proposed_amount"/>
+                            <field name="approved_amount"/>
+                            <field name="currency_id"/>
+                        </group>
+                    </group>
+                    <group string="Approval Evidence (required — never auto-paid)">
+                        <field name="evidence" nolabel="1"
+                               placeholder="Justification + evidence for the commission..."/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter"><field name="message_ids"/></div>
+            </form>
+        </field>
+    </record>
+    <record id="action_neon_hr_commission" model="ir.actions.act_window">
+        <field name="name">Commissions</field>
+        <field name="res_model">neon.hr.commission</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============ LOAN ============ -->
+    <record id="view_neon_hr_loan_tree" model="ir.ui.view">
+        <field name="model">neon.hr.loan</field>
+        <field name="arch" type="xml">
+            <tree string="Staff Loans" decoration-success="state == 'settled'"
+                  decoration-info="state == 'active'">
+                <field name="employee_id"/>
+                <field name="principal_amount"/>
+                <field name="instalment_count"/>
+                <field name="instalment_amount"/>
+                <field name="total_repaid"/>
+                <field name="balance_amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_neon_hr_loan_form" model="ir.ui.view">
+        <field name="model">neon.hr.loan</field>
+        <field name="arch" type="xml">
+            <form string="Staff Loan">
+                <header>
+                    <button name="action_approve" type="object" string="Approve"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_activate" type="object" string="Activate + Generate Schedule"
+                            class="btn-primary" invisible="state != 'approved'"/>
+                    <button name="action_settle" type="object" string="Settle"
+                            invisible="state != 'active'"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state in ('settled','cancelled')"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="principal_amount"/>
+                            <field name="currency_id"/>
+                        </group>
+                        <group>
+                            <field name="instalment_count"/>
+                            <field name="instalment_amount"/>
+                            <field name="start_date"/>
+                            <field name="total_repaid"/>
+                            <field name="balance_amount"/>
+                        </group>
+                    </group>
+                    <field name="repayment_ids">
+                        <tree>
+                            <field name="sequence"/>
+                            <field name="due_date"/>
+                            <field name="amount"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="state" widget="badge"/>
+                            <field name="payslip_id"/>
+                            <field name="deducted_date"/>
+                        </tree>
+                    </field>
+                    <field name="reason" placeholder="Reason..."/>
+                </sheet>
+                <div class="oe_chatter"><field name="message_ids"/></div>
+            </form>
+        </field>
+    </record>
+    <record id="action_neon_hr_loan" model="ir.actions.act_window">
+        <field name="name">Staff Loans</field>
+        <field name="res_model">neon.hr.loan</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- ============ CONFIG: statutory + grades ============ -->
+    <record id="view_neon_hr_statutory_tree" model="ir.ui.view">
+        <field name="model">neon.hr.statutory.rule</field>
+        <field name="arch" type="xml">
+            <tree string="Statutory Rules" editable="bottom"
+                  decoration-warning="needs_finance_confirmation">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="deduction_type"/>
+                <field name="calc_method"/>
+                <field name="rate_percent"/>
+                <field name="fixed_amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="basis"/>
+                <field name="needs_finance_confirmation"/>
+                <field name="active" column_invisible="1"/>
+            </tree>
+        </field>
+    </record>
+    <record id="action_neon_hr_statutory" model="ir.actions.act_window">
+        <field name="name">Statutory Rules</field>
+        <field name="res_model">neon.hr.statutory.rule</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <record id="view_neon_hr_wage_grade_tree" model="ir.ui.view">
+        <field name="model">neon.hr.wage.grade</field>
+        <field name="arch" type="xml">
+            <tree string="Freelance Wage Grades" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="amount"/>
+                <field name="currency_id" column_invisible="1"/>
+            </tree>
+        </field>
+    </record>
+    <record id="action_neon_hr_wage_grade" model="ir.actions.act_window">
+        <field name="name">Freelance Wage Grades</field>
+        <field name="res_model">neon.hr.wage.grade</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <!-- (Payroll menus live in neon_hr_menus.xml — loaded last so the
+         menu roots + these actions already exist, avoiding a
+         fresh-install forward-reference.) -->
+</odoo>

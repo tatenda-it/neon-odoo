@@ -1,0 +1,104 @@
+feat(b3): AI deployment plan generation
+
+P-B3 -- AI-generated deployment plan with strict design-seed lock.
+Routes document generation through B13's ClaudeDocGenAdapter
+(neon_doc_gen) for narrative + structure + sequencing; every fact
+(quantities, dates, crew names, conflict deficits) comes from
+Python via DeploymentPlanFactGatherer. A pure-Python
+DeploymentPlanValidator rejects any LLM output that contradicts or
+omits a fact, with seven enforcement rules.
+
+Models:
+  neon.deployment.plan                   header + state machine
+                                          (draft -> generated ->
+                                           reviewed -> final;
+                                           regenerate -> superseded)
+                                          + revision counter
+                                          + source_conflict snapshot
+                                          + audit (gen/review/final
+                                           timestamps + actors).
+                                          perm_unlink=0.
+  neon.deployment.plan.call.time.config  singleton (per gate-1 (c))
+                                          for the Lisa-tunable
+                                          call-time offsets
+                                          (chief -30, lead -60,
+                                          rest -15 minutes from
+                                          dispatch/prep anchor) +
+                                          is_ops_signed_off flag.
+
+Python helpers (NOT models -- importable by B4/B5):
+  DeploymentPlanFactGatherer  walks event_job -> venue + windows +
+                              crew + equipment + B2 conflict snapshot
+                              + Python-pre-computed crew call times.
+  DeploymentPlanValidator     7 strict rules:
+                                R1 hallucinated quantity
+                                R2 hallucinated competing event
+                                R3 hallucinated crew name
+                                R4 OMITTED deficit (cardinal sin)
+                                R5 wrong section.key enum
+                                R6 split per gate-1 (a): concrete
+                                   parseable datetimes HARD-reject
+                                   if not in facts; relative phrasing
+                                   ("morning of the event") passes
+                                R7 data_quality_note verbatim
+                                   carry-through
+  DeploymentPlanGenerator     orchestrator: gather -> B13 ->
+                              validate -> persist; ONE auto-retry
+                              with corrective context; on second
+                              failure -> quarantine_json + UserError.
+
+Per gate-1 D6: refuses to generate when event_job.state == 'draft'
+(mirrors B2-DM-2; demand isn't authoritative until out of draft).
+
+Per gate-1 D8: maps all six B13 typed DocGen* exceptions to
+friendly UI errors; no silent fallback.
+
+Per gate-1 D10 (trim): on-screen plan_summary_html render only.
+PDF deferred as a fast follow.
+
+Dependency note: neon_doc_gen NOT a hard depends to avoid the
+neon_jobs -> neon_doc_gen -> neon_core -> neon_jobs cycle (neon_core
+depends on neon_jobs for the cascade pattern). The B13 adapter is
+imported LAZILY inside _call_claude with ImportError -> UserError.
+
+Files:
+  addons/neon_jobs/models/neon_deployment_plan.py            (NEW)
+  addons/neon_jobs/models/deployment_plan_call_time_config.py (NEW)
+  addons/neon_jobs/models/deployment_plan_fact_gatherer.py    (NEW)
+  addons/neon_jobs/models/deployment_plan_validator.py        (NEW)
+  addons/neon_jobs/models/deployment_plan_generator.py        (NEW)
+  addons/neon_jobs/models/deployment_plan_renderer.py         (NEW)
+  addons/neon_jobs/views/neon_deployment_plan_views.xml       (NEW)
+  addons/neon_jobs/views/neon_deployment_plan_call_time_config_views.xml (NEW)
+  addons/neon_jobs/data/neon_deployment_plan_config_seed.xml  (NEW)
+  addons/neon_jobs/security/ir.model.access.csv               (7 new rows, all perm_unlink=0)
+  addons/neon_jobs/models/__init__.py                         (import wiring)
+  addons/neon_jobs/__manifest__.py                            (17.0.5.0.0 -> 17.0.6.0.0 MAJOR -- new pivot model)
+
+Tests:
+  .claude/pb3_deployment_plan_smoke.py           (NEW; 30 assertions; 30/30 PASS -- covers fact-gather, draft gate, all 7 validator rules incl R6 split, generator routes to Claude via B13, design-seed lock end-to-end, quarantine path, review gate, regenerate flow, render output)
+  .claude/pb3_deployment_plan_browser_smoke.py   (NEW; 3 scenarios PASS -- form renders, deficit block renders, review gate buttons advance state)
+  .claude/pb2_conflict_smoke.py                  (T-B2-40 version assertion made >= so B3's bump doesn't break it)
+  .claude/run_regression.sh                      (pb3_deployment_plan registered)
+
+Output contract for B4/B5:
+  from odoo.addons.neon_jobs.models.deployment_plan_generator \
+      import DeploymentPlanGenerator
+  from odoo.addons.neon_jobs.models.deployment_plan_validator \
+      import DeploymentPlanValidator, PlanValidationError
+  plan = DeploymentPlanGenerator(env).generate_for_event(event_job)
+  # plan is a neon.deployment.plan record (status='generated')
+
+Plan model contract:
+  event_job_id / status / revision / source_conflict_id /
+  source_conflict_window_start/end / plan_json / plan_summary_html /
+  data_quality_note / generated_at/_by_id / reviewed_at/_by_id /
+  finalised_at/_by_id / superseded_at / superseded_by_plan_id /
+  model_used / prompt_tokens / completion_tokens / latency_ms /
+  error_message / quarantine_json / deficit_count / is_active
+
+Regression: 2187/2201. 14 failures = 12 baselined p2/p6 drift +
+pb1 T-B1-28 known smoke ordering + pb2 T-B2-40 version (fixed in
+this commit). ZERO new B3 failures.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

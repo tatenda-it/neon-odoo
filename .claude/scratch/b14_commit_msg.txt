@@ -1,0 +1,121 @@
+feat(b14): equipment inventory CSV loader + sample fixture
+
+P-B14 -- idempotent CSV loader for workshop equipment units. Prod
+workshop is currently EMPTY (0 units, 0 workshop products); this
+ships the LOADER + a 12-row representative SAMPLE so the loader is
+testable now. The real-data load is a separate human-triggered
+step (run dry-run on prod, review report, run for real -- see
+scripts/README.md).
+
+Architecture (matches the P7e.M13 one-shot content-migration
+invariants from memory):
+- Standalone script at addons/neon_jobs/scripts/load_inventory.py
+  NOT in the manifest's data block, NOT imported by
+  addons/neon_jobs/__init__.py, no cron, no auto-trigger.
+- Thin @api.model wrapper on neon.equipment.unit
+  (.import_inventory_csv(path, dry_run=True, force_with_rejects=False))
+  so the smoke + a future wizard can hit the same entry point.
+
+Per gate-1:
+- D3 idempotency key = asset_tag ONLY. Rows without asset_tag are
+  REJECTED. Forces good data hygiene + uses the existing
+  UNIQUE(asset_tag) SQL constraint as the dedup contract.
+- D4 CSV column schema locked: asset_tag / category_code /
+  subcategory_code / workshop_name / tracking_mode / serial_number
+  / batch_code / workshop_location / condition_status /
+  purchase_date / purchase_price / currency /
+  low_stock_threshold / notes.
+- D5 auto-create asymmetry: top-level categories reject-on-unknown
+  (the 9 seeded codes are the contract); subcategories +
+  product.template auto-create when first seen.
+- D6 dry-run default; execute pass per-row savepoint; execute
+  with rejects is BLOCKED unless force_with_rejects=True; one bad
+  row never poisons the batch.
+- D8 ACL: only neon_core.group_neon_superuser OR
+  neon_jobs.group_neon_jobs_manager; PermissionError otherwise.
+- D9 NO new model fields, NO new manifest data entry. Pure
+  additive feature.
+- D10 sample fixture ships in data/sample_inventory.csv but is
+  NOT in __manifest__.py['data']. Real prod load remains
+  human-triggered (Lisa/Tatenda decide when).
+
+OPS NOTE (gate-1 (a)): the asset_tag-only key REJECTS rows
+without a per-unit asset tag, INCLUDING bulk quantity-tracked
+stock (cabling drums, truss segments, multi-pack mics). If
+ops/Lisa can't tag bulk stock at CSV-prep time, ping for a
+three-tier asset_tag -> serial -> external_ref fallback patch.
+
+Files:
+  addons/neon_jobs/scripts/__init__.py        (NEW; empty per
+                                                P7e.M13 invariant)
+  addons/neon_jobs/scripts/load_inventory.py  (NEW; ~350 LOC --
+                                                main() + plan
+                                                build + per-row
+                                                execute + report)
+  addons/neon_jobs/scripts/README.md          (NEW; procedure doc
+                                                for the real-data
+                                                load)
+  addons/neon_jobs/data/sample_inventory.csv  (NEW; 12 rows = 11
+                                                CREATE + 1 REJECT
+                                                covering serial /
+                                                quantity / batch
+                                                tracking modes)
+  addons/neon_jobs/models/neon_equipment_unit.py  (added
+                                                @api.model
+                                                import_inventory_csv
+                                                wrapper)
+  addons/neon_jobs/__manifest__.py            (17.0.6.0.0 ->
+                                                17.0.6.1.0
+                                                patch bump -- no
+                                                schema change)
+
+Tests:
+  .claude/pb14_inventory_load_smoke.py    (NEW; 25 assertions,
+    25/25 PASS -- preflight + header validation + dry-run no-write
+    + 12-row classification + REJECT reason surfacing + execute
+    blocked by rejects + force_with_rejects works + idempotent
+    re-run zero new units + subcategory auto-create + product
+    auto-create with is_workshop_item=True + low_stock_threshold
+    writes to CATEGORY (B1) + ACL non-manager rejected +
+    in-CSV-dup detection + malformed numeric reason)
+  .claude/run_regression.sh               (pb14_inventory_load
+                                            registered)
+
+Output contract for the real prod load:
+  # @api.model entry:
+  env["neon.equipment.unit"].import_inventory_csv(
+      "/path/to/inventory.csv",
+      dry_run=True,                       # default
+      force_with_rejects=False,           # default
+  )
+  # returns dict: {"ok": bool, "rows_total": int,
+  #   "rows_create": int, "rows_update": int,
+  #   "rows_reject": int, "rows_failed": int,
+  #   "blocked_by_rejects": bool, "report": [...], "dry_run": bool}
+
+  # Or via odoo shell:
+  # docker compose exec -T odoo odoo shell -d neon_crm --no-http
+  # exec(open('/mnt/extra-addons/neon_jobs/scripts/load_inventory.py').read())
+  # r = main('/path/to/inventory.csv', execute=False, env=env)
+
+CSV column schema (locked at this commit):
+  asset_tag*  category_code*  subcategory_code  workshop_name*
+  tracking_mode  serial_number  batch_code  workshop_location
+  condition_status  purchase_date  purchase_price  currency
+  low_stock_threshold  notes
+  (* = required; full doc in scripts/README.md)
+
+Mid-build adaptation: subcategory race fix -- two rows targeting
+the SAME new subcategory_code (e.g. CABLE-001 + CABLE-002 both
+needing xlr) used to hit the UNIQUE(code) constraint on the
+second row. _apply_row now re-checks Cat.search([("code","=",sub)])
+at execute time before creating, so a prior row's create is
+reused by subsequent rows in the same batch.
+
+Regression: pb14 25/25 PASS standalone. The prior regression
+batch (2187/2201) ran before pb14 was registered in the manifest;
+all other suites unchanged from the post-B3 baseline (12 baselined
+p2/p6 drift + pb1 T-B1-28 known smoke ordering + R1b1/R1b2 minor
+fluctuations not related to B14). ZERO new B14 failures.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

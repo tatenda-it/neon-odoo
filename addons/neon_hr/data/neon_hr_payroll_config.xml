@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Zimbabwe statutory deduction rules (Q18). EVERY rate is a
+        PLACEHOLDER with needs_finance_confirmation=True — finance/legal
+        must supply + sign off the current figures (PAYE is banded; the
+        flat rate here is a stand-in). The payslip creates the line so
+        the structure is right; the value is flagged until confirmed.
+    -->
+    <record id="statutory_paye" model="neon.hr.statutory.rule">
+        <field name="name">PAYE (Income Tax)</field>
+        <field name="code">paye</field>
+        <field name="deduction_type">paye</field>
+        <field name="calc_method">percent</field>
+        <field name="rate_percent">20.0</field>
+        <field name="basis">taxable</field>
+        <field name="needs_finance_confirmation" eval="True"/>
+        <field name="sequence">10</field>
+        <field name="note">PLACEHOLDER. PAYE is progressive/banded — finance must supply current ZIMRA bands.</field>
+    </record>
+    <record id="statutory_nssa" model="neon.hr.statutory.rule">
+        <field name="name">NSSA Contribution</field>
+        <field name="code">nssa</field>
+        <field name="deduction_type">nssa</field>
+        <field name="calc_method">percent</field>
+        <field name="rate_percent">4.5</field>
+        <field name="basis">gross</field>
+        <field name="needs_finance_confirmation" eval="True"/>
+        <field name="sequence">20</field>
+        <field name="note">PLACEHOLDER employee share. Confirm current NSSA rate + insurable-earnings ceiling + employer portion.</field>
+    </record>
+    <record id="statutory_aids_levy" model="neon.hr.statutory.rule">
+        <field name="name">AIDS Levy</field>
+        <field name="code">aids_levy</field>
+        <field name="deduction_type">aids_levy</field>
+        <field name="calc_method">percent</field>
+        <field name="rate_percent">3.0</field>
+        <field name="basis">gross</field>
+        <field name="needs_finance_confirmation" eval="True"/>
+        <field name="sequence">30</field>
+        <field name="note">PLACEHOLDER. AIDS levy is 3% of PAYE (not gross) — modelled as gross-% stand-in; finance to correct the basis.</field>
+    </record>
+    <record id="statutory_nec" model="neon.hr.statutory.rule">
+        <field name="name">NEC Contribution</field>
+        <field name="code">nec</field>
+        <field name="deduction_type">nec</field>
+        <field name="calc_method">percent</field>
+        <field name="rate_percent">1.0</field>
+        <field name="basis">gross</field>
+        <field name="applies_where_applicable" eval="True"/>
+        <field name="needs_finance_confirmation" eval="True"/>
+        <field name="sequence">40</field>
+        <field name="note">PLACEHOLDER. NEC applies by sector/CBA — confirm applicability + rate.</field>
+    </record>
+
+    <!-- Freelance graded rates (Part 4): USD 50 / 30 / 20 by qualification. -->
+    <record id="wage_grade_a" model="neon.hr.wage.grade">
+        <field name="name">Grade A (Senior)</field>
+        <field name="code">a</field>
+        <field name="amount">50.0</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="wage_grade_b" model="neon.hr.wage.grade">
+        <field name="name">Grade B (Intermediate)</field>
+        <field name="code">b</field>
+        <field name="amount">30.0</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="wage_grade_c" model="neon.hr.wage.grade">
+        <field name="name">Grade C (Junior)</field>
+        <field name="code">c</field>
+        <field name="amount">20.0</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- Config: USD 10 employed-tech event incentive; loan max open (0). -->
+    <record id="param_event_incentive" model="ir.config_parameter">
+        <field name="key">neon_hr.event_incentive_usd</field>
+        <field name="value">10</field>
+    </record>
+    <record id="param_loan_max" model="ir.config_parameter">
+        <field name="key">neon_hr.loan_max_usd</field>
+        <field name="value">0</field>
+    </record>
+</odoo>

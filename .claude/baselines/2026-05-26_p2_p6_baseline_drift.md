@@ -148,3 +148,27 @@ Untouched by neon_hr (equipment, not HR).
 `ValidationError: The selected Room does not belong to the selected
 Venue` in `commercial_job._check_room_belongs_to_venue` — venue/room
 fixture drift (b1/p9). Untouched by neon_hr.
+
+---
+
+## Update 2026-05-30 (P-HR-R1b close)
+
+### pb2_conflict — 34/35 (T-B2-40)
+Stale literal version assertion: T-B2-40 expects `neon_jobs 17.0.5.0.0`
+but B13 bumped neon_jobs to **17.0.6.0.0**. B2/B13-owned smoke (same
+class as p4m2/p4m8 count assertions + phr_* version assertions). Not a
+functional failure; B2/B13 to update the literal.
+
+### Dev-environment artifacts (NOT failures — future triage)
+1. **Stale bind mount** — the dev container auto-restarted mid-run and
+   returned on a stale Docker Desktop mount; every neon module failed
+   to load (`Unmet dependencies` / `KeyError: 'neon.*'`). Fix: full
+   `docker compose down && up` (not just `--force-recreate`). Any run
+   with mass `KeyError` on neon models is this, not real failures.
+2. **Superuser hr-grant wipe** — `neon_core_groups.xml` (noupdate="0",
+   `(6,0,[...])` REPLACE) on a neon_core reload wipes the
+   hr.group_hr_manager / hr_holidays_manager that neon_hr's
+   `_enforce_hr_confidentiality` grants to group_neon_superuser.
+   Symptom: phr_r1a/phr_r1b_1 fail with superuser AccessError on
+   hr.employee. The neon_hr migration re-applies it on each version
+   bump; latent risk if neon_core reloads without a neon_hr upgrade.

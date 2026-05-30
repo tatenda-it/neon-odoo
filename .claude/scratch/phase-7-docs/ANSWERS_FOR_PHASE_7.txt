@@ -1,0 +1,730 @@
+NEON EVENTS ELEMENTS
+Odoo Build Programme
+Phase 7 — Open Questions
+Training System
+Working document — 20 May 2026
+## Purpose & scope
+This document captures the design decisions that need to be locked before Phase 7 milestone build can begin. It follows the same pattern as prior phases — Phase 2, 3, 4, 5, and 6 each opened with an Open Questions document, then a Schema Sketch, then milestone-by-milestone build.
+Phase 7 is the Training System. The Master Plan position is after Finance (Phase 6, shipped 19 May 2026 as v17.0.7.9.0-phase6-live) and before Reports & Analytics (Phase 8). Goal: a structured way to track who at Neon is qualified to do what — covering crew competency, certifications, onboarding, and (potentially) external training, knowledge base, and event_job assignment integration.
+Unlike Phase 6, Phase 7 has NOT had a pre-document framing session with Robin. Group A of this document is precisely those framing questions — they gate everything downstream. The right pattern is: Robin (and ideally Munashe) work through Group A first in a focused 30–45 min session, then the detail groups can be answered async.
+### How to use this document
+24 questions across 8 thematic groups. Each question states the design context, lists options where relevant, and ends with a Decision field. As decisions are made (in working sessions or async), record:
+The decision itself (one of the options, or a written-out answer)
+The decision date
+Who decided (Tatenda alone / with Robin / with Munashe / with Ranganai / etc.)
+Any notes worth carrying forward into the Schema Sketch
+Some questions are clearly architectural (Tatenda can answer independently). Others are operational (Robin / Munashe / Ranganai / Kudzi input required). Owner tag on each question signals which is which.
+### Framing note — Group A FIRST
+Phase 6 had F1–F6 framing decisions locked verbally with Robin BEFORE the Open Questions document was drafted. For Phase 7, those framing decisions are still open — they live in Group A below. Until A1–A6 are answered, the detail questions in Groups B–H cannot meaningfully be locked. A 30–45 min working session with Robin (and ideally Munashe) to work through Group A is the right shape.
+## Group A — Scope & framing
+These six questions gate everything below. They set what Phase 7 is FOR. A working session with Robin (and ideally Munashe) is the right shape for getting them locked. Until F1–F6 here are answered, the detail groups below cannot meaningfully be designed.
+
+A1
+Primary problem the Training System solves
+Robin
+
+Different problem statements lead to very different module shapes. The training system could primarily exist to:
+(a) Ensure crew safety — compliance, certifications, accident prevention.
+(b) Improve crew capability — onboarding new hires, levelling up technicians.
+(c) Enable safe equipment assignment — confirming a tech is qualified before booking them on a job.
+(d) Capture institutional knowledge — SOPs, how-we-do-things-at-Neon, retain expertise as people come and go.
+(e) All of the above.
+Robin’s answer here shapes which features get built first.
+
+Options:
+A
+Safety & compliance — lead-with-certifications
+B
+Crew capability — onboarding & development first
+C
+Assignment gating — prevent unqualified assignment
+D
+Knowledge retention — SOP repository first
+E
+All of the above — broad rollout
+
+My instinct: E with C as the early milestone. Most production gain comes from ‘who can do what’ being queryable during quote-to-booking, which prevents disasters.
+
+Decision
+E
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+A2
+Who does the system track — crew only, or also office staff?
+Robin
+
+Training records can be operator-focused (lead techs, techs, runners, drivers) or organisation-wide (also include sales reps, bookkeeper, admin staff for things like Excel, customer service, Odoo itself).
+This affects the user model and reporting. If only crew, the data lives close to crew assignment and event_job. If org-wide, training records sit at res.users level and the module needs to cover non-event use cases.
+
+Options:
+A
+Crew only — lead techs, techs, runners, drivers
+B
+Crew + office staff — organisation-wide
+C
+Crew with office staff later — phased rollout, crew first
+
+My instinct: C. Crew is where compliance and assignment-gating value lives. Office staff training records can roll in later as a phase 7.x extension if value emerges.
+
+Decision
+B
+Decided by
+
+Decision date
+
+Notes / rationale
+Everyone has to get a training in their departments eg sales , tech , drivers , freelancers, PA , bookkeeper etc
+
+
+A3
+Compliance & Zimbabwe regulatory drivers
+Robin
+
+Does the Training System need to satisfy specific Zimbabwe occupational safety regulations, industry standards, or insurance requirements? Examples that might apply to events production: NSSA work-at-heights requirements, electrical regs for live mains work, first-aid certification, fire safety (especially for indoor venues).
+If yes, the module needs explicit compliance views (e.g. “Who is currently certified for X under regulation Y”) and audit-trail discipline similar to Phase 6 finance.
+If primarily operational, the design can be lighter — just “Robin/Munashe trusts this tech to do that thing” records, no formal compliance angle.
+
+Options:
+A
+Heavy compliance — formal regulator-facing reporting required
+B
+Light compliance — internal record-keeping is enough
+C
+Mixed — some certifications are regulator-tracked, most are internal
+
+Decision
+C
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+A4
+Integration with event_job assignment — hard gate or soft signal?
+Robin
+
+When a sales rep or production manager assigns a crew member to an event_job role (e.g. ‘Tech for LED wall’), the system can:
+(a) Hard-block the assignment if the crew member lacks the required certification/qualification. Forces compliance.
+(b) Warn but allow the assignment, requiring an override reason. Pragmatic for emergencies.
+(c) Just display qualification status; assignment is unaffected. Informational only.
+
+Options:
+A
+Hard gate — block assignment if not qualified
+B
+Soft warn — allow override with documented reason
+C
+Informational — no gate, just visible
+
+My instinct: B. Hard gates feel right in theory but break operational reality when someone calls in sick and a slightly-less-certified backup has to step in. Soft-warn with override reason captures both the safety signal AND the override audit trail — same posture as Phase 6’s SoD guard.
+
+Decision
+B
+Decided by
+
+Decision date
+
+Notes / rationale
+Data analytics should also record if someone has been tested in other field and has done job successfully
+
+
+A5
+Phase 6 cost integration — do training expenses flow to event P&L?
+Robin + Kudzi
+
+External training has costs (course fees, travel, accommodation, time off). These could:
+(a) Live entirely in Phase 7 — separate training-expenses model, not connected to Phase 6 finance.
+(b) Flow as cost.lines into Phase 6 — specifically to the events the trained crew worked, or to a general overhead bucket.
+(c) Be tracked in Zoho Books only — Phase 7 just records the training event, finance lives elsewhere.
+
+Options:
+A
+Phase 7 only — separate training expense model
+B
+Phase 6 cost integration — training costs flow to event P&L
+C
+Zoho Books — finance side stays in legacy system
+
+My instinct: A for the initial milestone. Once Phase 6 is settled in production for a few months, we can decide if training costs are worth wiring into event P&L. Early integration adds risk for marginal value.
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+A6
+Timeline & priority
+Robin
+
+Phase 6 (Finance) shipped 19 May 2026. Where does Phase 7 sit on the priority list?
+(a) Urgent — currently blocking real operational decisions. Build fast, even if scope is narrower.
+(b) Important but patient — quality matters more than speed. Same as Phase 6 cadence.
+(c) Lower priority — Phase 8 (Reports & Analytics) or WhatsApp Integration could come first.
+
+Options:
+A
+Urgent — build fast
+B
+Standard pace — quality over speed
+C
+Lower priority — happy to defer for now
+
+Decision
+B
+Decided by
+
+Decision date
+
+Notes / rationale
+Quality matters
+
+
+## Group B — Crew certifications & qualifications
+The data model for what a crew member is qualified to do. Anchors the assignment-gating in Group G.
+
+B1
+Certification taxonomy — what gets tracked?
+Robin + Ranganai
+
+What does ‘qualified’ mean at Neon? Possible categories:
+• Equipment-specific: MA3 console, DiGiCo audio desk, ChamSys, specific LED screen brand, etc.
+• Role-tier: ‘Lead Tech’ (carries authority and ability), ‘Tech’, ‘Runner’, ‘Driver’.
+• Safety: first-aid, work-at-heights, electrical, fire safety, vehicle licensing.
+• Soft skills: client handling, language skills, leadership.
+Which of these should the module track? Multi-tier taxonomy (each crew has many certifications across categories) is the flexible answer but adds schema complexity.
+
+Options:
+A
+Equipment-specific only — lightest model
+B
+Equipment + role tier — covers the common 'who can lead' question
+C
+Equipment + role + safety — the comprehensive option
+D
+All four including soft skills
+
+My instinct: C. Equipment + role tier + safety covers the main operational and compliance angles. Soft skills are notoriously hard to track formally and tend to live in Robin’s head better than in a database.
+
+Decision
+D
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+B2
+Expiry & renewal handling
+Robin
+
+Some certifications never expire (‘Bob completed MA3 training, he’s good for life’). Others have hard expiry dates (work-at-heights typically 2 years, first-aid typically 3 years).
+When a certification expires, what should happen automatically?
+(a) Crew member auto-loses the qualification on expiry date — hard transition.
+(b) Warning period before expiry (e.g. 30 days), expires gracefully — lets the renewal happen.
+(c) Manual marking required — someone updates the record when they confirm renewal/lapse.
+
+Options:
+A
+Auto-expire on date — strict
+B
+Auto-expire with warning period — standard
+C
+Manual marking — admin-driven
+
+My instinct: B. Warning period (configurable per category) plus WhatsApp reminders to crew + Robin gives the best balance. Same notification infrastructure Phase 6 uses.
+
+Decision
+B
+Decided by
+
+Decision date
+
+Notes / rationale
+Lets say certs are valid for a year or set by admin
+
+
+B3
+Certificate documents — storage and self-upload
+Robin
+
+When a tech completes external training, they receive a paper or PDF certificate. Should the system store the document?
+Self-upload by the crew member (via portal) versus admin-upload (Ranganai or office staff) are the main options. Document storage uses Odoo’s attachment system; ~1–10 MB per file expected.
+
+Options:
+A
+Self-upload — crew uploads their own certificates
+B
+Admin-upload — office handles, crew can view only
+C
+Both — self-upload draft, admin verifies + locks
+
+My instinct: C. Self-upload reduces office burden but admin verification is critical for audit trail (anyone can upload a fake PDF). The verify step also surfaces ‘is this certificate real’ as an explicit human-judgment moment.
+
+Decision
+C
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+B4
+Renewal reminders — channel & cadence
+Robin + Kudzi
+
+Phase 6 established the WhatsApp + email + in-app TODO notification stack. Should training renewals use the same channels?
+Cadence options: 90 days, 60 days, 30 days, 7 days before expiry; or just a single reminder; or daily during the final week.
+
+Options:
+A
+Single reminder at 30 days — minimal
+B
+Three reminders: 90, 30, 7 days
+C
+Daily countdown in final 7 days
+
+Decision
+B
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+## Group C — Equipment competency & sign-off
+How crew become qualified on specific equipment without (or before) external certification. Internal-to-Neon process.
+
+C1
+Sign-off authority — who confirms a tech is qualified?
+Robin
+
+When a junior tech reaches the point of ‘Bob can run MA3 solo,’ who records that and signs it off in the system?
+Options: Lead Tech (e.g. Ranganai); OD/MD (Robin/Munashe); external trainer signing off after a course; the tech themselves with peer verification.
+
+Options:
+A
+Lead Tech signs off — Ranganai authority
+B
+OD/MD signs off — Robin/Munashe authority
+C
+External trainer — vendor course completion
+D
+Mix — different sign-off authorities per certification type
+
+My instinct: D. Equipment competency = Lead Tech sign-off. Role tier (Lead Tech promotion etc.) = OD/MD. Safety/external = external trainer record. Mixed authority matches reality.
+
+Decision
+D
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+C2
+Skill levels per equipment — binary or tiered?
+Robin + Ranganai
+
+When tracking competency on an MA3 console, is it just ‘qualified / not qualified’ (binary)? Or are there levels (e.g. ‘Basic’ ‘Standard’ ‘Expert’)?
+Binary is simpler. Tiered captures the operational reality that some techs can run the console for a small wedding but not a corporate event with three operators.
+
+Options:
+A
+Binary — qualified yes or no
+B
+Three-tier — Basic / Standard / Expert
+C
+Per-equipment-category configurable — some binary, some tiered
+
+Decision
+C
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+C3
+Equipment categories vs specific equipment
+Robin
+
+Should a tech be certified on ‘lighting consoles’ (category) or specifically on ‘MA3’ (model)?
+Category-level is simpler but loses fidelity (‘qualified on console’ doesn’t distinguish MA3 from grandMA from Avolites). Model-level is granular but proliferates records.
+
+Options:
+A
+Category only — 'lighting console', 'audio desk', 'LED wall'
+B
+Specific model only — 'MA3', 'DiGiCo Quantum 5'
+C
+Both — category competency implied by any model certification within
+
+My instinct: C. Model-level for tracking; category roll-up for queries. Lets Ranganai answer ‘who can run any lighting console for a small job’ AND ‘who specifically can do MA3 for the corporate event.’
+
+Decision
+C
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+## Group D — Onboarding & curriculum for new crew
+How a new hire moves from ‘day 1’ to ‘trusted solo on event jobs.’
+
+D1
+Onboarding sequence — fixed curriculum or per-hire?
+Robin + Ranganai
+
+Does every new tech follow the same onboarding (read SOPs, shadow 3 events, basic equipment cert, etc.)? Or is each new hire onboarded differently based on prior experience?
+
+Options:
+A
+Fixed curriculum — same for everyone
+B
+Per-hire customised — based on existing experience
+C
+Templated with skip rules — default sequence, skippable based on prior experience
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+D2
+Probationary period — formal milestone or fuzzy?
+Robin
+
+Does Neon have a defined probation period (e.g. 90 days) after which a new hire is formally ‘crew’? Or is it a fuzzy transition?
+If formal: the system can track the probation milestone and surface when it’s reached. If fuzzy: less to formalise.
+
+Options:
+A
+Formal probation milestone — e.g. 90 days, then transition
+B
+Fuzzy transition — happens organically, not tracked formally
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+D3
+Mentor assignment — paired with senior tech?
+Robin + Ranganai
+
+Is each new hire paired with a senior tech (mentor) during onboarding? If yes, should the system record that relationship?
+Useful for tracking who taught whom, and for routing onboarding-related questions back to the mentor.
+
+Options:
+A
+Yes — explicit mentor field on the new-hire record
+B
+No — mentorship is informal, not tracked
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+## Group E — External training & courses
+Training events run by vendors or third-party institutions, not internal.
+
+E1
+Track external course bookings in this module?
+Robin + Kudzi
+
+When Neon sends a tech on an external course (e.g. MA Lighting training in Cape Town, or first-aid certification in Harare), should the module track:
+(a) The booking itself (course name, vendor, date, cost, attendee)
+(b) Just the resulting certification, not the booking process
+(c) Booking via a separate system (e.g. Zoho), only the certification lands in Odoo
+
+Options:
+A
+Full booking + certification
+B
+Certification only — booking lives elsewhere
+C
+External system for booking — manual cert entry
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+E2
+Approval workflow for external training expenses?
+Robin + Kudzi
+
+External training costs money. Does it need an approval workflow similar to Phase 6’s quote approval? Or does Robin/Munashe approve verbally and Kudzi just books it?
+
+Options:
+A
+Formal approval workflow — mirrors Phase 6 quote approval
+B
+Verbal approval — light, just record after
+C
+Threshold-based — above $X needs formal approval, below is auto
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+## Group F — Knowledge base & SOPs
+Documents capturing how Neon does things — SOPs, equipment guides, internal references.
+
+F1
+Knowledge base in scope for Phase 7?
+Robin
+
+Some training systems include a document/wiki repository for SOPs and how-we-do-things. Others stay narrow to certifications and competency only.
+If in scope, the module would offer document storage + tagging + search. Substantial scope addition.
+
+Options:
+A
+Yes — KB is core to Phase 7
+B
+No — KB is out of scope; certifications only
+C
+Defer — KB as Phase 7.x extension if certifications go well
+
+My instinct: C. The training system can be useful without a KB. Adding it doubles the scope. Defer until certifications + assignment-gating are settled.
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+F2
+If KB is in scope: who can author & publish?
+Robin
+
+Skip if F1 = B (out of scope).
+If KB is in scope, who can write SOPs?
+
+Options:
+A
+Robin/Munashe only — authoritative
+B
+Lead Tech (Ranganai) can also author
+C
+Any crew member — wiki style, light governance
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+## Group G — Event_job assignment integration
+How Phase 7 connects to Phase 2/3’s commercial.event.job and crew assignment.
+
+G1
+Required qualifications on an event_job role line
+Robin
+
+When a sales rep creates an event_job, they assign crew to roles (e.g. ‘Lead Tech’, ‘LED Tech’, ‘Driver’). Should each role line declare what qualifications the assigned crew must hold?
+Either:
+(a) Per-role required-qualifications field — the sales rep specifies needed certifications when creating the role.
+(b) Inferred from role tier — ‘Lead Tech’ role automatically requires Lead Tech tier; equipment-specific qualifications inferred from event equipment lines.
+(c) Free-form — no required qualifications declared on role lines; just informational matching.
+
+Options:
+A
+Per-role declarative — sales rep specifies needs
+B
+Inferred from role + equipment context
+C
+Free-form — no formal requirements
+
+My instinct: B. Sales reps shouldn’t have to remember ‘the MA3 console requires Advanced level’ every time they create a role; the system should know from the equipment line + role tier mapping. Reduces sales-rep burden, surfaces gaps early.
+
+Decision
+B
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+G2
+Gate timing — at assignment, at quote-accept, or at event-start?
+Robin
+
+Tied to A4. If A4 = soft warn or hard gate, WHEN does the gate fire?
+(a) At role-line crew assignment — sales rep gets warned immediately when assigning an unqualified tech.
+(b) At quote acceptance — final compliance check before event becomes confirmed.
+(c) At event start — day-of check, last chance to swap.
+(d) All three — layered.
+
+Options:
+A
+At assignment — catch early
+B
+At quote acceptance — final pre-event check
+C
+At event start — last-mile
+D
+Layered — all three with different severity
+
+My instinct: D. At assignment = informational warn; at quote acceptance = stronger warn requiring override reason; at event start = block unless override is documented. Each layer adds friction proportional to commitment.
+
+Decision
+D
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+## Group H — Roles, RBAC, & audit trail
+Who owns the training data, who can read it, what audit trail looks like.
+
+H1
+Training system owner
+Robin
+
+Phase 6 has Kudzi as bookkeeper-owner of finance, with Robin/Munashe as approvers. Phase 7 needs an equivalent: who is the day-to-day operator of training records?
+Candidates: Ranganai (Lead Tech — closest to crew, knows competency reality), Lisa (sales rep with admin lean), an office-admin person, or Robin/Munashe themselves.
+
+Options:
+A
+Ranganai — Lead Tech, owns crew competency
+B
+Office admin role — if such a person exists
+C
+Robin/Munashe — OD/MD own it directly
+D
+Shared — multiple owners with different scopes
+
+Decision
+D
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+H2
+Crew self-service — can techs view their own records?
+Robin
+
+Should each crew member be able to log in and see their own certifications, upcoming expiries, training history? Useful for transparency and self-management.
+Requires giving crew members Odoo logins, which currently most don’t have (WhatsApp is their primary channel per memory).
+
+Options:
+A
+Yes — crew get read-only access to own records
+B
+No — WhatsApp notifications only; office handles record management
+C
+Hybrid — senior techs (Lead Tech tier) get access; others WhatsApp-only
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+H3
+Audit trail discipline — same posture as Phase 6?
+Tatenda (architectural)
+
+Phase 6 ships with append-only records, no perm_unlink for any group, corrections via new records with later effective_date. Should Phase 7 follow the same discipline?
+For compliance-relevant training (work-at-heights, first-aid), an audit-trail with no-delete is strongly preferable. For internal competency notes that are administrative in nature, lighter audit might be OK.
+
+Options:
+A
+Full Phase 6 audit discipline — append-only everywhere
+B
+Tiered — strict for compliance records, lighter for internal notes
+C
+Standard Odoo — normal edit/delete with chatter history only
+
+My instinct: A. The audit-trail discipline pattern from Phase 6 is well-established and protects the institution. Lighter discipline saves marginal effort and adds real audit risk.
+
+Decision
+A
+Decided by
+
+Decision date
+
+Notes / rationale
+
+
+
+## Next steps
+Once Group A is answered, Tatenda drafts the Phase 7 Schema Sketch reflecting Robin’s framing answers. The schema sketch then anchors a master plan revision (Phase 7 might be 8–12 milestones depending on scope from A1).
+If Group A locks to a narrower scope than the maximalist reading of this document, Groups B–H may be partially or entirely deferred. That’s expected.
+Send to Robin after the Phase 6 walkthrough completes. Robin reviews async; we reconvene for the Group A working session.

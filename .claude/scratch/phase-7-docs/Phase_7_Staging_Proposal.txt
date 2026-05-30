@@ -1,0 +1,182 @@
+NEON EVENTS ELEMENTS
+Odoo Build Programme
+Phase 7 — Staging Proposal
+Training System — Sub-Phase Breakdown
+Working document — 20 May 2026
+## Why staging
+Robin's Phase 7 Open Questions answers (locked 20 May 2026) chose the maximalist option across most groups: org-wide user coverage (A2=B), all four certification categories including soft skills (B1=D), formal approval workflow for external training (E2=A), Knowledge Base as core scope (F1=A), and layered three-tier event_job assignment gating (G2=D). The result: estimated 19–24 milestones across the full phase — roughly twice the scope of Phase 6.
+Building this as a single linear phase means Robin sees no production value until ~8 weeks of build complete. Sub-phase staging means each major capability ships independently as it's ready. Phase 7a (the foundation) delivers operational value in ~3 weeks instead of 8.
+This proposal breaks Phase 7 into four logical sub-phases. Each ships as a tagged production release, gets walkthrough acceptance, then the next sub-phase begins design. Master plan numbering stays at 12 phases — sub-phases are tracked internally.
+## The four sub-phases at a glance
+Sub-phase
+Focus
+Milestones
+Build time
+7a — Core
+Certifications, competency, audit, event_job gating
+~10–12
+~3 weeks
+7b — Onboarding & Self-service
+Curriculum, probation, mentor, crew portal
+~4–5
+~1–1.5 weeks
+7c — External Training
+Vendor + course + booking + approval workflow
+~3–4
+~1 week
+7d — Custom KB
+SOP repository — articles, search, permissions, versioning
+~5–7
+~3–4 weeks
+Total
+All Phase 7
+~22–28
+~8–10 weeks
+
+Estimates reflect Phase 6's actual cadence (10–12 milestones over ~3 weeks for a similar scope). Phase 7a is sized to match Phase 6 exactly so the rhythm is familiar.
+## Phase 7a — Core (foundation)
+First sub-phase. Anchors everything else. Ships before 7b/7c/7d are designed in detail — they sketch as we build.
+Field
+Detail
+What it includes
+Certification taxonomy (Equipment + Role Tier + Safety + Soft Skills). Per-person certification records with attachments and admin verification. Per-category skill levels (binary or tiered). Mixed sign-off authority (Lead Tech / OD-MD / external trainer). Expiry tracking with 90/30/7 day reminders. Cross-competency model ('Bob doesn't have MA3 cert but ran it successfully on May event'). Event_job assignment integration with layered three-tier gating (informational at assignment / warning at quote-acceptance / blocking at event-start, all with override-reason logging).
+What it excludes
+Onboarding curriculum (7b). Crew self-service portal (7b). External training booking (7c). KB / SOPs (7d).
+Module name
+neon_training
+Dependencies
+neon_jobs (event_job), neon_crm_extensions, neon_finance (read-only for audit pattern reuse).
+Value at completion
+Ranganai can record all crew certifications. Sales reps see qualification status when assigning crew to event_job roles. Event-start gating prevents unqualified crew on confirmed jobs. Reminders flow via WhatsApp + email + in-app TODO.
+Milestones (est.)
+10–12
+Build time (est.)
+~3 weeks at Phase 6 cadence
+
+Milestone outline for 7a (subject to schema sketch confirmation):
+M1 — Certification category + type models, admin views, audit-trail setup
+M2 — Certification record per person, file attachments, admin verification workflow
+M3 — Per-category configurable skill levels (binary / 3-tier / per-category configurable)
+M4 — Expiry tracking, computed states (active / expired / pending-verification / suspended), cron for state transitions
+M5 — Notification dispatch (90 / 30 / 7 day reminders via WhatsApp + email + TODO)
+M6 — Cross-competency model ("successfully demonstrated on event X" workflow)
+M7 — Sign-off authority workflow (Lead Tech / OD-MD / external trainer routing)
+M8 — Event_job role line extensions — required_certifications field, computed inference from role + equipment
+M9 — Layered gating tier 1: informational warning at crew assignment
+M10 — Layered gating tier 2: warning with override reason at quote acceptance
+M11 — Layered gating tier 3: blocking gate at event_start with override-reason capture
+M12 — "Who can do X" query interface for Ranganai + certification roster dashboard + post-deploy verification
+## Phase 7b — Onboarding & Self-service
+Second sub-phase. Adds onboarding workflow plus the crew self-service portal.
+Field
+Detail
+What it includes
+Fixed onboarding curriculum (same sequence for every new hire). Probation period tracking (90 days, formal milestone). Mentor pairing (explicit field on new-hire record). Crew self-service portal — read-only own records, view own upcoming expiries, view own training history.
+Scope of portal access
+Permanent + regular crew only (~10–15 users), not all freelancers ever booked. Per Robin's clarification (Q1A) on 20 May 2026.
+What it excludes
+External course booking (7c). KB articles (7d).
+Dependencies
+Phase 7a complete and stable in production. Crew user records need to exist or be created during this sub-phase.
+Value at completion
+New hires move through a defined curriculum. Probation milestones surface automatically. Crew members can self-check their certification status on phone (mobile-first UX).
+Milestones (est.)
+4–5
+Build time (est.)
+~1–1.5 weeks
+## Phase 7c — External Training & Booking
+Third sub-phase. Vendor records, course catalog, booking workflow, formal approval (mirrors Phase 6 quote approval pattern).
+Field
+Detail
+What it includes
+Vendor records (training providers — MA Lighting, AVIXA, NSSA, etc.). Course catalog with prices, dates, locations. Booking records linking attendee + course + dates + cost. Formal approval workflow (Kudzi submits, Robin/Munashe approve, same pattern as Phase 6 quote approval queue). Post-completion certification linkage — when course is complete, attendee's certification record is created/updated from the booking.
+What it excludes
+Phase 6 cost integration is NOT included — per Robin's A5=A decision, training costs stay in a separate Phase 7 expense model and do not flow to event P&L. This can be revisited in Phase 8+ if value emerges.
+Dependencies
+Phase 7a complete (certification model needed for post-completion linkage).
+Value at completion
+Office staff and Robin/Munashe approve external training expenditure formally. Booking history per crew member visible. Vendor relationships tracked.
+Milestones (est.)
+3–4
+Build time (est.)
+~1 week
+## Phase 7d — Custom Knowledge Base
+Fourth and final sub-phase. SOP repository, articles, search, permissions, versioning. Robin chose custom build over Odoo's built-in module (decision F1=A, then again at clarification on 20 May 2026).
+Field
+Detail
+What it includes
+Article model with rich text content. Category hierarchy (collapsible tree). Tagging system. Search (full-text). Permissions — Robin/Munashe-only authoring (per F2=A); read access broader (likely all training-system users). Version history (drafts vs published). Attachment support (images, PDFs in SOPs).
+What it excludes
+Comments/discussion on articles (could be added later if needed). External (client-facing) KB — internal only.
+Dependencies
+Phase 7a complete (the cert/competency context informs which SOPs are relevant).
+Value at completion
+Institutional knowledge captured in a searchable structured form. New hires onboard against SOPs. "How we do things at Neon" is documented, not just in Robin's head.
+Milestones (est.)
+5–7
+Build time (est.)
+~3–4 weeks
+Open question
+Custom KB vs Odoo built-in — Robin's choice locked at B (custom) but Tatenda is sending one final confirmation given the substantial time difference (3–4 weeks custom vs 1 week built-in vs hybrid mid-ground). Schema sketch for 7d defers until that confirmation lands.
+## Order of build
+Suggested execution order: 7a → 7b → 7c → 7d. Reasoning:
+7a anchors the certification model that 7b's onboarding, 7c's external bookings, and 7d's permissions all depend on.
+7b lands second so crew portal exists for crew to see their own records as they're recorded by 7c bookings.
+7c lands third — by then the crew records and certification model are settled enough for external bookings to feed cleanly into them.
+7d lands last because (a) it's the largest individual sub-phase and (b) it's the most independent — KB content doesn't depend on certifications being in place, just on the institutional infrastructure being settled.
+
+Each sub-phase ends with a tagged production release and a Robin/Munashe walkthrough — same shape as Phase 6's M12. Decisions about polish or refinement land before the next sub-phase opens.
+## Cumulative timeline (estimate)
+Sub-phase
+End week
+Production state at that point
+7a complete
+Week 3
+Core certifications + competency + event_job gating LIVE. Ranganai records certs. Sales reps see qualification status. Layered gates fire at assign / quote / event-start.
+7b complete
+Week 4.5
+Onboarding curriculum live for new hires. Probation tracking active. Crew self-service portal live for ~10–15 permanent + regular crew.
+7c complete
+Week 5.5
+External training bookings + formal approval workflow live. Kudzi books, Robin/Munashe approve. Bookings link to certifications on completion.
+7d complete
+Week 9–10
+Custom KB live. SOPs accessible. Phase 7 fully complete.
+
+These are estimates against Phase 6's actual cadence. If 7a runs slower or faster, the rest shifts accordingly. Robin's A6=B preference (quality over speed) means we don't compress — we ship when ready.
+## Risks worth flagging upfront
+Risk
+Severity
+Mitigation
+7d (custom KB) is large and may pull focus from Phase 8–12 work
+Medium
+Sending Robin a final KB confirmation note (built-in vs custom vs hybrid). If he reconsiders to hybrid, 7d shrinks to ~2 weeks
+7b crew self-service portal requires giving ~10–15 crew Odoo logins, password resets, etc.
+Low-Med
+Scope is small (~15 users). Pattern proven from Phase 6 (Robin and Kudzi user setup). Could WhatsApp-onboard each user individually
+Cross-competency model (Robin's A4 note) is novel — no prior phase pattern
+Low
+Schema sketch designs it explicitly; M6 of 7a builds it; can refactor based on first production use
+Soft skills tracking (B1=D) includes 10 categories that span very different shapes
+Low
+Schema design covers each as its own certification type within a 'Soft Skills' category. Free-text notes available for nuance
+External training cost (A5=A) staying separate may feel disconnected from event P&L during walkthrough
+Low
+Robin explicitly chose this. Can revisit in Phase 8+. Defer to live feedback
+## Master plan implications
+The master plan stays at 12 phases. Sub-phase staging is internal.
+Revised position:
+Phase 6 — Finance Module (DONE, live 19 May 2026)
+Phase 7 — Training System (this proposal: 7a / 7b / 7c / 7d, ~8–10 weeks)
+Phase 8 — Reports & Analytics (next after Phase 7)
+Phase 9 — WhatsApp Integration
+Phase 10 — Production Hardening
+Phase 11 — Cutover & Training (legacy PHP retirement + parallel run)
+Phase 12 — UI/UX Polish
+
+After 7a ships, project_phase7_status.md is created as a parallel tracking document to project_phase6_status.md. Memory entries reflect the active sub-phase.
+## Next steps
+Approve this staging proposal (or revise) — Tatenda
+Send Robin the custom-KB confirmation note (separate WhatsApp / chat)
+Review Phase 7a Schema Sketch (separate document, delivered in parallel)
+Once schema sketch is locked, begin Phase 7a Milestone 1: certification.category + certification.type models
