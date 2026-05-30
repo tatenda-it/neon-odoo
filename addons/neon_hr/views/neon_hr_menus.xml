@@ -75,4 +75,23 @@
     <menuitem id="menu_neon_hr_wage_grades" name="Freelance Wage Grades"
               parent="menu_neon_hr_config"
               action="action_neon_hr_wage_grade" sequence="50"/>
+
+    <!-- ===== R2: safety / conduct / handbook ===== -->
+    <menuitem id="menu_neon_hr_safety" name="Safety &amp; Conduct"
+              parent="menu_neon_hr_root" sequence="50"/>
+    <menuitem id="menu_neon_hr_accidents" name="Workplace Accidents"
+              parent="menu_neon_hr_safety"
+              action="action_neon_hr_accident" sequence="10"/>
+    <menuitem id="menu_neon_hr_cases" name="Cases (Disciplinary / Incident / etc.)"
+              parent="menu_neon_hr_safety"
+              action="action_neon_hr_case" sequence="20"/>
+    <menuitem id="menu_neon_hr_overtime" name="Overtime / TOIL"
+              parent="menu_neon_hr_safety"
+              action="action_neon_hr_overtime" sequence="30"/>
+    <menuitem id="menu_neon_hr_handbook_pending" name="Handbook — Not Acknowledged"
+              parent="menu_neon_hr_safety"
+              action="action_neon_hr_handbook_pending" sequence="40"/>
+    <menuitem id="menu_neon_hr_handbook" name="Handbook Versions"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_handbook" sequence="60"/>
 </odoo>

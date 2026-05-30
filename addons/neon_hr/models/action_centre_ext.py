@@ -18,15 +18,21 @@ neon_hr depends on neon_jobs, but shares no FILES with it.
 """
 from odoo import _, api, fields, models
 
-NEON_HR_TRIGGER = ("contract_expiry_30days", "Contract Expiring / Expired")
+# neon_hr-contributed Action Centre triggers (R1a contract expiry + R2
+# accident NSSA deadline). Added via selection_add from this module so
+# neon_jobs' TRIGGER_TYPE_SELECTION is never edited.
+NEON_HR_TRIGGERS = [
+    ("contract_expiry_30days", "Contract Expiring / Expired"),
+    ("accident_nssa_14day", "Workplace Accident — NSSA 14-Day Deadline"),
+]
 
 
 class ActionCentreItem(models.Model):
     _inherit = "action.centre.item"
 
     trigger_type = fields.Selection(
-        selection_add=[NEON_HR_TRIGGER],
-        ondelete={"contract_expiry_30days": "set default"},
+        selection_add=NEON_HR_TRIGGERS,
+        ondelete={t[0]: "set default" for t in NEON_HR_TRIGGERS},
     )
 
 
@@ -34,8 +40,8 @@ class ActionCentreTriggerConfig(models.Model):
     _inherit = "action.centre.trigger.config"
 
     trigger_type = fields.Selection(
-        selection_add=[NEON_HR_TRIGGER],
-        ondelete={"contract_expiry_30days": "cascade"},
+        selection_add=NEON_HR_TRIGGERS,
+        ondelete={t[0]: "cascade" for t in NEON_HR_TRIGGERS},
     )
 
     @api.depends("trigger_type")

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Daily scan: raise/refresh an Action Centre item for every
+         workplace accident not yet NSSA-submitted (hard 14-day
+         deadline). nextcall tomorrow 02:15 so install/smoke don't spawn
+         items mid-process. -->
+    <record id="ir_cron_accident_nssa" model="ir.cron">
+        <field name="name">Neon HR: Accident NSSA 14-day Deadline</field>
+        <field name="model_id" ref="model_neon_hr_accident"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_accident_nssa_deadline_scan()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="active" eval="True"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="nextcall"
+               eval="(DateTime.now().replace(hour=2, minute=15, second=0, microsecond=0) + relativedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
+    </record>
+</odoo>

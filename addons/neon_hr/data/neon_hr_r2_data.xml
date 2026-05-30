@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- TOIL leave type (R2). Accrues via hr.leave.allocation from
+         approved overtime resolved as TOIL; taking it reduces the R1b
+         crew-availability signal. -->
+    <record id="leave_type_toil" model="hr.leave.type">
+        <field name="name">TOIL (Time Off in Lieu)</field>
+        <field name="requires_allocation">yes</field>
+        <field name="leave_validation_type">manager</field>
+        <field name="request_unit">day</field>
+        <field name="time_type">leave</field>
+        <field name="neon_statutory_days">0</field>
+    </record>
+
+    <!-- Action Centre trigger config: accident NSSA 14-day deadline. -->
+    <record id="trigger_config_accident_nssa_14day"
+            model="action.centre.trigger.config">
+        <field name="trigger_type">accident_nssa_14day</field>
+        <field name="is_enabled" eval="True"/>
+        <field name="item_type">task</field>
+        <field name="primary_role">manager</field>
+        <field name="priority">high</field>
+        <field name="escalation_minutes">1440</field>
+        <field name="escalated_to_role">manager</field>
+        <field name="description">Hard 14-day NSSA reporting deadline for a workplace accident. Assigned to HR, visible to OD/MD. Closes when NSSA submission is recorded.</field>
+    </record>
+
+    <!-- Seed a current handbook version so the ack compliance flag is
+         meaningful (all staff must acknowledge). -->
+    <record id="handbook_v1" model="neon.hr.handbook">
+        <field name="name">Employee Handbook</field>
+        <field name="version">v1</field>
+        <field name="is_current" eval="True"/>
+    </record>
+</odoo>
