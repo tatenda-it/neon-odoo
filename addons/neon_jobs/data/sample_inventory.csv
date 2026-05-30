@@ -1,0 +1,13 @@
+asset_tag,category_code,subcategory_code,workshop_name,tracking_mode,serial_number,batch_code,workshop_location,condition_status,purchase_date,purchase_price,currency,low_stock_threshold,notes
+MIC-001,sound,wireless_mics,Shure SLX-D Handheld,serial,SLXD-001-2024,,Sound Rack A,good,2024-01-15,650.00,USD,2,
+MIC-002,sound,wireless_mics,Shure SLX-D Handheld,serial,SLXD-002-2024,,Sound Rack A,good,2024-01-15,650.00,USD,,
+LED-001,visual,led_walls,Absen A3 Pro 3.9mm,serial,A3P-001,,Visual Bay 1,good,2023-08-10,4200.00,USD,1,
+MBP-001,laptops,,MacBook Pro 16 M3,serial,FVFY1234ABCD,,Tech Cage,good,2024-03-01,3500.00,USD,,Lead tech kit
+SWITCH-001,visual,,Roland V-1HD Switcher,serial,VHD-A22001,,Visual Bay 2,good,2022-11-05,990.00,USD,,
+LIGHT-001,lighting,moving_heads,Chauvet Maverick Storm 1 Wash,serial,MS1W-PROD-001,,Lighting Bay,good,2023-06-20,2400.00,USD,2,
+CABLE-001,cabling,xlr,XLR Drum 25m,quantity,,,Cable Store,good,,,,4,
+CABLE-002,cabling,xlr,XLR Drum 25m,quantity,,,Cable Store,good,,,,,
+TRUSS-001,trussing,,F34 Square 2m Section,quantity,,,Truss Yard,good,,,,,
+TRUSS-002,trussing,,F34 Square 2m Section,quantity,,,Truss Yard,good,,,,,
+GEL-001,effects,gels,Lee 201 Full CTB Pack,batch,,BATCH-2025-Q1,Gel Drawer,good,,,,1,Lee CTB stock
+,sound,wireless_mics,Shure SLX-D Handheld,serial,SLXD-003-2024,,Sound Rack A,good,,,,,Missing asset_tag - REJECT

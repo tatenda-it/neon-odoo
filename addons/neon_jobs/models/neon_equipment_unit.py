@@ -210,6 +210,51 @@ class NeonEquipmentUnit(models.Model):
         "stock-take-line attestation flow.",
     )
 
+    # ============================================================
+    # P-B14 -- thin @api.model wrapper around the standalone
+    # scripts/load_inventory.py. Lets the smoke + a future wizard
+    # call the loader without re-importing the script every time.
+    # ============================================================
+    @api.model
+    def import_inventory_csv(self, csv_path, dry_run=True,
+                              force_with_rejects=False):
+        """B14 entry point. See scripts/load_inventory.py for the
+        full contract.
+
+        Args:
+            csv_path: absolute path inside the odoo container.
+            dry_run: True = parse + validate + report; False =
+                execute (per-row savepoint).
+            force_with_rejects: when dry_run=False, bypasses the
+                "zero rejects" guard. Use sparingly.
+
+        Returns: report dict (see load_inventory.main).
+        """
+        import importlib.util as _ilu
+        import pathlib as _pl
+        # Resolve the script path from this addon's directory --
+        # this works even when the test DB calls the wrapper from
+        # an odoo shell that has a different cwd.
+        try:
+            from odoo.modules.module import get_module_path
+            mod_path = get_module_path("neon_jobs")
+        except Exception:  # noqa: BLE001
+            mod_path = None
+        if not mod_path:
+            mod_path = str(_pl.Path(__file__).resolve().parent.parent)
+        script_path = (_pl.Path(mod_path)
+                        / "scripts" / "load_inventory.py")
+        if not script_path.exists():
+            raise RuntimeError(
+                "Inventory loader script missing at %s" % script_path)
+        spec = _ilu.spec_from_file_location(
+            "_b14_load_inventory", str(script_path))
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.main(
+            csv_path, execute=(not dry_run),
+            force_with_rejects=force_with_rejects, env=self.env)
+
     _sql_constraints = [
         ("unique_serial_per_product",
          "UNIQUE (product_template_id, serial_number)",
