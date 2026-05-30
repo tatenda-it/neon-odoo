@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        R2 confidentiality (Q28 pattern): accident, case (disciplinary
+        etc.) and overtime are sensitive — visible to OD/MD
+        (group_neon_superuser), HR Admin (group_neon_hr_admin) and the
+        record OWNER only. Handbook acks are owner-scoped too (employees
+        see their own; OD/MD/Admin see all for compliance). Same OR-rule
+        combination as R1a/R1b; perm_unlink=0 everywhere.
+    -->
+    <data>
+        <!-- ===== owner-only read (base.group_user) ===== -->
+        <record id="rule_accident_own" model="ir.rule">
+            <field name="name">Accident: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_accident"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_case_own" model="ir.rule">
+            <field name="name">Case: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_case"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_overtime_own" model="ir.rule">
+            <field name="name">Overtime: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_overtime"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_handbook_ack_own" model="ir.rule">
+            <field name="name">Handbook ack: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_handbook_ack"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- ===== OD/MD + HR Admin: full (read/write/create, no unlink) ===== -->
+        <record id="rule_accident_all" model="ir.rule">
+            <field name="name">Accident: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_accident"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_case_all" model="ir.rule">
+            <field name="name">Case: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_case"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_overtime_all" model="ir.rule">
+            <field name="name">Overtime: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_overtime"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_handbook_ack_all" model="ir.rule">
+            <field name="name">Handbook ack: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_handbook_ack"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+    </data>
+</odoo>

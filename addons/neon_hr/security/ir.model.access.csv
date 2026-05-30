@@ -38,3 +38,18 @@ access_neon_hr_loan_super,neon.hr.loan superuser,model_neon_hr_loan,neon_core.gr
 access_neon_hr_loan_repayment_user,neon.hr.loan.repayment read (own via rule),model_neon_hr_loan_repayment,base.group_user,1,0,0,0
 access_neon_hr_loan_repayment_admin,neon.hr.loan.repayment HR admin,model_neon_hr_loan_repayment,neon_hr.group_neon_hr_admin,1,1,1,0
 access_neon_hr_loan_repayment_super,neon.hr.loan.repayment superuser,model_neon_hr_loan_repayment,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_accident_user,neon.hr.accident read (own via rule),model_neon_hr_accident,base.group_user,1,0,0,0
+access_neon_hr_accident_admin,neon.hr.accident HR admin,model_neon_hr_accident,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_accident_super,neon.hr.accident superuser,model_neon_hr_accident,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_case_user,neon.hr.case read (own via rule),model_neon_hr_case,base.group_user,1,0,0,0
+access_neon_hr_case_admin,neon.hr.case HR admin,model_neon_hr_case,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_case_super,neon.hr.case superuser,model_neon_hr_case,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_overtime_user,neon.hr.overtime read (own via rule),model_neon_hr_overtime,base.group_user,1,0,0,0
+access_neon_hr_overtime_admin,neon.hr.overtime HR admin,model_neon_hr_overtime,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_overtime_super,neon.hr.overtime superuser,model_neon_hr_overtime,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_handbook_user,neon.hr.handbook read (all internal),model_neon_hr_handbook,base.group_user,1,0,0,0
+access_neon_hr_handbook_admin,neon.hr.handbook HR admin,model_neon_hr_handbook,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_handbook_super,neon.hr.handbook superuser,model_neon_hr_handbook,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_handbook_ack_user,neon.hr.handbook.ack read (own via rule),model_neon_hr_handbook_ack,base.group_user,1,0,0,0
+access_neon_hr_handbook_ack_admin,neon.hr.handbook.ack HR admin,model_neon_hr_handbook_ack,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_handbook_ack_super,neon.hr.handbook.ack superuser,model_neon_hr_handbook_ack,neon_core.group_neon_superuser,1,1,1,0

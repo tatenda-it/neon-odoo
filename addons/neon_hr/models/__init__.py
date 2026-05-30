@@ -14,3 +14,8 @@ from . import neon_hr_event_wage       # event wage + freelance grade
 from . import neon_hr_loan             # loan + repayment schedule
 from . import neon_hr_payslip          # payslip + line (engine)
 from . import neon_hr_commission       # sales commission (proposed)
+# ----- R2: accidents/NSSA + disciplinary + TOIL + handbook -----
+from . import neon_hr_accident         # workplace accident + NSSA 14-day AC
+from . import neon_hr_case             # disciplinary/incident/performance/recognition
+from . import neon_hr_overtime         # overtime resolution + TOIL accrual
+from . import neon_hr_handbook         # handbook versions + acks + compliance flag
