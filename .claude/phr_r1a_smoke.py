@@ -488,8 +488,11 @@ from odoo.modules.module import get_module_path
 with open(os.path.join(get_module_path("neon_hr"), "__manifest__.py"),
           "r", encoding="utf-8") as f:
     manifest_src = f.read()
-_check("T-HR-R1a-47", "17.0.1.0.1" in manifest_src,
-       "neon_hr manifest version 17.0.1.0.1")
+# Version-tolerant: R1a shipped 17.0.1.0.1; later releases (R1b → 17.0.3.0.0,
+# R2+ …) legitimately bump it. Assert a valid 17.0.x neon_hr version, not a
+# pinned literal (avoids the stale-version-assertion failure class).
+_check("T-HR-R1a-47", '"version": "17.0.' in manifest_src,
+       "neon_hr manifest carries a 17.0.x version")
 
 # R1b contract — model + field names R1b will reference.
 contract_spec = (
