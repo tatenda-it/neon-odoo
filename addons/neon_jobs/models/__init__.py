@@ -43,3 +43,11 @@ from . import neon_equipment_incident
 from . import neon_equipment_dashboard
 # P-B2 — Conflict Detection Engine (header + line + engine service)
 from . import neon_equipment_conflict
+# P-B3 — AI Deployment Plan (model + helpers; B13 adapter wired
+# via neon_doc_gen depends).
+from . import deployment_plan_call_time_config
+from . import deployment_plan_renderer
+from . import deployment_plan_fact_gatherer
+from . import deployment_plan_validator
+from . import deployment_plan_generator
+from . import neon_deployment_plan

@@ -41,6 +41,7 @@ SMOKES=(
   pb1_datamodel
   pb2_conflict
   pb13_docgen
+  pb3_deployment_plan
   phr_r1a
   phr_r1b_1
   phr_r1b_2
@@ -96,7 +97,7 @@ echo
 echo "================================================="
 echo "BROWSER SMOKES (Playwright, headless)"
 echo "================================================="
-BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11 p6_predeploy_fixes p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1 p8a_m1m3 p8a_m4m5 p8a_m6 p8a_m7 p8a_m8 p8a_m9 p8a_m10 p8a_m11 p8a_m12 p8b p8b_m4 p9m1 p9m1_1 p9m2_pin_modal p9m3_multi_map p12m1_chat p12m1_1_chat p12m2_write pb1_datamodel pb2_conflict pb13_docgen phr_r1a)
+BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11 p6_predeploy_fixes p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1 p8a_m1m3 p8a_m4m5 p8a_m6 p8a_m7 p8a_m8 p8a_m9 p8a_m10 p8a_m11 p8a_m12 p8b p8b_m4 p9m1 p9m1_1 p9m2_pin_modal p9m3_multi_map p12m1_chat p12m1_1_chat p12m2_write pb1_datamodel pb2_conflict pb13_docgen pb3_deployment_plan phr_r1a phr_r1b)
 VENV_PY="${SCRIPT_DIR}/.venv-browser/Scripts/python.exe"
 if [[ ! -x "$VENV_PY" ]] && [[ ! -f "$VENV_PY" ]]; then
   echo "MISSING venv: $VENV_PY"

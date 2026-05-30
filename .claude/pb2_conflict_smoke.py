@@ -600,9 +600,14 @@ from odoo.modules.module import get_module_path
 mfp = os.path.join(get_module_path("neon_jobs"), "__manifest__.py")
 with open(mfp, "r", encoding="utf-8") as f:
     src = f.read()
-_check("T-B2-40",
-       '"version": "17.0.5.0.0"' in src,
-       "neon_jobs version 17.0.5.0.0")
+# Accept >= 17.0.5.0.0 -- B3 bumped to 17.0.6.0.0, subsequent
+# milestones roll forward on the same addon.
+import re as _re
+_m = _re.search(r'"version":\s*"([\d.]+)"', src)
+_ver = tuple(int(x) for x in (_m.group(1) if _m else "0").split("."))
+_check("T-B2-40", _ver >= (17, 0, 5, 0, 0),
+       f"neon_jobs version >= 17.0.5.0.0; "
+       f"got={_m.group(1) if _m else '?'}")
 
 
 # ============================================================

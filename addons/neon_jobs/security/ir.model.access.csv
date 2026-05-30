@@ -141,3 +141,10 @@ access_neon_equipment_conflict_line_user,neon.equipment.conflict.line user (read
 access_neon_equipment_conflict_line_crew_leader,neon.equipment.conflict.line crew_leader (read-only),model_neon_equipment_conflict_line,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
 access_neon_equipment_conflict_line_manager,neon.equipment.conflict.line manager (R/W/C; no unlink — audit),model_neon_equipment_conflict_line,neon_jobs.group_neon_jobs_manager,1,1,1,0
 access_neon_equipment_conflict_line_superuser,neon.equipment.conflict.line superuser (R/W/C; no unlink — audit),model_neon_equipment_conflict_line,neon_core.group_neon_superuser,1,1,1,0
+access_neon_deployment_plan_user,neon.deployment.plan user (read-only),model_neon_deployment_plan,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_deployment_plan_crew_leader,neon.deployment.plan crew_leader (R/W; no unlink),model_neon_deployment_plan,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_deployment_plan_manager,neon.deployment.plan manager (R/W/C; no unlink),model_neon_deployment_plan,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_deployment_plan_superuser,neon.deployment.plan superuser (R/W/C; no unlink),model_neon_deployment_plan,neon_core.group_neon_superuser,1,1,1,0
+access_neon_deployment_plan_config_user,neon.deployment.plan.call.time.config user (read-only),model_neon_deployment_plan_call_time_config,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_deployment_plan_config_manager,neon.deployment.plan.call.time.config manager (R/W),model_neon_deployment_plan_call_time_config,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_deployment_plan_config_superuser,neon.deployment.plan.call.time.config superuser (R/W),model_neon_deployment_plan_call_time_config,neon_core.group_neon_superuser,1,1,1,0
