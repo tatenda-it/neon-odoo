@@ -40,7 +40,14 @@
     # neon.equipment.unit. asset_tag-only idempotency key
     # (gate-1 D3 confirmed). Patch bump -- no schema change, no
     # new pivot model; pure additive feature.
-    "version": "17.0.6.1.0",
+    # 17.0.7.0.0 = P-B4 Sub-hire request drafting + PO draft. NEW
+    # models neon.subhire.request + neon.subhire.request.line.
+    # Reuses B3's DeploymentPlanFactGatherer (no conflict
+    # recomputation). Adds 'purchase' as a hard depends so
+    # purchase.order is available -- prod will auto-install
+    # purchase on next -u. Minor bump (new layer on top of B3 +
+    # B13; not a new central pivot model in the B2/B3 sense).
+    "version": "17.0.7.0.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -79,6 +86,12 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         # for venue mapping. Registers the geo fields the event-job map
         # widget reads via the venue_id related chain.
         "base_geolocalize",
+        # P-B4 -- needed for purchase.order + purchase.order.line.
+        # `-u neon_jobs` will auto-install `purchase` on prod
+        # (standard Odoo Community, well-tested). Gate-1 D9
+        # consciously accepts this. See SubhirePoDraftBuilder for
+        # the integration shape.
+        "purchase",
     ],
     # P-B3 NOTE: neon_doc_gen is NOT a hard depends here because
     # neon_core -> neon_jobs (group cascade) + neon_doc_gen ->
@@ -168,6 +181,9 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         "data/neon_deployment_plan_config_seed.xml",
         "views/neon_deployment_plan_call_time_config_views.xml",
         "views/neon_deployment_plan_views.xml",
+        # P-B4 -- Sub-hire request model + views + menu. Loads
+        # after the Operations submenu (parent) is registered.
+        "views/neon_subhire_request_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

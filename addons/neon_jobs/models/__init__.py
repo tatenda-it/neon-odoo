@@ -51,3 +51,12 @@ from . import deployment_plan_fact_gatherer
 from . import deployment_plan_validator
 from . import deployment_plan_generator
 from . import neon_deployment_plan
+# P-B4 — Sub-hire drafting + PO draft (reuses B3's fact-gather;
+# lazy-imports B13's adapter for the draft generation).
+from . import subhire_request_renderer
+from . import subhire_request_fact_gatherer
+from . import subhire_request_validator
+from . import subhire_request_generator
+from . import subhire_po_draft_builder
+from . import neon_subhire_request
+from . import neon_subhire_request_line

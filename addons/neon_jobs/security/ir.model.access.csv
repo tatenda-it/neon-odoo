@@ -148,3 +148,11 @@ access_neon_deployment_plan_superuser,neon.deployment.plan superuser (R/W/C; no 
 access_neon_deployment_plan_config_user,neon.deployment.plan.call.time.config user (read-only),model_neon_deployment_plan_call_time_config,neon_jobs.group_neon_jobs_user,1,0,0,0
 access_neon_deployment_plan_config_manager,neon.deployment.plan.call.time.config manager (R/W),model_neon_deployment_plan_call_time_config,neon_jobs.group_neon_jobs_manager,1,1,1,0
 access_neon_deployment_plan_config_superuser,neon.deployment.plan.call.time.config superuser (R/W),model_neon_deployment_plan_call_time_config,neon_core.group_neon_superuser,1,1,1,0
+access_neon_subhire_request_user,neon.subhire.request user (read-only),model_neon_subhire_request,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_subhire_request_crew_leader,neon.subhire.request crew_leader (R/W; no unlink),model_neon_subhire_request,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_subhire_request_manager,neon.subhire.request manager (R/W/C; no unlink),model_neon_subhire_request,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_subhire_request_superuser,neon.subhire.request superuser (R/W/C; no unlink),model_neon_subhire_request,neon_core.group_neon_superuser,1,1,1,0
+access_neon_subhire_request_line_user,neon.subhire.request.line user (read-only),model_neon_subhire_request_line,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_subhire_request_line_crew_leader,neon.subhire.request.line crew_leader (R/W; no unlink),model_neon_subhire_request_line,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_subhire_request_line_manager,neon.subhire.request.line manager (R/W/C; no unlink),model_neon_subhire_request_line,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_subhire_request_line_superuser,neon.subhire.request.line superuser (R/W/C; no unlink),model_neon_subhire_request_line,neon_core.group_neon_superuser,1,1,1,0
