@@ -34,3 +34,4 @@ backups/
 # (committed); settings.local.json holds personal accumulated
 # allow-list entries and never goes in the repo.
 .claude/settings.local.json
+addons/neon_jobs/scripts/legacy_workshop*.sql

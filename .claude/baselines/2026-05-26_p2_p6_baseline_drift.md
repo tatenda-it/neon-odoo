@@ -178,6 +178,18 @@ sequence (B1 → B2 → B3 → B14 → R1a → R1b → R2 → B4 → B5 → R3a)
 remediation as the other p2/p6 baselined items: fresh-DB re-init when
 fixture pollution becomes blocking.
 
+### pb2_conflict — 34/35 (T-B2-28)
+`sub_hire_priority == 1` assertion expects the probe product to land
+at priority slot 1 in a single-product scenario; got priority=3 on
+the dev DB. The conflict engine assigns priority by competing-event
+start time across the cluster, so slot 1+2 are taken by pre-existing
+PB14B/PB4/PB5/R3a fixtures whose events sit earlier on the calendar
+than the probe scenario. NOT introduced by PB14b's loader extension
+or migration script (neither touches priority computation or the
+conflict engine). Same class as p2m7-T2: an "isolated DB assumes
+empty" test failing on a long-lived dev DB. On a fresh DB this
+passes. Surfaced 2026-06-01 during the PB14b regression run.
+
 ### Dev-environment artifacts (NOT failures — future triage)
 1. **Stale bind mount** — the dev container auto-restarted mid-run and
    returned on a stale Docker Desktop mount; every neon module failed

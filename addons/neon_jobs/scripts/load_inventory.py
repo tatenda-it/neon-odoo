@@ -14,13 +14,19 @@ content migration pattern. Called via:
         -c "exec(open('/mnt/extra-addons/neon_jobs/scripts/load_inventory.py').read())"
     main('/path/to/inventory.csv', execute=False)
 
-⚠️ DECISION (B14, D3): idempotency key = asset_tag ONLY. Rows
-without asset_tag are REJECTED. Forces good data hygiene and uses
-the existing SQL UNIQUE constraint as the dedup contract.
-NOTE-TO-OPS: bulk quantity-tracked items (cabling drums, truss
-segments, mic packs) STILL need a per-unit asset tag in the source
-CSV. Lisa should sign off on the tagging convention before the
-real load.
+⚠️ DECISION (B14, D3 -- v2 from B14b): idempotency key is asset_tag
+for SERIAL and BATCH rows; for QUANTITY rows, asset_tag is OPTIONAL.
+Quantity-row idempotency = (resolved_product_template_id,
+resolved_category_id, workshop_name, no_serial, no_asset_tag) --
+re-running the same CSV UPDATES the existing matching row instead
+of creating a duplicate. This relaxation reconciles the original
+B14 "asset_tag on everything" rule with the Phase-5 quantity-
+tracking design (one row carrying the count, not N tagged units --
+the legacy migration B14b drives this need).
+NOTE-TO-OPS: SERIAL rows STILL require asset_tag (per-unit identity);
+the migration script auto-generates them from a stable legacy key
+when the source lacks one. Lisa should sign off on the tagging
+convention before the real load.
 
 ⚠️ DECISION (B14, D5): top-level categories REJECT-on-unknown
 (the 9 seeded codes are the contract); subcategories + products
@@ -206,6 +212,7 @@ def _build_plan(env, rows):
     Unit = env["neon.equipment.unit"].sudo()
 
     seen_asset_tags_this_run = set()
+    seen_quantity_keys_this_run = set()
     plan = []
     for row_num, row in rows:
         entry = {
@@ -216,20 +223,19 @@ def _build_plan(env, rows):
             "resolved_category_id": 0,
             "resolved_product_id": 0,
             "existing_unit_id": 0,
+            "is_quantity_row": False,
         }
-        # Sequential validation: each failure short-circuits with
-        # a clear reason.
-        if not entry["asset_tag"]:
-            entry["reason"] = (
-                "no asset_tag (idempotency key required per B14 D3 "
-                "-- assign one in the source CSV)")
-            plan.append(entry); continue
-        if entry["asset_tag"] in seen_asset_tags_this_run:
-            entry["reason"] = (
-                "asset_tag %r duplicated within this CSV "
-                "(rows must be unique)") % entry["asset_tag"]
-            plan.append(entry); continue
-        seen_asset_tags_this_run.add(entry["asset_tag"])
+        # B14b D3-v2: a row WITHOUT asset_tag is allowed ONLY if
+        # tracking_mode='quantity'. Defer that decision to the
+        # tracking-mode resolution below; for now, capture the
+        # asset_tag (if any) and check uniqueness on it.
+        if entry["asset_tag"]:
+            if entry["asset_tag"] in seen_asset_tags_this_run:
+                entry["reason"] = (
+                    "asset_tag %r duplicated within this CSV "
+                    "(rows must be unique)") % entry["asset_tag"]
+                plan.append(entry); continue
+            seen_asset_tags_this_run.add(entry["asset_tag"])
 
         # Required fields
         if not row.get("category_code"):
@@ -297,6 +303,31 @@ def _build_plan(env, rows):
             entry["reason"] = (
                 "tracking_mode='batch' requires batch_code")
             plan.append(entry); continue
+        # B14b D3-v2: asset_tag required for serial + batch; OPTIONAL
+        # for quantity. If a serial/batch row has no asset_tag, REJECT
+        # with the original B14 message. Quantity rows without
+        # asset_tag dedup against (cat, workshop_name) below.
+        if not entry["asset_tag"]:
+            if tm != "quantity":
+                entry["reason"] = (
+                    "no asset_tag (idempotency key required per "
+                    "B14 D3 for tracking_mode=%r -- only quantity "
+                    "rows may omit asset_tag per B14b D3-v2)") % tm
+                plan.append(entry); continue
+            entry["is_quantity_row"] = True
+            # Within-CSV dedup for quantity rows: same
+            # (cat, workshop_name) -- second occurrence is a CSV
+            # bug (would silently merge into the first on execute).
+            q_key = (cat_code, row.get("subcategory_code") or "",
+                       row["workshop_name"])
+            if q_key in seen_quantity_keys_this_run:
+                entry["reason"] = (
+                    "quantity row duplicated within CSV: "
+                    "(category=%r, subcategory=%r, workshop_name="
+                    "%r). Collapse upstream or split into "
+                    "distinct workshop_names.") % q_key
+                plan.append(entry); continue
+            seen_quantity_keys_this_run.add(q_key)
 
         # Condition + threshold + numeric fields
         cond = (row.get("condition_status") or "good").lower()
@@ -373,19 +404,50 @@ def _build_plan(env, rows):
             }
             entry["resolved_tracking_mode"] = tm
 
-        # Existing unit lookup by asset_tag
-        existing_unit = Unit.search(
-            [("asset_tag", "=", entry["asset_tag"])], limit=1)
-        if existing_unit:
-            entry["existing_unit_id"] = existing_unit.id
-            entry["action"] = "UPDATE"
-            entry["reason"] = (
-                "asset_tag matches existing unit id=%s -- update "
-                "mapped fields"
-            ) % existing_unit.id
+        # Existing unit lookup
+        if entry["is_quantity_row"]:
+            # B14b D3-v2: dedup by (product, no asset_tag, no
+            # serial). Only meaningful when we already resolved
+            # the product (subcategory + product create both
+            # deferred -> create-new on execute).
+            if (entry.get("resolved_product_id") and
+                    not entry.get("create_product")):
+                existing_unit = Unit.search([
+                    ("product_template_id", "=",
+                     entry["resolved_product_id"]),
+                    ("asset_tag", "in", (False, "")),
+                    ("serial_number", "in", (False, "")),
+                    ("active", "=", True),
+                ], limit=1)
+                if existing_unit:
+                    entry["existing_unit_id"] = existing_unit.id
+                    entry["action"] = "UPDATE"
+                    entry["reason"] = (
+                        "quantity row matches existing unit id=%s "
+                        "(product+no-asset+no-serial) -- update "
+                        "mapped fields") % existing_unit.id
+                else:
+                    entry["action"] = "CREATE"
+                    entry["reason"] = (
+                        "new quantity row -- create one unit "
+                        "(no asset_tag, no serial)")
+            else:
+                entry["action"] = "CREATE"
+                entry["reason"] = (
+                    "new quantity row (product create deferred to "
+                    "execute) -- create one unit")
         else:
-            entry["action"] = "CREATE"
-            entry["reason"] = "new asset_tag -- create unit"
+            existing_unit = Unit.search(
+                [("asset_tag", "=", entry["asset_tag"])], limit=1)
+            if existing_unit:
+                entry["existing_unit_id"] = existing_unit.id
+                entry["action"] = "UPDATE"
+                entry["reason"] = (
+                    "asset_tag matches existing unit id=%s -- "
+                    "update mapped fields") % existing_unit.id
+            else:
+                entry["action"] = "CREATE"
+                entry["reason"] = "new asset_tag -- create unit"
         plan.append(entry)
     return plan
 
@@ -471,12 +533,35 @@ def _apply_row(env, Cat, Product, Unit, entry):
             product_id = new_product.id
         entry["resolved_product_id"] = product_id
 
+    # B14b D3-v2: for quantity rows whose product was created in
+    # THIS execute pass, the plan-time dedup couldn't find an
+    # existing unit. Re-check now (a prior row in this same batch
+    # may have created the product + the matching quantity unit;
+    # we must reuse, not insert a duplicate).
+    if (entry.get("is_quantity_row")
+            and not entry.get("existing_unit_id")):
+        existing = Unit.search([
+            ("product_template_id", "=", product_id),
+            ("asset_tag", "in", (False, "")),
+            ("serial_number", "in", (False, "")),
+            ("active", "=", True),
+        ], limit=1)
+        if existing:
+            entry["existing_unit_id"] = existing.id
+            entry["action"] = "UPDATE"
+            entry["reason"] = (
+                "quantity row matches existing unit id=%s "
+                "(re-checked at execute) -- update mapped fields"
+            ) % existing.id
+
     # Build the unit vals
     vals = {
         "product_template_id": product_id,
-        "asset_tag": entry["asset_tag"],
         "condition_status": entry["resolved_condition"],
     }
+    # asset_tag only when present (quantity rows may have none)
+    if entry["asset_tag"]:
+        vals["asset_tag"] = entry["asset_tag"]
     if row.get("serial_number"):
         vals["serial_number"] = row["serial_number"]
     if row.get("batch_code"):
@@ -495,6 +580,10 @@ def _apply_row(env, Cat, Product, Unit, entry):
         # Don't touch serial_number on UPDATE -- the SQL constraint
         # on (product, serial) would fire if we re-assigned.
         vals.pop("serial_number", None)
+        # Don't churn asset_tag on update either (it's the dedup
+        # key for serial/batch; rewriting on UPDATE would mask a
+        # real key change as a no-op).
+        vals.pop("asset_tag", None)
         # Bypass the state-machine readonly guard.
         unit.with_context(_allow_state_write=True).write(vals)
     else:
