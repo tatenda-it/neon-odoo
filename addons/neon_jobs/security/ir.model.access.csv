@@ -156,3 +156,7 @@ access_neon_subhire_request_line_user,neon.subhire.request.line user (read-only)
 access_neon_subhire_request_line_crew_leader,neon.subhire.request.line crew_leader (R/W; no unlink),model_neon_subhire_request_line,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
 access_neon_subhire_request_line_manager,neon.subhire.request.line manager (R/W/C; no unlink),model_neon_subhire_request_line,neon_jobs.group_neon_jobs_manager,1,1,1,0
 access_neon_subhire_request_line_superuser,neon.subhire.request.line superuser (R/W/C; no unlink),model_neon_subhire_request_line,neon_core.group_neon_superuser,1,1,1,0
+access_neon_event_reconciliation_user,neon.event.reconciliation user (read-only),model_neon_event_reconciliation,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_event_reconciliation_crew_leader,neon.event.reconciliation crew_leader (R/W; no unlink),model_neon_event_reconciliation,neon_jobs.group_neon_jobs_crew_leader,1,1,1,0
+access_neon_event_reconciliation_manager,neon.event.reconciliation manager (R/W/C; no unlink),model_neon_event_reconciliation,neon_jobs.group_neon_jobs_manager,1,1,1,0
+access_neon_event_reconciliation_superuser,neon.event.reconciliation superuser (R/W/C; no unlink),model_neon_event_reconciliation,neon_core.group_neon_superuser,1,1,1,0

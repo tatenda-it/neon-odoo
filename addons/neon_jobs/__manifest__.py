@@ -47,7 +47,15 @@
     # purchase.order is available -- prod will auto-install
     # purchase on next -u. Minor bump (new layer on top of B3 +
     # B13; not a new central pivot model in the B2/B3 sense).
-    "version": "17.0.7.0.0",
+    # 17.0.8.0.0 = P-B5 Post-event reconciliation. NEW model
+    # neon.event.reconciliation. Reuses B3's fact-gatherer +
+    # snapshots the active B3 plan + B4 sub-hire requests +
+    # equipment condition deltas + planned-vs-actual cost
+    # variance (READ-ONLY on finance models via sudo()). Lazy-
+    # imports the B13 adapter (cycle pattern). NO writes to any
+    # financial model; condition_status never auto-flipped. Minor
+    # bump (new backward-view layer on top of B3/B4).
+    "version": "17.0.8.0.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
@@ -184,6 +192,10 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
         # P-B4 -- Sub-hire request model + views + menu. Loads
         # after the Operations submenu (parent) is registered.
         "views/neon_subhire_request_views.xml",
+        # P-B5 -- Post-event reconciliation model + views + menu.
+        # Loads after the B3/B4 views so any future cross-refs
+        # resolve.
+        "views/neon_event_reconciliation_views.xml",
     ],
     "assets": {
         "web.assets_backend": [
