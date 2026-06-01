@@ -92,6 +92,29 @@ def backfill(env, execute=False, force=False):
             "new_value": None,
         }
         if not legacy_qtys:
+            # B14c follow-up (2026-06-01 prod-load gap): when the
+            # migrate script's notes carry no `legacy_qty=N` token
+            # (because legacy total_quantity was 1 -- the script
+            # only writes the token when > 1), fall back to the
+            # principled count of representing unit rows. One
+            # unit row per legacy product == 1 of stock. This
+            # only fires when:
+            #   - the product is quantity/batch-tracked
+            #   - it has at least one representing unit
+            #   - its current quantity_on_hand is 0
+            # (the force-protection branch below still wins when
+            # the current value is non-zero, so manual edits stay
+            # safe.)
+            if units and entry["current_quantity_on_hand"] == 0:
+                new_value = len(units)
+                entry["action"] = "WRITE"
+                entry["new_value"] = new_value
+                entry["reason"] = (
+                    "no legacy_qty=N in notes; fell back to "
+                    "len(units)=%d (legacy total_quantity was 1 "
+                    "-- the script only emits legacy_qty=N when "
+                    "> 1)") % new_value
+                plan.append(entry); continue
             entry["reason"] = (
                 "no unit with legacy_qty=N in notes; left as-is")
             plan.append(entry); continue
