@@ -60,3 +60,11 @@ from . import subhire_request_generator
 from . import subhire_po_draft_builder
 from . import neon_subhire_request
 from . import neon_subhire_request_line
+# P-B5 — Post-event reconciliation (reuses B3's fact-gather; reads
+# B3 plan + B4 sub-hire; lazy-imports B13 adapter; READ-ONLY on
+# finance models via sudo()).
+from . import event_reconciliation_renderer
+from . import event_reconciliation_fact_gatherer
+from . import event_reconciliation_validator
+from . import event_reconciliation_generator
+from . import neon_event_reconciliation
