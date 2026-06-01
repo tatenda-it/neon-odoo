@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon HR",
-    "version": "17.0.4.0.0",
-    "summary": "People R1a/R1b/R2 — employee master, contracts, docs, "
+    "version": "17.0.5.0.0",
+    "summary": "People R1a/R1b/R2/R3a — employee master, contracts, docs, "
                "leave, payroll, wages, loans, accidents, discipline, "
-               "TOIL, handbook",
+               "TOIL, handbook, driver licences + competency gating",
     "description": """
 Neon HR — Release 1a (Employee Foundation)
 ===========================================
@@ -39,6 +39,7 @@ Gate-2 summary.
         "security/neon_hr_record_rules.xml",
         "security/neon_hr_payroll_rules.xml",
         "security/neon_hr_r2_rules.xml",
+        "security/neon_hr_r3_rules.xml",
         "data/neon_hr_document_type_data.xml",
         "data/neon_hr_category_data.xml",
         "data/contract_templates.xml",
@@ -48,6 +49,8 @@ Gate-2 summary.
         "data/neon_hr_payroll_config.xml",
         "data/neon_hr_r2_data.xml",
         "data/ir_cron_accident_nssa.xml",
+        "data/neon_hr_r3_data.xml",
+        "data/ir_cron_licence_expiry.xml",
         "views/neon_hr_category_views.xml",
         "views/neon_hr_document_views.xml",
         "views/hr_employee_views.xml",
@@ -55,6 +58,7 @@ Gate-2 summary.
         "views/neon_hr_leave_views.xml",
         "views/neon_hr_payroll_views.xml",
         "views/neon_hr_r2_views.xml",
+        "views/neon_hr_r3_views.xml",
         "views/neon_hr_menus.xml",
     ],
     "installable": True,

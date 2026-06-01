@@ -24,6 +24,7 @@ from odoo import _, api, fields, models
 NEON_HR_TRIGGERS = [
     ("contract_expiry_30days", "Contract Expiring / Expired"),
     ("accident_nssa_14day", "Workplace Accident — NSSA 14-Day Deadline"),
+    ("licence_expiry", "Driver Licence Expiring / Expired"),
 ]
 
 

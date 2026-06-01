@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================ -->
+    <!-- R3a: Driver Licences                                         -->
+    <!-- ============================================================ -->
+    <record id="view_neon_hr_licence_tree" model="ir.ui.view">
+        <field name="model">neon.hr.licence</field>
+        <field name="arch" type="xml">
+            <tree decoration-danger="state == 'expired'"
+                  decoration-warning="state == 'expiring'"
+                  decoration-success="state == 'valid'">
+                <field name="employee_id"/>
+                <field name="licence_class"/>
+                <field name="licence_number"/>
+                <field name="issue_date"/>
+                <field name="expiry_date"/>
+                <field name="days_to_expiry" string="Days to Expiry"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'valid'"
+                       decoration-warning="state == 'expiring'"
+                       decoration-danger="state == 'expired'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_hr_licence_form" model="ir.ui.view">
+        <field name="model">neon.hr.licence</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Expired"
+                            bg_color="text-bg-danger"
+                            invisible="state != 'expired'"/>
+                    <group>
+                        <group string="Licence">
+                            <field name="employee_id"/>
+                            <field name="licence_class"/>
+                            <field name="licence_number"/>
+                            <field name="issuing_authority"/>
+                        </group>
+                        <group string="Validity">
+                            <field name="issue_date"/>
+                            <field name="expiry_date"/>
+                            <field name="state" widget="badge"
+                                   decoration-success="state == 'valid'"
+                                   decoration-warning="state == 'expiring'"
+                                   decoration-danger="state == 'expired'"/>
+                            <field name="days_to_expiry"/>
+                        </group>
+                    </group>
+                    <field name="attachment_ids" widget="many2many_binary"/>
+                    <field name="notes" placeholder="Notes..."/>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_neon_hr_licence_search" model="ir.ui.view">
+        <field name="model">neon.hr.licence</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_id"/>
+                <field name="licence_number"/>
+                <filter name="f_expired" string="Expired"
+                        domain="[('state', '=', 'expired')]"/>
+                <filter name="f_expiring" string="Expiring Soon"
+                        domain="[('state', '=', 'expiring')]"/>
+                <filter name="f_valid" string="Valid"
+                        domain="[('state', '=', 'valid')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_state" string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="g_class" string="Class"
+                            context="{'group_by': 'licence_class'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_hr_licence" model="ir.actions.act_window">
+        <field name="name">Driver Licences</field>
+        <field name="res_model">neon.hr.licence</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_neon_hr_licence_search"/>
+        <field name="context">{'search_default_f_expiring': 1, 'search_default_f_expired': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">No driver licences captured yet.</p>
+            <p>A driver is any employee holding a current (non-expired) licence.</p>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- R3a: Competency catalog + role requirement map               -->
+    <!-- ============================================================ -->
+    <record id="view_neon_hr_competency_tree" model="ir.ui.view">
+        <field name="model">neon.hr.competency</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="requires_expiry"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_neon_hr_competency" model="ir.actions.act_window">
+        <field name="name">Competencies</field>
+        <field name="res_model">neon.hr.competency</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">No competencies defined yet.</p>
+            <p>Seeded empty — add the skills/certifications you gate crew roles on.</p>
+        </field>
+    </record>
+
+    <record id="view_neon_hr_role_competency_tree" model="ir.ui.view">
+        <field name="model">neon.hr.role.competency</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="crew_role"/>
+                <field name="competency_ids" widget="many2many_tags"/>
+                <field name="active" widget="boolean_toggle"/>
+                <field name="note"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_neon_hr_role_competency" model="ir.actions.act_window">
+        <field name="name">Role Competency Requirements</field>
+        <field name="res_model">neon.hr.role.competency</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">No role requirements defined yet.</p>
+            <p>Seeded empty (flagged for ops). Map a crew role to the competencies it requires to start gating it.</p>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- R3a: Crew Assignment Gate (commercial.job.crew extension)    -->
+    <!-- ============================================================ -->
+    <record id="view_crew_gate_tree" model="ir.ui.view">
+        <field name="model">commercial.job.crew</field>
+        <field name="arch" type="xml">
+            <tree create="false"
+                  decoration-danger="neon_gate_state == 'licence_block'"
+                  decoration-warning="neon_gate_state in ('competency_warning', 'no_employee')"
+                  decoration-success="neon_gate_state == 'ok'">
+                <field name="job_id"/>
+                <field name="partner_id"/>
+                <field name="role"/>
+                <field name="neon_employee_id"/>
+                <field name="neon_gate_state" widget="badge"
+                       decoration-success="neon_gate_state == 'ok'"
+                       decoration-danger="neon_gate_state == 'licence_block'"
+                       decoration-warning="neon_gate_state in ('competency_warning', 'no_employee')"
+                       decoration-info="neon_gate_state == 'overridden'"/>
+                <field name="neon_gate_message"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_crew_gate_search" model="ir.ui.view">
+        <field name="model">commercial.job.crew</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="job_id"/>
+                <field name="partner_id"/>
+                <filter name="f_block" string="Licence Block"
+                        domain="[('neon_gate_state', '=', 'licence_block')]"/>
+                <filter name="f_warn" string="Competency Gap"
+                        domain="[('neon_gate_state', '=', 'competency_warning')]"/>
+                <filter name="f_noemp" string="No Employee Record"
+                        domain="[('neon_gate_state', '=', 'no_employee')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_gate" string="Gate State"
+                            context="{'group_by': 'neon_gate_state'}"/>
+                    <filter name="g_role" string="Role"
+                            context="{'group_by': 'role'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_hr_crew_gate" model="ir.actions.act_window">
+        <field name="name">Crew Assignment Gate</field>
+        <field name="res_model">commercial.job.crew</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_crew_gate_tree"/>
+        <field name="search_view_id" ref="view_crew_gate_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">No crew assignments to gate.</p>
+            <p>Driver-role assignments without a valid licence are blocked; competency gaps warn.</p>
+        </field>
+    </record>
+
+    <!-- Surface the gate on the native crew form (add fields + override button). -->
+    <record id="view_crew_form_neon_gate" model="ir.ui.view">
+        <field name="model">commercial.job.crew</field>
+        <field name="inherit_id" ref="neon_jobs.commercial_job_crew_view_form"/>
+        <field name="arch" type="xml">
+            <field name="role" position="after">
+                <field name="neon_employee_id"/>
+                <field name="neon_gate_state" widget="badge"
+                       decoration-success="neon_gate_state == 'ok'"
+                       decoration-danger="neon_gate_state == 'licence_block'"
+                       decoration-warning="neon_gate_state in ('competency_warning', 'no_employee')"
+                       decoration-info="neon_gate_state == 'overridden'"/>
+                <field name="neon_gate_message"/>
+                <field name="neon_competency_override"/>
+                <button name="action_neon_override_competency" type="object"
+                        string="Override Competency Gate (OD/MD)"
+                        class="btn-warning"
+                        confirm="Override the competency gate? OD/MD decision. (Does NOT bypass the driver-licence block.)"
+                        invisible="neon_gate_state != 'competency_warning'"/>
+            </field>
+        </field>
+    </record>
+</odoo>

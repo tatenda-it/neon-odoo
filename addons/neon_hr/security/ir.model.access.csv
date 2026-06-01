@@ -53,3 +53,15 @@ access_neon_hr_handbook_super,neon.hr.handbook superuser,model_neon_hr_handbook,
 access_neon_hr_handbook_ack_user,neon.hr.handbook.ack read (own via rule),model_neon_hr_handbook_ack,base.group_user,1,0,0,0
 access_neon_hr_handbook_ack_admin,neon.hr.handbook.ack HR admin,model_neon_hr_handbook_ack,neon_hr.group_neon_hr_admin,1,1,1,0
 access_neon_hr_handbook_ack_super,neon.hr.handbook.ack superuser,model_neon_hr_handbook_ack,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_licence_user,neon.hr.licence read (own via rule),model_neon_hr_licence,base.group_user,1,0,0,0
+access_neon_hr_licence_admin,neon.hr.licence HR admin,model_neon_hr_licence,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_licence_super,neon.hr.licence superuser,model_neon_hr_licence,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_competency_user,neon.hr.competency read (all internal),model_neon_hr_competency,base.group_user,1,0,0,0
+access_neon_hr_competency_admin,neon.hr.competency HR admin,model_neon_hr_competency,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_competency_super,neon.hr.competency superuser,model_neon_hr_competency,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_emp_competency_user,neon.hr.employee.competency read (own via rule),model_neon_hr_employee_competency,base.group_user,1,0,0,0
+access_neon_hr_emp_competency_admin,neon.hr.employee.competency HR admin,model_neon_hr_employee_competency,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_emp_competency_super,neon.hr.employee.competency superuser,model_neon_hr_employee_competency,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_role_competency_user,neon.hr.role.competency read (all internal),model_neon_hr_role_competency,base.group_user,1,0,0,0
+access_neon_hr_role_competency_admin,neon.hr.role.competency HR admin,model_neon_hr_role_competency,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_role_competency_super,neon.hr.role.competency superuser,model_neon_hr_role_competency,neon_core.group_neon_superuser,1,1,1,0
