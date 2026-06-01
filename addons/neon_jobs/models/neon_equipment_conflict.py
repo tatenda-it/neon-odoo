@@ -499,18 +499,49 @@ class ConflictEngine:
     def _available_for_product(self, product_id):
         """D3 -- window-relative availability per gate-1.
 
-        available = total_owned
-                    - units in state='transferred' (sub-hired out)
-                    - units with condition_status != 'good'
+        SERIAL products (B2 original behaviour, UNCHANGED):
+            available = total_owned
+                        - units in state='transferred' (sub-hired)
+                        - units with condition_status != 'good'
+
+        QUANTITY / BATCH products (B14c D2 + D3):
+            available = max(0, product.quantity_on_hand
+                              - (quantity_on_hand if the single
+                                 representing unit is hard-unavailable
+                                 or non-good, else 0))
+            i.e. quantity products store the count on the product;
+            their single unit row is binary (all-or-nothing) for
+            sub-hired / non-good state. A future enhancement could
+            model fractional sub-hires for bulk SKUs (⚠️ B14c D3:
+            flagged, not implemented this milestone).
 
         Does NOT subtract reservations (overlapping reservations
         come in via required_qty; non-overlapping reservations are
         irrelevant to this cluster).
         """
+        Product = self.env["product.template"].sudo()
+        product = Product.browse(product_id).exists()
+        if not product:
+            return 0
+        tm = product.tracking_mode or "serial"
         units = self.Unit.search([
             ("product_template_id", "=", product_id),
             ("active", "=", True),
         ])
+        if tm in ("quantity", "batch"):
+            qoh = int(product.quantity_on_hand or 0)
+            if not units:
+                return max(0, qoh)
+            # Binary unavailability: if ANY representing unit is
+            # hard-unavailable or non-good, treat the whole on-
+            # hand count as unavailable. Quantity products
+            # canonically have ONE unit row; defensive against
+            # multiple rows by checking the union.
+            blocked = bool(units.filtered(
+                lambda u: u.state in _UNIT_UNAVAILABLE_STATES_HARD
+                           or u.condition_status != "good"))
+            return 0 if blocked else max(0, qoh)
+        # SERIAL path (unchanged behaviour)
         total = len(units)
         if not total:
             return 0

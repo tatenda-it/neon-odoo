@@ -178,6 +178,28 @@ sequence (B1 → B2 → B3 → B14 → R1a → R1b → R2 → B4 → B5 → R3a)
 remediation as the other p2/p6 baselined items: fresh-DB re-init when
 fixture pollution becomes blocking.
 
+### p8a_m7_alerts — 28/30 (T8808 + T8814)
+T8808 expects a pending_approval alert visible to an approver-tier
+user; got 0. T8814 depends on T8808 (fingerprint format). Cause:
+existing pending_approval quotes on the dev DB are owned by users
+whose tier mapping has drifted, OR the alert mechanism's
+fingerprint-week scoping has already dismissed today's alerts
+from earlier runs. NOT introduced by B14c: T8808/T8814 test finance
+pending_approval alerts; B14c only modifies product.template +
+B2._available_for_product() (equipment_conflict path, separate
+alert type). On a fresh DB this passes. Surfaced 2026-06-01 during
+the PB14c regression run.
+
+### p9m2_pin_modal — 11/12 (T9207)
+T9207 expects a TBD-style row (event with the placeholder TBD
+venue partner) to produce a row dict with default-safe map keys
+(venue_id=False, all map keys present). Got: row not found by id
+because no TBD-venue events exist on the dev DB at the test's
+expected date offset. NOT introduced by B14c: tests venue UI
+data shape, not inventory. On a fresh DB (with the TBD venue
+partner present + the test creating the event) this passes.
+Surfaced 2026-06-01 during the PB14c regression run.
+
 ### Dev-environment artifacts (NOT failures — future triage)
 1. **Stale bind mount** — the dev container auto-restarted mid-run and
    returned on a stale Docker Desktop mount; every neon module failed

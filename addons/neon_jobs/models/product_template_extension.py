@@ -60,6 +60,22 @@ class ProductTemplate(models.Model):
         "product_template_id",
         string="Units",
     )
+    # ⚠️ DECISION (B14c, D1): quantity_on_hand lives on
+    # product.template (one number per product) per the D1 follow-
+    # up spec. Semantically meaningful ONLY for tracking_mode in
+    # ('quantity', 'batch'). For serial products the count comes
+    # from len(equipment_unit_ids filtered to good + active) -- the
+    # serial path is unchanged.
+    quantity_on_hand = fields.Integer(
+        string="Quantity On Hand",
+        default=0,
+        help="Total physical count on hand for quantity/batch-"
+        "tracked products. For serial-tracked products, "
+        "availability is computed from per-unit rows -- this field "
+        "is ignored. Populated by the B14b legacy migration via "
+        "the B14c back-fill script that parses 'legacy_qty=N' from "
+        "unit notes.",
+    )
     total_units = fields.Integer(
         compute="_compute_unit_counts",
         string="Total Units",

@@ -55,7 +55,18 @@
     # imports the B13 adapter (cycle pattern). NO writes to any
     # financial model; condition_status never auto-flipped. Minor
     # bump (new backward-view layer on top of B3/B4).
-    "version": "17.0.8.0.0",
+    # 17.0.8.1.0 = P-B14c quantity_on_hand field + B2 availability
+    # branch (D1 follow-up). Adds Integer quantity_on_hand to
+    # product.template (one number per product, semantically
+    # meaningful only for tracking_mode in ('quantity','batch'));
+    # B2._available_for_product() now branches on tracking_mode --
+    # serial path UNCHANGED, quantity/batch reads
+    # product.quantity_on_hand. Standalone back-fill script
+    # scripts/backfill_quantity_on_hand.py parses 'legacy_qty=N'
+    # from unit notes (idempotent; force=False default prevents
+    # clobbering manual edits). Patch bump -- additive field +
+    # availability branch; no new pivot model.
+    "version": "17.0.8.1.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
