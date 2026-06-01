@@ -19,3 +19,7 @@ from . import neon_hr_accident         # workplace accident + NSSA 14-day AC
 from . import neon_hr_case             # disciplinary/incident/performance/recognition
 from . import neon_hr_overtime         # overtime resolution + TOIL accrual
 from . import neon_hr_handbook         # handbook versions + acks + compliance flag
+# ----- R3a: fleet/driver licences + competency gating -----
+from . import neon_hr_licence          # driver licence + expiry AC alert
+from . import neon_hr_competency       # competency catalog + employee + role map
+from . import commercial_job_crew_ext  # extend commercial.job.crew: gate

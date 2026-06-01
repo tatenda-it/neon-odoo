@@ -92,8 +92,17 @@ if not ejob:
     mjob = env['commercial.job'].sudo().search(
         [('name', '=', 'PHR-R1B JOB')], limit=1)
     if not mjob:
+        # commercial_job.venue_id is required (since p2.m1). Resolve a
+        # venue partner (create one if the DB has none) so the seed
+        # never trips the NOT NULL constraint on a fresh DB.
+        venue = env['res.partner'].sudo().search(
+            [('is_venue', '=', True)], limit=1)
+        if not venue:
+            venue = env['res.partner'].sudo().create(
+                {'name': 'PHR-R1B Venue', 'is_venue': True})
         mjob = env['commercial.job'].sudo().create({
             'name': 'PHR-R1B JOB', 'partner_id': partner.id,
+            'venue_id': venue.id,
             'state': 'active', 'event_date': today})
     ejob = env['commercial.event.job'].sudo().create({
         'name': 'PHR-R1B EVENT', 'commercial_job_id': mjob.id,

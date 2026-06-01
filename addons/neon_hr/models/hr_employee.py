@@ -69,6 +69,22 @@ class HrEmployee(models.Model):
         "confirmation).",
     )
 
+    # ----- R3a: fleet / competency ----------------------------------
+    licence_ids = fields.One2many(
+        "neon.hr.licence", "employee_id", string="Driver Licences",
+    )
+    employee_competency_ids = fields.One2many(
+        "neon.hr.employee.competency", "employee_id",
+        string="Competencies",
+    )
+    is_driver = fields.Boolean(
+        compute="_compute_is_driver", store=True, tracking=True,
+        help="True when the employee holds at least one current "
+        "(non-expired) driver licence. A driver is defined by holding "
+        "a valid licence — NOT by category (R3a).",
+    )
+    valid_licence_count = fields.Integer(compute="_compute_is_driver")
+
     # ----------------------------------------------------------------
     @api.depends(
         "neon_category_id",
@@ -102,6 +118,31 @@ class HrEmployee(models.Model):
                 and (not c.date_end or c.date_end >= today)
             )
             emp.has_valid_contract = bool(valid)
+
+    # ----- R3a: fleet / competency ----------------------------------
+    @api.depends("licence_ids.state")
+    def _compute_is_driver(self):
+        for emp in self:
+            valid = emp.licence_ids.filtered(
+                lambda l: l.state in ("valid", "expiring"))
+            emp.valid_licence_count = len(valid)
+            emp.is_driver = bool(valid)
+
+    def _has_valid_licence(self, licence_class=None):
+        """A current (non-expired) licence. ``licence_class`` is accepted
+        for the R3b class-match API but IGNORED in R3a (any valid licence
+        qualifies — Gate-1 decision)."""
+        self.ensure_one()
+        return any(l.state in ("valid", "expiring")
+                   for l in self.licence_ids)
+
+    def _missing_competencies(self, competencies):
+        """Return the subset of ``competencies`` the employee does NOT
+        hold in a current (non-expired) state."""
+        self.ensure_one()
+        held = self.employee_competency_ids.filtered(
+            lambda c: c.state in ("valid", "expiring")).mapped("competency_id")
+        return competencies - held
 
     # ----- Checklist generation -------------------------------------
     def _sync_compliance_documents(self):

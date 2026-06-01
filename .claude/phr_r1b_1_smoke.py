@@ -147,13 +147,19 @@ _check("T-R1b1-17", HRHmgr in od_user.groups_id,
 
 # ---- manifest ----
 import os
+import re
 from odoo.modules.module import get_module_path
 with open(os.path.join(get_module_path("neon_hr"), "__manifest__.py"),
           encoding="utf-8") as f:
     _src = f.read()
-    # R1b-1 bumped to 17.0.2.0.0; R1b-2 (same branch/deploy) to 17.0.3.0.0.
-    _check("T-R1b1-18", ("17.0.2.0.0" in _src or "17.0.3.0.0" in _src),
-           "neon_hr manifest version is R1b (>= 17.0.2.0.0)")
+    # R1b-1 bumped to 17.0.2.0.0. Relaxed from a literal substring to a
+    # >= tuple check so later milestones (R2 -> 17.0.4.0.0, R3a ->
+    # 17.0.5.0.0, ...) that legitimately bump the version stay green.
+    _m = re.search(r'["\']version["\']\s*:\s*["\']([\d.]+)["\']', _src)
+    _ver = tuple(int(x) for x in _m.group(1).split(".")) if _m else ()
+    _check("T-R1b1-18", _ver >= (17, 0, 2, 0, 0),
+           "neon_hr manifest version >= R1b 17.0.2.0.0 (got %s)"
+           % (_m.group(1) if _m else "?"))
 
 print()
 print("=" * 72)

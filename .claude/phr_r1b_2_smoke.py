@@ -241,11 +241,18 @@ _check("T-R1b2-25", doc_blocked, "non-OD/MD/Admin CANNOT read another's loan")
 
 # ---- manifest ----
 import os
+import re
 from odoo.modules.module import get_module_path
 with open(os.path.join(get_module_path("neon_hr"), "__manifest__.py"),
           encoding="utf-8") as f:
-    _check("T-R1b2-26", "17.0.3.0.0" in f.read(),
-           "neon_hr manifest version 17.0.3.0.0")
+    # R1b-2 bumped to 17.0.3.0.0. Relaxed from a literal substring to a
+    # >= tuple check so later milestones (R2/R3a/...) that legitimately
+    # bump the version stay green.
+    _m = re.search(r'["\']version["\']\s*:\s*["\']([\d.]+)["\']', f.read())
+    _ver = tuple(int(x) for x in _m.group(1).split(".")) if _m else ()
+    _check("T-R1b2-26", _ver >= (17, 0, 3, 0, 0),
+           "neon_hr manifest version >= R1b 17.0.3.0.0 (got %s)"
+           % (_m.group(1) if _m else "?"))
 
 print()
 print("=" * 72)

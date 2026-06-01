@@ -94,4 +94,20 @@
     <menuitem id="menu_neon_hr_handbook" name="Handbook Versions"
               parent="menu_neon_hr_config"
               action="action_neon_hr_handbook" sequence="60"/>
+
+    <!-- ===== R3a: fleet / competency ===== -->
+    <menuitem id="menu_neon_hr_fleet" name="Fleet &amp; Competency"
+              parent="menu_neon_hr_root" sequence="55"/>
+    <menuitem id="menu_neon_hr_licences" name="Driver Licences"
+              parent="menu_neon_hr_fleet"
+              action="action_neon_hr_licence" sequence="10"/>
+    <menuitem id="menu_neon_hr_crew_gate" name="Crew Assignment Gate"
+              parent="menu_neon_hr_fleet"
+              action="action_neon_hr_crew_gate" sequence="20"/>
+    <menuitem id="menu_neon_hr_competencies" name="Competencies"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_competency" sequence="70"/>
+    <menuitem id="menu_neon_hr_role_competency" name="Role Competency Requirements"
+              parent="menu_neon_hr_config"
+              action="action_neon_hr_role_competency" sequence="80"/>
 </odoo>
