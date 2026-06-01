@@ -1,6 +1,6 @@
 # NEON BUILD — AUTONOMY CHARTER
 *Standing decisions for the Claude Code build relay. Reduces gate round-trips by pre-deciding the recurring judgment calls. Lives at `.claude/AUTONOMY_CHARTER.md`; reference it at the top of every build prompt: "Charter applies."*
-*Owner: Tatenda (ERP lead) · approves changes: Robin (MD). Version 1.0 · 30 May 2026.*
+*Owner: Tatenda (ERP lead) · approves changes: Robin (MD). Version 1.1 · 1 June 2026.*
 
 ---
 
@@ -64,13 +64,40 @@ Just do these; report in the Gate summary.
 
 ---
 
-## 5. GIT & BRANCH DISCIPLINE (the debt-prevention rules)
-*Added because parallel work has repeatedly generated reconciliation debt.*
-- Each parallel track on its **own branch, own module** — no shared-file edits across concurrent sessions (`__manifest__.py`, `ir.model.access.csv`, `run_regression.sh` are the usual collision points).
-- **Never rewrite a shared branch that carries another session's commit.** Flag it, leave the only copy intact, let the owning session relocate it.
-- Prefer a clean commit on the proper branch over a surgical `checkout -- <path>` deploy artifact; when a surgical deploy is unavoidable, **log it as debt to reconcile before main-merge.**
-- Before stacking a *new* parallel track on an already-multi-branch state, run a read-only branch-reconciliation diagnostic first.
-- The **full combined regression** (all live modules together) runs at main-merge — that's the real integration gate; per-branch regression only partially cross-validates.
+## 5. PARALLEL BUILD ISOLATION (v1.1)
+*Amendment to the Neon Build Autonomy Charter. Supersedes the original §5 "Git & branch discipline." Reason: three branch reconciliations in two days, every one caused by parallel build sessions sharing one working tree — not by any feature failing. This section makes the recovery discipline the default so there is no fourth.*
+*Owner: Tatenda · approves changes: Robin · v1.1 · 30 May 2026.*
+
+### 5.1 — One tree per session (hard rule)
+Two build sessions MUST NOT operate on the same working tree at the same time. Parallel builds run in **separate `git worktree` trees**, one per session. The R3a recovery proved this is clean: an isolated worktree let R3a commit while B5's uncommitted work on the shared tree grew untouched.
+
+- A session that needs the shared tree + container (for a browser gate or a `-u` deploy) **requests it explicitly**; it is handed over only when the holding session's tree is **porcelain-clean** (committed or deliberately stashed).
+- Builds isolate by worktree; **deploys still serialize** — one `-u` per prod DB, whichever session reaches SQL-verify first.
+
+### 5.2 — Never sweep uncommitted work (hard rule)
+No session may **blind-auto-stash or auto-checkout away from uncommitted work** — its own or another session's. On encountering uncommitted changes when a tree-switch is needed, the session **STOPS and flags** to the relay; it never silently stashes or switches.
+
+- This single rule would have prevented the R3a sweep *and* protected B5 in the reverse direction.
+- A stash made deliberately (by the owning session, knowingly) is fine. An auto-stash triggered by a checkout the session didn't intend is forbidden.
+
+### 5.3 — Verify fork-base at Gate 1 (hard rule)
+Every build branch forks off **current `origin/main`**, and the session **reports its base SHA in the Gate-1 design pause** for confirmation. A build that discovers it is not based on current `origin/main` STOPS at Gate 1 and flags, before any work accumulates.
+
+- The wrong-base fork (B4/B5 off the old b-line instead of reconciled `d92e71c`) is what triggered the entire third reconciliation. A one-line `git merge-base` check at Gate 1 catches it for free.
+
+### 5.4 — Wire every smoke into the manifest at build time (hard rule)
+Every new smoke (`*_smoke.py` + browser smoke) is added to `.claude/run_regression.sh` (SMOKES / BROWSER_SMOKES) **in its own commit, in the same milestone** that creates it.
+
+- The phr_r3a `crew_ids` bug hid undetected until landing **because the smoke was never in any branch's regression manifest** until the reconcile branch wired it in. A smoke that isn't in the manifest is an untested test.
+
+### 5.5 — Never merge a divergent branch wholesale (retained from v1.0)
+Reconciliation lands work by **cherry-picking canonical SHAs onto an integration branch off main**, never `git merge`-ing a branch that carries duplicate commits. Patch-id divergence (same content, different SHA — the b9755ce / 2fbdb1e / 4fd323c class) means git will NOT auto-dedup; duplicates must be abandoned by hand. The full combined regression runs on the integration branch before the FF to main.
+
+### 5.6 — RED-tier history operations (retained, reaffirmed)
+Any history rewrite, force-push, or branch reconciliation is RED-tier: **diagnose (read-only) → propose plan → human reviews → execute to a hard pause before the irreversible step (push/FF) → human verifies the log + regression → human approves → push.** Keep a rollback anchor tag until post-push confirmation. This is the pattern all three reconciliations followed; it works — keep it.
+
+### Standing reminder — the grant-wipe self-heal (hardening backlog, not a rule yet)
+`-u neon_core`'s `noupdate=0` REPLACE wipes the OD/MD→hr_manager grant; it is only re-applied if `-u neon_hr` then fires and the migration runs (a *same-version* `-u` skips the migration, so the grant stays wiped on dev). This has bitten R1a, R2, and R3a. The durable fix is to make the neon_hr grant **self-heal on every `neon_core` upgrade** rather than depend on `-u neon_hr` ordering. Tracked for a hardening pass; not in scope of this amendment.
 
 ---
 
@@ -85,4 +112,6 @@ The charter makes Claude Code resolve *more*, not *everything*. These remain the
 The goal: the next ten milestones need far fewer round-trips because the recurring patterns are pre-decided here — while the handful of calls that genuinely need a person still get one.
 
 ---
-*Change log: v1.0 — initial charter, codifying decisions from the B1–B3 / R1a–R1b / B13 build cycle.*
+*Change log:*
+*v1.1 — §5 rewritten for worktree isolation after the B4/B5/R3a reconciliation cycle. §1–§4 (GREEN/AMBER/RED tiers, invariants) unchanged from v1.0.*
+*v1.0 — initial charter, codifying decisions from the B1–B3 / R1a–R1b / B13 build cycle.*
