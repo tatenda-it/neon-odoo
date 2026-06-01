@@ -41,7 +41,7 @@ today = fields.Date.today()
 
 # ---- clean prior PHR-R3A fixtures (idempotent across cycles) ----
 for j in env["commercial.job"].sudo().search([("name", "=like", "PHR-R3A%")]):
-    j.crew_ids.unlink()
+    j.crew_assignment_ids.unlink()
     j.unlink()
 for e in HR.search([("name", "=like", "PHR-R3A%")]):
     Lic.search([("employee_id", "=", e.id)]).unlink()

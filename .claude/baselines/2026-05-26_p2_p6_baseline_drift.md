@@ -159,6 +159,25 @@ but B13 bumped neon_jobs to **17.0.6.0.0**. B2/B13-owned smoke (same
 class as p4m2/p4m8 count assertions + phr_* version assertions). Not a
 functional failure; B2/B13 to update the literal.
 
+## Update 2026-06-01 (B4 + B5 + R3a reconciliation onto main)
+
+### p2m7 — 16/17 (T2 dashboard "all counts 0 on empty DB")
+`commercial.job.dashboard` 5-tile counts read `[3, 0, 3, 0, 5]` on
+the dev DB; T2 expects all zeros because it presumes an empty DB.
+Long-lived dev DB has pre-existing job / crew / cash-flow fixtures
+from earlier smoke runs polluting the global state — same class as
+the other p2/p6 baselined items. NOT introduced by B4 / B5 / R3a:
+* B4 / B5 add NEW models (subhire / reconciliation) — don't touch
+  `commercial.job.dashboard` compute methods.
+* R3a inherits `commercial.job.crew` to add gate fields but the
+  dashboard counts read `crew_assignment_ids` filtered by state =
+  this output is unchanged.
+On a fresh DB this passes. Surfaced post-reconciliation because the
+reconcile-branch dev DB has been hit by every milestone fixture in
+sequence (B1 → B2 → B3 → B14 → R1a → R1b → R2 → B4 → B5 → R3a). Same
+remediation as the other p2/p6 baselined items: fresh-DB re-init when
+fixture pollution becomes blocking.
+
 ### Dev-environment artifacts (NOT failures — future triage)
 1. **Stale bind mount** — the dev container auto-restarted mid-run and
    returned on a stale Docker Desktop mount; every neon module failed
