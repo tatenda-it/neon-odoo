@@ -349,9 +349,16 @@ def _module_by_code(env, code):
         [("code", "=", code)], limit=1)
 
 
-def _section_slide(env, module, execute):
+def _section_slide(env, module, execute, seq=10):
     """Get-or-create the per-module section slide (is_category=True)
-    in the program channel. Returns the section slide or None."""
+    in the program channel, at sequence ``seq``. Returns the section
+    slide or None.
+
+    ⚠️ slide.slide.category_id is READONLY + sequence-computed in
+    website_slides (a content slide belongs to the nearest PRECEDING
+    is_category slide by sequence) -- it cannot be set directly. So we
+    place the section at a module-ordered base sequence and the lessons
+    just after it (see import_lessons), and the compute groups them."""
     channel = module.channel_id
     if not channel:
         return None
@@ -363,13 +370,23 @@ def _section_slide(env, module, execute):
     if sec or not execute:
         return sec or Slide  # empty recordset placeholder in dry-run
     return Slide.create({"name": name, "channel_id": channel.id,
-                         "is_category": True})
+                         "is_category": True, "sequence": seq})
 
 
 def import_lessons(env, data, execute):
     counts = {"created": 0, "skipped": 0, "errors": 0}
     Slide = env["slide.slide"].sudo()
     id2code = data["_mod_id_to_code"]
+    # Module-ordered sequence bands: section M(i) at base (i+1)*1000, its
+    # lessons at base+1, base+2, ... (< next band). website_slides then
+    # computes each lesson's category_id = nearest preceding is_category
+    # slide = its OWN module section. 1000-gap >> any module's lesson
+    # count (237 total / 17 modules). Section/lesson sort_order in the
+    # legacy dump only orders WITHIN a module -> mapped to the local
+    # counter, preserving intra-module order.
+    mods = env["neon.lms.module"].sudo().search([], order="code")
+    base_seq = {m.code: (i + 1) * 1000 for i, m in enumerate(mods)}
+    local = {}
     for r in data["lms_lessons"]:
         code = id2code.get(_to_int(r.get("module_id")))
         module = _module_by_code(env, code) if code else None
@@ -392,9 +409,13 @@ def import_lessons(env, data, execute):
             continue
         try:
             with env.cr.savepoint():
-                section = _section_slide(env, module, execute)
+                sbase = base_seq.get(module.code, 1000)
+                _section_slide(env, module, execute, seq=sbase)
+                local[module.code] = local.get(module.code, 0) + 1
                 ltype = (r.get("lesson_type") or "").lower()
                 cat = "video" if ltype == "video" else "document"
+                # NO category_id (readonly/sequence-computed) -- set the
+                # sequence just after the module's section instead.
                 vals = {
                     "name": title,
                     "channel_id": module.channel_id.id,
@@ -403,11 +424,9 @@ def import_lessons(env, data, execute):
                         r.get("body_html") or ""),
                     "completion_time": (
                         (_to_int(r.get("est_minutes")) or 0) / 60.0),
-                    "sequence": _to_int(r.get("sort_order"), 10),
+                    "sequence": sbase + local[module.code],
                     "is_published": False,
                 }
-                if section:
-                    vals["category_id"] = section.id
                 Slide.create(vals)
                 counts["created"] += 1
         except Exception as e:  # noqa: BLE001
