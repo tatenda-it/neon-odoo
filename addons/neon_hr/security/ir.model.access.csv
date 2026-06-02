@@ -65,3 +65,6 @@ access_neon_hr_emp_competency_super,neon.hr.employee.competency superuser,model_
 access_neon_hr_role_competency_user,neon.hr.role.competency read (all internal),model_neon_hr_role_competency,base.group_user,1,0,0,0
 access_neon_hr_role_competency_admin,neon.hr.role.competency HR admin,model_neon_hr_role_competency,neon_hr.group_neon_hr_admin,1,1,1,0
 access_neon_hr_role_competency_super,neon.hr.role.competency superuser,model_neon_hr_role_competency,neon_core.group_neon_superuser,1,1,1,0
+access_neon_hr_review_user,neon.hr.review read (own via record rule),model_neon_hr_review,base.group_user,1,0,0,0
+access_neon_hr_review_admin,neon.hr.review HR admin (R/W/C; perm_unlink=0),model_neon_hr_review,neon_hr.group_neon_hr_admin,1,1,1,0
+access_neon_hr_review_super,neon.hr.review superuser (R/W/C; perm_unlink=0),model_neon_hr_review,neon_core.group_neon_superuser,1,1,1,0

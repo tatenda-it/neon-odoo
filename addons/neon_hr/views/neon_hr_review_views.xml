@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_hr_review_tree" model="ir.ui.view">
+        <field name="name">neon.hr.review.tree</field>
+        <field name="model">neon.hr.review</field>
+        <field name="arch" type="xml">
+            <tree string="Performance Reviews"
+                  decoration-success="state == 'acknowledged'"
+                  decoration-info="state == 'submitted'"
+                  decoration-muted="state == 'draft'">
+                <field name="employee_id"/>
+                <field name="review_period"/>
+                <field name="reviewer_id"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'acknowledged'"
+                       decoration-info="state == 'submitted'"
+                       decoration-muted="state == 'draft'"/>
+                <field name="rating_overall" optional="show"/>
+                <field name="submitted_at" optional="hide"/>
+                <field name="acknowledged_at" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_hr_review_form" model="ir.ui.view">
+        <field name="name">neon.hr.review.form</field>
+        <field name="model">neon.hr.review</field>
+        <field name="arch" type="xml">
+            <form string="Performance Review">
+                <header>
+                    <button name="action_submit" type="object"
+                            string="Submit"
+                            class="oe_highlight"
+                            invisible="state != 'draft'"
+                            confirm="Submit this review? The employee will be notified and may acknowledge."/>
+                    <button name="action_acknowledge" type="object"
+                            string="Acknowledge"
+                            class="oe_highlight"
+                            invisible="state != 'submitted'"/>
+                    <button name="action_back_to_draft" type="object"
+                            string="Back to Draft"
+                            class="btn-secondary"
+                            invisible="state != 'submitted'"
+                            groups="neon_hr.group_neon_hr_admin,neon_core.group_neon_superuser"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,acknowledged"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="display_name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Subject">
+                            <field name="employee_id"
+                                   readonly="state != 'draft'"/>
+                            <field name="review_period"
+                                   readonly="state != 'draft'"
+                                   placeholder="2026-Q2 / 2026-H1 / 2026-Annual"/>
+                            <field name="reviewer_id"
+                                   readonly="state != 'draft'"
+                                   groups="neon_hr.group_neon_hr_admin,neon_core.group_neon_superuser"/>
+                        </group>
+                        <group string="Audit">
+                            <field name="submitted_at" readonly="1"
+                                   invisible="not submitted_at"/>
+                            <field name="submitted_by_id" readonly="1"
+                                   invisible="not submitted_by_id"/>
+                            <field name="acknowledged_at" readonly="1"
+                                   invisible="not acknowledged_at"/>
+                            <field name="acknowledged_by_id" readonly="1"
+                                   invisible="not acknowledged_by_id"/>
+                        </group>
+                    </group>
+                    <group string="Ratings (1-5)">
+                        <field name="rating_overall"
+                               readonly="state != 'draft'"/>
+                        <field name="rating_technical"
+                               readonly="state != 'draft'"/>
+                        <field name="rating_conduct"
+                               readonly="state != 'draft'"/>
+                    </group>
+                    <notebook>
+                        <page string="Reviewer Comments"
+                              name="page_reviewer">
+                            <field name="reviewer_comments"
+                                   readonly="state != 'draft'"
+                                   nolabel="1"
+                                   placeholder="Strengths, growth areas, specific examples"/>
+                        </page>
+                        <page string="Employee Comments"
+                              name="page_employee">
+                            <field name="employee_comments"
+                                   readonly="state == 'acknowledged'"
+                                   nolabel="1"
+                                   placeholder="Filled by the employee at acknowledgement (optional)"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_neon_hr_review_search" model="ir.ui.view">
+        <field name="name">neon.hr.review.search</field>
+        <field name="model">neon.hr.review</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_id"/>
+                <field name="review_period"/>
+                <field name="reviewer_id"/>
+                <separator/>
+                <filter name="filter_draft" string="Draft"
+                        domain="[('state','=','draft')]"/>
+                <filter name="filter_submitted" string="Submitted"
+                        domain="[('state','=','submitted')]"/>
+                <filter name="filter_acknowledged" string="Acknowledged"
+                        domain="[('state','=','acknowledged')]"/>
+                <group expand="0" string="Group by">
+                    <filter name="group_state" string="State"
+                            context="{'group_by':'state'}"/>
+                    <filter name="group_period" string="Period"
+                            context="{'group_by':'review_period'}"/>
+                    <filter name="group_reviewer" string="Reviewer"
+                            context="{'group_by':'reviewer_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_hr_review"
+            model="ir.actions.act_window">
+        <field name="name">Performance Reviews</field>
+        <field name="res_model">neon.hr.review</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No performance reviews yet
+            </p>
+            <p>
+                Lifecycle: draft &#8594; submitted &#8594;
+                acknowledged. Acknowledged reviews are append-only.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_neon_hr_review"
+              name="Performance Reviews"
+              parent="menu_neon_hr_root"
+              action="action_neon_hr_review"
+              sequence="60"
+              groups="neon_hr.group_neon_hr_admin,neon_core.group_neon_superuser"/>
+
+</odoo>

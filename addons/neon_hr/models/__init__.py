@@ -23,3 +23,5 @@ from . import neon_hr_handbook         # handbook versions + acks + compliance f
 from . import neon_hr_licence          # driver licence + expiry AC alert
 from . import neon_hr_competency       # competency catalog + employee + role map
 from . import commercial_job_crew_ext  # extend commercial.job.crew: gate
+# ----- R3b C2: performance reviews -----
+from . import neon_hr_review           # neon.hr.review (lifecycle + ACL)

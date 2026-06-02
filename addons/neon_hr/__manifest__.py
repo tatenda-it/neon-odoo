@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon HR",
-    "version": "17.0.5.0.0",
+    # 17.0.6.0.0 = R3b -- performance reviews (neon.hr.review),
+    # licence-class gating on commercial.job.crew, TOIL retire,
+    # post-migrate _enforce_hr_confidentiality re-fire.
+    "version": "17.0.6.0.0",
     "summary": "People R1a/R1b/R2/R3a — employee master, contracts, docs, "
                "leave, payroll, wages, loans, accidents, discipline, "
                "TOIL, handbook, driver licences + competency gating",
@@ -59,6 +62,9 @@ Gate-2 summary.
         "views/neon_hr_payroll_views.xml",
         "views/neon_hr_r2_views.xml",
         "views/neon_hr_r3_views.xml",
+        # R3b C2: performance reviews (model + views + ACL + record
+        # rules already in neon_hr_r2_rules.xml updated upstream).
+        "views/neon_hr_review_views.xml",
         "views/neon_hr_menus.xml",
     ],
     "installable": True,

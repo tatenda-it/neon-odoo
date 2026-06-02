@@ -92,5 +92,40 @@
             <field name="perm_create" eval="True"/>
             <field name="perm_unlink" eval="False"/>
         </record>
+
+        <!-- ===== R3b C2: neon.hr.review confidentiality ===== -->
+        <!-- Owner sees their own (read-only via portal). Reviewer
+             sees the ones they're assigned to. OD/MD + HR Admin
+             see all. Mirrors R2 pattern. perm_unlink=0 everywhere. -->
+        <record id="rule_neon_hr_review_own" model="ir.rule">
+            <field name="name">Review: owner sees own</field>
+            <field name="model_id" ref="model_neon_hr_review"/>
+            <field name="domain_force">[('employee_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_neon_hr_review_reviewer" model="ir.rule">
+            <field name="name">Review: reviewer sees own</field>
+            <field name="model_id" ref="model_neon_hr_review"/>
+            <field name="domain_force">[('reviewer_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_neon_hr_review_all" model="ir.rule">
+            <field name="name">Review: OD/MD/Admin see all</field>
+            <field name="model_id" ref="model_neon_hr_review"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('neon_core.group_neon_superuser'), ref('neon_hr.group_neon_hr_admin')])]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
     </data>
 </odoo>
