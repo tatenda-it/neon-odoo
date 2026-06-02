@@ -27,6 +27,13 @@
         <field name="domain">[('state', '=', 'checked_out')]</field>
     </record>
 
+    <record id="action_dashboard_units_in_maintenance" model="ir.actions.act_window">
+        <field name="name">Units In Maintenance</field>
+        <field name="res_model">neon.equipment.unit</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('state', '=', 'maintenance')]</field>
+    </record>
+
     <record id="action_dashboard_reservations_7d" model="ir.actions.act_window">
         <field name="name">Reservations — Next 7 Days</field>
         <field name="res_model">neon.equipment.reservation</field>

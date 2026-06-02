@@ -66,7 +66,14 @@
     # from unit notes (idempotent; force=False default prevents
     # clobbering manual edits). Patch bump -- additive field +
     # availability branch; no new pivot model.
-    "version": "17.0.8.1.0",
+    # 17.0.8.2.0 = P-B14d Workshop dashboard adds an "In Maintenance"
+    # tile counting neon.equipment.unit where state='maintenance'.
+    # Distinct from the existing "Repair Orders" tile (which counts
+    # neon.equipment.repair.order workflow records). Inventory-
+    # snapshot row, attention urgency, click-through to a unit list
+    # filtered to state='maintenance'. Patch bump -- additive
+    # tile/compute/action; no model changes, no schema risk.
+    "version": "17.0.8.2.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema

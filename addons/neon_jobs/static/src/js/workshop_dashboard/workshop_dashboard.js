@@ -142,6 +142,14 @@ export class WorkshopDashboard extends Component {
                     value: v("units_out"),
                 },
                 {
+                    key: "units_in_maintenance",
+                    title: _t("In Maintenance"),
+                    subtitle: _t("Flagged for repair"),
+                    icon: "fa-wrench",
+                    urgency: "attention",
+                    value: v("units_in_maintenance"),
+                },
+                {
                     key: "reservations_next_7days",
                     title: _t("Reservations — 7 Days"),
                     subtitle: _t("Upcoming holds"),

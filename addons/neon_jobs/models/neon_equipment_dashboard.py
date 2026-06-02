@@ -77,6 +77,17 @@ class NeonEquipmentDashboard(models.Model):
             [("state", "=", "checked_out")])
 
     # ============================================================
+    # === Tile 2b (B14d): units_in_maintenance — units sitting in
+    # state='maintenance'. Distinct from `repair_orders_open` which
+    # counts neon.equipment.repair.order workflow records; this is
+    # the count of UNITS themselves whose state is maintenance.
+    # ============================================================
+    @api.model
+    def _count_units_in_maintenance(self):
+        return self.env["neon.equipment.unit"].sudo().search_count(
+            [("state", "=", "maintenance")])
+
+    # ============================================================
     # === Tile 3: reservations_next_7days — active holds whose
     # window opens within the next 7 days.
     # Filter for state IN ('soft_hold','confirmed') only — fulfilled
@@ -191,6 +202,11 @@ class NeonEquipmentDashboard(models.Model):
             "units_out": {
                 "value": self._count_units_out(),
                 "action_id": ref("neon_jobs.action_dashboard_units_out").id,
+            },
+            "units_in_maintenance": {
+                "value": self._count_units_in_maintenance(),
+                "action_id": ref(
+                    "neon_jobs.action_dashboard_units_in_maintenance").id,
             },
             "reservations_next_7days": {
                 "value": self._count_reservations_next_7days(),

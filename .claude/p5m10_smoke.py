@@ -311,12 +311,12 @@ results["T410"] = ok
 # ============================================================
 print()
 print("=" * 72)
-print("T411 - get_dashboard_data wire shape (10 keys + last_updated)")
+print("T411 - get_dashboard_data wire shape (11 keys + last_updated, B14d added units_in_maintenance)")
 print("=" * 72)
 data = Dashboard.sudo().get_dashboard_data()
 expected_keys = {
     "active_units", "units_out", "reservations_next_7days",
-    "pending_transfers", "late_returns",
+    "pending_transfers", "late_returns", "units_in_maintenance",
     "equipment_conflicts_open", "stock_discrepancies_open",
     "repair_orders_open", "incidents_open", "high_impact_30d",
     "last_updated",
