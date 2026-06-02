@@ -103,12 +103,16 @@ results["T8100"] = ok
 
 # ============================================================
 print()
-print("T8101 -- default_layouts.xml seeded 5 rows")
+print("T8101 -- default_layouts.xml seeds the P8 + R3b core types")
 print("=" * 72)
 seeds = Default.search([])
 type_set = set(seeds.mapped("dashboard_type"))
-expected = {"director", "sales", "bookkeeper", "lead_tech", "tech"}
-ok = type_set == expected
+# 5 P8 types + 'hr' added by P-HR-R3b C1.1 (default_layout_hr).
+# Subset assertion lets later phases add more types without
+# breaking this test (per baselined stale-count pattern).
+required = {"director", "sales", "bookkeeper", "lead_tech", "tech",
+            "hr"}
+ok = required.issubset(type_set)
 print("  seeded types:", sorted(type_set))
 print("T8101:", "PASS" if ok else "FAIL")
 results["T8101"] = ok

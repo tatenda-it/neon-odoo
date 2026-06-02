@@ -283,12 +283,15 @@ results["T8214"] = ok
 
 # ============================================================
 print()
-print("T8215 -- superuser sees all 5 view-as options")
+print("T8215 -- superuser sees the P8 + R3b view-as options")
 print("=" * 72)
 opts = data["available_types"]
 values = {o["value"] for o in opts}
-expected = {"director", "sales", "bookkeeper", "lead_tech", "tech"}
-ok = data["is_superuser"] is True and values == expected
+# 5 P8 types + 'hr' added by P-HR-R3b C1. Subset so later phases
+# can extend without breaking (baselined stale-count pattern).
+required = {"director", "sales", "bookkeeper", "lead_tech", "tech",
+            "hr"}
+ok = (data["is_superuser"] is True and required.issubset(values))
 print("  is_superuser:", data["is_superuser"], "options:", sorted(values))
 print("T8215:", "PASS" if ok else "FAIL")
 results["T8215"] = ok

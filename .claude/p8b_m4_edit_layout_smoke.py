@@ -151,8 +151,13 @@ _check("T8B91", jobs_row and jobs_row.size == "large",
 
 # T8B84/T8B85 -- accessible types.
 acc_super = Dashboard.with_user(u_super)._accessible_dashboard_types()
-_check("T8B84", set(acc_super) == {"director", "sales", "bookkeeper",
-                                   "lead_tech", "tech"})
+# 5 P8 types + 'hr' added by P-HR-R3b C1. Subset assertion so the
+# test survives future variant additions (baselined stale-count
+# class -- same pattern as p4m2/p4m8 count tests).
+_required_super = {"director", "sales", "bookkeeper", "lead_tech",
+                   "tech", "hr"}
+_check("T8B84", _required_super.issubset(set(acc_super)),
+       f"got {sorted(acc_super)}")
 acc_lead = Dashboard.with_user(u_lead)._accessible_dashboard_types()
 _check("T8B85", acc_lead == ["lead_tech"], f"{acc_lead}")
 
