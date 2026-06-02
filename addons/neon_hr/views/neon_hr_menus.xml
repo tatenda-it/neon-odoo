@@ -85,9 +85,16 @@
     <menuitem id="menu_neon_hr_cases" name="Cases (Disciplinary / Incident / etc.)"
               parent="menu_neon_hr_safety"
               action="action_neon_hr_case" sequence="20"/>
-    <menuitem id="menu_neon_hr_overtime" name="Overtime / TOIL"
+    <!-- R3b C4 — TOIL retired per OD/MD (overtime is incentive
+         covered; the workflow stays in the codebase but is hidden
+         from menus + records active=False'd. To re-enable, drop
+         the groups attribute below and run the post-migrate's
+         reverse step manually. Data is preserved (perm_unlink=0
+         + active=False, not unlink) for audit. -->
+    <menuitem id="menu_neon_hr_overtime" name="Overtime / TOIL [retired]"
               parent="menu_neon_hr_safety"
-              action="action_neon_hr_overtime" sequence="30"/>
+              action="action_neon_hr_overtime" sequence="30"
+              groups="base.group_no_one"/>
     <menuitem id="menu_neon_hr_handbook_pending" name="Handbook — Not Acknowledged"
               parent="menu_neon_hr_safety"
               action="action_neon_hr_handbook_pending" sequence="40"/>

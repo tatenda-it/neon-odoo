@@ -55,6 +55,7 @@ SMOKES=(
   phr_r3b_c1_1_hr_panels
   phr_r3b_c2_performance_reviews
   phr_r3b_c3_licence_class
+  phr_r3b_c4_housekeeping
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

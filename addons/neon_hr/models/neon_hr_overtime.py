@@ -45,6 +45,10 @@ class NeonHrOvertime(models.Model):
     toil_allocation_id = fields.Many2one(
         "hr.leave.allocation", readonly=True, string="TOIL Allocation")
     notes = fields.Text()
+    # R3b C4 -- add active field so the 17.0.6.0.0 post-migrate can
+    # retire records without deletion (perm_unlink=0 audit rule
+    # holds; data preserved, reversible by setting active=True).
+    active = fields.Boolean(default=True, tracking=True)
 
     @api.depends("employee_id", "hours", "resolution")
     def _compute_display_name(self):
