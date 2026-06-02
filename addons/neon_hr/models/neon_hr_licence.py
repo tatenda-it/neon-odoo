@@ -27,15 +27,18 @@ _logger = logging.getLogger(__name__)
 DEFAULT_LICENCE_LEAD_DAYS = 30
 LICENCE_LEAD_PARAM = "neon_hr.licence_expiry_lead_days"
 
-# Zimbabwe driver-licence classes — DATA CAPTURE ONLY in R3a (the gate
-# does not match on class yet, see module docstring). 'other' is a
-# catch-all; the authoritative list is locked at R3b.
+# Zimbabwe driver-licence classes. R3b corrects R3a's wrong labels
+# per OD/MD: Class 2 = truck/heavy goods (this is the value the
+# crew gate now matches on for trucks); Class 4 = light/small
+# motor vehicles (this is the value the crew gate matches on for
+# light vehicles). Class 1/3/5 stay selectable for data capture
+# but carry no gating logic this milestone (per R3b spec).
 LICENCE_CLASS_SELECTION = [
-    ("class_1", "Class 1 — Heavy / articulated"),
-    ("class_2", "Class 2 — Heavy goods vehicles"),
-    ("class_3", "Class 3 — Light motor vehicles"),
-    ("class_4", "Class 4 — Motorcycles"),
-    ("class_5", "Class 5 — Tractors / plant"),
+    ("class_1", "Class 1 — Articulated / road train"),
+    ("class_2", "Class 2 — Truck / heavy goods"),
+    ("class_3", "Class 3 — Public service vehicles"),
+    ("class_4", "Class 4 — Light / small motor vehicles"),
+    ("class_5", "Class 5 — Motorcycles / mopeds"),
     ("other", "Other / Foreign"),
 ]
 

@@ -129,12 +129,17 @@ class HrEmployee(models.Model):
             emp.is_driver = bool(valid)
 
     def _has_valid_licence(self, licence_class=None):
-        """A current (non-expired) licence. ``licence_class`` is accepted
-        for the R3b class-match API but IGNORED in R3a (any valid licence
-        qualifies — Gate-1 decision)."""
+        """A current (non-expired) licence. R3b activates the
+        ``licence_class`` filter: when set, ONLY licences of that
+        exact class qualify. When None, falls back to R3a's
+        any-valid behaviour."""
         self.ensure_one()
-        return any(l.state in ("valid", "expiring")
-                   for l in self.licence_ids)
+        valid = self.licence_ids.filtered(
+            lambda l: l.state in ("valid", "expiring"))
+        if licence_class:
+            valid = valid.filtered(
+                lambda l: l.licence_class == licence_class)
+        return bool(valid)
 
     def _missing_competencies(self, competencies):
         """Return the subset of ``competencies`` the employee does NOT

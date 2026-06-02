@@ -52,6 +52,23 @@ class CommercialJobCrew(models.Model):
         string="Competency Gate Overridden", tracking=True,
         help="OD/MD-only bypass of the COMPETENCY gate (never the "
         "licence block).")
+    # ----- R3b C3: vehicle-type → required licence class -----
+    # When set on a driver assignment, the licence gate requires
+    # the employee to hold a VALID licence of EXACTLY this class.
+    # When None, falls back to R3a's any-valid-licence behaviour.
+    # The licence-block stays non-override-able (legal/safety rail
+    # held). Class 2 = truck/heavy; Class 4 = light/small. Sales/
+    # coord picks per assignment.
+    neon_required_licence_class = fields.Selection(
+        [("class_2", "Class 2 — Truck / heavy"),
+         ("class_4", "Class 4 — Light / small")],
+        string="Required Licence Class",
+        help="When set on a driver assignment, the licence gate "
+        "requires the employee to hold a VALID licence of EXACTLY "
+        "this class. Class 2 = truck/heavy goods; Class 4 = light/"
+        "small motor vehicles. Leave empty to fall back to R3a's "
+        "any-valid-licence behaviour. NEVER override-able -- the "
+        "block is the same legal/safety rail R3a put in place.")
 
     @api.depends("user_id", "partner_id")
     def _compute_neon_employee_id(self):
@@ -91,13 +108,31 @@ class CommercialJobCrew(models.Model):
                     self.partner_id.name or _("crew member")),
                 "block": False}
         # Driver licence — HARD block, not override-able.
-        if needs_licence and emp and not emp._has_valid_licence():
-            return {
-                "state": "licence_block",
-                "message": _(
-                    "%s has no valid driver licence on file — cannot be "
-                    "assigned as Driver (legal/safety).") % emp.name,
-                "block": True}
+        # R3b C3: when neon_required_licence_class is set, match the
+        # exact class; otherwise fall back to R3a's any-valid check.
+        if needs_licence and emp:
+            req_class = self.neon_required_licence_class or None
+            if not emp._has_valid_licence(licence_class=req_class):
+                if req_class:
+                    cls_label = dict(
+                        self._fields["neon_required_licence_class"]
+                        .selection).get(req_class, req_class)
+                    return {
+                        "state": "licence_block",
+                        "message": _(
+                            "%(emp)s has no valid %(cls)s licence "
+                            "on file — cannot be assigned as "
+                            "Driver of this vehicle type (legal/"
+                            "safety).") % {
+                                "emp": emp.name, "cls": cls_label},
+                        "block": True}
+                return {
+                    "state": "licence_block",
+                    "message": _(
+                        "%s has no valid driver licence on file — "
+                        "cannot be assigned as Driver (legal/safety)."
+                    ) % emp.name,
+                    "block": True}
         # Competency gap (config-driven warn/block, override-able).
         if role_req and emp:
             missing = emp._missing_competencies(role_req)
@@ -121,9 +156,12 @@ class CommercialJobCrew(models.Model):
         return {"state": "ok", "message": _("Assignment cleared."),
                 "block": False}
 
-    @api.depends("role", "neon_competency_override", "neon_employee_id",
+    @api.depends("role", "neon_competency_override",
+                 "neon_required_licence_class",
+                 "neon_employee_id",
                  "neon_employee_id.is_driver",
                  "neon_employee_id.licence_ids.state",
+                 "neon_employee_id.licence_ids.licence_class",
                  "neon_employee_id.employee_competency_ids.state")
     def _compute_neon_gate(self):
         for rec in self:
@@ -157,7 +195,8 @@ class CommercialJobCrew(models.Model):
     def write(self, vals):
         res = super().write(vals)
         if {"role", "user_id", "partner_id",
-                "neon_competency_override"} & set(vals):
+                "neon_competency_override",
+                "neon_required_licence_class"} & set(vals):
             self._neon_enforce_gate()
         return res
 
