@@ -859,7 +859,13 @@
                     <div class="o_neon_dashboard_controls">
                         <!-- Normal controls: hidden while editing. -->
                         <t t-if="!state.editMode">
-                            <select t-if="isSuperuser"
+                            <!-- P-HR-R3b C1.1: render View-As when
+                                 the user has at least one option
+                                 (Superuser=5 incl. HR; HR-tier=HR
+                                 only; everyone else=[] -> hidden).
+                                 _available_types_for_user is the
+                                 authoritative RBAC gate. -->
+                            <select t-if="availableTypes.length"
                                     class="o_neon_dashboard_viewas"
                                     t-on-change="onViewAsChange">
                                 <option value="" disabled="disabled">

@@ -69,6 +69,15 @@ _WIDGET_KEYS = [
     # P-B2 -- Equipment Conflicts panel (Operations variant only,
     # per D7-trim. Director MD-peeks Operations to see it).
     ("block_conflicts", "Block: Equipment Conflicts"),
+    # P-HR-R3b C1 + C1.1 -- HR variant KPI tiles + panels.
+    ("kpi_hr_headcount", "KPI: HR Headcount"),
+    ("kpi_hr_on_leave_today", "KPI: HR On Leave Today"),
+    ("kpi_hr_contracts_30", "KPI: HR Contracts Expiring (30d)"),
+    ("kpi_hr_licences_30", "KPI: HR Licences Expiring (30d)"),
+    ("kpi_hr_pending_leave", "KPI: HR Pending Leave Approvals"),
+    ("block_hr_contracts", "Block: HR Contracts Expiring"),
+    ("block_hr_licences", "Block: HR Licences Expiring"),
+    ("block_hr_pending_leaves", "Block: HR Pending Leaves"),
 ]
 
 # Schema sketch §4.2 -- not hide-able. Set in M1 so the API contract

@@ -522,6 +522,18 @@ class NeonDashboard(models.Model):
             payload["cert_expiry_block"] = self._compute_cert_expiry_block()
             # P-B2 D7 -- conflicts block on the Operations variant.
             payload["conflicts_block"] = self._compute_conflicts_block()
+        elif resolved_type == "hr":
+            # P-HR-R3b C1.1 -- HR variant panels.
+            # All three are re-checked via _check_hr_data_access at
+            # the data layer (defence-in-depth: a non-HR caller who
+            # constructed type='hr' via a crafted RPC still gets
+            # AccessError before any HR data leaves the server).
+            payload["hr_contracts_block"] = (
+                self._compute_hr_contracts_expiring_block())
+            payload["hr_licences_block"] = (
+                self._compute_hr_licences_expiring_block())
+            payload["hr_pending_leaves_block"] = (
+                self._compute_hr_pending_leaves_block())
         return payload
 
     # ==================================================================
@@ -939,6 +951,85 @@ class NeonDashboard(models.Model):
             "subtitle": "Awaiting approver action",
             "currency": "",
         }
+
+    # ==================================================================
+    # P-HR-R3b C1.1 -- HR variant panels (3).
+    # Each returns up to 10 rows, sorted by relevance (most urgent
+    # first), with stable dict shapes for the OWL renderer.
+    # Defence-in-depth: every panel re-checks _check_hr_data_access.
+    # ==================================================================
+    @api.model
+    def _compute_hr_contracts_expiring_block(self):
+        self._check_hr_data_access()
+        today = self._today_harare()
+        end_window = today + timedelta(days=30)
+        Contract = self.env["hr.contract"].sudo()
+        contracts = Contract.search([
+            ("state", "in", ("open", "pending")),
+            ("date_end", ">=", today),
+            ("date_end", "<=", end_window),
+        ], order="date_end asc, id desc", limit=10)
+        rows = [{
+            "id": c.id,
+            "employee_name": (c.employee_id.name
+                                or "(no employee)"),
+            "contract_name": c.name or "",
+            "date_end": (str(c.date_end)
+                          if c.date_end else ""),
+            "days_to_end": (
+                (c.date_end - today).days if c.date_end else 0),
+        } for c in contracts]
+        return {"rows": rows, "title": "Contracts Expiring (30d)",
+                "row_count": len(rows)}
+
+    @api.model
+    def _compute_hr_licences_expiring_block(self):
+        self._check_hr_data_access()
+        today = self._today_harare()
+        end_window = today + timedelta(days=30)
+        Licence = self.env.get("neon.hr.licence")
+        if Licence is None:
+            return {"rows": [], "title": "Licences Expiring (30d)",
+                    "row_count": 0,
+                    "note": "neon_hr R3a not installed"}
+        recs = Licence.sudo().search([
+            ("state", "=", "valid"),
+            ("expiry_date", ">=", today),
+            ("expiry_date", "<=", end_window),
+        ], order="expiry_date asc, id desc", limit=10)
+        rows = [{
+            "id": r.id,
+            "employee_name": (r.employee_id.name
+                                or "(no employee)"),
+            "licence_class": (r.licence_class or ""),
+            "expiry_date": (str(r.expiry_date)
+                              if r.expiry_date else ""),
+            "days_to_expiry": (
+                (r.expiry_date - today).days
+                if r.expiry_date else 0),
+        } for r in recs]
+        return {"rows": rows, "title": "Licences Expiring (30d)",
+                "row_count": len(rows)}
+
+    @api.model
+    def _compute_hr_pending_leaves_block(self):
+        self._check_hr_data_access()
+        Leave = self.env["hr.leave"].sudo()
+        recs = Leave.search([
+            ("state", "=", "confirm"),
+        ], order="date_from asc, id desc", limit=10)
+        rows = [{
+            "id": r.id,
+            "employee_name": (r.employee_id.name
+                                or "(no employee)"),
+            "holiday_status":
+                (r.holiday_status_id.name or ""),
+            "date_from": str(r.date_from) if r.date_from else "",
+            "date_to": str(r.date_to) if r.date_to else "",
+            "number_of_days": float(r.number_of_days or 0),
+        } for r in recs]
+        return {"rows": rows, "title": "Pending Leave Approvals",
+                "row_count": len(rows)}
 
     # ⚠️ DECISION (M2, marker 3): Cash-on-Hand source is the standard
     # Odoo ``account.journal`` (type ∈ bank, cash) aggregated through

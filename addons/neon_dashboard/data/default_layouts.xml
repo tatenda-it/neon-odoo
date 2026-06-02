@@ -138,5 +138,29 @@
             ]"/>
         </record>
 
+        <!-- ============================================================
+             HR (HR Admin + HR Manager + Superuser peek) — P-HR-R3b C1.1.
+             RBAC enforced at three layers (see _available_types_for_user
+             / _resolve_dashboard_type / _check_hr_data_access in
+             neon_dashboard.py); this seed is just the widget visibility
+             manifest.
+             ============================================================ -->
+        <record id="default_layout_hr"
+                model="neon.dashboard.default.layout">
+            <field name="dashboard_type">hr</field>
+            <field name="layout_line_ids" eval="[
+                (0, 0, {'widget_key': 'kpi_hr_headcount',       'order_index': 1}),
+                (0, 0, {'widget_key': 'kpi_hr_on_leave_today',  'order_index': 2}),
+                (0, 0, {'widget_key': 'kpi_hr_contracts_30',    'order_index': 3}),
+                (0, 0, {'widget_key': 'kpi_hr_licences_30',     'order_index': 4}),
+                (0, 0, {'widget_key': 'kpi_hr_pending_leave',   'order_index': 5}),
+                (0, 0, {'widget_key': 'block_hr_contracts',     'order_index': 10}),
+                (0, 0, {'widget_key': 'block_hr_licences',      'order_index': 11}),
+                (0, 0, {'widget_key': 'block_hr_pending_leaves','order_index': 12}),
+                (0, 0, {'widget_key': 'block_alerts',           'order_index': 15}),
+                (0, 0, {'widget_key': 'block_tasks',            'order_index': 16}),
+            ]"/>
+        </record>
+
     </data>
 </odoo>

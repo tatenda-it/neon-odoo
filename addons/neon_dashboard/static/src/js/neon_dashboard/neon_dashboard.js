@@ -980,6 +980,8 @@ export class NeonDashboard extends Component {
             bookkeeper: "AR · Cash · ZiG · Compliance",
             lead_tech: "Jobs · Crew · Equipment · Certifications",
             tech: "Today's Jobs",
+            // P-HR-R3b C1.1
+            hr: "Headcount · Leave · Contracts · Licences",
         };
         return map[t] || map.director;
     }
