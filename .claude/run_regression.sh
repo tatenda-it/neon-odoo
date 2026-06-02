@@ -51,6 +51,7 @@ SMOKES=(
   phr_r1b_2
   phr_r2
   phr_r3a
+  phr_r3b_c1_dashboard_hr_lens
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

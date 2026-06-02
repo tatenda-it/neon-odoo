@@ -30,7 +30,10 @@
     # reading from neon.equipment.conflict (the new pivot model
     # added in neon_jobs 17.0.5.0.0). Read-only panel; engine runs
     # are triggered server-side.
-    "version": "17.0.10.0.0",
+    # 17.0.11.0.0 = P-HR-R3b C1 -- HR role-lens RBAC + KPI compute
+    # (new 'hr' value in _DASHBOARD_TYPES; _is_hr_user gate at
+    # the View-As resolver + defence-in-depth in _compute_kpi_hr).
+    "version": "17.0.11.0.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

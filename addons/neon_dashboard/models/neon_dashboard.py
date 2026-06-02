@@ -67,6 +67,14 @@ _GROUP_BOOKKEEPER = "neon_core.group_neon_bookkeeper"
 _GROUP_SALES_REP = "neon_core.group_neon_sales_rep"
 _GROUP_LEAD_TECH = "neon_core.group_neon_lead_tech"
 _GROUP_CREW = "neon_core.group_neon_crew"
+# P-HR-R3b C1 -- HR role-lens: extend the existing 5-role
+# View-As mechanism with a sixth role 'hr'. RBAC RED-RAIL:
+# 'hr' selectable ONLY by users in HR-tier or superuser.
+# Both the View-As resolver AND every HR data branch re-check
+# (defence-in-depth). Sales / Lead Tech / Bookkeeper / Crew
+# can NOT see HR salaries / disciplinary / leave-detail.
+_GROUP_HR_MANAGER = "hr.group_hr_manager"
+_GROUP_NEON_HR_ADMIN = "neon_hr.group_neon_hr_admin"
 
 _DASHBOARD_TYPES = [
     ("director", "Director"),
@@ -74,6 +82,7 @@ _DASHBOARD_TYPES = [
     ("bookkeeper", "Bookkeeper"),
     ("lead_tech", "Lead Tech"),
     ("tech", "Tech"),
+    ("hr", "HR"),
 ]
 _DASHBOARD_TYPE_VALUES = {t[0] for t in _DASHBOARD_TYPES}
 
@@ -237,8 +246,16 @@ class NeonDashboard(models.Model):
         if user.preferred_dashboard_type:
             return user.preferred_dashboard_type
         # Then walk tier groups in priority order.
+        # ⚠️ DECISION (R3b C1, marker 3): Superuser still trumps --
+        # OD/MD lands on Director by default; if they want HR they
+        # use the View-As selector. HR-tier-only users land on 'hr'
+        # (they have no other tier). HR sits BELOW superuser but
+        # ABOVE the operational tiers in priority.
         if user.has_group(_GROUP_SUPERUSER):
             return "director"
+        if (user.has_group(_GROUP_NEON_HR_ADMIN)
+                or user.has_group(_GROUP_HR_MANAGER)):
+            return "hr"
         if user.has_group(_GROUP_BOOKKEEPER):
             return "bookkeeper"
         if user.has_group(_GROUP_LEAD_TECH):
@@ -287,12 +304,21 @@ class NeonDashboard(models.Model):
     # ------------------------------------------------------------------
     @api.model
     def _check_dashboard_access(self):
-        """Any internal user with one of the five tier meta-groups may
-        load the dashboard. Tier-specific data filtering happens inside
-        the RPC -- this guard only excludes external/portal users."""
+        """Any internal user with one of the five operational tier
+        meta-groups OR an HR-tier group may load the dashboard.
+        Tier-specific data filtering happens inside the RPC -- this
+        guard only excludes external/portal users.
+
+        ⚠️ DECISION (R3b C1, marker 4): HR-tier users (HR Admin /
+        HR Manager) may not be in any of the five neon_core tiers
+        but legitimately need dashboard access. Added to the allow-
+        list here; the _resolve_dashboard_type call below routes
+        them to the 'hr' lens (which itself re-checks _is_hr_user
+        per defence-in-depth)."""
         user = self.env.user
         for group in (_GROUP_SUPERUSER, _GROUP_BOOKKEEPER,
-                      _GROUP_SALES_REP, _GROUP_LEAD_TECH, _GROUP_CREW):
+                      _GROUP_SALES_REP, _GROUP_LEAD_TECH, _GROUP_CREW,
+                      _GROUP_NEON_HR_ADMIN, _GROUP_HR_MANAGER):
             if user.has_group(group):
                 return
         raise AccessError(_(
@@ -305,25 +331,57 @@ class NeonDashboard(models.Model):
         return user.has_group(_GROUP_SUPERUSER)
 
     @api.model
-    def _available_types_for_user(self, user=None):
-        """View-as dropdown options. Superusers see all five tier
-        labels; everyone else gets an empty list (dropdown hidden by
-        the OWL template)."""
+    def _is_hr_user(self, user=None):
+        """⚠️ DECISION (R3b C1, marker 1): HR role-lens RBAC rail.
+        Returns True when the user is in HR-tier or superuser.
+        Used in three places (defence-in-depth):
+          1. _available_types_for_user (View-As dropdown HR option)
+          2. _resolve_dashboard_type (server-side selection check)
+          3. _compute_kpi_hr + _compute_hr_*_block (data methods)
+        A Sales / Lead Tech / Bookkeeper / Crew user must NOT pass
+        this check -- they should never see HR salaries, leave
+        details, contract end dates, or disciplinary data."""
         user = user or self.env.user
-        if not self._is_superuser(user):
-            return []
-        return [{"value": v, "label": label} for v, label in _DASHBOARD_TYPES]
+        return (user.has_group(_GROUP_SUPERUSER)
+                 or user.has_group(_GROUP_NEON_HR_ADMIN)
+                 or user.has_group(_GROUP_HR_MANAGER))
+
+    @api.model
+    def _available_types_for_user(self, user=None):
+        """View-as dropdown options. Superusers see all six tier
+        labels (incl. HR); HR-tier users see only HR (they have no
+        other tier; the dropdown will show one option so they can
+        confirm their landing). Everyone else gets an empty list
+        (dropdown hidden by the OWL template)."""
+        user = user or self.env.user
+        if self._is_superuser(user):
+            return [{"value": v, "label": label}
+                     for v, label in _DASHBOARD_TYPES]
+        if self._is_hr_user(user):
+            return [{"value": "hr", "label": "HR"}]
+        return []
 
     def _resolve_dashboard_type(self, requested_type):
-        """Superusers may flip dashboard_type via the View-as dropdown;
-        everyone else's requested_type is ignored and they get their
-        default."""
+        """Role-toggle resolver with RBAC. Superusers may flip to
+        any dashboard_type. HR-tier users may flip ONLY to 'hr'
+        (their default + only allowed lens). Everyone else's
+        requested_type is ignored and they get their default.
+
+        ⚠️ DECISION (R3b C1, marker 2): a non-HR / non-superuser
+        requesting 'hr' is downgraded to their default lens
+        (NOT raised AccessError) -- the OWL component might cache
+        a stale value across a role downgrade; silently coercing
+        to the user's real tier is safer than 403'ing. The data
+        methods still re-check (no data leak)."""
         user = self.env.user
         if requested_type and self._is_superuser(user):
             if requested_type not in _DASHBOARD_TYPE_VALUES:
                 raise ValidationError(
                     _("Unknown dashboard_type: %s") % requested_type)
             return requested_type
+        if (requested_type == "hr"
+                and self._is_hr_user(user)):
+            return "hr"
         return self._default_dashboard_type_for_user(user.id)
 
     # ------------------------------------------------------------------
@@ -708,6 +766,8 @@ class NeonDashboard(models.Model):
             return self._compute_kpi_bookkeeper()
         if dashboard_type == "lead_tech":
             return self._compute_kpi_lead_tech()
+        if dashboard_type == "hr":
+            return self._compute_kpi_hr()
         return self._compute_kpi_director()
 
     @api.model
@@ -770,6 +830,114 @@ class NeonDashboard(models.Model):
             "kpi_jobs_week": self._kpi_jobs_week(),
             "kpi_crew_gaps": self._kpi_crew_gaps(),
             "kpi_certs_30": self._kpi_certs_30(),
+        }
+
+    # ==================================================================
+    # P-HR-R3b C1 -- HR variant KPI set (5 tiles).
+    # ⚠️ DECISION (R3b C1, marker 5): tile set =
+    #   headcount / on_leave_today / contracts_expiring_30 /
+    #   licences_expiring_30 / pending_leave_approvals.
+    # Defence-in-depth: _check_hr_data_access() refuses non-HR users
+    # at the data layer (so a non-HR user who bypasses
+    # _resolve_dashboard_type still gets nothing). Each helper uses
+    # sudo() to read the HR models -- HR data is intentionally
+    # scoped to HR-tier readers via the call-site check, not via
+    # plain ACL widening on the underlying records.
+    # ==================================================================
+    @api.model
+    def _check_hr_data_access(self):
+        """RBAC red-rail recheck at the HR data layer. A non-HR /
+        non-superuser user must NEVER read HR salaries, leave
+        details, contract end dates, or disciplinary data even if
+        they manage to call the HR compute methods directly."""
+        if not self._is_hr_user():
+            raise AccessError(_(
+                "HR lens requires HR Admin / HR Manager / OD/MD "
+                "membership. Sales / Lead Tech / Bookkeeper / "
+                "Crew users cannot view this content."))
+
+    @api.model
+    def _compute_kpi_hr(self):
+        self._check_hr_data_access()
+        return {
+            "kpi_hr_headcount": self._kpi_hr_headcount(),
+            "kpi_hr_on_leave_today": self._kpi_hr_on_leave_today(),
+            "kpi_hr_contracts_30":
+                self._kpi_hr_contracts_expiring_30(),
+            "kpi_hr_licences_30":
+                self._kpi_hr_licences_expiring_30(),
+            "kpi_hr_pending_leave":
+                self._kpi_hr_pending_leave_approvals(),
+        }
+
+    def _kpi_hr_headcount(self):
+        Employee = self.env["hr.employee"].sudo()
+        total = Employee.search_count([("active", "=", True)])
+        return {
+            "value": int(total or 0),
+            "label": "Headcount",
+            "subtitle": "Active employees",
+            "currency": "",
+        }
+
+    def _kpi_hr_on_leave_today(self):
+        today = self._today_harare()
+        Leave = self.env["hr.leave"].sudo()
+        count = Leave.search_count([
+            ("state", "=", "validate"),
+            ("date_from", "<=", today),
+            ("date_to", ">=", today),
+        ])
+        return {
+            "value": int(count or 0),
+            "label": "On Leave Today",
+            "subtitle": "Validated, overlapping today",
+            "currency": "",
+        }
+
+    def _kpi_hr_contracts_expiring_30(self):
+        today = self._today_harare()
+        Contract = self.env["hr.contract"].sudo()
+        count = Contract.search_count([
+            ("state", "in", ("open", "pending")),
+            ("date_end", ">=", today),
+            ("date_end", "<=", today + timedelta(days=30)),
+        ])
+        return {
+            "value": int(count or 0),
+            "label": "Contracts Expiring (30d)",
+            "subtitle": "Renewal action window",
+            "currency": "",
+        }
+
+    def _kpi_hr_licences_expiring_30(self):
+        today = self._today_harare()
+        Licence = self.env.get("neon.hr.licence")
+        if Licence is None:
+            return {"value": 0,
+                     "label": "Licences Expiring (30d)",
+                     "subtitle": "neon_hr R3a not installed",
+                     "currency": ""}
+        count = Licence.sudo().search_count([
+            ("state", "=", "valid"),
+            ("expiry_date", ">=", today),
+            ("expiry_date", "<=", today + timedelta(days=30)),
+        ])
+        return {
+            "value": int(count or 0),
+            "label": "Licences Expiring (30d)",
+            "subtitle": "Driver fleet renewal window",
+            "currency": "",
+        }
+
+    def _kpi_hr_pending_leave_approvals(self):
+        Leave = self.env["hr.leave"].sudo()
+        count = Leave.search_count([("state", "=", "confirm")])
+        return {
+            "value": int(count or 0),
+            "label": "Pending Leave Approvals",
+            "subtitle": "Awaiting approver action",
+            "currency": "",
         }
 
     # ⚠️ DECISION (M2, marker 3): Cash-on-Hand source is the standard
