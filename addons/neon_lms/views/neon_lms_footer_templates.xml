@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7h: dedicated Neon LMS footer on eLearning (/slides*) pages only.
+    Per Gate 1: the course page (/slides/<course>) renders the GLOBAL
+    footer (website.footer_custom 1302 + o_footer_copyright); the empty
+    website_slides.courses_footer (2128) is unused + not on course pages.
+    So we conditionally SWAP the footer on /slides* routes: hide the
+    global footer content + copyright and render a purpose-built Neon
+    footer (course-support email + Operations-Director line + NO socials
+    + "(c) <year> Neon Events Elements"). Everywhere else the global
+    footer is untouched. We do NOT modify views 1302 / 1312 (global
+    footer is a separate human-owned task). Inherits website.layout at a
+    high priority so it applies after footer_custom has built #footer.
+    Styling: .o_neon_lms_footer in neon_lms_branding.scss (frontend).
+-->
+<odoo>
+    <template id="neon_lms_footer"
+              inherit_id="website.layout"
+              name="Neon LMS Footer (/slides only)"
+              priority="99">
+
+        <!-- eLearning-page flag + the Neon footer (rendered only on /slides*) -->
+        <xpath expr="//footer[@id='bottom']//div[@id='footer']" position="before">
+            <t t-set="neon_is_slides"
+               t-value="bool(request) and request.httprequest.path.startswith('/slides')"/>
+            <div t-if="neon_is_slides" class="o_neon_lms_footer">
+                <div class="container">
+                    <div class="o_neon_lms_footer_top">
+                        <div class="o_neon_lms_footer_brand">
+                            <img class="o_neon_logo"
+                                 src="/neon_lms/static/src/img/neon_logo.png"
+                                 alt="Neon Events Elements"/>
+                            <div class="o_neon_lms_footer_tag">Neon Workshop Training</div>
+                        </div>
+                        <div class="o_neon_lms_footer_contact">
+                            <h5>Course Support</h5>
+                            <ul class="list-unstyled mb-0">
+                                <li><i class="fa fa-envelope fa-fw me-2"/><a href="mailto:admin@neonhiring.co.zw">admin@neonhiring.co.zw</a></li>
+                                <li><i class="fa fa-phone fa-fw me-2"/><span class="o_force_ltr"><a href="tel:+263772336333">+263 772 336 333</a></span></li>
+                                <li><i class="fa fa-comment fa-fw me-2"/><a href="/contactus">Contact us</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="o_neon_lms_footer_copyright">
+                        &#169; <t t-out="datetime.datetime.now().year"/> Neon Events Elements
+                    </div>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- hide the GLOBAL footer body on eLearning pages (untouched elsewhere) -->
+        <xpath expr="//footer[@id='bottom']//div[@id='footer']" position="attributes">
+            <attribute name="t-if">not no_footer and not (bool(request) and request.httprequest.path.startswith('/slides'))</attribute>
+        </xpath>
+
+        <!-- hide the GLOBAL copyright on eLearning pages (Neon footer has its own) -->
+        <xpath expr="//footer[@id='bottom']//div[hasclass('o_footer_copyright')]" position="attributes">
+            <attribute name="t-if">not (bool(request) and request.httprequest.path.startswith('/slides'))</attribute>
+        </xpath>
+    </template>
+</odoo>

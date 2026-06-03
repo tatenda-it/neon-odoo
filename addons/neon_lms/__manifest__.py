@@ -5,7 +5,7 @@
     # cards + capstone band on the course landing (scoped QWeb + SCSS),
     # plus the one-shot publish/visibility/responsible/orphan-cleanup
     # config applied via migration.
-    "version": "17.0.1.16.0",
+    "version": "17.0.1.17.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -76,6 +76,9 @@ Subsequent milestones:
         # P7g -- branded course landing (hero + track cards + capstone),
         # inherits website_slides.course_main; scoped to neon_branded.
         "views/neon_lms_branding_templates.xml",
+        # P7h -- dedicated Neon LMS footer on /slides* pages only
+        # (conditional swap; global footer untouched elsewhere).
+        "views/neon_lms_footer_templates.xml",
     ],
     "assets": {
         "web.assets_backend": [
