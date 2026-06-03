@@ -1,0 +1,6 @@
+# P7f -- the custom image only needs deploy/fonts/ (COPY'd in the
+# Dockerfile). Exclude everything else from the build context so
+# `docker compose build` doesn't ship .git / addons / oca to the daemon.
+# addons + config are bind-mounted at runtime, not baked into the image.
+*
+!deploy/fonts/

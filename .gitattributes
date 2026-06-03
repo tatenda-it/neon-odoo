@@ -1,0 +1,8 @@
+# P7f -- guarantee the custom-image build files check out with the right
+# encoding on the prod (Linux) host regardless of core.autocrlf. A CRLF
+# in a Dockerfile RUN line breaks the build; the font binaries must never
+# be line-ending-converted. Scoped to these paths only (no `* text=auto`)
+# so the rest of the repo's line-ending behaviour is unchanged.
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+deploy/fonts/*.ttf binary
