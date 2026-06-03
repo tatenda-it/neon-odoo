@@ -40,6 +40,12 @@ ModuleComp = env["neon.lms.module.completion"].sudo()
 TrackComp = env["neon.lms.track.completion"].sudo()
 Enrollment = env["slide.channel.partner"].sudo()
 Cert = env["neon.training.certification"].sudo()
+ScenarioComp = env["neon.lms.scenario.completion"].sudo()
+
+# Neutralise outgoing mail: a prod-cloned DB carries a real ir.mail_server,
+# and the existing M12 cert-notification stub message_posts on cert issuance.
+# In-tx (rolled back); keeps SMTP noise out of the run.
+env["ir.mail_server"].sudo().search([]).write({"active": False})
 
 ch = Ch.search([("neon_track_ids", "!=", False)], limit=1)
 _check("T-P7I-00", bool(ch), "Neon channel with tracks exists")
@@ -51,12 +57,44 @@ base_user = env.ref("base.group_user")
 def _mk_user(login):
     u = Users.search([("login", "=", login)], limit=1)
     if not u:
+        # No email: keeps the cert-notification stub from queuing real mail.
         u = Users.create({
             "name": login, "login": login,
-            "email": "%s@example.com" % login,
             "groups_id": [(6, 0, [base_user.id, crew.id])],
         })
     return u
+
+
+def _signoff_scenarios(user, module):
+    """Sign off every active practical scenario on the module for this
+    learner (passed=True) -- mirrors the existing P7e M5 reviewer flow.
+    A module with scenarios is gated on quiz AND scenario signoff; P7i
+    feeds quiz_score, it does not bypass the scenario gate.
+
+    NB: module.completion.scenarios_completed is a non-stored compute that
+    does not @depend on scenario.completion, so within ONE transaction it
+    can read stale. In production each signoff is a separate request (fresh
+    env -> fresh compute). We reproduce that here by invalidating + running
+    the advance once after all signoffs, rather than masking the gate."""
+    scenarios = module.sudo().practical_scenario_ids.filtered("active")
+    for sc in scenarios:
+        comp = ScenarioComp.search([
+            ("learner_id", "=", user.id), ("scenario_id", "=", sc.id)], limit=1)
+        if not comp:
+            comp = ScenarioComp.create({
+                "learner_id": user.id, "scenario_id": sc.id})
+        comp.write({"passed": True, "signed_off_by_id": env.uid,
+                    "signoff_date": fields.Datetime.now()})
+    if not scenarios:
+        return
+    enr = Enrollment.search([
+        ("partner_id", "=", user.partner_id.id),
+        ("channel_id", "=", module.channel_id.id)], limit=1)
+    mc = ModuleComp.search([
+        ("enrollment_id", "=", enr.id), ("module_id", "=", module.id)], limit=1)
+    if mc:
+        mc.invalidate_recordset(["scenarios_completed", "scenarios_total"])
+        mc._check_and_advance_to_completed()
 
 
 def _enroll(user):
@@ -125,6 +163,14 @@ tf_q = mk_tf(m01, seq=130, true_correct=True)
 sa_q = mk_sa(m01, answer="Dante", seq=140)
 mc1 = mk_mc(m01, seq=110)
 mc2 = mk_mc(m01, seq=120)
+# Make m01 scenario-gated on EVERY dataset (prod modules already carry
+# practical scenarios; an empty clone has none). This makes the no-bypass
+# test deterministic: a passing quiz must NOT complete a module that still
+# has an unsigned scenario.
+env["neon.lms.practical.scenario"].sudo().create({
+    "module_id": m01.id, "title": "P7I gate scenario",
+    "description": "P7i no-bypass gate scenario",
+    "signoff_authority": "superuser"})
 
 
 def build_cmds(module, correct=True):
@@ -217,8 +263,9 @@ _check("T-P7I-10", mixed.passed is False,
        "0.5 < min_quiz_score 0.8 -> not passed")
 
 full = attempt(learner, m01, correct=True)
-_check("T-P7I-11", full.passed is True and full.score >= 0.8,
-       "all-correct attempt passes (score %s)" % full.score)
+_check("T-P7I-11", full.passed is True,
+       "all-correct attempt passes (score %s >= mark %s)"
+       % (full.score, m01.min_quiz_score))
 
 n_before = Attempt.sudo().search_count([
     ("learner_id", "=", learner.id), ("module_id", "=", m01.id)])
@@ -228,30 +275,39 @@ _check("T-P7I-12", again.attempt_number == n_before + 1,
        % (again.attempt_number, n_before + 1))
 
 # =====================================================================
-# 13-16  quiz_score written + chain fed + best-score
+# 13-16  quiz_score written + chain FED (not bypassed) + best-score
 # =====================================================================
 enr_l = _enroll(learner)
 mc_m01 = ModuleComp.search([("enrollment_id", "=", enr_l.id),
                             ("module_id", "=", m01.id)], limit=1)
-_check("T-P7I-13", mc_m01 and abs(mc_m01.quiz_score - full.score) < 0.001,
-       "module.completion.quiz_score written from attempt: %s"
-       % (mc_m01.quiz_score if mc_m01 else None))
-# m01 has 2 practical scenarios? (0 in this DB) -> quiz pass alone completes
-_check("T-P7I-14", mc_m01 and mc_m01.state == "completed",
-       "passing attempt advanced module via existing chain (state=%s)"
+# 'full' (T11) is a passing attempt on m01; quiz_score is the best score.
+_check("T-P7I-13",
+       full.passed and mc_m01 and abs(mc_m01.quiz_score - full.score) < 1e-6,
+       "passing quiz writes module.completion.quiz_score=%s (pass mark %s)"
+       % (mc_m01.quiz_score if mc_m01 else None, m01.min_quiz_score))
+# NO-BYPASS: quiz passed, but m01 has an unsigned practical scenario, so
+# the EXISTING gate keeps it in_progress. P7i feeds quiz_score; it does
+# not bypass the scenario requirement.
+_check("T-P7I-14", mc_m01 and mc_m01.state != "completed",
+       "scenario-gated module NOT completed on quiz alone (state=%s)"
        % (mc_m01.state if mc_m01 else None))
-
-# best-score: a deliberately failing attempt must NOT lower quiz_score
-# nor un-complete the module.
+# Sign off the scenario(s) -> the existing chain now completes the module.
+_signoff_scenarios(learner, m01)
+mc_m01.invalidate_recordset()
+_check("T-P7I-15", mc_m01.state == "completed",
+       "module completes once quiz>=mark AND scenarios signed (state=%s)"
+       % mc_m01.state)
+# best-score: a later failing attempt must NOT lower quiz_score or
+# un-complete the module.
 score_before = mc_m01.quiz_score
 fail_after = attempt(learner, m01, correct=False)
 mc_m01.invalidate_recordset()
-_check("T-P7I-15", fail_after.passed is False,
-       "later weak attempt itself fails (score %s)" % fail_after.score)
 _check("T-P7I-16",
-       mc_m01.quiz_score >= score_before and mc_m01.state == "completed",
-       "best-score: quiz_score not lowered (%s>=%s), still completed (%s)"
-       % (mc_m01.quiz_score, score_before, mc_m01.state))
+       (not fail_after.passed) and mc_m01.quiz_score >= score_before
+       and mc_m01.state == "completed",
+       "best-score: fail (passed=%s) doesn't lower score (%s>=%s) or "
+       "un-complete (%s)" % (fail_after.passed, mc_m01.quiz_score,
+                             score_before, mc_m01.state))
 
 # =====================================================================
 # 17  materialisation creates 7 track + 17 module rows; idempotent
@@ -287,7 +343,10 @@ _check("T-P7I-18",
 mx.write({"min_quiz_score": orig_min})
 
 # =====================================================================
-# 19-20  END-TO-END: learner passes all 17 -> 7 sub-certs + capstone
+# 19-20  END-TO-END: learner passes all 17 quizzes + signs off every
+#        practical scenario -> 7 sub-certs + capstone. (On the real
+#        prod bank 6 modules carry scenarios, so quiz-pass alone is
+#        necessary but not sufficient -- this proves the FULL chain.)
 # =====================================================================
 certs_before = Cert.search_count([("user_id", "=", e2e.id)])
 # Process tracks foundation-first (mirrors the prereq order learners
@@ -298,7 +357,8 @@ e2e_error = ""
 try:
     for trk in ordered_tracks:
         for mod in trk.module_ids.sorted(lambda x: (x.sequence_in_track, x.id)):
-            attempt(e2e, mod, correct=True)
+            attempt(e2e, mod, correct=True)   # pass the real quiz
+            _signoff_scenarios(e2e, mod)       # + sign off any scenarios
 except Exception as exc:  # surface, don't abort the summary line
     e2e_error = repr(exc)
 
@@ -360,6 +420,23 @@ seen_other = Attempt.with_user(learner).search([
 _check("T-P7I-24", len(seen_other) == 0,
        "own-row read rule hides other learners' attempts: saw %d"
        % len(seen_other))
+
+# =====================================================================
+# 25  a module with ZERO questions cannot be passed/completed vacuously
+# =====================================================================
+zero_mod = env["neon.lms.module"].sudo().create({
+    "code": "P7I_ZEROQ", "name": "Zero-question test module",
+    "track_id": found_track.id, "sequence_in_track": 999,
+    "min_quiz_score": 0.8})
+z_att = attempt(learner, zero_mod, correct=True)  # 0 questions -> 0 responses
+z_mc = ModuleComp.search([("enrollment_id", "=", enr_l.id),
+                          ("module_id", "=", zero_mod.id)], limit=1)
+_check("T-P7I-25",
+       z_att.score == 0.0 and not z_att.passed
+       and (not z_mc or z_mc.state != "completed"),
+       "0-question module: score=%s passed=%s state=%s -> no vacuous "
+       "completion" % (z_att.score, z_att.passed,
+                       z_mc.state if z_mc else None))
 
 # =====================================================================
 print()
