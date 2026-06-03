@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Training',
-    'version': '17.0.8.10.0',
+    # P7f (17.0.8.11.0): LMS certificate numbering (NEON-<TRACK>-<YEAR>-
+    # <SEQ>) + verification token + revoke flag + Design-A QWeb/PDF cert
+    # + internal verification lookup. Issuance chain itself is unchanged
+    # (neon_lms M8); number/token assigned in certification.create().
+    'version': '17.0.8.11.0',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
@@ -294,6 +298,9 @@ dashboard.
         # seed data: categories MUST load before types so the
         # category_id ref="..." lookups resolve.
         'data/neon_training_data.xml',
+        # P7f -- certificate-number sequences (one per LMS track token
+        # + capstone). noupdate=1; counter survives upgrades.
+        'data/neon_training_cert_sequence.xml',
         # P7a.M4 -- daily expiry cron + reminder mail templates.
         # Load after the seed XML so model_id refs in the cron
         # record + templates resolve cleanly. noupdate=1 preserves
@@ -337,6 +344,12 @@ dashboard.
         'report/neon_training_expiring_report.xml',
         'report/neon_training_compliance_report.xml',
         'report/neon_training_cross_competency_report.xml',
+        # P7f -- Design-A certificate PDF (paperformat + action +
+        # template). model_neon_training_certification must exist
+        # (loaded via the CSV above), so this loads fine here.
+        'report/neon_training_certificate_report.xml',
+        # P7f -- internal verification lookup wizard view + menu.
+        'views/neon_training_cert_verify_wizard_views.xml',
         # menus last so action ref()s resolve. M2 added the
         # Configuration submenu; M6 adds Cross-Competencies at
         # sequence=20 between Certifications and Configuration.

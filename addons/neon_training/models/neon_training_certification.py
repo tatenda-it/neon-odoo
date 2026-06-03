@@ -106,6 +106,33 @@ _CERT_VERIFIER_LOGINS = (
 )
 
 
+# ---------------------------------------------------------------------
+# P7f -- certificate number tokens + PDF render metadata, keyed by cert
+# TYPE code. Covers the 7 LMS sub-cert types + the capstone
+# (neon_technical). Number scheme NEON-<TOKEN>-<YEAR>-<SEQ> (capstone
+# NEON-TC-...). Strip order matches the approved Design A (capstone
+# lights all 7; a sub-cert highlights only its own track).
+# Non-LMS cert types (operational P7a certs) are absent here -> they get
+# no certificate_number (the PDF + numbering are LMS-cert scope).
+# ---------------------------------------------------------------------
+NEON_CERT_META = {
+    "neon_foundations_safety": {"token": "FND", "label": "Foundations & Safety", "seal": "FOUNDATIONS"},
+    "neon_audio":              {"token": "AUD", "label": "Audio",                "seal": "AUDIO TRACK"},
+    "neon_lighting":           {"token": "LIG", "label": "Lighting",             "seal": "LIGHTING TRACK"},
+    "neon_video_led":          {"token": "VID", "label": "Video & LED",          "seal": "VIDEO TRACK"},
+    "neon_workflow_ops":       {"token": "WFL", "label": "Workflow & Ops",       "seal": "WORKFLOW TRACK"},
+    "neon_rigging":            {"token": "RIG", "label": "Rigging",              "seal": "RIGGING TRACK"},
+    "neon_client_ready":       {"token": "SOF", "label": "Soft Skills",          "seal": "SOFT SKILLS"},
+    "neon_technical":          {"token": "TC",  "label": "Technical Certification", "seal": "NEON CERTIFIED", "capstone": True},
+}
+# Display order of the 7 tracks in the cert strip (Design A).
+NEON_TRACK_STRIP = [
+    "Foundations & Safety", "Audio", "Lighting", "Video & LED",
+    "Workflow & Ops", "Rigging", "Soft Skills",
+]
+_CAPSTONE_TYPE_CODE = "neon_technical"
+
+
 class NeonTrainingCertification(models.Model):
     _name = "neon.training.certification"
     _description = "Training Certification Record"
@@ -357,6 +384,36 @@ class NeonTrainingCertification(models.Model):
     )
 
     # ============================================================
+    # P7f -- certificate number + verification token + revoke flag
+    # ============================================================
+    certificate_number = fields.Char(
+        string="Certificate No.",
+        readonly=True,
+        copy=False,
+        index=True,
+        tracking=True,
+        help="Unique number assigned on issuance for LMS sub-cert / "
+        "capstone certs. Scheme NEON-<TRACK>-<YEAR>-<SEQ> "
+        "(capstone NEON-TC-<YEAR>-<SEQ>). Blank for non-LMS cert "
+        "types.",
+    )
+    verification_token = fields.Char(
+        string="Verification Token",
+        readonly=True,
+        copy=False,
+        index=True,
+        help="Stable opaque token (uuid4 hex) for the internal "
+        "verification lookup. Assigned on create for every cert.",
+    )
+    active = fields.Boolean(
+        default=True,
+        tracking=True,
+        help="Revocation flag (P7f). An OD/admin revoke archives the "
+        "cert (active=False) — the record is PRESERVED (append-only, "
+        "never unlinked). The system never auto-revokes.",
+    )
+
+    # ============================================================
     # Notes + compliance
     # ============================================================
     notes = fields.Text(string="Notes")
@@ -395,7 +452,15 @@ class NeonTrainingCertification(models.Model):
         "reactivation.",
     )
 
-    _sql_constraints = []  # all rules are Python-level (see _check_*)
+    _sql_constraints = [
+        # P7f: cert number + verification token uniqueness (DB-level).
+        ("certificate_number_unique",
+         "unique(certificate_number)",
+         "Certificate number must be unique."),
+        ("verification_token_unique",
+         "unique(verification_token)",
+         "Verification token must be unique."),
+    ]  # other rules are Python-level (see _check_*)
 
     # ============================================================
     # Computes
@@ -712,6 +777,16 @@ class NeonTrainingCertification(models.Model):
         action_verify's transition for the renewal case. M5 ships
         the create-time hook; verify-time hook tracked as polish.
         """
+        # P7f: assign certificate_number (LMS sub/capstone types only)
+        # + verification_token (every cert) before insert. Explicit
+        # values in vals win (data imports / tests passing their own).
+        for vals in vals_list:
+            if vals.get("type_id") and not vals.get("certificate_number"):
+                num = self._next_cert_number(vals["type_id"])
+                if num:
+                    vals["certificate_number"] = num
+            if not vals.get("verification_token"):
+                vals["verification_token"] = self._new_verification_token()
         records = super().create(vals_list)
         for rec in records:
             if rec.state != "active" or not rec.user_id or not rec.type_id:
@@ -1288,3 +1363,128 @@ class NeonTrainingCertification(models.Model):
             ", ".join(f"{k}={v}" for k, v in sorted(by_tier.items())),
         )
         return sent
+
+    # ============================================================
+    # P7f -- certificate numbering / token / revoke / PDF render
+    # ============================================================
+    @api.model
+    def _new_verification_token(self):
+        import uuid
+        return uuid.uuid4().hex
+
+    @api.model
+    def _next_cert_number(self, type_id):
+        """Next NEON-<TOKEN>-<YEAR>-<SEQ> for the cert type, or False
+        for non-LMS types (no number scheme)."""
+        ctype = self.env["neon.training.certification.type"].browse(type_id)
+        meta = NEON_CERT_META.get(ctype.code)
+        if not meta:
+            return False
+        return self.env["ir.sequence"].sudo().next_by_code(
+            "neon_training.cert_num_%s" % meta["token"]) or False
+
+    @api.model
+    def _cert_verifier_user_ids(self):
+        return self.env["res.users"].sudo().search(
+            [("login", "in", list(_CERT_VERIFIER_LOGINS))]).ids
+
+    def is_capstone_cert(self):
+        self.ensure_one()
+        return self.type_id.code == _CAPSTONE_TYPE_CODE
+
+    def action_revoke(self):
+        """OD/MD (cert verifier) or training admin revoke -> active=
+        False (archive). Append-only: record preserved, never
+        unlinked; the system never auto-revokes. Reason via
+        context['revoke_reason'] -> chatter."""
+        if not (self.env.user.has_group(
+                    "neon_training.group_neon_training_admin")
+                or self.env.user.id in self._cert_verifier_user_ids()
+                or self.env.user.id == SUPERUSER_ID):
+            raise AccessError(_(
+                "Only OD/MD (cert verifiers) or a training admin may "
+                "revoke a certification."))
+        reason = (self.env.context.get("revoke_reason") or "").strip()
+        for rec in self:
+            rec.active = False
+            rec.message_post(body=_(
+                "Certificate REVOKED by %(user)s.%(reason)s") % {
+                    "user": self.env.user.name,
+                    "reason": (" Reason: %s" % reason) if reason else "",
+                })
+        return True
+
+    @api.model
+    def _certificate_logo_data_uri(self):
+        """Base64 data-URI of the bundled Neon logo. Embedded inline so
+        wkhtmltopdf needs NO network at render (a bare static URL throws
+        ProtocolUnknownError under the report engine)."""
+        import base64
+        from odoo.modules.module import get_module_path
+        path = (get_module_path("neon_training")
+                + "/static/src/img/neon_cert_logo.png")
+        try:
+            with open(path, "rb") as fh:
+                return "data:image/png;base64," + base64.b64encode(
+                    fh.read()).decode()
+        except Exception:  # noqa: BLE001
+            return ""
+
+    # P7f: Design A's display fonts (Fraunces + Spline Sans / Spline Sans
+    # Mono) are NOT loaded via @font-face — wkhtmltopdf 0.12.6 (patched
+    # Qt, as Odoo drives it) ignores @font-face web fonts in every form
+    # (inline <style>, report-bundle, base64 data: URI) and renders only
+    # with OS-installed fonts via fontconfig (proven: standard Odoo
+    # reports come out in Roboto, OS-installed, never the bundle's Lato).
+    # The faces are therefore OS-installed in the container image at the
+    # prod-deploy step (the 6 consolidated TTFs → /usr/share/fonts +
+    # fc-cache); the report template's font-family stacks
+    # ('Fraunces' / 'Spline Sans' / 'Spline Sans Mono', each with a
+    # serif/sans/mono fallback) then resolve to them automatically. On a
+    # box without the faces installed the cert renders in the fallback
+    # (clean sans) — faithful in every other respect. No per-render font
+    # work is needed here.
+
+    def _get_certificate_render_vals(self):
+        """Everything the Design-A QWeb cert report needs, per cert."""
+        self.ensure_one()
+        meta = NEON_CERT_META.get(self.type_id.code, {})
+        is_capstone = bool(meta.get("capstone"))
+        my_label = meta.get("label")
+        strip = [{"label": lbl, "on": (is_capstone or lbl == my_label)}
+                 for lbl in NEON_TRACK_STRIP]
+        if is_capstone:
+            eyebrow = "Neon Workshop Training Programme"
+            title_html = "Certificate of <em>Technical Certification</em>"
+            body_html = (
+                "for the successful completion of the <b>Neon Workshop "
+                "Training Programme</b> &mdash; demonstrating technical "
+                "competence across all seven disciplines of professional "
+                "event production, and meeting Neon&rsquo;s standard for "
+                "a <b>Client-Ready Technician</b>.")
+        else:
+            idx = (NEON_TRACK_STRIP.index(my_label) + 1
+                   if my_label in NEON_TRACK_STRIP else 0)
+            eyebrow = "Neon Workshop Training &middot; Track %d of 7" % idx
+            title_html = "<em>%s</em> Technical Certification" % (
+                my_label or self.type_id.name)
+            body_html = (
+                "for successfully completing the <b>%s</b> track of the "
+                "Neon Workshop Training Programme &mdash; to "
+                "Neon&rsquo;s professional standard." % (
+                    my_label or self.type_id.name))
+        return {
+            "recipient": self.user_id.name or "",
+            "eyebrow": eyebrow,
+            "title_html": title_html,
+            "body_html": body_html,
+            "tracks": strip,
+            "seal": meta.get("seal", "NEON CERTIFIED"),
+            "number": self.certificate_number or "(unassigned)",
+            "issued": (self.date_obtained.strftime("%d %B %Y")
+                       if self.date_obtained else ""),
+            "is_capstone": is_capstone,
+            "signatory": "Robin Goneso",
+            "signatory_role": "Operations Director",
+            "logo": self._certificate_logo_data_uri(),
+        }

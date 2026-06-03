@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7f: certificate number sequences. One per LMS sub-cert token +
+    the capstone (TC). Scheme NEON-<TOKEN>-<YEAR>-<SEQ>; %(year)s is the
+    issue year, SEQ is a continuous zero-padded counter per token.
+    noupdate="1" so the running counter survives module upgrades (never
+    reset). neon.training.certification._next_cert_number picks the
+    sequence by the cert type's token (NEON_CERT_META).
+-->
+<odoo noupdate="1">
+    <record id="seq_cert_num_FND" model="ir.sequence">
+        <field name="name">Neon Cert No. — Foundations &amp; Safety</field>
+        <field name="code">neon_training.cert_num_FND</field>
+        <field name="prefix">NEON-FND-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_cert_num_AUD" model="ir.sequence">
+        <field name="name">Neon Cert No. — Audio</field>
+        <field name="code">neon_training.cert_num_AUD</field>
+        <field name="prefix">NEON-AUD-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_cert_num_LIG" model="ir.sequence">
+        <field name="name">Neon Cert No. — Lighting</field>
+        <field name="code">neon_training.cert_num_LIG</field>
+        <field name="prefix">NEON-LIG-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_cert_num_VID" model="ir.sequence">
+        <field name="name">Neon Cert No. — Video &amp; LED</field>
+        <field name="code">neon_training.cert_num_VID</field>
+        <field name="prefix">NEON-VID-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_cert_num_WFL" model="ir.sequence">
+        <field name="name">Neon Cert No. — Workflow &amp; Ops</field>
+        <field name="code">neon_training.cert_num_WFL</field>
+        <field name="prefix">NEON-WFL-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_cert_num_RIG" model="ir.sequence">
+        <field name="name">Neon Cert No. — Rigging</field>
+        <field name="code">neon_training.cert_num_RIG</field>
+        <field name="prefix">NEON-RIG-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_cert_num_SOF" model="ir.sequence">
+        <field name="name">Neon Cert No. — Soft Skills</field>
+        <field name="code">neon_training.cert_num_SOF</field>
+        <field name="prefix">NEON-SOF-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+    <record id="seq_cert_num_TC" model="ir.sequence">
+        <field name="name">Neon Cert No. — Technical Capstone</field>
+        <field name="code">neon_training.cert_num_TC</field>
+        <field name="prefix">NEON-TC-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="number_increment">1</field>
+    </record>
+</odoo>

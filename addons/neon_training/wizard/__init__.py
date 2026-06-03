@@ -7,3 +7,5 @@ from . import neon_training_quote_gate_override_wizard
 from . import neon_training_event_start_gate_override_wizard
 # P7a.M12 -- find-qualified-user search wizard.
 from . import neon_training_find_qualified_user_wizard
+# P7f -- internal certificate verification lookup.
+from . import neon_training_cert_verify_wizard

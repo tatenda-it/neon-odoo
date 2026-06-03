@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7f: internal certificate verification lookup wizard.
+    Admin / signoff only (internal use; no public route). Resolves a
+    certificate number OR verification token to a cert + validity.
+-->
+<odoo>
+    <record id="cert_verify_wizard_form" model="ir.ui.view">
+        <field name="name">neon.training.cert.verify.wizard.form</field>
+        <field name="model">neon.training.cert.verify.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Verify Certificate">
+                <group>
+                    <field name="query"
+                           placeholder="NEON-AUD-2026-0001 or a verification token"/>
+                </group>
+                <field name="result_html" widget="html" readonly="1"
+                       invisible="not result_html"/>
+                <field name="resolved_cert_id" invisible="1"/>
+                <footer>
+                    <button name="action_lookup" type="object"
+                            string="Look Up" class="btn-primary"/>
+                    <button string="Close" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cert_verify_wizard" model="ir.actions.act_window">
+        <field name="name">Verify Certificate</field>
+        <field name="res_model">neon.training.cert.verify.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_neon_training_verify_cert"
+              name="Verify Certificate"
+              parent="menu_neon_training_root"
+              action="action_cert_verify_wizard"
+              sequence="15"
+              groups="neon_training.group_neon_training_signoff,neon_training.group_neon_training_admin"/>
+</odoo>

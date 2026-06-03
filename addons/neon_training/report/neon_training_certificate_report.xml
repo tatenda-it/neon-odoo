@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7f: Neon training certificate PDF (Design A, approved).
+    QWeb/wkhtmltopdf, landscape A4, zero margins, full-page custom
+    layout (NOT web.external_layout). One cert per page. Renders for
+    both sub-certs (one track highlighted) and the capstone (all 7 lit)
+    via doc._get_certificate_render_vals(). The font-family stacks below
+    request Fraunces / Spline Sans / Spline Sans Mono with serif/sans/
+    mono fallbacks; those faces are OS-installed in the image at the
+    prod-deploy step (wkhtmltopdf honours only OS fonts, not @font-face).
+    Until then the cert renders in the clean fallback — Design-A-faithful
+    in every other respect. See models/..._certification.py for the why.
+-->
+<odoo>
+    <!-- Landscape A4, no margins; the cert frame is drawn by the
+         template itself. -->
+    <record id="paperformat_neon_certificate" model="report.paperformat">
+        <field name="name">Neon Certificate (A4 landscape, full bleed)</field>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">0</field>
+        <field name="margin_bottom">0</field>
+        <field name="margin_left">0</field>
+        <field name="margin_right">0</field>
+        <field name="header_spacing">0</field>
+        <field name="dpi">110</field>
+    </record>
+
+    <record id="action_report_certificate" model="ir.actions.report">
+        <field name="name">Certificate (PDF)</field>
+        <field name="model">neon.training.certification</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">neon_training.report_certificate_document</field>
+        <field name="report_file">neon_training.report_certificate_document</field>
+        <field name="paperformat_id" ref="paperformat_neon_certificate"/>
+        <field name="binding_model_id" ref="model_neon_training_certification"/>
+        <field name="binding_type">report</field>
+        <!-- Cert owner (training_user, scoped to own via ir.rule) +
+             signoff + admin can print. -->
+        <field name="groups_id" eval="[(4, ref('neon_training.group_neon_training_user')),
+                                        (4, ref('neon_training.group_neon_training_signoff')),
+                                        (4, ref('neon_training.group_neon_training_admin'))]"/>
+    </record>
+
+    <template id="report_certificate_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-set="v" t-value="doc._get_certificate_render_vals()"/>
+                <div class="page">
+                    <style>
+                        .ncert *{box-sizing:border-box;margin:0;padding:0}
+                        .ncert{--ink:#171019;--ink-soft:#4b4350;--grape:#6B21A8;--grape-deep:#3f0f6b;--violet:#8b5cf6;--lilac:#a78bfa;--gold:#c9a35e;--slate:#8a8290;
+                            font-family:'Spline Sans','Helvetica Neue',Arial,sans-serif;color:var(--ink);width:100%;}
+                        .ncert .cert{position:relative;width:100%;height:200mm;background:#fffdf9;padding:16mm 20mm;display:flex;flex-direction:column;overflow:hidden}
+                        .ncert .cert::before{content:'';position:absolute;top:5mm;left:5mm;right:5mm;bottom:5mm;border:1.5px solid var(--grape);opacity:.18}
+                        .ncert .cert::after{content:'';position:absolute;top:7mm;left:7mm;right:7mm;bottom:7mm;border:1px solid var(--gold);opacity:.35}
+                        .ncert .corner{position:absolute;width:14mm;height:14mm;border:0 solid var(--grape)}
+                        .ncert .c-tl{top:7mm;left:7mm;border-top-width:3px;border-left-width:3px}
+                        .ncert .c-tr{top:7mm;right:7mm;border-top-width:3px;border-right-width:3px}
+                        .ncert .c-bl{bottom:7mm;left:7mm;border-bottom-width:3px;border-left-width:3px}
+                        .ncert .c-br{bottom:7mm;right:7mm;border-bottom-width:3px;border-right-width:3px}
+                        .ncert .ribbon{position:absolute;top:0;right:22mm;width:16mm;height:26mm;background:#3f0f6b;clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
+                        .ncert .ribbon span{position:absolute;top:7mm;left:50%;transform:translateX(-50%);color:#fff;font-size:16px}
+                        .ncert .logo{height:16mm;align-self:center;margin-top:2mm}
+                        .ncert .eyebrow{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--slate);text-align:center;margin-top:6mm}
+                        .ncert .title{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:900;font-size:34px;line-height:1.04;text-align:center;margin-top:3mm}
+                        .ncert .title em{font-style:italic;color:var(--grape)}
+                        .ncert .presented{text-align:center;color:var(--ink-soft);font-size:13px;margin-top:6mm}
+                        .ncert .name{font-family:'Fraunces',Georgia,serif;font-style:italic;font-weight:500;font-size:32px;color:var(--grape-deep);padding-bottom:3mm;border-bottom:1.5px solid var(--gold);display:inline-block;margin-top:1mm}
+                        .ncert .namewrap{text-align:center}
+                        .ncert .bodytxt{text-align:center;color:var(--ink-soft);font-size:12.5px;line-height:1.6;max-width:160mm;margin:5mm auto 0}
+                        .ncert .bodytxt b{color:var(--ink);font-weight:600}
+                        .ncert .tracks{text-align:center;margin:5mm auto 0;max-width:200mm}
+                        .ncert .trk{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.04em;text-transform:uppercase;background:#f0e9f7;color:var(--grape-deep);border:1px solid #d6c2ec;padding:3px 8px;border-radius:12px;margin:2px}
+                        .ncert .trk.on{background:var(--grape);color:#fff;border-color:var(--grape)}
+                        .ncert .footer{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;padding-top:8mm}
+                        .ncert .sigline{width:55mm;border-top:1.5px solid var(--ink);padding-top:2mm;text-align:center}
+                        .ncert .signame{font-weight:600;font-size:12px}
+                        .ncert .sigrole{font-size:9px;color:var(--slate);font-family:'Spline Sans Mono',monospace;letter-spacing:.08em;text-transform:uppercase;margin-top:1mm}
+                        .ncert .seal{width:26mm;height:26mm;border-radius:50%;background:#6B21A8;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+                        .ncert .seal .hex{font-size:22px;line-height:1}
+                        .ncert .seal .sealtxt{font-family:'Spline Sans Mono',monospace;font-size:6px;letter-spacing:.1em;margin-top:1mm;padding:0 3mm}
+                        .ncert .meta{font-family:'Spline Sans Mono',monospace;font-size:9px;color:var(--slate);text-align:right}
+                        .ncert .meta div{margin-bottom:1mm}
+                        .ncert .meta b{color:var(--ink);font-weight:600}
+                    </style>
+                    <div class="ncert">
+                        <div class="cert">
+                            <span class="corner c-tl"/><span class="corner c-tr"/><span class="corner c-bl"/><span class="corner c-br"/>
+                            <div class="ribbon"><span>&#9733;</span></div>
+                            <img class="logo" t-if="v['logo']" t-att-src="v['logo']"/>
+                            <div class="eyebrow"><t t-raw="v['eyebrow']"/></div>
+                            <div class="title"><t t-raw="v['title_html']"/></div>
+                            <div class="presented">This is proudly presented to</div>
+                            <div class="namewrap"><span class="name" t-out="v['recipient']"/></div>
+                            <div class="bodytxt"><t t-raw="v['body_html']"/></div>
+                            <div class="tracks">
+                                <t t-foreach="v['tracks']" t-as="trk">
+                                    <span t-att-class="'trk on' if trk['on'] else 'trk'" t-out="trk['label']"/>
+                                </t>
+                            </div>
+                            <div class="footer">
+                                <div class="sigblock">
+                                    <div class="sigline">
+                                        <div class="signame" t-out="v['signatory']"/>
+                                        <div class="sigrole" t-out="v['signatory_role']"/>
+                                    </div>
+                                </div>
+                                <div class="seal">
+                                    <div class="hex">&#11042;</div>
+                                    <div class="sealtxt" t-out="v['seal']"/>
+                                </div>
+                                <div class="meta">
+                                    <div>Certificate No. <b t-out="v['number']"/></div>
+                                    <div>Issued <b t-out="v['issued']"/></div>
+                                    <div>Verify: ref <b t-out="doc.verification_token[:12] if doc.verification_token else ''"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
