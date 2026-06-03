@@ -1,6 +1,16 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
+    # P7k (17.0.2.1.1): lesson-render fix -- the 237 lessons were
+    # imported as slide_category='document'/'pdf' with no pdf payload,
+    # so the player hung on "Loading..." (embed_code raises on a
+    # file-less pdf). One-shot transform script (scripts/migrate_p7k_
+    # slide_render.py, admin-run, NOT in data/) flips them to 'article'
+    # so html_content renders; html preserved byte-for-byte. Plus the
+    # invented lime accent (#c8f36b) retired from the LMS branding +
+    # quiz SCSS -> white on grape surfaces, grape on light (gate badge
+    # -> white pill + grape text/border; quiz CTA -> grape bar). No
+    # model change; patch bump.
     # P7i (17.0.2.0.0): learner-facing review-quiz surface + the
     # neon.lms.quiz.attempt pivot model -- the missing "M10 attempts
     # model" that writes module.completion.quiz_score and so FEEDS the
@@ -12,7 +22,7 @@
     # cards + capstone band on the course landing (scoped QWeb + SCSS),
     # plus the one-shot publish/visibility/responsible/orphan-cleanup
     # config applied via migration.
-    "version": "17.0.2.1.0",
+    "version": "17.0.2.1.1",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """

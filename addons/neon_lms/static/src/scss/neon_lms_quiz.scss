@@ -1,9 +1,9 @@
 // P7i -- learner-facing review-quiz styling. Scoped under the
 // quiz wrapper so no other website page is touched. Reuses the
-// P7g Neon palette (grape + lime accent).
+// P7g Neon palette (grape accent). P7k: invented lime retired ->
+// white on grape surfaces, grape on light surfaces.
 $neon-grape: #6B21A8;
 $neon-grape-deep: #3f0f6b;
-$neon-lime: #c8f36b;
 $neon-ink: #1d1230;
 
 .o_neon_lms_quizwrap {
@@ -47,7 +47,7 @@ $neon-ink: #1d1230;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
-            border-bottom: 2px solid $neon-lime;
+            border-bottom: 2px solid $neon-grape;   // P7k: grape on white (was lime)
             padding-bottom: .5rem;
             margin-bottom: .75rem;
             h2 { font-size: 1.15rem; font-weight: 800; margin: 0; }
@@ -150,10 +150,10 @@ $neon-ink: #1d1230;
         .o_neon_quiz_bigscore {
             font-size: 3rem;
             font-weight: 900;
-            color: $neon-lime;
+            color: #fff;   // P7k: white on grape result card (was lime)
         }
         .o_neon_quiz_resultmeta { opacity: .85; }
-        .o_neon_quiz_completebanner { color: $neon-lime; font-weight: 700; }
+        .o_neon_quiz_completebanner { color: #fff; font-weight: 700; }   // P7k: white (was lime)
         .o_neon_quiz_resultactions {
             margin-top: 1rem;
             display: flex;
@@ -211,8 +211,8 @@ $neon-ink: #1d1230;
     gap: 1rem;
     flex-wrap: wrap;
     padding: .85rem 1.25rem;
-    background: $neon-lime;
-    color: $neon-ink;
+    background: $neon-grape;   // P7k: grape CTA bar (was lime)
+    color: #fff;
 
     .o_neon_quizcta_note { font-size: .85rem; font-weight: 600; }
 }
