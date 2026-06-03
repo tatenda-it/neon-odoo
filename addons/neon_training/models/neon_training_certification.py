@@ -1451,27 +1451,47 @@ class NeonTrainingCertification(models.Model):
         meta = NEON_CERT_META.get(self.type_id.code, {})
         is_capstone = bool(meta.get("capstone"))
         my_label = meta.get("label")
-        strip = [{"label": lbl, "on": (is_capstone or lbl == my_label)}
+        # Pill styles are INLINE: wkhtmltopdf reliably applies style="" but
+        # NOT the head-linked report bundle CSS (verified on prod -- the
+        # bundle .ncert rules never took; inline did). So every cert
+        # element carries its own style attribute (see the report template)
+        # and the two track-pill variants are emitted here per track.
+        _pill = ("display:inline-block;font-family:'Spline Sans Mono',"
+                 "monospace;font-size:8.5px;letter-spacing:.4px;"
+                 "text-transform:uppercase;padding:3px 8px;"
+                 "border-radius:11px;margin:2px;")
+        pill_off = _pill + "background:#f0e9f7;color:#3f0f6b;border:1px solid #d6c2ec;"
+        pill_on = _pill + "background:#6B21A8;color:#ffffff;border:1px solid #6B21A8;"
+        strip = [{"label": lbl, "on": (is_capstone or lbl == my_label),
+                  "style": (pill_on if (is_capstone or lbl == my_label)
+                            else pill_off)}
                  for lbl in NEON_TRACK_STRIP]
+        em = "<em style='font-style:italic;color:#6B21A8'>%s</em>"
+        # ASCII-only copy: Odoo's report body-split re-serialises entities
+        # / Unicode to raw UTF-8 bytes, which the wkhtmltopdf body fragment
+        # then reads as latin-1 (mojibake -- proven on the em-dash + the
+        # ribbon star). A spaced hyphen + straight apostrophe render
+        # cleanly; typographic em-dash/curly-quote is a later refinement
+        # if the encoding can be forced.
         if is_capstone:
             eyebrow = "Neon Workshop Training Programme"
-            title_html = "Certificate of <em>Technical Certification</em>"
+            title_html = "Certificate of " + (em % "Technical Certification")
             body_html = (
                 "for the successful completion of the <b>Neon Workshop "
-                "Training Programme</b> &mdash; demonstrating technical "
+                "Training Programme</b> - demonstrating technical "
                 "competence across all seven disciplines of professional "
-                "event production, and meeting Neon&rsquo;s standard for "
+                "event production, and meeting Neon's standard for "
                 "a <b>Client-Ready Technician</b>.")
         else:
             idx = (NEON_TRACK_STRIP.index(my_label) + 1
                    if my_label in NEON_TRACK_STRIP else 0)
-            eyebrow = "Neon Workshop Training &middot; Track %d of 7" % idx
-            title_html = "<em>%s</em> Technical Certification" % (
-                my_label or self.type_id.name)
+            eyebrow = "Neon Workshop Training - Track %d of 7" % idx
+            title_html = (em % (my_label or self.type_id.name)
+                          ) + " Technical Certification"
             body_html = (
                 "for successfully completing the <b>%s</b> track of the "
-                "Neon Workshop Training Programme &mdash; to "
-                "Neon&rsquo;s professional standard." % (
+                "Neon Workshop Training Programme - to "
+                "Neon's professional standard." % (
                     my_label or self.type_id.name))
         return {
             "recipient": self.user_id.name or "",
@@ -1483,6 +1503,7 @@ class NeonTrainingCertification(models.Model):
             "number": self.certificate_number or "(unassigned)",
             "issued": (self.date_obtained.strftime("%d %B %Y")
                        if self.date_obtained else ""),
+            "verify_ref": (self.verification_token or "")[:12],
             "is_capstone": is_capstone,
             "signatory": "Robin Goneso",
             "signatory_role": "Operations Director",

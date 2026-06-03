@@ -46,75 +46,70 @@
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="doc">
                 <t t-set="v" t-value="doc._get_certificate_render_vals()"/>
+                <!-- All styling is INLINE: wkhtmltopdf 0.12.6 reliably
+                     applies style="" attributes but NOT the head-linked
+                     report bundle (verified on prod) and NOT an inline
+                     <style> block (dropped by Odoo's body-split). Layout is
+                     absolute-positioned divs + a footer table; no flexbox /
+                     clip-path / var() / pseudo-elements (unsupported by the
+                     2016-era QtWebKit). Copy is ASCII (see render-vals). -->
                 <div class="page">
-                    <style>
-                        .ncert *{box-sizing:border-box;margin:0;padding:0}
-                        .ncert{--ink:#171019;--ink-soft:#4b4350;--grape:#6B21A8;--grape-deep:#3f0f6b;--violet:#8b5cf6;--lilac:#a78bfa;--gold:#c9a35e;--slate:#8a8290;
-                            font-family:'Spline Sans','Helvetica Neue',Arial,sans-serif;color:var(--ink);width:100%;}
-                        .ncert .cert{position:relative;width:100%;height:200mm;background:#fffdf9;padding:16mm 20mm;display:flex;flex-direction:column;overflow:hidden}
-                        .ncert .cert::before{content:'';position:absolute;top:5mm;left:5mm;right:5mm;bottom:5mm;border:1.5px solid var(--grape);opacity:.18}
-                        .ncert .cert::after{content:'';position:absolute;top:7mm;left:7mm;right:7mm;bottom:7mm;border:1px solid var(--gold);opacity:.35}
-                        .ncert .corner{position:absolute;width:14mm;height:14mm;border:0 solid var(--grape)}
-                        .ncert .c-tl{top:7mm;left:7mm;border-top-width:3px;border-left-width:3px}
-                        .ncert .c-tr{top:7mm;right:7mm;border-top-width:3px;border-right-width:3px}
-                        .ncert .c-bl{bottom:7mm;left:7mm;border-bottom-width:3px;border-left-width:3px}
-                        .ncert .c-br{bottom:7mm;right:7mm;border-bottom-width:3px;border-right-width:3px}
-                        .ncert .ribbon{position:absolute;top:0;right:22mm;width:16mm;height:26mm;background:#3f0f6b;clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
-                        .ncert .ribbon span{position:absolute;top:7mm;left:50%;transform:translateX(-50%);color:#fff;font-size:16px}
-                        .ncert .logo{height:16mm;align-self:center;margin-top:2mm}
-                        .ncert .eyebrow{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--slate);text-align:center;margin-top:6mm}
-                        .ncert .title{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:900;font-size:34px;line-height:1.04;text-align:center;margin-top:3mm}
-                        .ncert .title em{font-style:italic;color:var(--grape)}
-                        .ncert .presented{text-align:center;color:var(--ink-soft);font-size:13px;margin-top:6mm}
-                        .ncert .name{font-family:'Fraunces',Georgia,serif;font-style:italic;font-weight:500;font-size:32px;color:var(--grape-deep);padding-bottom:3mm;border-bottom:1.5px solid var(--gold);display:inline-block;margin-top:1mm}
-                        .ncert .namewrap{text-align:center}
-                        .ncert .bodytxt{text-align:center;color:var(--ink-soft);font-size:12.5px;line-height:1.6;max-width:160mm;margin:5mm auto 0}
-                        .ncert .bodytxt b{color:var(--ink);font-weight:600}
-                        .ncert .tracks{text-align:center;margin:5mm auto 0;max-width:200mm}
-                        .ncert .trk{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.04em;text-transform:uppercase;background:#f0e9f7;color:var(--grape-deep);border:1px solid #d6c2ec;padding:3px 8px;border-radius:12px;margin:2px}
-                        .ncert .trk.on{background:var(--grape);color:#fff;border-color:var(--grape)}
-                        .ncert .footer{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;padding-top:8mm}
-                        .ncert .sigline{width:55mm;border-top:1.5px solid var(--ink);padding-top:2mm;text-align:center}
-                        .ncert .signame{font-weight:600;font-size:12px}
-                        .ncert .sigrole{font-size:9px;color:var(--slate);font-family:'Spline Sans Mono',monospace;letter-spacing:.08em;text-transform:uppercase;margin-top:1mm}
-                        .ncert .seal{width:26mm;height:26mm;border-radius:50%;background:#6B21A8;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-                        .ncert .seal .hex{font-size:22px;line-height:1}
-                        .ncert .seal .sealtxt{font-family:'Spline Sans Mono',monospace;font-size:6px;letter-spacing:.1em;margin-top:1mm;padding:0 3mm}
-                        .ncert .meta{font-family:'Spline Sans Mono',monospace;font-size:9px;color:var(--slate);text-align:right}
-                        .ncert .meta div{margin-bottom:1mm}
-                        .ncert .meta b{color:var(--ink);font-weight:600}
-                    </style>
-                    <div class="ncert">
-                        <div class="cert">
-                            <span class="corner c-tl"/><span class="corner c-tr"/><span class="corner c-bl"/><span class="corner c-br"/>
-                            <div class="ribbon"><span>&#9733;</span></div>
-                            <img class="logo" t-if="v['logo']" t-att-src="v['logo']"/>
-                            <div class="eyebrow"><t t-raw="v['eyebrow']"/></div>
-                            <div class="title"><t t-raw="v['title_html']"/></div>
-                            <div class="presented">This is proudly presented to</div>
-                            <div class="namewrap"><span class="name" t-out="v['recipient']"/></div>
-                            <div class="bodytxt"><t t-raw="v['body_html']"/></div>
-                            <div class="tracks">
-                                <t t-foreach="v['tracks']" t-as="trk">
-                                    <span t-att-class="'trk on' if trk['on'] else 'trk'" t-out="trk['label']"/>
-                                </t>
+                    <div style="font-family:'Spline Sans','Helvetica Neue',Arial,sans-serif;color:#171019;width:100%;">
+                        <div style="position:relative;width:100%;height:196mm;background:#fffdf9;overflow:hidden;">
+                            <!-- double frame -->
+                            <div style="position:absolute;top:5mm;left:5mm;right:5mm;bottom:5mm;border:1.5px solid #b794d4;"/>
+                            <div style="position:absolute;top:7mm;left:7mm;right:7mm;bottom:7mm;border:1px solid #ddc89a;"/>
+                            <!-- corner accents -->
+                            <div style="position:absolute;top:7mm;left:7mm;width:13mm;height:13mm;border-top:3px solid #6B21A8;border-left:3px solid #6B21A8;"/>
+                            <div style="position:absolute;top:7mm;right:7mm;width:13mm;height:13mm;border-top:3px solid #6B21A8;border-right:3px solid #6B21A8;"/>
+                            <div style="position:absolute;bottom:7mm;left:7mm;width:13mm;height:13mm;border-bottom:3px solid #6B21A8;border-left:3px solid #6B21A8;"/>
+                            <div style="position:absolute;bottom:7mm;right:7mm;width:13mm;height:13mm;border-bottom:3px solid #6B21A8;border-right:3px solid #6B21A8;"/>
+                            <!-- ribbon + CSS diamond emblem -->
+                            <div style="position:absolute;top:5mm;right:24mm;width:15mm;height:23mm;background:#3f0f6b;">
+                                <div style="width:5mm;height:5mm;margin:6mm auto 0;background:#ffffff;transform:rotate(45deg);"/>
                             </div>
-                            <div class="footer">
-                                <div class="sigblock">
-                                    <div class="sigline">
-                                        <div class="signame" t-out="v['signatory']"/>
-                                        <div class="sigrole" t-out="v['signatory_role']"/>
-                                    </div>
+                            <!-- content column -->
+                            <div style="position:absolute;top:13mm;left:16mm;right:16mm;text-align:center;">
+                                <img t-if="v['logo']" t-att-src="v['logo']" style="height:15mm;margin:0 auto 4mm;display:block;"/>
+                                <div style="font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a8290;"><t t-out="v['eyebrow']"/></div>
+                                <div style="font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:900;font-size:33px;line-height:1.05;margin-top:3mm;"><t t-raw="v['title_html']"/></div>
+                                <div style="color:#4b4350;font-size:13px;margin-top:6mm;">This is proudly presented to</div>
+                                <div style="margin-top:1mm;"><span style="font-family:'Fraunces',Georgia,serif;font-style:italic;font-weight:500;font-size:31px;color:#3f0f6b;padding-bottom:2mm;border-bottom:1.5px solid #c9a35e;display:inline-block;" t-out="v['recipient']"/></div>
+                                <div style="color:#4b4350;font-size:12.5px;line-height:1.6;max-width:165mm;margin:5mm auto 0;"><t t-raw="v['body_html']"/></div>
+                                <div style="margin-top:6mm;">
+                                    <t t-foreach="v['tracks']" t-as="trk">
+                                        <span t-att-style="trk['style']" t-out="trk['label']"/>
+                                    </t>
                                 </div>
-                                <div class="seal">
-                                    <div class="hex">&#11042;</div>
-                                    <div class="sealtxt" t-out="v['seal']"/>
-                                </div>
-                                <div class="meta">
-                                    <div>Certificate No. <b t-out="v['number']"/></div>
-                                    <div>Issued <b t-out="v['issued']"/></div>
-                                    <div>Verify: ref <b t-out="doc.verification_token[:12] if doc.verification_token else ''"/></div>
-                                </div>
+                            </div>
+                            <!-- footer: sig | seal | meta (table = reliable 3-up).
+                                 Wrapped in a positioned div so the table can be
+                                 width:100% of the 18mm-inset box and the cells
+                                 actually spread (a positioned table with width
+                                 auto shrinks + clusters left). -->
+                            <div style="position:absolute;bottom:14mm;left:18mm;right:18mm;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <tr>
+                                    <td style="vertical-align:bottom;text-align:left;width:33%;">
+                                        <div style="display:inline-block;width:55mm;border-top:1.5px solid #171019;padding-top:2mm;text-align:center;">
+                                            <div style="font-weight:600;font-size:12px;" t-out="v['signatory']"/>
+                                            <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:#8a8290;margin-top:1mm;" t-out="v['signatory_role']"/>
+                                        </div>
+                                    </td>
+                                    <td style="vertical-align:bottom;text-align:center;width:34%;">
+                                        <div style="display:inline-block;width:24mm;height:24mm;border-radius:50%;background:#6B21A8;color:#ffffff;text-align:center;">
+                                            <span style="font-family:'Spline Sans Mono',monospace;font-size:7px;letter-spacing:1px;line-height:1.3;padding:8mm 2mm 0;display:block;" t-out="v['seal']"/>
+                                        </div>
+                                    </td>
+                                    <td style="vertical-align:bottom;text-align:right;width:33%;">
+                                        <div style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#8a8290;line-height:1.5;">
+                                            <div>Certificate No. <b style="color:#171019;" t-out="v['number']"/></div>
+                                            <div>Issued <b style="color:#171019;" t-out="v['issued']"/></div>
+                                            <div>Verify: ref <b style="color:#171019;" t-out="v['verify_ref']"/></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
                             </div>
                         </div>
                     </div>

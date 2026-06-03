@@ -5,7 +5,7 @@
     # <SEQ>) + verification token + revoke flag + Design-A QWeb/PDF cert
     # + internal verification lookup. Issuance chain itself is unchanged
     # (neon_lms M8); number/token assigned in certification.create().
-    'version': '17.0.8.11.0',
+    'version': '17.0.8.11.1',
     'summary': 'Phase 7a -- workforce training, certification, and '
                'skill tracking. M1: category + type reference. '
                'M2: per-person cert records with state machine. '
