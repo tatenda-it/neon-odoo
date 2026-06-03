@@ -12,7 +12,7 @@
     # cards + capstone band on the course landing (scoped QWeb + SCSS),
     # plus the one-shot publish/visibility/responsible/orphan-cleanup
     # config applied via migration.
-    "version": "17.0.2.0.0",
+    "version": "17.0.2.1.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -94,6 +94,9 @@ Subsequent milestones:
         # P7i -- learner-facing review-quiz website templates +
         # course-page CTA (inherits website_slides.course_main).
         "views/neon_lms_quiz_templates.xml",
+        # P7j (item 2) -- remove the "Useful Links" column from the
+        # GLOBAL footer (inherits website.footer_custom; reversible).
+        "views/neon_lms_global_footer.xml",
     ],
     "assets": {
         "web.assets_backend": [

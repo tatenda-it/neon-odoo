@@ -189,3 +189,12 @@
         font-size: 12px; color: #b9a9d4; text-align: center;
     }
 }
+
+// ---- P7j: keep the Neon slide-cover logo (top-left) visible ----
+// eLearning cover images use object-fit:cover at object-position:center.
+// On cards wider than the cover's 16:9, the center-crop cuts the top --
+// exactly where the Neon logo sits. Anchor course covers to the top so
+// the logo survives the crop (scoped to website_slides cover containers).
+.o_wslides_background_image img {
+    object-position: top center !important;
+}

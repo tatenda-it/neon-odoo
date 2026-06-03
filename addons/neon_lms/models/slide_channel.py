@@ -178,3 +178,19 @@ class SlideChannelNeonLMS(models.Model):
             if orphans:
                 orphans.unlink()
         return True
+
+    # ================================================================
+    # P7j (item 1) -- slide / channel cover image
+    # ================================================================
+    def _get_placeholder_filename(self, field):
+        """Cover placeholder for neon_branded channels = the approved Neon
+        event image, not the stock channel_type='training' coffee-mug.
+        slide.slide._get_placeholder_filename delegates to the channel, so
+        this one override covers all 237 lesson slides + the channel card +
+        any future slide with no cover image (zero DB writes). Non-branded
+        channels keep the stock website_slides default via super()."""
+        image_fields = ["image_%s" % size
+                        for size in (1920, 1024, 512, 256, 128)]
+        if self.neon_branded and field in image_fields:
+            return "neon_lms/static/src/img/neon_slide_cover.jpg"
+        return super()._get_placeholder_filename(field)

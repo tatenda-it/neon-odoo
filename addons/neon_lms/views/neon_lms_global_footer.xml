@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7j (item 2): remove the stock "Useful Links" column from the GLOBAL
+    footer. The column (Home / About us / Products / Services / Legal /
+    Contact us) is a placeholder col-lg-2 inside website.footer_custom
+    (view 1302). We do NOT edit 1302's arch (no arch_db poke); this is a
+    separate module inheritance that xpath-removes the column at render, so
+    it's reversible (delete this view + -u) and version-controlled. Global
+    footer (every non-LMS page). The P7h LMS footer (/slides*) is a
+    different mechanism and is untouched. Other placeholder text (About us,
+    etc.) is a separate future task, out of P7j scope.
+-->
+<odoo>
+    <template id="neon_remove_footer_useful_links"
+              inherit_id="website.footer_custom"
+              name="Neon: remove global-footer 'Useful Links' column">
+        <!-- the column is the parent of the 'Useful Links' heading -->
+        <xpath expr="//div[@id='footer']//h5[normalize-space(text())='Useful Links']/parent::div"
+               position="replace"/>
+    </template>
+</odoo>
