@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7i: learner-facing review-quiz website templates. Branded with the
+    P7g o_neon_lms_* palette (see neon_lms_quiz.scss, web.assets_frontend).
+    Pages: index, take, result, locked, not-enrolled, not-available.
+    Plus a "Review Quizzes" CTA injected into the branded course landing.
+-->
+<odoo>
+
+    <!-- ============ Course-landing CTA (branded channels only) ============ -->
+    <template id="neon_lms_course_quiz_cta"
+              inherit_id="website_slides.course_main"
+              name="Neon LMS Review-Quizzes CTA">
+        <xpath expr="//div[@t-call='website.record_cover']" position="before">
+            <t t-if="channel.neon_branded">
+                <div class="o_neon_lms_quizcta">
+                    <a href="/slides/neon/quizzes" class="o_neon_quizcta_btn">
+                        Review Quizzes &#8594;
+                    </a>
+                    <span class="o_neon_quizcta_note">Pass each module quiz
+                        (<t t-out="'80'"/>%) to earn your sub-certificates and
+                        the capstone.</span>
+                </div>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- ============================ Index ============================ -->
+    <template id="quiz_index" name="Neon LMS - Review Quizzes">
+        <t t-call="website.layout">
+            <div class="o_neon_lms_quizwrap">
+                <div class="o_neon_quiz_head">
+                    <div class="o_neon_eyebrow">Neon Workshop Training</div>
+                    <h1>Module Review Quizzes</h1>
+                    <p class="o_neon_quiz_lede">Pass a module's quiz to mark it
+                        complete. Complete every module in a track to earn its
+                        sub-certificate; earn all seven for the capstone.</p>
+                </div>
+                <t t-foreach="tracks" t-as="tr">
+                    <div class="o_neon_quiz_track" t-att-class="'o_neon_quiz_track ' + ('is-locked' if tr['locked'] else '')">
+                        <div class="o_neon_quiz_trackhead">
+                            <h2 t-out="tr['track'].name"/>
+                            <span t-if="tr['locked']" class="o_neon_quiz_lockbadge"
+                                  t-out="tr['reason']"/>
+                        </div>
+                        <div class="o_neon_quiz_modules">
+                            <t t-foreach="tr['modules']" t-as="m">
+                                <div class="o_neon_quiz_modulecard"
+                                     t-att-class="'o_neon_quiz_modulecard status-' + m['status']">
+                                    <div class="o_neon_quiz_mtitle">
+                                        <span class="o_neon_quiz_mcode" t-out="m['module'].code"/>
+                                        <span t-out="m['module'].name"/>
+                                    </div>
+                                    <div class="o_neon_quiz_mmeta">
+                                        <span t-out="m['question_count']"/> question<t t-if="m['question_count'] != 1">s</t>
+                                        <span t-if="m['status'] == 'passed'" class="o_neon_quiz_pill passed">
+                                            Passed &#183; <t t-out="m['score_percent']"/>%
+                                        </span>
+                                        <span t-elif="m['status'] == 'in_progress'" class="o_neon_quiz_pill prog">
+                                            Best <t t-out="m['score_percent']"/>%
+                                        </span>
+                                        <span t-elif="m['status'] == 'locked'" class="o_neon_quiz_pill locked">Locked</span>
+                                    </div>
+                                    <div class="o_neon_quiz_maction">
+                                        <a t-if="m['status'] != 'locked' and m['question_count'] &gt; 0"
+                                           t-attf-href="/slides/neon/quiz/#{m['module'].id}"
+                                           class="o_neon_quizcta_btn small">
+                                            <t t-if="m['status'] == 'passed'">Retake</t>
+                                            <t t-else="">Take quiz</t>
+                                        </a>
+                                        <span t-elif="m['question_count'] &lt;= 0" class="o_neon_quiz_muted">No quiz yet</span>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================ Take ============================ -->
+    <template id="quiz_take" name="Neon LMS - Take Quiz">
+        <t t-call="website.layout">
+            <div class="o_neon_lms_quizwrap">
+                <div class="o_neon_quiz_head">
+                    <a href="/slides/neon/quizzes" class="o_neon_quiz_back">&#8592; All quizzes</a>
+                    <h1>
+                        <span class="o_neon_quiz_mcode" t-out="module.code"/>
+                        <span t-out="module.name"/>
+                    </h1>
+                    <p class="o_neon_quiz_lede">Pass mark: <strong><t t-out="pass_mark_pct"/>%</strong>.
+                        Answer every question, then submit.</p>
+                </div>
+                <form t-attf-action="/slides/neon/quiz/#{module.id}/submit"
+                      method="post" class="o_neon_quiz_form">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+                    <t t-set="qn" t-value="0"/>
+                    <t t-foreach="questions" t-as="q">
+                        <t t-set="qn" t-value="qn + 1"/>
+                        <div class="o_neon_quiz_q">
+                            <div class="o_neon_quiz_qtext">
+                                <span class="o_neon_quiz_qnum" t-out="qn"/>
+                                <span t-out="q.question_text"/>
+                            </div>
+                            <div class="o_neon_quiz_opts">
+                                <t t-if="q.question_type == 'short_answer'">
+                                    <input type="text" t-attf-name="q_#{q.id}"
+                                           class="o_neon_quiz_text"
+                                           placeholder="Your answer"/>
+                                </t>
+                                <t t-else="">
+                                    <t t-set="itype" t-value="'radio' if q.question_type == 'true_false' else 'checkbox'"/>
+                                    <t t-foreach="q.option_ids.sorted(lambda o: (o.sequence, o.id))" t-as="opt">
+                                        <label class="o_neon_quiz_opt">
+                                            <input t-att-type="itype"
+                                                   t-attf-name="q_#{q.id}"
+                                                   t-att-value="opt.id"/>
+                                            <span t-out="opt.option_text"/>
+                                        </label>
+                                    </t>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+                    <div class="o_neon_quiz_submit">
+                        <button type="submit" class="o_neon_quizcta_btn">Submit quiz</button>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================ Result ============================ -->
+    <template id="quiz_result" name="Neon LMS - Quiz Result">
+        <t t-call="website.layout">
+            <div class="o_neon_lms_quizwrap">
+                <div t-att-class="'o_neon_quiz_resultcard ' + ('passed' if attempt.passed else 'failed')">
+                    <div class="o_neon_quiz_resulticon">
+                        <t t-if="attempt.passed">&#10003;</t>
+                        <t t-else="">&#10007;</t>
+                    </div>
+                    <h1 t-if="attempt.passed">Passed</h1>
+                    <h1 t-else="">Not yet</h1>
+                    <div class="o_neon_quiz_bigscore"><t t-out="attempt.score_percent"/>%</div>
+                    <p class="o_neon_quiz_resultmeta">
+                        <t t-out="attempt.points_earned"/> / <t t-out="attempt.points_possible"/> points
+                        &#183; pass mark <t t-out="pass_mark_pct"/>%
+                        &#183; attempt #<t t-out="attempt.attempt_number"/>
+                    </p>
+                    <p t-if="attempt.passed and module_state == 'completed'"
+                       class="o_neon_quiz_completebanner">
+                        <strong t-out="module.code"/> is now marked complete.
+                    </p>
+                    <p t-elif="not attempt.passed" class="o_neon_quiz_retryhint">
+                        You can retake this quiz &#8212; your best score counts.
+                    </p>
+                    <div class="o_neon_quiz_resultactions">
+                        <a t-attf-href="/slides/neon/quiz/#{module.id}"
+                           class="o_neon_quizcta_btn small">Retake</a>
+                        <a href="/slides/neon/quizzes"
+                           class="o_neon_quizcta_btn small ghost">All quizzes</a>
+                    </div>
+                </div>
+                <div class="o_neon_quiz_review">
+                    <h3>Review</h3>
+                    <t t-foreach="attempt.response_ids" t-as="r">
+                        <div t-att-class="'o_neon_quiz_reviewrow ' + ('ok' if r.is_correct else 'bad')">
+                            <span class="o_neon_quiz_revicon">
+                                <t t-if="r.is_correct">&#10003;</t><t t-else="">&#10007;</t>
+                            </span>
+                            <span class="o_neon_quiz_revq" t-out="r.question_id.question_text"/>
+                            <span t-if="r.question_id.explanation"
+                                  class="o_neon_quiz_revexp" t-out="r.question_id.explanation"/>
+                        </div>
+                    </t>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ======================= Guard pages ======================= -->
+    <template id="quiz_locked" name="Neon LMS - Quiz Locked">
+        <t t-call="website.layout">
+            <div class="o_neon_lms_quizwrap">
+                <div class="o_neon_quiz_guard">
+                    <h1>Quiz locked</h1>
+                    <p t-out="reason"/>
+                    <a href="/slides/neon/quizzes" class="o_neon_quizcta_btn small">Back to quizzes</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="quiz_not_enrolled" name="Neon LMS - Not Enrolled">
+        <t t-call="website.layout">
+            <div class="o_neon_lms_quizwrap">
+                <div class="o_neon_quiz_guard">
+                    <h1>Join the programme first</h1>
+                    <p>You need to be enrolled in the Neon Workshop Training
+                        programme to take the review quizzes.</p>
+                    <a t-if="channel" t-attf-href="/slides/#{channel.id}"
+                       class="o_neon_quizcta_btn small">Go to the course</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="quiz_not_available" name="Neon LMS - Quiz Not Available">
+        <t t-call="website.layout">
+            <div class="o_neon_lms_quizwrap">
+                <div class="o_neon_quiz_guard">
+                    <h1>Quizzes unavailable</h1>
+                    <p>The Neon training programme is not configured yet.
+                        Contact your training admin.</p>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

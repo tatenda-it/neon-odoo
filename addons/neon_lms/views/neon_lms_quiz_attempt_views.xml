@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        P7i: backend (admin) views for quiz attempts. Read-only audit
+        surface; attempts are append-only (perm_unlink=0) and scores are
+        server-computed, so no create/edit buttons here.
+    -->
+    <record id="view_neon_lms_quiz_attempt_tree" model="ir.ui.view">
+        <field name="name">neon.lms.quiz.attempt.tree</field>
+        <field name="model">neon.lms.quiz.attempt</field>
+        <field name="arch" type="xml">
+            <tree string="Quiz Attempts" create="false" edit="false"
+                  decoration-success="passed" decoration-muted="not passed">
+                <field name="learner_id"/>
+                <field name="module_id"/>
+                <field name="track_id"/>
+                <field name="attempt_number"/>
+                <field name="score_percent" string="Score %"/>
+                <field name="min_quiz_score" string="Pass" widget="percentage"/>
+                <field name="passed"/>
+                <field name="state"/>
+                <field name="submitted_at"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_lms_quiz_attempt_form" model="ir.ui.view">
+        <field name="name">neon.lms.quiz.attempt.form</field>
+        <field name="model">neon.lms.quiz.attempt</field>
+        <field name="arch" type="xml">
+            <form string="Quiz Attempt" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="module_id" readonly="1"/>
+                        </h1>
+                        <h3>
+                            <field name="learner_id" readonly="1"/>
+                            &#183; attempt #<field name="attempt_number" readonly="1"/>
+                        </h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="score_percent" string="Score %"/>
+                            <field name="passed"/>
+                            <field name="state"/>
+                        </group>
+                        <group>
+                            <field name="points_earned"/>
+                            <field name="points_possible"/>
+                            <field name="started_at"/>
+                            <field name="submitted_at"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Responses">
+                            <field name="response_ids" readonly="1">
+                                <tree>
+                                    <field name="question_id"/>
+                                    <field name="question_type"/>
+                                    <field name="is_correct"/>
+                                    <field name="points_awarded"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_neon_lms_quiz_attempt_search" model="ir.ui.view">
+        <field name="name">neon.lms.quiz.attempt.search</field>
+        <field name="model">neon.lms.quiz.attempt</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="learner_id"/>
+                <field name="module_id"/>
+                <field name="track_id"/>
+                <filter name="passed" string="Passed" domain="[('passed','=',True)]"/>
+                <filter name="failed" string="Not passed" domain="[('passed','=',False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_learner" string="Learner" context="{'group_by':'learner_id'}"/>
+                    <filter name="g_module" string="Module" context="{'group_by':'module_id'}"/>
+                    <filter name="g_track" string="Track" context="{'group_by':'track_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_lms_quiz_attempt" model="ir.actions.act_window">
+        <field name="name">Quiz Attempts</field>
+        <field name="res_model">neon.lms.quiz.attempt</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_g_module': 1}</field>
+    </record>
+
+    <menuitem id="menu_neon_lms_attempts"
+              name="Quiz Attempts"
+              parent="menu_neon_lms_root"
+              action="action_neon_lms_quiz_attempt"
+              sequence="40"
+              groups="neon_training.group_neon_training_admin,neon_jobs.group_neon_jobs_manager"/>
+</odoo>

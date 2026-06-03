@@ -1,0 +1,218 @@
+// P7i -- learner-facing review-quiz styling. Scoped under the
+// quiz wrapper so no other website page is touched. Reuses the
+// P7g Neon palette (grape + lime accent).
+$neon-grape: #6B21A8;
+$neon-grape-deep: #3f0f6b;
+$neon-lime: #c8f36b;
+$neon-ink: #1d1230;
+
+.o_neon_lms_quizwrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+    color: $neon-ink;
+
+    .o_neon_quiz_head {
+        margin-bottom: 1.5rem;
+
+        .o_neon_eyebrow {
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            font-size: .75rem;
+            font-weight: 700;
+            color: $neon-grape;
+        }
+        h1 { font-weight: 800; margin: .25rem 0 .5rem; }
+        .o_neon_quiz_lede { color: #5b5570; max-width: 60ch; }
+        .o_neon_quiz_back {
+            display: inline-block;
+            margin-bottom: .5rem;
+            color: $neon-grape;
+            text-decoration: none;
+            font-weight: 600;
+        }
+    }
+
+    .o_neon_quiz_track {
+        border: 1px solid #ece7f3;
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.25rem;
+        background: #fff;
+
+        &.is-locked { opacity: .7; }
+
+        .o_neon_quiz_trackhead {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom: 2px solid $neon-lime;
+            padding-bottom: .5rem;
+            margin-bottom: .75rem;
+            h2 { font-size: 1.15rem; font-weight: 800; margin: 0; }
+        }
+        .o_neon_quiz_lockbadge {
+            font-size: .75rem;
+            color: #8a8398;
+            font-style: italic;
+        }
+    }
+
+    .o_neon_quiz_modules {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: .5rem;
+    }
+
+    .o_neon_quiz_modulecard {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .65rem .85rem;
+        border-radius: 10px;
+        background: #faf8fd;
+        border: 1px solid #f0ecf7;
+
+        &.status-passed { border-color: rgba($neon-grape, .35); background: #f6f1fb; }
+        &.status-locked { opacity: .6; }
+
+        .o_neon_quiz_mtitle { font-weight: 600; }
+        .o_neon_quiz_mcode {
+            display: inline-block;
+            min-width: 2.6rem;
+            font-weight: 800;
+            color: $neon-grape;
+        }
+        .o_neon_quiz_mmeta {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            color: #6b6580;
+            font-size: .85rem;
+        }
+        .o_neon_quiz_muted { color: #9a93a8; font-size: .8rem; }
+    }
+
+    .o_neon_quiz_pill {
+        padding: .12rem .55rem;
+        border-radius: 999px;
+        font-size: .72rem;
+        font-weight: 700;
+        &.passed { background: $neon-grape; color: #fff; }
+        &.prog { background: #efe7fb; color: $neon-grape; }
+        &.locked { background: #eceaf1; color: #8a8398; }
+    }
+
+    .o_neon_quiz_q {
+        padding: 1rem 0;
+        border-bottom: 1px solid #efecf5;
+
+        .o_neon_quiz_qtext { font-weight: 600; margin-bottom: .6rem; }
+        .o_neon_quiz_qnum {
+            display: inline-block;
+            min-width: 1.6rem;
+            color: $neon-grape;
+            font-weight: 800;
+        }
+        .o_neon_quiz_opt {
+            display: block;
+            padding: .4rem .6rem;
+            border-radius: 8px;
+            cursor: pointer;
+            input { margin-right: .55rem; }
+            &:hover { background: #f6f1fb; }
+        }
+        .o_neon_quiz_text {
+            width: 100%;
+            max-width: 480px;
+            padding: .5rem .7rem;
+            border: 1px solid #d9d2e6;
+            border-radius: 8px;
+        }
+    }
+
+    .o_neon_quiz_submit { margin-top: 1.5rem; }
+
+    .o_neon_quiz_resultcard {
+        text-align: center;
+        padding: 2rem 1rem;
+        border-radius: 16px;
+        margin-bottom: 1.5rem;
+        color: #fff;
+        background: linear-gradient(135deg, $neon-grape-deep, $neon-grape);
+
+        &.failed { background: linear-gradient(135deg, #5b5470, #2f2a3d); }
+
+        .o_neon_quiz_resulticon { font-size: 2.4rem; line-height: 1; }
+        h1 { font-weight: 800; margin: .5rem 0; }
+        .o_neon_quiz_bigscore {
+            font-size: 3rem;
+            font-weight: 900;
+            color: $neon-lime;
+        }
+        .o_neon_quiz_resultmeta { opacity: .85; }
+        .o_neon_quiz_completebanner { color: $neon-lime; font-weight: 700; }
+        .o_neon_quiz_resultactions {
+            margin-top: 1rem;
+            display: flex;
+            gap: .5rem;
+            justify-content: center;
+        }
+    }
+
+    .o_neon_quiz_review {
+        h3 { font-weight: 800; }
+        .o_neon_quiz_reviewrow {
+            display: grid;
+            grid-template-columns: 1.5rem 1fr;
+            gap: .5rem;
+            padding: .55rem 0;
+            border-bottom: 1px solid #efecf5;
+            &.ok .o_neon_quiz_revicon { color: #1e9e5a; font-weight: 800; }
+            &.bad .o_neon_quiz_revicon { color: #c0392b; font-weight: 800; }
+        }
+        .o_neon_quiz_revexp {
+            grid-column: 2;
+            color: #6b6580;
+            font-size: .85rem;
+            font-style: italic;
+        }
+    }
+
+    .o_neon_quiz_guard {
+        text-align: center;
+        padding: 3rem 1rem;
+        h1 { font-weight: 800; }
+    }
+}
+
+.o_neon_quizcta_btn {
+    display: inline-block;
+    background: $neon-grape;
+    color: #fff !important;
+    font-weight: 700;
+    text-decoration: none;
+    padding: .6rem 1.1rem;
+    border-radius: 999px;
+    border: 0;
+    cursor: pointer;
+    transition: transform .08s ease, box-shadow .12s ease;
+
+    &:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba($neon-grape, .35); }
+    &.small { padding: .35rem .8rem; font-size: .85rem; }
+    &.ghost { background: transparent; color: $neon-grape !important; border: 1px solid $neon-grape; }
+}
+
+.o_neon_lms_quizcta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: .85rem 1.25rem;
+    background: $neon-lime;
+    color: $neon-ink;
+
+    .o_neon_quizcta_note { font-size: .85rem; font-weight: 600; }
+}

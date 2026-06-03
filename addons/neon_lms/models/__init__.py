@@ -9,3 +9,4 @@ from . import neon_lms_sop
 from . import neon_lms_enrollment
 from . import neon_lms_track_completion
 from . import neon_lms_module_completion
+from . import neon_lms_quiz_attempt

@@ -28,3 +28,9 @@ access_lms_module_completion_manager,LMS Module Completion - Jobs Manager,model_
 access_lms_module_completion_crew,LMS Module Completion - Crew (own via rule),model_neon_lms_module_completion,neon_jobs.group_neon_jobs_crew,1,0,0,0
 access_lms_quiz_import_wizard_admin,LMS Quiz Import Wizard - Training Admin,model_neon_lms_quiz_import_wizard,neon_training.group_neon_training_admin,1,1,1,1
 access_lms_quiz_import_wizard_manager,LMS Quiz Import Wizard - Jobs Manager,model_neon_lms_quiz_import_wizard,neon_jobs.group_neon_jobs_manager,1,0,1,0
+access_lms_attempt_admin,LMS Quiz Attempt - Training Admin,model_neon_lms_quiz_attempt,neon_training.group_neon_training_admin,1,1,1,0
+access_lms_attempt_manager,LMS Quiz Attempt - Jobs Manager,model_neon_lms_quiz_attempt,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_lms_attempt_crew,LMS Quiz Attempt - Crew (own via rule; create own),model_neon_lms_quiz_attempt,neon_jobs.group_neon_jobs_crew,1,0,1,0
+access_lms_attempt_response_admin,LMS Quiz Attempt Response - Training Admin,model_neon_lms_quiz_attempt_response,neon_training.group_neon_training_admin,1,1,1,0
+access_lms_attempt_response_manager,LMS Quiz Attempt Response - Jobs Manager,model_neon_lms_quiz_attempt_response,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_lms_attempt_response_crew,LMS Quiz Attempt Response - Crew (own via rule; create own),model_neon_lms_quiz_attempt_response,neon_jobs.group_neon_jobs_crew,1,0,1,0

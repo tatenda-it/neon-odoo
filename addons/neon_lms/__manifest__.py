@@ -1,11 +1,18 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
+    # P7i (17.0.2.0.0): learner-facing review-quiz surface + the
+    # neon.lms.quiz.attempt pivot model -- the missing "M10 attempts
+    # model" that writes module.completion.quiz_score and so FEEDS the
+    # existing module -> track -> sub-cert -> capstone workflow. Major
+    # bump: new central pivot model. Layered on P7h (1.17.0) per the
+    # P7g(1.16)->P7h(1.17)->P7i(2.0.0) lineage.
+    # P7h (17.0.1.17.0): dedicated Neon LMS footer on /slides* pages.
     # P7g (17.0.1.16.0): course-page branding layer -- Neon hero + track
     # cards + capstone band on the course landing (scoped QWeb + SCSS),
     # plus the one-shot publish/visibility/responsible/orphan-cleanup
     # config applied via migration.
-    "version": "17.0.1.17.0",
+    "version": "17.0.2.0.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -45,6 +52,9 @@ Subsequent milestones:
         # M7 -- enrollment + completion record rules ("own
         # row" pattern, 4th instance in codebase).
         "security/neon_lms_enrollment_rules.xml",
+        # P7i -- quiz-attempt own-row rules (learner sees/creates
+        # only their own attempts + responses).
+        "security/neon_lms_quiz_attempt_rules.xml",
         "data/neon_lms_program.xml",
         "data/neon_lms_tracks.xml",
         "data/neon_lms_modules.xml",
@@ -79,6 +89,11 @@ Subsequent milestones:
         # P7h -- dedicated Neon LMS footer on /slides* pages only
         # (conditional swap; global footer untouched elsewhere).
         "views/neon_lms_footer_templates.xml",
+        # P7i -- quiz-attempt admin views + menu.
+        "views/neon_lms_quiz_attempt_views.xml",
+        # P7i -- learner-facing review-quiz website templates +
+        # course-page CTA (inherits website_slides.course_main).
+        "views/neon_lms_quiz_templates.xml",
     ],
     "assets": {
         "web.assets_backend": [
@@ -87,8 +102,11 @@ Subsequent milestones:
         ],
         # P7g -- course-page branding styles (scoped under .o_neon_lms_*;
         # @font-face Fraunces; fonts + logo served as static, not bundled).
+        # P7i -- review-quiz styling (separate file; scoped under
+        # .o_neon_lms_quizwrap so no other website page is touched).
         "web.assets_frontend": [
             "neon_lms/static/src/scss/neon_lms_branding.scss",
+            "neon_lms/static/src/scss/neon_lms_quiz.scss",
         ],
     },
     "installable": True,

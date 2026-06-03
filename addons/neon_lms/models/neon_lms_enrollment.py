@@ -109,6 +109,54 @@ class NeonLMSEnrollment(models.Model):
                 rec.neon_overall_progress = 0.0
 
     # ============================================================
+    # P7i -- completion-record materialisation
+    # ============================================================
+    def _neon_ensure_completion_records(self):
+        """Idempotently create the per-track and per-module
+        completion rows for this enrollment's Neon channel.
+
+        The schema designed these to be materialised on enroll
+        ("deferred to M8") but that wiring was never built. The
+        P7i quiz-attempt flow needs them to exist BEFORE a score
+        is recorded: writing quiz_score needs a module.completion
+        target row, AND module.completion._check_and_advance_to_
+        completed's track rollup does TrackComp.search([...]) --
+        with no track.completion row, no sub-cert ever issues.
+
+        sudo()-safe; callers are workflow paths (the website
+        controller, run as the learner) that lack write ACL on
+        the completion models. Safe to call repeatedly.
+        """
+        TrackComp = self.env["neon.lms.track.completion"].sudo()
+        ModuleComp = self.env["neon.lms.module.completion"].sudo()
+        for enr in self:
+            channel = enr.channel_id
+            if not channel:
+                continue
+            tracks = channel.sudo().neon_track_ids
+            for track in tracks:
+                tc = TrackComp.search([
+                    ("enrollment_id", "=", enr.id),
+                    ("track_id", "=", track.id),
+                ], limit=1)
+                if not tc:
+                    TrackComp.create({
+                        "enrollment_id": enr.id,
+                        "track_id": track.id,
+                    })
+                for module in track.module_ids:
+                    mc = ModuleComp.search([
+                        ("enrollment_id", "=", enr.id),
+                        ("module_id", "=", module.id),
+                    ], limit=1)
+                    if not mc:
+                        ModuleComp.create({
+                            "enrollment_id": enr.id,
+                            "module_id": module.id,
+                        })
+        return True
+
+    # ============================================================
     # M8 workflow -- capstone check + cert issuance
     # ============================================================
     def _check_and_advance_to_certified(self):

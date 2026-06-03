@@ -7,3 +7,4 @@ modules + tracks + capstone.
 """
 from . import models
 from . import wizards
+from . import controllers

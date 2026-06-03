@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        P7i record rules: "own row" pattern (extends the M7 set in
+        neon_lms_enrollment_rules.xml). A learner (crew tier) sees and
+        creates only their OWN quiz attempts + responses. perm_create is
+        rule-enforced so a crafted RPC cannot create an attempt on behalf
+        of another learner; scores are written server-side in sudo, never
+        by the learner, so write/unlink stay closed for crew.
+        Admin / manager tiers see all via the ACL CSV (no rule).
+    -->
+    <record id="rule_quiz_attempt_learner_own" model="ir.rule">
+        <field name="name">Learner sees own quiz attempts</field>
+        <field name="model_id" ref="model_neon_lms_quiz_attempt"/>
+        <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+        <field name="domain_force">[('learner_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_quiz_attempt_response_learner_own" model="ir.rule">
+        <field name="name">Learner sees own quiz attempt responses</field>
+        <field name="model_id" ref="model_neon_lms_quiz_attempt_response"/>
+        <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+        <field name="domain_force">[('attempt_id.learner_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+</odoo>
