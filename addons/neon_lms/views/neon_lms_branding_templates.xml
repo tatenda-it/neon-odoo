@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P7g: Neon Workshop Training course-page branding.
+    Inherits website_slides.course_main. For channels flagged
+    neon_branded, the stock eLearning cover (the coffee-mug photo + stock
+    header) is hidden and replaced with the Neon landing: a grape-deep
+    header bar (white wordmark via CSS-invert), a grape-gradient hero with
+    a hexagon motif + Fraunces title (lime accent) + a 4-stat strip, the 7
+    colour-accented track cards (reusing channel.neon_track_ids), and a
+    capstone band. The standard slide list below is untouched, so enrolled
+    learners still reach the modules/lessons. Styling: neon_lms_branding
+    .scss (web.assets_frontend), all scoped under .o_neon_lms_*.
+-->
+<odoo>
+    <template id="neon_lms_course_main"
+              inherit_id="website_slides.course_main"
+              name="Neon LMS Branded Course Landing">
+
+        <!-- hide the stock cover (coffee-mug + header) for branded courses -->
+        <xpath expr="//div[@t-call='website.record_cover']" position="attributes">
+            <attribute name="t-if">not channel.neon_branded</attribute>
+        </xpath>
+
+        <!-- inject the Neon branded landing at the top of the page -->
+        <xpath expr="//div[@t-call='website.record_cover']" position="before">
+            <t t-if="channel.neon_branded">
+                <t t-set="ncards" t-value="channel._neon_track_cards()"/>
+                <t t-set="nstats" t-value="channel._neon_branding_stats()"/>
+
+                <div class="o_neon_lms_header">
+                    <img class="o_neon_logo"
+                         src="/neon_lms/static/src/img/neon_logo.png"
+                         alt="Neon Events Elements"/>
+                </div>
+
+                <div class="o_neon_lms_hero">
+                    <div class="o_neon_eyebrow">Neon Events Elements</div>
+                    <h1 class="o_neon_title">Neon Workshop <em>Training Programme</em></h1>
+                    <div class="o_neon_lede">Seven discipline tracks, one professional
+                        standard &#8212; train, certify, and prove your craft in live
+                        event production.</div>
+                    <div class="o_neon_lms_stats">
+                        <div class="o_neon_stat">
+                            <div class="num" t-out="nstats['tracks']"/>
+                            <div class="lbl">Tracks</div>
+                        </div>
+                        <div class="o_neon_stat">
+                            <div class="num" t-out="nstats['modules']"/>
+                            <div class="lbl">Modules</div>
+                        </div>
+                        <div class="o_neon_stat">
+                            <div class="num" t-out="nstats['lessons']"/>
+                            <div class="lbl">Lessons</div>
+                        </div>
+                        <div class="o_neon_stat">
+                            <div class="num" t-out="nstats['certs']"/>
+                            <div class="lbl">Certificates</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="o_neon_lms_tracks">
+                    <t t-foreach="ncards" t-as="c">
+                        <div class="o_neon_card" t-attf-style="--neon-accent: #{c['color']};">
+                            <span t-if="c['is_gate']" class="o_neon_card_gate">Start Here &#183; Prerequisite</span>
+                            <h3 class="o_neon_card_title" t-out="c['name']"/>
+                            <div class="o_neon_card_meta">
+                                <t t-out="c['module_count']"/> module<t t-if="c['module_count'] != 1">s</t>
+                            </div>
+                            <div class="o_neon_card_cert" t-if="c['cert_label']">
+                                Earns the <t t-out="c['cert_label']"/>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+
+                <div class="o_neon_lms_capstone">
+                    <div class="inner">
+                        <div class="o_neon_seal">NEON CERTIFIED</div>
+                        <div>
+                            <h2>Complete all 7 tracks for full <em>Technical Certification</em></h2>
+                            <p>Earn every sub-certificate to qualify as a Neon
+                                Client-Ready Technician &#8212; the programme&#8217;s
+                                capstone credential.</p>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+    </template>
+</odoo>

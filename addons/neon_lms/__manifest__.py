@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
-    "version": "17.0.1.15.0",
+    # P7g (17.0.1.16.0): course-page branding layer -- Neon hero + track
+    # cards + capstone band on the course landing (scoped QWeb + SCSS),
+    # plus the one-shot publish/visibility/responsible/orphan-cleanup
+    # config applied via migration.
+    "version": "17.0.1.16.0",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
@@ -69,11 +73,19 @@ Subsequent milestones:
         # tree views with header-button templates + Set
         # Default Points action.
         "views/neon_lms_quiz_views.xml",
+        # P7g -- branded course landing (hero + track cards + capstone),
+        # inherits website_slides.course_main; scoped to neon_branded.
+        "views/neon_lms_branding_templates.xml",
     ],
     "assets": {
         "web.assets_backend": [
             # LMS Admin Polish M3 -- autosave indicator JS.
             "neon_lms/static/src/js/lms_slide_autosave.js",
+        ],
+        # P7g -- course-page branding styles (scoped under .o_neon_lms_*;
+        # @font-face Fraunces; fonts + logo served as static, not bundled).
+        "web.assets_frontend": [
+            "neon_lms/static/src/scss/neon_lms_branding.scss",
         ],
     },
     "installable": True,
