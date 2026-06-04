@@ -1,6 +1,19 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
+    # P7l (17.0.2.1.3): dead-video fix (data-only, one-shot admin
+    # script scripts/migrate_p7l_video_search.py, NOT in data/). 125
+    # lessons carried YouTube <iframe> embeds whose IDs were ~97%
+    # fabricated (404 -> "Video unavailable"). Robin declined curating
+    # replacements; each dead embed is converted to the SAME
+    # "search YouTube for this topic" prompt the other 66 lessons
+    # already use (byte-identical markup; query = deprefixed title +
+    # per-module suffix). 124 converted (122 enriched-wrapper-at-start +
+    # 2 Capture watch-and-learn in place); lesson 443 (curated ear-
+    # training pack, 4 labelled videos w/ direct links) is EXCLUDED.
+    # Lesson 450's stale "watch the embedded tutorials" line rephrased
+    # to the search link. All other content byte-for-byte. Patch bump
+    # (after P7m's .2). No model change.
     # P7m (17.0.2.1.2): LMS content tidy (data-only, one-shot admin
     # script scripts/migrate_p7m_content_tidy.py, NOT in data/). (1) 21
     # short summary lessons (M01 L1.1-L1.11 + M02 L2.1-L2.10) get a
@@ -31,7 +44,7 @@
     # cards + capstone band on the course landing (scoped QWeb + SCSS),
     # plus the one-shot publish/visibility/responsible/orphan-cleanup
     # config applied via migration.
-    "version": "17.0.2.1.2",
+    "version": "17.0.2.1.3",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
