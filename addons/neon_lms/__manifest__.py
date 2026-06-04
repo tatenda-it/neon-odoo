@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon LMS",
+    # P7m (17.0.2.1.2): LMS content tidy (data-only, one-shot admin
+    # script scripts/migrate_p7m_content_tidy.py, NOT in data/). (1) 21
+    # short summary lessons (M01 L1.1-L1.11 + M02 L2.1-L2.10) get a
+    # "Quick Reference: " title prefix so they read as quick-ref not
+    # duplicate deep-dives (grouped-at-start; reversible). id 443
+    # (L2.11 ear-training pack, 4063 chars) excluded. (2) 6 lessons
+    # (453/455/459/463/470/476) had content-brief meta ("The source
+    # brief...") rephrased out of learner text, meaning preserved, rest
+    # byte-for-byte. No model change; patch bump.
     # P7k (17.0.2.1.1): lesson-render fix -- the 237 lessons were
     # imported as slide_category='document'/'pdf' with no pdf payload,
     # so the player hung on "Loading..." (embed_code raises on a
@@ -22,7 +31,7 @@
     # cards + capstone band on the course landing (scoped QWeb + SCSS),
     # plus the one-shot publish/visibility/responsible/orphan-cleanup
     # config applied via migration.
-    "version": "17.0.2.1.1",
+    "version": "17.0.2.1.2",
     "summary": "Internal LMS -- Coursera-style 7-track "
                "program with sub-certs + capstone. Phase 7e.",
     "description": """
