@@ -33,7 +33,14 @@
     # 17.0.11.0.0 = P-HR-R3b C1 -- HR role-lens RBAC + KPI compute
     # (new 'hr' value in _DASHBOARD_TYPES; _is_hr_user gate at
     # the View-As resolver + defence-in-depth in _compute_kpi_hr).
-    "version": "17.0.11.0.0",
+    # 17.0.11.1.0 = B11/PRE-WA-0 -- shared AI engine extracted to
+    # neon_ai_core (provider catalog generic half, chat adapter, tool
+    # registry, two-phase write engine, chat audit models, chat
+    # orchestrator). This module now DEPENDS on neon_ai_core, EXTENDS
+    # the provider model via _inherit (insight half), and re-exports
+    # the moved symbols via shims in models/ai/. Definition-ownership
+    # shift only -- no behaviour change to the live Copilot.
+    "version": "17.0.11.1.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
@@ -88,6 +95,12 @@ ranganai by login).
         # ``_default_dashboard_type_for_user`` and ``_is_superuser``
         # (no new dashboard groups created in this phase).
         "neon_core",
+        # B11/PRE-WA-0 -- shared AI engine (provider catalog, chat
+        # adapter, tool registry, two-phase write engine, chat audit
+        # models, orchestrator). Load order: neon_core -> neon_ai_core
+        # -> neon_dashboard so the moved models are owned by core
+        # before this module's _inherit + shims load.
+        "neon_ai_core",
         # commercial.event.job + commercial.job for the Jobs block
         # and KPI tiles 3-4 (jobs today / week).
         "neon_jobs",

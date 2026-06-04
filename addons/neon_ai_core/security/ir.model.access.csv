@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_ai_core_provider_superuser,ai provider / superuser RW,model_neon_dashboard_ai_provider,neon_core.group_neon_superuser,1,1,1,0
+access_neon_ai_core_chat_session_superuser,ai chat session / superuser,model_neon_finance_ai_chat_session,neon_core.group_neon_superuser,1,1,1,0
+access_neon_ai_core_chat_message_superuser,ai chat message / superuser,model_neon_finance_ai_chat_message,neon_core.group_neon_superuser,1,1,1,0
+access_neon_ai_core_chat_write_log_superuser,ai write log / superuser,model_neon_finance_ai_chat_write_log,neon_core.group_neon_superuser,1,1,1,0

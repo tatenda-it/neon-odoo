@@ -1,51 +1,36 @@
 # -*- coding: utf-8 -*-
-"""Phase 8A.M11 -- AI Insight provider catalog.
+"""Phase 8A.M11 -- AI Insight provider catalog (INSIGHT half).
 
-One row per provider. Holds config + usage stats; thin
-@api.model wrappers expose cron + manual trigger entry points
-that instantiate the orchestrator from the plain-python `ai/`
-submodule.
+B11 / PRE-WA-0: the generic provider machinery (config fields, API-key
+management, exactly-one-default constraint, superuser guard,
+action_set_default) moved to neon_ai_core.models.ai_provider. This file
+now EXTENDS that model via _inherit and re-adds the insight-generation
+entry points that are coupled to neon_dashboard:
 
-⚠️ DECISION (M11, marker inline): API key NEVER stored in
-`api_key_encrypted` field as plaintext. Field holds a reference
-string (e.g. 'groq:v1'); the actual secret lives in
-ir.config_parameter under 'neon_dashboard.ai_keys_<provider_key>'
-which is sudo-only readable. Per addendum §11.
+  * daily_call_count (reads neon.dashboard.ai.insight)
+  * action_test_connection (uses the insight adapters that stay here)
+  * action_generate_now + the cron + the OWL rpc_* entry points
+  * _check_manual_refresh_rate + insight payload serialisers
 
-⚠️ DECISION (M11, marker inline): exactly-one-default constraint
-enforced via @api.constrains, not SQL UNIQUE WHERE (Odoo 17 ORM
-doesn't reliably support partial unique). The constraint runs
-on every write of is_default; cheap query.
+These reference neon.dashboard / neon.dashboard.ai.insight /
+InsightOrchestrator / GroqAdapter / RuleBasedAdapter -- all of which
+stay in neon_dashboard. Keeping them here (not in core) preserves core
+neutrality: neon_ai_core never imports neon_dashboard.
+
+⚠️ DECISION (M11, carried): exactly-one-default constraint + key
+management live in core now (neon_ai_core.models.ai_provider).
 """
 import logging
-from datetime import datetime, timedelta
-
-import pytz
+from datetime import datetime
 
 from odoo import _, api, fields, models
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import UserError
 
 from .ai.insight_orchestrator import InsightOrchestrator
 
 
 _logger = logging.getLogger(__name__)
 
-
-_PROVIDER_KEYS = [
-    ("groq", "Groq (OpenAI-compatible)"),
-    ("rule_based", "Rule-based fallback"),
-    # M11.1 will add: ('anthropic', 'Anthropic Claude'),
-    #                 ('google', 'Google Gemini'),
-    #                 ('ollama', 'Ollama (local)'),
-]
-
-_HEALTH_STATUSES = [
-    ("untested", "Untested"),
-    ("ok", "OK"),
-    ("error", "Error"),
-]
-
-_CONFIG_KEY_PREFIX = "neon_dashboard.ai_keys_"
 
 _MANUAL_REFRESH_RATE_LIMIT_SECONDS = 300  # 5 minutes per user
 
@@ -57,72 +42,12 @@ _MANUAL_REFRESH_LAST_BY_USER = {}
 
 
 class NeonDashboardAiProvider(models.Model):
-    _name = "neon.dashboard.ai.provider"
-    _description = "AI Insight Provider Catalog"
-    _order = "is_default desc, sequence, id"
-    _rec_name = "name"
+    _inherit = "neon.dashboard.ai.provider"
 
-    name = fields.Char(required=True, translate=False)
-    provider_key = fields.Selection(
-        _PROVIDER_KEYS, required=True, index=True,
-        help="Stable adapter identifier. Maps to a Python class "
-             "in models/ai/*.py.",
-    )
-    endpoint_url = fields.Char(
-        help="API endpoint. Empty for rule-based.",
-    )
-    api_key_encrypted = fields.Char(
-        string="API Key Reference",
-        help="Reference identifier only; the actual secret lives "
-             "in ir.config_parameter under "
-             "'neon_dashboard.ai_keys_<provider_key>'. "
-             "Never store plaintext keys in this field.",
-    )
-    model_id = fields.Char(
-        string="Model",
-        help="Provider-specific model name. For Groq: "
-             "'llama-3.3-70b-versatile' (default, GPT-4o-class) or "
-             "'llama-3.1-8b-instant' (max throughput).",
-    )
-    is_enabled = fields.Boolean(default=True)
-    is_default = fields.Boolean(default=False)
-    sequence = fields.Integer(default=10)
-    max_tokens = fields.Integer(default=800)
-    temperature = fields.Float(default=0.3)
-    system_prompt_template = fields.Text(
-        help="Override the default per-adapter system prompt. "
-             "Leave blank to use the adapter's built-in default.",
-    )
-    daily_call_limit = fields.Integer(
-        default=1000,
-        help="Free-tier daily quota (Groq 1000 for llama-3.3-70b; "
-             "rule-based ignored).",
-    )
     daily_call_count = fields.Integer(
         compute="_compute_daily_call_count",
         store=False,
     )
-    last_health_check = fields.Datetime(readonly=True)
-    last_health_status = fields.Selection(
-        _HEALTH_STATUSES,
-        default="untested",
-        readonly=True,
-    )
-
-    # --------------------------------------------------------------
-    # Constraints
-    # --------------------------------------------------------------
-    @api.constrains("is_default", "is_enabled")
-    def _check_one_default(self):
-        """Exactly one provider can be default at any time. We
-        permit zero defaults briefly during a swap (the UI toggles
-        old -> new in two writes); enforce 'at most one' here."""
-        defaults = self.search([("is_default", "=", True)])
-        if len(defaults) > 1:
-            raise ValidationError(_(
-                "Only one AI provider can be marked default. "
-                "Currently: %s"
-            ) % ", ".join(defaults.mapped("name")))
 
     # --------------------------------------------------------------
     # Computed -- usage stats
@@ -138,34 +63,6 @@ class NeonDashboardAiProvider(models.Model):
                 ("provider_id", "=", rec.id),
                 ("create_date", ">=", start),
             ])
-
-    # --------------------------------------------------------------
-    # API-key encryption helpers
-    # --------------------------------------------------------------
-    def _config_key(self):
-        self.ensure_one()
-        return _CONFIG_KEY_PREFIX + (self.provider_key or "")
-
-    def _get_decrypted_api_key(self):
-        """Return the actual API key from ir.config_parameter.
-        Returns empty string if no key set or rule-based provider."""
-        self.ensure_one()
-        if self.provider_key == "rule_based":
-            return ""
-        Config = self.env["ir.config_parameter"].sudo()
-        return Config.get_param(self._config_key(), "") or ""
-
-    def _set_api_key(self, plaintext):
-        """Stash the plaintext key in ir.config_parameter; stamp
-        the reference field with a non-secret marker."""
-        self.ensure_one()
-        if self.provider_key == "rule_based":
-            raise UserError(_(
-                "Rule-based provider does not require an API key."))
-        Config = self.env["ir.config_parameter"].sudo()
-        Config.set_param(self._config_key(), plaintext or "")
-        marker = ((self.provider_key or "?") + ":v1") if plaintext else ""
-        self.sudo().write({"api_key_encrypted": marker})
 
     # --------------------------------------------------------------
     # Public actions (called from settings UI buttons)
@@ -207,24 +104,6 @@ class NeonDashboardAiProvider(models.Model):
                 "sticky": False,
             },
         }
-
-    def action_set_default(self):
-        """Mark this provider as the active default. Clears the
-        flag on every other provider first."""
-        self.ensure_one()
-        self._check_superuser()
-        if self.provider_key == "rule_based":
-            raise UserError(_(
-                "Rule-based provider cannot be the default. It is "
-                "always available as a fallback when the AI "
-                "provider fails."))
-        others = self.search([
-            ("id", "!=", self.id),
-            ("is_default", "=", True),
-        ])
-        others.sudo().write({"is_default": False})
-        self.sudo().write({"is_default": True, "is_enabled": True})
-        return True
 
     def action_generate_now(self):
         """Manual refresh trigger from settings page. Rate-limited
@@ -334,12 +213,6 @@ class NeonDashboardAiProvider(models.Model):
     # --------------------------------------------------------------
     # Helpers
     # --------------------------------------------------------------
-    def _check_superuser(self):
-        if not self.env.user.has_group("neon_core.group_neon_superuser"):
-            raise AccessError(_(
-                "AI Insights configuration is restricted to "
-                "Neon Superuser."))
-
     def _check_manual_refresh_rate(self):
         uid = self.env.user.id
         last = _MANUAL_REFRESH_LAST_BY_USER.get(uid)
