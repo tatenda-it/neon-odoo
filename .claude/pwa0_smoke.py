@@ -208,6 +208,82 @@ try:
           src.count("_process_bot_command(") == 1,
           "calls=%d" % src.count("_process_bot_command("))
 
+    # ---- T7: INTEGRATION -- handle_inbound must ROUTE via resolve()
+    #          (the gap that bit twice: unit resolve() worked, the live
+    #          handle_inbound path used its own exact-match + fell through).
+    #          Gemini + send are mocked so no live API / WhatsApp calls.
+    from unittest.mock import patch as _patch
+    from odoo.addons.neon_ai_core.models.ai.groq_chat_adapter import (
+        ChatTurnResult)
+    WM = env["neon.whatsapp.message"].sudo()
+    _GCA = ("odoo.addons.neon_ai_core.models.ai.gemini_chat_adapter."
+            "GeminiChatAdapter.chat")
+
+    def _stub_chat(self, messages, tools=None):
+        return ChatTurnResult(success=True, assistant_message="stub",
+                              tool_calls=[])
+
+    _sends = []
+
+    def _stub_send(self, to, body, *a, **k):
+        _sends.append((to, body))
+        return True
+
+    def _lead_ct(num):
+        return env["crm.lead"].sudo().search_count(
+            ['|', ("phone", "=", num), ("mobile", "=", num)])
+
+    # resolved case: Meta-format `from` (no '+') -> PRIVILEGED path
+    bu_int = env["neon.bot.user"].sudo().create({
+        "name": "WA0 int", "phone_number": "+263 990 88 7766",
+        "user_id": sales.id})
+    msg = {"id": "wamid.INT", "from": "263990887766", "type": "text",
+           "text": {"body": "hello"}}
+    with _patch(_GCA, _stub_chat), \
+         _patch.object(type(WM), "send_message", _stub_send), \
+         _patch.object(type(WM), "send_cta_url",
+                       lambda self, *a, **k: True):
+        leads_before = _lead_ct("263990887766")
+        WM.handle_inbound(msg, {})
+        inrow = WM.search([("phone_number", "=", "263990887766"),
+                           ("direction", "=", "inbound")],
+                          order="id desc", limit=1)
+        outrow = WM.search([("phone_number", "=", "263990887766"),
+                            ("direction", "=", "outbound")],
+                           order="id desc", limit=1)
+        leads_after = _lead_ct("263990887766")
+    check("handle_inbound(Meta-format) -> PRIVILEGED (inbound bot_user_id set)",
+          bool(inrow) and inrow.bot_user_id.id == bu_int.id,
+          "bu=%s" % (inrow.bot_user_id if inrow else None))
+    check("handle_inbound -> outbound reply row carries variant",
+          bool(outrow) and bool(outrow.variant), "out=%s" % outrow)
+    check("handle_inbound -> process_incoming NOT called (no raw lead)",
+          leads_after == leads_before)
+    check("handle_inbound -> send attempted", len(_sends) >= 1)
+
+    # ambiguous case: two active rows, same normalised digits -> fall
+    # through to raw-lead, NO privilege (RBAC safety at the live layer).
+    env["neon.bot.user"].sudo().create({
+        "name": "WA0 amb A", "phone_number": "+263 990 11 2233",
+        "user_id": sales.id})
+    env["neon.bot.user"].sudo().create({
+        "name": "WA0 amb B", "phone_number": "263990112233",
+        "user_id": su.id})
+    msg2 = {"id": "wamid.AMB", "from": "263990112233", "type": "text",
+            "text": {"body": "hi"}}
+    with _patch(_GCA, _stub_chat), \
+         _patch.object(type(WM), "send_message", _stub_send), \
+         _patch.object(type(WM), "send_cta_url",
+                       lambda self, *a, **k: True):
+        WM.handle_inbound(msg2, {})
+        priv = WM.search_count([("phone_number", "=", "263990112233"),
+                                ("bot_user_id", "!=", False)])
+        lead_amb = _lead_ct("263990112233")
+    check("handle_inbound ambiguous(>1) -> NO privilege (no bot_user_id row)",
+          priv == 0)
+    check("handle_inbound ambiguous(>1) -> fell through to raw-lead",
+          lead_amb >= 1)
+
     # ---- Copilot-unchanged regression bar ----
     nr = len(TR.list_tools(category="read"))
     nw = len(TR.list_tools(category="write"))

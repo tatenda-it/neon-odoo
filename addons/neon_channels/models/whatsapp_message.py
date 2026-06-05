@@ -171,10 +171,14 @@ class WhatsAppMessage(models.Model):
         PRIVILEGED WhatsApp Copilot turn under THEIR identity. An unmapped
         sender falls through to the existing raw-lead intake
         (process_incoming), UNCHANGED -- no privileged access."""
+        from .wa_copilot import WhatsAppCopilotService  # noqa: PLC0415
+        svc = WhatsAppCopilotService(self.env)
         from_number = message.get('from')
-        bot_user = self.env['neon.bot.user'].sudo().search(
-            [('phone_number', '=', from_number), ('active', '=', True)],
-            limit=1)
+        # WA-0 fix: delegate to the SINGLE resolver (digits-only match +
+        # RBAC-defensive >1-match -> UNRESOLVED). This replaced an inline
+        # exact '=' match that the resolve() fix never reached -- the live
+        # fallthrough bug (id 10). One source of truth now.
+        bot_user = svc.resolve(from_number)
         if not bot_user:
             return self.process_incoming(message, metadata)
 
@@ -195,8 +199,6 @@ class WhatsAppMessage(models.Model):
         provider_key = self.env['ir.config_parameter'].sudo().get_param(
             'neon_channels.whatsapp_provider_key', 'google')
         try:
-            from .wa_copilot import WhatsAppCopilotService  # noqa: PLC0415
-            svc = WhatsAppCopilotService(self.env)
             variant = svc.variant_for(bot_user.user_id)
             result = svc.run_turn(bot_user, body)
         except Exception as e:  # noqa: BLE001
