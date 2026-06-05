@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    WA-0 —confirm-in-Odoo deep-link target. The WhatsApp cta_url points
+    here (/web#id=<rec>&model=neon.finance.ai.chat.write.log&view_type=form
+    &action=<this>). The user reviews the proposal IN ODOO and clicks
+    Confirm; the existing two-phase engine (token + user + TTL + savepoint)
+    executes the reversible write. NEVER a single-tap WhatsApp commit.
+    The model + its append-only ACL live in neon_ai_core.
+-->
+<odoo>
+
+    <record id="view_wa_writelog_form" model="ir.ui.view">
+        <field name="name">neon.finance.ai.chat.write.log.wa.form</field>
+        <field name="model">neon.finance.ai.chat.write.log</field>
+        <field name="arch" type="xml">
+            <form string="Confirm Action" create="false" edit="false"
+                  delete="false">
+                <header>
+                    <button name="action_confirm_from_ui" type="object"
+                            string="Confirm" class="btn-primary"
+                            invisible="status != 'proposed'"/>
+                    <button name="action_cancel_from_ui" type="object"
+                            string="Cancel"
+                            invisible="status != 'proposed'"/>
+                    <field name="status" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="human_summary"/>
+                        <field name="action_type"/>
+                        <field name="target_model"/>
+                        <field name="user_id"/>
+                        <field name="expires_at"/>
+                    </group>
+                    <group string="Proposed change (review before confirming)">
+                        <field name="before_json"/>
+                        <field name="after_json"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_wa_writelog_tree" model="ir.ui.view">
+        <field name="name">neon.finance.ai.chat.write.log.wa.tree</field>
+        <field name="model">neon.finance.ai.chat.write.log</field>
+        <field name="arch" type="xml">
+            <tree string="Pending Actions" create="false">
+                <field name="create_date"/>
+                <field name="human_summary"/>
+                <field name="action_type"/>
+                <field name="status"/>
+                <field name="expires_at"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_wa_pending_writes" model="ir.actions.act_window">
+        <field name="name">Confirm Action</field>
+        <field name="res_model">neon.finance.ai.chat.write.log</field>
+        <field name="view_mode">form,tree</field>
+        <!-- a user only ever sees / confirms their OWN proposals -->
+        <field name="domain">[('user_id', '=', uid)]</field>
+        <field name="groups_id" eval="[(4, ref('neon_core.group_neon_superuser')),
+            (4, ref('neon_core.group_neon_sales_rep')),
+            (4, ref('neon_core.group_neon_bookkeeper')),
+            (4, ref('neon_core.group_neon_lead_tech'))]"/>
+    </record>
+
+</odoo>

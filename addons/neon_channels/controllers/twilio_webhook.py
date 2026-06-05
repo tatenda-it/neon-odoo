@@ -29,19 +29,16 @@ class TwilioWebhookController(http.Controller):
             ], limit=1)
 
             if bot_user:
-                # Process as bot command using mapped user
+                # Process as bot command using the mapped user identity.
                 reply = self._process_bot_command(body, from_number, profile_name, bot_user)
             else:
-                # Check legacy authorised numbers list
-                twilio_config = request.env['twilio.config'].sudo().search([], limit=1)
-                authorised_numbers = []
-                if twilio_config:
-                    authorised_numbers = [n.strip() for n in (twilio_config.authorised_numbers or '').replace('\n', ',').split(',') if n.strip()]
-
-                if authorised_numbers and from_number in authorised_numbers:
-                    reply = self._process_bot_command(body, from_number, profile_name, None)
-                else:
-                    reply = self._process_client_message(body, from_number, profile_name)
+                # WA-0 (locked #3): neon.bot.user is the SOLE identity
+                # source. twilio.config.authorised_numbers is NO LONGER
+                # consulted for bot auth -- an unmapped number is treated
+                # as a client (raw-lead intake), never granted bot access.
+                # The field + its data are retained (deprecated) for the
+                # later separate removal cleanup once non-use is confirmed.
+                reply = self._process_client_message(body, from_number, profile_name)
 
             return self._twilio_response(reply)
 

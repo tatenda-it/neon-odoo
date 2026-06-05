@@ -35,10 +35,12 @@ _logger = logging.getLogger(__name__)
 
 _PROVIDER_KEYS = [
     ("groq", "Groq (OpenAI-compatible)"),
+    # WA-0: activated -- GeminiChatAdapter (chat_adapter_factory) routes
+    # this key. Default chat provider for the WhatsApp rails; the
+    # dashboard Copilot keeps Groq as is_default.
+    ("google", "Google Gemini"),
     ("rule_based", "Rule-based fallback"),
-    # M11.1 / WA-0 will add: ('google', 'Google Gemini'),
-    #                        ('anthropic', 'Anthropic Claude'),
-    #                        ('ollama', 'Ollama (local)'),
+    # Future: ('anthropic', 'Anthropic Claude'), ('ollama', 'Ollama').
 ]
 
 _HEALTH_STATUSES = [

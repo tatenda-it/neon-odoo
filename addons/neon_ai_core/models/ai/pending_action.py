@@ -279,3 +279,51 @@ class NeonFinanceAiChatWriteLog(models.Model):
             if created_target_id:
                 vals["created_target_id"] = int(created_target_id)
         self.sudo().write(vals)
+
+    # ==================================================================
+    # WA-0 -- confirm/cancel from the Odoo UI (cta_url deep-link target)
+    # ==================================================================
+    def action_confirm_from_ui(self):
+        """Header-button entry on the write.log form. Executes the
+        proposed write via the EXISTING two-phase confirm path (token +
+        user + TTL + savepoint all enforced inside confirm_pending_action).
+        Reached from the WhatsApp cta_url deep-link -- the user confirms
+        IN ODOO, never single-tap over WhatsApp. Deferred import avoids a
+        module-load cycle with chat_orchestrator."""
+        self.ensure_one()
+        from .chat_orchestrator import ChatOrchestrator  # noqa: PLC0415
+        res = ChatOrchestrator(self.env).confirm_pending_action(
+            self.env.user, self.confirmation_token)
+        ok = bool(res.get("ok"))
+        msg = ((res.get("result") or {}).get("human_summary")
+               if ok else res.get("error")) or (
+                   "Executed." if ok else "Could not confirm.")
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": "Action confirmed" if ok else "Not confirmed",
+                "message": msg,
+                "type": "success" if ok else "danger",
+                "sticky": False,
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }
+
+    def action_cancel_from_ui(self):
+        """Header-button entry -- void the proposal without executing."""
+        self.ensure_one()
+        from .chat_orchestrator import ChatOrchestrator  # noqa: PLC0415
+        res = ChatOrchestrator(self.env).cancel_pending_action(
+            self.env.user, self.confirmation_token)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": "Action cancelled",
+                "message": res.get("error") or "Proposal cancelled.",
+                "type": "warning",
+                "sticky": False,
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }

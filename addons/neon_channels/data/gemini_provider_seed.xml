@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    WA-0 —Google Gemini provider row in the (neon_ai_core) catalog.
+    is_default=False so it does NOT become the dashboard Copilot's
+    provider (Groq stays is_default). WhatsApp selects this row via the
+    neon_channels.whatsapp_provider_key config param.
+
+    model_id on the row (gemini-2.5-flash, locked #5) so it can be changed
+    to a newer model (e.g. 3.5-flash) later WITHOUT a code change.
+    API key: ir.config_parameter neon_dashboard.ai_keys_google (set by an
+    admin via the provider's Set Key flow; RED —not shipped here).
+    endpoint_url is the v1beta base; the adapter appends
+    /models/<model>:generateContent.
+
+    noupdate=1 so admin tweaks (model, temperature, key marker) survive -u.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="ai_provider_gemini" model="neon.dashboard.ai.provider">
+            <field name="name">Google Gemini (2.5 Flash)</field>
+            <field name="provider_key">google</field>
+            <field name="endpoint_url">https://generativelanguage.googleapis.com/v1beta</field>
+            <field name="model_id">gemini-2.5-flash</field>
+            <field name="is_enabled" eval="True"/>
+            <field name="is_default" eval="False"/>
+            <field name="sequence">20</field>
+            <field name="max_tokens">800</field>
+            <field name="temperature">0.3</field>
+            <field name="daily_call_limit">1000</field>
+        </record>
+    </data>
+</odoo>

@@ -40,7 +40,14 @@
     # the provider model via _inherit (insight half), and re-exports
     # the moved symbols via shims in models/ai/. Definition-ownership
     # shift only -- no behaviour change to the live Copilot.
-    "version": "17.0.11.1.0",
+    # 17.0.11.1.1 = B11/WA-0 latent-fix -- the chat-model ACL rows that
+    # stayed here now reference the moved models by QUALIFIED xmlid
+    # (neon_ai_core.model_neon_finance_ai_chat_*). They were unqualified,
+    # which resolved during the extraction's own -u (old xmlid not yet
+    # orphan-removed) but broke on any later neon_dashboard reload (e.g.
+    # the WA-0 -u neon_ai_core dependency cascade). Surfaced by the WA-0
+    # staging dry-run.
+    "version": "17.0.11.1.1",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

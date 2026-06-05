@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    WA-0 —which catalog provider the WhatsApp rails use. SEPARATE from
+    the dashboard Copilot's is_default (Groq), so Gemini-for-WhatsApp
+    never touches the Copilot. noupdate=1 so an admin can switch the WA
+    provider (e.g. back to groq) without a -u overwriting it.
+
+    NB: neon_channels.whatsapp_app_secret (Meta app secret for
+    X-Hub-Signature-256) is intentionally NOT seeded here —it is a RED
+    credential an admin sets manually. Until set, the webhook logs a
+    warning and allows (fail-open); once set, signatures are enforced.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="wa_provider_key_param" model="ir.config_parameter">
+            <field name="key">neon_channels.whatsapp_provider_key</field>
+            <field name="value">google</field>
+        </record>
+    </data>
+</odoo>

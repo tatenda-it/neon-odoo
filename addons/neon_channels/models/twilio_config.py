@@ -14,8 +14,11 @@ class TwilioConfig(models.Model):
     phone_number = fields.Char(string='Twilio Phone Number', help='E.g. +14758897488')
     whatsapp_number = fields.Char(string='WhatsApp Sandbox Number', help='E.g. +14155238886')
     authorised_numbers = fields.Text(
-        string='Authorised Bot Numbers',
-        help='Comma-separated list of phone numbers allowed to use the WhatsApp bot. E.g. +263771234567, +263772345678'
+        string='Authorised Bot Numbers (DEPRECATED)',
+        help='DEPRECATED (WA-0): no longer consulted for bot auth -- '
+             'neon.bot.user is the sole identity source. Field + data '
+             'retained for a later separate removal cleanup. Do not rely '
+             'on this for granting bot access.'
     )
     active = fields.Boolean(default=True)
 

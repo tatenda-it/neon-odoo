@@ -13,7 +13,12 @@
     # every moved model keeps its _name (neon.finance.ai.chat.*,
     # neon.dashboard.ai.provider) so no table is renamed/copied/dropped.
     # Consumers: neon_dashboard (live Copilot), neon_channels (WA-0).
-    "version": "17.0.1.0.0",
+    # 17.0.1.1.0 = WA-0 -- GeminiChatAdapter (Google generateContent
+    # tool-calling) + get_chat_adapter factory + 'google' provider_key
+    # activated + write.log action_confirm/cancel_from_ui (cta_url
+    # deep-link target). Additive; dashboard Copilot unaffected (Groq
+    # stays is_default).
+    "version": "17.0.1.1.0",
     "summary": "Shared AI engine -- provider abstraction, tool-calling "
                "chat orchestrator, two-phase write guardrail, chat "
                "audit models. Neutral core for neon_dashboard + "

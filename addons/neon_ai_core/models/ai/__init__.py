@@ -16,4 +16,6 @@ from . import chat_session_message
 from . import tool_registry
 from . import pending_action
 from . import groq_chat_adapter
+from . import gemini_chat_adapter   # WA-0: Google Gemini chat adapter
+from . import chat_adapter_factory  # WA-0: provider_key -> adapter
 from . import chat_orchestrator
