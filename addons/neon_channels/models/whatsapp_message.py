@@ -224,7 +224,9 @@ class WhatsAppMessage(models.Model):
             'state': 'sent',
             'bot_user_id': bot_user.id,
             'variant': variant or False,
-            'provider_key': provider_key,
+            # WA-0: record the provider that ACTUALLY served (may be the
+            # Groq fallback when Gemini 503'd), not just the configured one.
+            'provider_key': result.get('provider_key') or provider_key,
         })
         return True
 

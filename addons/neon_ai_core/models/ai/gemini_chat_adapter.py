@@ -43,6 +43,13 @@ _logger = logging.getLogger(__name__)
 _TIMEOUT_SECONDS = 15
 _HEALTH_TIMEOUT_SECONDS = 5
 
+# WA-0 503-resilience: gemini-2.5-flash free-tier returns 503 "high
+# demand" intermittently (200s land ms later). Retry these transient
+# statuses with short backoff before giving up (the orchestrator then
+# falls back to Groq if even the retries fail).
+_RETRY_STATUSES = (429, 503)
+_RETRY_BACKOFFS = (0.3, 0.8)  # seconds; len => number of retries
+
 
 def _to_gemini_tools(tools):
     """Groq tool schemas -> Gemini tools[].functionDeclarations[].
@@ -129,22 +136,59 @@ class GeminiChatAdapter:
         model = self.provider.model_id or "gemini-2.5-flash"
         return f"{base}/models/{model}:{action}"
 
+    def _fail(self, start, msg, snapshot=None):
+        """Build a failure ChatTurnResult AND log it (WA-0: failures were
+        previously invisible in the app log)."""
+        _logger.warning("Gemini chat failed: %s", msg)
+        return ChatTurnResult(
+            success=False, is_fallback=True, error_message=msg,
+            request_body_snapshot=(
+                _snapshot_request(snapshot) if snapshot else ""),
+            latency_ms=int((time.time() - start) * 1000))
+
+    def _parse_ok(self, response, start):
+        data = response.json()
+        candidates = data.get("candidates") or [{}]
+        parts = (((candidates[0] or {}).get("content") or {})
+                 .get("parts") or [])
+        text_chunks = []
+        parsed_tool_calls = []
+        for i, part in enumerate(parts):
+            if "text" in part:
+                text_chunks.append(part.get("text") or "")
+            elif "functionCall" in part:
+                fc = part["functionCall"] or {}
+                args = fc.get("args") or {}
+                parsed_tool_calls.append({
+                    # Gemini gives no call id; synthesise a stable one.
+                    "tool_call_id": f"gem_{i}_{fc.get('name', '')}",
+                    "tool_name": fc.get("name") or "",
+                    "params": args if isinstance(args, dict) else {},
+                })
+        usage = data.get("usageMetadata") or {}
+        return ChatTurnResult(
+            success=True,
+            assistant_message="".join(text_chunks),
+            tool_calls=parsed_tool_calls,
+            raw_response=json.dumps(candidates[0] if candidates else {}),
+            prompt_tokens=int(usage.get("promptTokenCount") or 0),
+            completion_tokens=int(usage.get("candidatesTokenCount") or 0),
+            latency_ms=int((time.time() - start) * 1000))
+
     def chat(self, messages, tools=None):
-        """One generateContent round-trip. NEVER raises -- returns
-        ChatTurnResult(success=False, ...) on any failure."""
+        """generateContent with retry on transient 503/429. NEVER raises
+        -- returns ChatTurnResult(success=False, ...) on any failure.
+        gemini-2.5-flash free-tier returns 503 'high demand' ~half the
+        time; a short retry resolves the large majority (200s land ms
+        after the 503). If even the retries fail, the orchestrator
+        (run_turn) falls back to Groq."""
         start = time.time()
         try:
             api_key = self.provider._get_decrypted_api_key()
         except Exception as exc:  # noqa: BLE001
-            return ChatTurnResult(
-                success=False, is_fallback=True,
-                error_message=f"Gemini API key lookup failed: {exc}",
-                latency_ms=int((time.time() - start) * 1000))
+            return self._fail(start, f"Gemini API key lookup failed: {exc}")
         if not api_key:
-            return ChatTurnResult(
-                success=False, is_fallback=True,
-                error_message="Gemini API key not configured.",
-                latency_ms=int((time.time() - start) * 1000))
+            return self._fail(start, "Gemini API key not configured.")
         system_text, contents = _to_gemini_contents(messages)
         payload = {
             "contents": contents,
@@ -160,71 +204,55 @@ class GeminiChatAdapter:
             payload["tools"] = gem_tools
             payload["toolConfig"] = {
                 "functionCallingConfig": {"mode": "AUTO"}}
-        try:
-            response = requests.post(
-                self._endpoint(),
-                headers={
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": api_key,
-                },
-                json=payload,
-                timeout=_TIMEOUT_SECONDS,
-            )
-            if not response.ok:
-                err = ""
+
+        attempts = len(_RETRY_BACKOFFS) + 1
+        for attempt in range(attempts):
+            try:
+                response = requests.post(
+                    self._endpoint(),
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": api_key,
+                    },
+                    json=payload,
+                    timeout=_TIMEOUT_SECONDS,
+                )
+            except requests.exceptions.Timeout:
+                return self._fail(
+                    start,
+                    f"Gemini request timed out (>{_TIMEOUT_SECONDS}s).",
+                    snapshot=payload)
+            except requests.exceptions.RequestException as exc:
+                return self._fail(
+                    start, f"Gemini HTTP error: {exc}", snapshot=payload)
+            except Exception as exc:  # noqa: BLE001
+                return self._fail(
+                    start, f"Gemini adapter error: {exc}", snapshot=payload)
+
+            if response.ok:
                 try:
-                    err = (response.json() if response.content
-                           else {}).get("error", {})
-                except Exception:  # noqa: BLE001
-                    err = (response.text or "")[:1000]
-                return ChatTurnResult(
-                    success=False, is_fallback=True,
-                    error_message=(
-                        f"Gemini HTTP {response.status_code}: {err}"),
-                    request_body_snapshot=_snapshot_request(payload),
-                    latency_ms=int((time.time() - start) * 1000))
-            data = response.json()
-            candidates = data.get("candidates") or [{}]
-            parts = (((candidates[0] or {}).get("content") or {})
-                     .get("parts") or [])
-            text_chunks = []
-            parsed_tool_calls = []
-            for i, part in enumerate(parts):
-                if "text" in part:
-                    text_chunks.append(part.get("text") or "")
-                elif "functionCall" in part:
-                    fc = part["functionCall"] or {}
-                    args = fc.get("args") or {}
-                    parsed_tool_calls.append({
-                        # Gemini gives no call id; synthesise a stable one.
-                        "tool_call_id": f"gem_{i}_{fc.get('name', '')}",
-                        "tool_name": fc.get("name") or "",
-                        "params": args if isinstance(args, dict) else {},
-                    })
-            usage = data.get("usageMetadata") or {}
-            return ChatTurnResult(
-                success=True,
-                assistant_message="".join(text_chunks),
-                tool_calls=parsed_tool_calls,
-                raw_response=json.dumps(candidates[0] if candidates else {}),
-                prompt_tokens=int(usage.get("promptTokenCount") or 0),
-                completion_tokens=int(usage.get("candidatesTokenCount") or 0),
-                latency_ms=int((time.time() - start) * 1000))
-        except requests.exceptions.Timeout:
-            return ChatTurnResult(
-                success=False, is_fallback=True,
-                error_message=f"Gemini request timed out (>{_TIMEOUT_SECONDS}s).",
-                latency_ms=int((time.time() - start) * 1000))
-        except requests.exceptions.RequestException as exc:
-            return ChatTurnResult(
-                success=False, is_fallback=True,
-                error_message=f"Gemini HTTP error: {exc}",
-                latency_ms=int((time.time() - start) * 1000))
-        except Exception as exc:  # noqa: BLE001
-            return ChatTurnResult(
-                success=False, is_fallback=True,
-                error_message=f"Gemini adapter error: {exc}",
-                latency_ms=int((time.time() - start) * 1000))
+                    return self._parse_ok(response, start)
+                except Exception as exc:  # noqa: BLE001
+                    return self._fail(
+                        start, f"Gemini parse error: {exc}", snapshot=payload)
+
+            status = response.status_code
+            err = ""
+            try:
+                err = (response.json() if response.content
+                       else {}).get("error", {})
+            except Exception:  # noqa: BLE001
+                err = (response.text or "")[:1000]
+            if status in _RETRY_STATUSES and attempt < attempts - 1:
+                _logger.warning(
+                    "Gemini HTTP %s (attempt %d/%d) -- retrying in %.1fs",
+                    status, attempt + 1, attempts, _RETRY_BACKOFFS[attempt])
+                time.sleep(_RETRY_BACKOFFS[attempt])
+                continue
+            return self._fail(
+                start, f"Gemini HTTP {status}: {err}", snapshot=payload)
+        # Defensive -- the loop always returns above.
+        return self._fail(start, "Gemini retries exhausted.", snapshot=payload)
 
     def health_check(self):
         try:

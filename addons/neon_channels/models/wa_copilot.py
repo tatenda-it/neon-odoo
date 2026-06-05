@@ -127,27 +127,50 @@ class WhatsAppCopilotService:
         tools = self.whatsapp_tools(user, variant)
         schemas = tool_registry.groq_tool_schemas(tools=tools)
 
-        provider = self._wa_provider()
-        adapter = get_chat_adapter(provider) if provider else None
-        if not adapter:
-            return {"text": "The assistant is not configured yet. Please "
-                            "contact an administrator.",
-                    "cta_url": None, "error": "no_provider"}
-
         messages = self._build_messages(
             user, variant, inbound_text, bot_user.phone_number)
 
-        # SINGLE provider call per inbound turn -- no fan-out, no
-        # iterate-after-tools loop (free-tier guard, locked).
-        result = adapter.chat(messages, tools=schemas)
-        if not result.success:
+        # ONE primary provider call (Gemini; it self-retries 503/429). No
+        # fan-out -- the Groq path below is a sequential resilience
+        # fallback that fires ONLY if the primary fails.
+        provider = self._wa_provider()
+        adapter = get_chat_adapter(provider) if provider else None
+        served_by = provider.provider_key if provider else None
+        result = adapter.chat(messages, tools=schemas) if adapter else None
+
+        # PROVIDER FALLBACK (WA-0): primary failed (transient 5xx/429 after
+        # its own retries, or unconfigured). Fall through to Groq so the
+        # user still gets an answer -- this is why we kept Groq. tool_call
+        # shape is provider-agnostic, so downstream dispatch is unchanged.
+        if result is None or not result.success:
+            primary_err = (result.error_message if result is not None
+                           else "no WhatsApp provider configured")
+            fb = self._fallback_adapter(exclude=served_by)
+            if fb:
+                fb_adapter, fb_key = fb
+                _logger.warning(
+                    "WA: provider %s failed (%s) -- falling back to %s",
+                    served_by or "none", primary_err, fb_key)
+                result = fb_adapter.chat(messages, tools=schemas)
+                served_by = fb_key
+
+        if result is None or not result.success:
+            _logger.warning(
+                "WA: all providers failed for %s; err=%s", user.login,
+                (result.error_message if result is not None else "n/a"))
             return {"text": "Sorry -- I can't reach the assistant right "
                             "now. Please try again shortly.",
-                    "cta_url": None, "error": result.error_message}
+                    "cta_url": None, "provider_key": served_by,
+                    "error": (result.error_message if result is not None
+                              else "no_provider")}
+
+        _logger.info("WA: turn served by provider=%s (%dms)",
+                     served_by, result.latency_ms or 0)
 
         if not result.tool_calls:
             return {"text": result.assistant_message or "...",
-                    "cta_url": None, "error": None}
+                    "cta_url": None, "error": None,
+                    "provider_key": served_by}
 
         # Execute tool calls in ONE pass (no second LLM call). Reads
         # return data; writes become a cta_url confirm-in-Odoo link.
@@ -192,11 +215,28 @@ class WhatsAppCopilotService:
         head = (result.assistant_message + "\n"
                 if result.assistant_message else "")
         text = (head + "\n".join(lines)).strip() or "Done."
-        return {"text": text, "cta_url": cta_url, "error": None}
+        return {"text": text, "cta_url": cta_url, "error": None,
+                "provider_key": served_by}
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _fallback_adapter(self, exclude=None):
+        """Resilience fallback provider (Groq) for when the WhatsApp
+        primary (Gemini) fails after its retries. Returns (adapter, key)
+        or None. Groq is enabled + keyed (the dashboard Copilot default);
+        this does NOT change the Copilot's provider. Skipped if Groq is
+        already the primary (``exclude``)."""
+        prov = self.env["neon.dashboard.ai.provider"].sudo().search([
+            ("provider_key", "=", "groq"),
+            ("is_enabled", "=", True),
+        ], limit=1)
+        if prov and prov.provider_key != exclude:
+            adapter = get_chat_adapter(prov)
+            if adapter:
+                return adapter, prov.provider_key
+        return None
+
     def _wa_provider(self):
         key = self.env["ir.config_parameter"].sudo().get_param(
             _WA_PROVIDER_PARAM, "google")

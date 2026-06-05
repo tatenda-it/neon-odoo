@@ -284,6 +284,75 @@ try:
     check("handle_inbound ambiguous(>1) -> fell through to raw-lead",
           lead_amb >= 1)
 
+    # ---- T8: Gemini 503 resilience (retry -> Groq fallback -> graceful)
+    from unittest.mock import MagicMock as _MM
+    from odoo.addons.neon_ai_core.models.ai.gemini_chat_adapter import (
+        GeminiChatAdapter as _GAd)
+    prov_g = env["neon.dashboard.ai.provider"].sudo().search(
+        [("provider_key", "=", "google")], limit=1)
+    _GP = "odoo.addons.neon_ai_core.models.ai.gemini_chat_adapter"
+    _GRP = ("odoo.addons.neon_ai_core.models.ai.groq_chat_adapter."
+            "GroqChatAdapter.chat")
+
+    def _resp(status, body):
+        m = _MM()
+        m.status_code = status
+        m.ok = (200 <= status < 300)
+        m.content = b"x"
+        m.text = ""
+        m.json.return_value = body
+        return m
+
+    _ok_body = {"candidates": [{"content": {"role": "model", "parts": [
+        {"text": "hi"}]}}], "usageMetadata": {}}
+    _503_body = {"error": {"code": 503, "message": "high demand"}}
+
+    def _post_always_503(*a, **k):
+        return _resp(503, _503_body)
+
+    # 8a: 503-then-200 -> retry succeeds, one reply
+    _seq = {"n": 0}
+
+    def _post_503_then_200(*a, **k):
+        _seq["n"] += 1
+        return _resp(503, _503_body) if _seq["n"] == 1 else _resp(200, _ok_body)
+    with _patch(_GP + ".requests.post", side_effect=_post_503_then_200), \
+         _patch(_GP + ".time.sleep", lambda s: None):
+        rr = _GAd(prov_g).chat([{"role": "user", "content": "hi"}], tools=None)
+    check("503-then-200 -> retry succeeds (one reply)",
+          rr.success and rr.assistant_message == "hi", rr.error_message)
+    check("503-then-200 -> exactly 2 attempts", _seq["n"] == 2)
+
+    # 8b: 503-always -> Groq fallback answers (this is why we kept Groq)
+    bu_fb = env["neon.bot.user"].sudo().create({
+        "name": "WA0 fb", "phone_number": "+263 990 55 4433",
+        "user_id": sales.id})
+
+    def _groq_ok(self, messages, tools=None):
+        return ChatTurnResult(success=True, assistant_message="groq-served",
+                              tool_calls=[], latency_ms=10)
+    with _patch(_GP + ".requests.post", side_effect=_post_always_503), \
+         _patch(_GP + ".time.sleep", lambda s: None), \
+         _patch(_GRP, _groq_ok):
+        res_fb = svc.run_turn(bu_fb, "hello")
+    check("503-always -> Groq fallback served the turn",
+          res_fb.get("provider_key") == "groq",
+          "pk=%s" % res_fb.get("provider_key"))
+    check("503-always -> real reply (not the can't-reach fallback)",
+          "groq-served" in (res_fb.get("text") or ""))
+
+    # 8c: both providers fail -> graceful fallback + error surfaced
+    def _groq_fail(self, messages, tools=None):
+        return ChatTurnResult(success=False, error_message="Groq HTTP 503",
+                              latency_ms=5)
+    with _patch(_GP + ".requests.post", side_effect=_post_always_503), \
+         _patch(_GP + ".time.sleep", lambda s: None), \
+         _patch(_GRP, _groq_fail):
+        res_bf = svc.run_turn(bu_fb, "hello again")
+    check("both providers fail -> graceful 'can't reach' message",
+          "can't reach the assistant" in (res_bf.get("text") or "").lower())
+    check("both fail -> error surfaced", bool(res_bf.get("error")))
+
     # ---- Copilot-unchanged regression bar ----
     nr = len(TR.list_tools(category="read"))
     nw = len(TR.list_tools(category="write"))
