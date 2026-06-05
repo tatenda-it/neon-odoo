@@ -72,6 +72,33 @@ try:
     su = user_in_group("neon_core.group_neon_superuser")
     sales = user_in_group("neon_core.group_neon_sales_rep")
 
+    # ---- T1b: resolve() by Meta-format `from` (the gap that 24/24 missed)
+    # Meta sends digits WITHOUT '+'; bot.user stores '+E.164' (often with
+    # spaces). resolve() must normalise digits-only and match.
+    bu_fmt = env["neon.bot.user"].sudo().create({
+        "name": "WA0 fmt", "phone_number": "+263 990 12 3456",
+        "user_id": sales.id})
+    r1 = svc.resolve("263990123456")            # Meta: digits, no '+'
+    check("resolve Meta-format from (no +) -> right bot.user",
+          len(r1) == 1 and r1.id == bu_fmt.id, "got %s" % r1)
+    r2 = svc.resolve("+263990123456")           # with '+'
+    check("resolve with + -> same bot.user",
+          len(r2) == 1 and r2.id == bu_fmt.id)
+    r3 = svc.resolve("+263 990 12 3456")        # spaces in stored form
+    check("resolve with spaces -> same bot.user",
+          len(r3) == 1 and r3.id == bu_fmt.id)
+    # full privileged turn must now resolve (not fall through to raw-lead)
+    check("Meta-format from resolves to a variant (privileged path)",
+          svc.variant_for(svc.resolve("263990123456").user_id) in (
+              "director", "sales", "bookkeeper", "lead_tech"))
+    # DEFENSIVE: a 2nd active row with the SAME normalised digits ->
+    # UNRESOLVED (RBAC safety: never pick one of several).
+    bu_dup = env["neon.bot.user"].sudo().create({
+        "name": "WA0 dup", "phone_number": "263990123456",
+        "user_id": su.id})
+    check("resolve ambiguous (>1 normalised match) -> UNRESOLVED (empty)",
+          len(svc.resolve("263990123456")) == 0)
+
     # ---- T2: intersection-ACL (a tool the user's groups disallow is
     #          rejected by dispatch, even if "the agent" emits it) ----
     blocked = None

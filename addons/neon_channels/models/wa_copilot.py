@@ -22,6 +22,7 @@ even Robin cannot move money or single-tap an irreversible commit here.
 """
 import json
 import logging
+import re
 
 from odoo.addons.neon_ai_core.models.ai import tool_registry
 from odoo.addons.neon_ai_core.models.ai.chat_adapter_factory import (
@@ -70,11 +71,36 @@ class WhatsAppCopilotService:
     # Resolution + scope  (piece a)
     # ------------------------------------------------------------------
     def resolve(self, phone):
-        """phone_number -> active neon.bot.user (or empty recordset)."""
-        return self.env["neon.bot.user"].sudo().search([
-            ("phone_number", "=", phone),
-            ("active", "=", True),
-        ], limit=1)
+        """phone_number -> active neon.bot.user via DIGITS-ONLY match.
+
+        ⚠️ DECISION (WA-0 fix, Option 1): Meta sends the sender as
+        '263771891325' (no '+'); bot.user stores '+263771891325'. An
+        exact '=' match resolved 0 rows and dropped every mapped user to
+        the raw-lead path. Normalise both sides with re.sub(r'\\D','',...)
+        so '+', spaces and dashes don't matter. No data migration; the
+        stored +E.164 format is unchanged.
+
+        ⚠️ DECISION (WA-0 fix, RBAC safety): this resolver IS the
+        privilege gate. If normalisation yields MORE THAN ONE match we
+        return EMPTY (treat as UNRESOLVED -> raw-lead) rather than guess
+        -- a mis-resolution would be a privilege mis-attribution. Never
+        pick one of several.
+        """
+        target = re.sub(r"\D", "", phone or "")
+        if not target:
+            return self.env["neon.bot.user"]
+        candidates = self.env["neon.bot.user"].sudo().search(
+            [("active", "=", True)])
+        matches = candidates.filtered(
+            lambda r: re.sub(r"\D", "", r.phone_number or "") == target)
+        if len(matches) != 1:
+            if len(matches) > 1:
+                _logger.warning(
+                    "WA resolve: %d active bot.users share normalised "
+                    "phone %s -- treating as UNRESOLVED (RBAC safety).",
+                    len(matches), target)
+            return self.env["neon.bot.user"]
+        return matches
 
     def variant_for(self, user):
         """REUSE the core group->variant resolver under the user's env."""
