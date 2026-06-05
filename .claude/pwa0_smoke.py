@@ -405,6 +405,35 @@ try:
     check("tool-loop: cap hit -> graceful reply, NOT raw JSON",
           '"kpi"' not in _ctxt and not _ctxt.strip().startswith("{"))
 
+    # 9c: the id-18 scenario -- Gemini FORCED to fail so GROQ serves, and
+    #     Groq itself makes a tool call -> the loop must STILL synthesize
+    #     NL (the leak was on the Groq-fallback tool path, untested before).
+    _grl = {"n": 0}
+
+    def _groq_tool_then_text(self, messages, tools=None):
+        _grl["n"] += 1
+        if _grl["n"] == 1:
+            return ChatTurnResult(
+                success=True, assistant_message="",
+                tool_calls=[{"tool_call_id": "g1",
+                             "tool_name": "get_dashboard_summary",
+                             "params": {}}], latency_ms=5)
+        return ChatTurnResult(
+            success=True, tool_calls=[], latency_ms=5,
+            assistant_message="Cash on hand is healthy and nothing overdue.")
+    with _patch(_GP + ".requests.post", side_effect=_post_always_503), \
+         _patch(_GP + ".time.sleep", lambda s: None), \
+         _patch(_GRP, _groq_tool_then_text):
+        rgl = svc.run_turn(bu_loop, "can i check finance?")
+    _gt = rgl.get("text") or ""
+    check("Groq-fallback tool turn -> NL synthesis (the id-18 scenario)",
+          "Cash on hand is healthy" in _gt, _gt[:80])
+    check("Groq-fallback: NO raw JSON leaked",
+          '"kpi"' not in _gt and not _gt.strip().startswith("{"))
+    check("Groq-fallback: served=groq + looped (tool -> NL)",
+          rgl.get("provider_key") == "groq" and _grl["n"] == 2,
+          "pk=%s calls=%d" % (rgl.get("provider_key"), _grl["n"]))
+
     # ---- Copilot-unchanged regression bar ----
     nr = len(TR.list_tools(category="read"))
     nw = len(TR.list_tools(category="write"))
