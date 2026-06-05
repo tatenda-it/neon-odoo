@@ -48,6 +48,12 @@ _WA_SAFE_WRITES = {"log_lead", "move_stage", "post_chatter_note"}
 
 _HISTORY_LIMIT = 6
 
+# WA-0 tool-use loop: model -> tool_call -> dispatch -> tool result ->
+# model again -> NL text. Capped so a tool-calling model can't loop
+# forever. Up to this many model calls per inbound turn (only when tools
+# are used); each call still has Gemini retry + Groq fallback.
+_MAX_TOOL_ITERATIONS = 3
+
 _SYSTEM_PROMPT = (
     "You are the Neon Events {role} assistant, replying to {name} over "
     "WhatsApp. Neon Events Elements is an event-production company in "
@@ -119,103 +125,116 @@ class WhatsAppCopilotService:
     # Turn  (pieces a + b + c)
     # ------------------------------------------------------------------
     def run_turn(self, bot_user, inbound_text):
-        """Drive one privileged inbound turn. Returns
-        {"text": str, "cta_url": str|None, "error": str|None}."""
+        """Drive one privileged inbound turn through the full tool-use
+        loop: model -> tool_call -> dispatch -> append tool result ->
+        model again -> return the model's NATURAL-LANGUAGE text. Capped at
+        _MAX_TOOL_ITERATIONS. A raw tool/JSON payload is NEVER sent to the
+        user -- tool results go BACK to the model, not to WhatsApp.
+        Returns {"text", "cta_url", "error", "provider_key"}."""
         user = bot_user.user_id
         env_u = self.env(user=user.id)
         variant = self.variant_for(user)
-        tools = self.whatsapp_tools(user, variant)
-        schemas = tool_registry.groq_tool_schemas(tools=tools)
-
+        schemas = tool_registry.groq_tool_schemas(
+            tools=self.whatsapp_tools(user, variant))
         messages = self._build_messages(
             user, variant, inbound_text, bot_user.phone_number)
 
-        # ONE primary provider call (Gemini; it self-retries 503/429). No
-        # fan-out -- the Groq path below is a sequential resilience
-        # fallback that fires ONLY if the primary fails.
-        provider = self._wa_provider()
-        adapter = get_chat_adapter(provider) if provider else None
-        served_by = provider.provider_key if provider else None
-        result = adapter.chat(messages, tools=schemas) if adapter else None
-
-        # PROVIDER FALLBACK (WA-0): primary failed (transient 5xx/429 after
-        # its own retries, or unconfigured). Fall through to Groq so the
-        # user still gets an answer -- this is why we kept Groq. tool_call
-        # shape is provider-agnostic, so downstream dispatch is unchanged.
-        if result is None or not result.success:
-            primary_err = (result.error_message if result is not None
-                           else "no WhatsApp provider configured")
-            fb = self._fallback_adapter(exclude=served_by)
-            if fb:
-                fb_adapter, fb_key = fb
+        served_by = None
+        last = None
+        for iteration in range(_MAX_TOOL_ITERATIONS):
+            result, served_by = self._provider_chat(messages, schemas)
+            last = result
+            if result is None or not result.success:
                 _logger.warning(
-                    "WA: provider %s failed (%s) -- falling back to %s",
-                    served_by or "none", primary_err, fb_key)
-                result = fb_adapter.chat(messages, tools=schemas)
-                served_by = fb_key
+                    "WA: all providers failed for %s; err=%s", user.login,
+                    (result.error_message if result is not None else "n/a"))
+                return {"text": "Sorry -- I can't reach the assistant right "
+                                "now. Please try again shortly.",
+                        "cta_url": None, "provider_key": served_by,
+                        "error": (result.error_message
+                                  if result is not None else "no_provider")}
 
-        if result is None or not result.success:
-            _logger.warning(
-                "WA: all providers failed for %s; err=%s", user.login,
-                (result.error_message if result is not None else "n/a"))
-            return {"text": "Sorry -- I can't reach the assistant right "
-                            "now. Please try again shortly.",
-                    "cta_url": None, "provider_key": served_by,
-                    "error": (result.error_message if result is not None
-                              else "no_provider")}
+            # Final natural-language turn (text, no tool calls).
+            if not result.tool_calls:
+                _logger.info("WA: turn served by %s (%dms, iters=%d)",
+                             served_by, result.latency_ms or 0, iteration + 1)
+                return {"text": result.assistant_message or "Done.",
+                        "cta_url": None, "error": None,
+                        "provider_key": served_by}
 
-        _logger.info("WA: turn served by provider=%s (%dms)",
-                     served_by, result.latency_ms or 0)
+            # Record the assistant tool-call turn (OpenAI shape; both
+            # adapters consume it -- Gemini functionCall, Groq tool_calls).
+            messages.append({
+                "role": "assistant",
+                "content": result.assistant_message or "",
+                "tool_calls": [{
+                    "id": tc["tool_call_id"], "type": "function",
+                    "function": {"name": tc["tool_name"],
+                                 "arguments": json.dumps(tc["params"])},
+                } for tc in result.tool_calls],
+            })
 
-        if not result.tool_calls:
-            return {"text": result.assistant_message or "...",
-                    "cta_url": None, "error": None,
-                    "provider_key": served_by}
-
-        # Execute tool calls in ONE pass (no second LLM call). Reads
-        # return data; writes become a cta_url confirm-in-Odoo link.
-        lines = []
-        cta_url = None
-        for tc in result.tool_calls:
-            name = tc.get("tool_name") or ""
-            params = tc.get("params") or {}
-            tool = tool_registry.get_tool(name)
-            if tool is not None and tool.category == "write":
-                if name not in _WA_SAFE_WRITES:
-                    # Structural money/irreversible block.
-                    lines.append(
-                        "That action isn't available over WhatsApp.")
-                    continue
-                disp = tool_registry.dispatch(name, env_u, user, params)
-                if disp.get("is_proposal"):
-                    prop = self.env[
-                        "neon.finance.ai.chat.write.log"].sudo().propose(
-                            self._session(user), user, disp)
-                    if prop.get("ok"):
-                        rec = prop["record"]
-                        cta_url = self._cta_url(rec)
-                        lines.append(
-                            (rec.human_summary or "Action ready")
-                            + " - review & confirm in Odoo:")
+            # Dispatch each call; append its result as a tool-role message
+            # fed BACK to the model (never to the user). A write proposal
+            # is TERMINAL -- ends the turn with a confirm-in-Odoo cta_url.
+            saw_proposal = False
+            cta_url = None
+            steer = None
+            for tc in result.tool_calls:
+                name = tc.get("tool_name") or ""
+                params = tc.get("params") or {}
+                tool = tool_registry.get_tool(name)
+                if tool is not None and tool.category == "write":
+                    if name not in _WA_SAFE_WRITES:
+                        tool_result = {"ok": False,
+                                       "error": "not available over WhatsApp"}
                     else:
-                        lines.append(prop.get(
-                            "error", "Could not queue that action."))
+                        disp = tool_registry.dispatch(
+                            name, env_u, user, params)
+                        if disp.get("is_proposal"):
+                            prop = self.env[
+                                "neon.finance.ai.chat.write.log"].sudo(
+                            ).propose(self._session(user), user, disp)
+                            if prop.get("ok"):
+                                rec = prop["record"]
+                                cta_url = self._cta_url(rec)
+                                steer = ((rec.human_summary or "Action ready")
+                                         + " - review & confirm in Odoo.")
+                                saw_proposal = True
+                                tool_result = {"ok": True, "proposed": True,
+                                               "summary": rec.human_summary}
+                            else:
+                                tool_result = {"ok": False, "error": prop.get(
+                                    "error", "could not queue action")}
+                        else:
+                            tool_result = disp
                 else:
-                    lines.append(disp.get(
-                        "error", "That action could not be prepared."))
-            else:
-                # Read tool (or unknown -> dispatch returns access/unknown
-                # error). dispatch enforces user_can_call defensively.
-                disp = tool_registry.dispatch(name, env_u, user, params)
-                if disp.get("error"):
-                    lines.append(disp["error"])
-                else:
-                    lines.append(self._format_read(name, disp))
+                    # Read tool (dispatch enforces user_can_call defensively).
+                    tool_result = tool_registry.dispatch(
+                        name, env_u, user, params)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("tool_call_id") or "",
+                    "name": name,
+                    "content": json.dumps(tool_result, default=str),
+                })
 
-        head = (result.assistant_message + "\n"
-                if result.assistant_message else "")
-        text = (head + "\n".join(lines)).strip() or "Done."
-        return {"text": text, "cta_url": cta_url, "error": None,
+            if saw_proposal:
+                # Confirm-in-Odoo: terminal, do NOT loop back to the model.
+                return {"text": steer or ("I have an action ready - please "
+                                          "confirm it in Odoo."),
+                        "cta_url": cta_url, "error": None,
+                        "provider_key": served_by}
+            # else: loop -- model receives the tool results, replies in NL.
+
+        # Iteration cap -- graceful, NEVER raw JSON / tool output.
+        _logger.info("WA: tool-loop cap (%d) reached for %s",
+                     _MAX_TOOL_ITERATIONS, user.login)
+        return {"text": (last.assistant_message if last
+                         and last.assistant_message else
+                         "I've gathered the details - could you rephrase "
+                         "what you'd like?"),
+                "cta_url": None, "error": "tool_loop_exhausted",
                 "provider_key": served_by}
 
     # ------------------------------------------------------------------
@@ -236,6 +255,29 @@ class WhatsAppCopilotService:
             if adapter:
                 return adapter, prov.provider_key
         return None
+
+    def _provider_chat(self, messages, schemas):
+        """One model call with Groq fallback. Returns (result, served_by).
+        Gemini self-retries 503/429; if it still fails (or is
+        unconfigured), fall back to Groq. Called once per tool-loop
+        iteration; messages are OpenAI-shaped so either provider consumes
+        the same array."""
+        provider = self._wa_provider()
+        adapter = get_chat_adapter(provider) if provider else None
+        served_by = provider.provider_key if provider else None
+        result = adapter.chat(messages, tools=schemas) if adapter else None
+        if result is None or not result.success:
+            primary_err = (result.error_message if result is not None
+                           else "no WhatsApp provider configured")
+            fb = self._fallback_adapter(exclude=served_by)
+            if fb:
+                fb_adapter, fb_key = fb
+                _logger.warning(
+                    "WA: provider %s failed (%s) -- falling back to %s",
+                    served_by or "none", primary_err, fb_key)
+                result = fb_adapter.chat(messages, tools=schemas)
+                served_by = fb_key
+        return result, served_by
 
     def _wa_provider(self):
         key = self.env["ir.config_parameter"].sudo().get_param(
@@ -282,16 +324,3 @@ class WhatsAppCopilotService:
                 messages.append({"role": role, "content": m.message_body})
         messages.append({"role": "user", "content": text or ""})
         return messages
-
-    def _format_read(self, name, disp):
-        """Compact text rendering of a read-tool result for WhatsApp.
-        WA-1 can pretty-format per tool; WA-0 keeps it short + factual."""
-        data = {k: v for k, v in disp.items()
-                if k not in ("ok", "tool", "is_proposal")}
-        if not data:
-            return "No results."
-        try:
-            blob = json.dumps(data, default=str)
-        except Exception:  # noqa: BLE001
-            blob = str(data)
-        return blob if len(blob) <= 600 else blob[:600] + "..."

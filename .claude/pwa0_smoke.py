@@ -353,6 +353,58 @@ try:
           "can't reach the assistant" in (res_bf.get("text") or "").lower())
     check("both fail -> error surfaced", bool(res_bf.get("error")))
 
+    # ---- T9: tool-use LOOP -- the tool result must come back as NL, never
+    #          raw JSON to the user (the leak bug), and stay under the cap.
+    _GA_chat = ("odoo.addons.neon_ai_core.models.ai.gemini_chat_adapter."
+                "GeminiChatAdapter.chat")
+    bu_loop = env["neon.bot.user"].sudo().create({
+        "name": "WA0 loop", "phone_number": "+263 990 77 1100",
+        "user_id": su.id})
+
+    # 9a: model calls a READ tool, then replies in NL -> user gets prose.
+    _lp = {"n": 0}
+
+    def _chat_tool_then_text(self, messages, tools=None):
+        _lp["n"] += 1
+        if _lp["n"] == 1:
+            return ChatTurnResult(
+                success=True, assistant_message="",
+                tool_calls=[{"tool_call_id": "c1",
+                             "tool_name": "get_dashboard_summary",
+                             "params": {}}], latency_ms=5)
+        return ChatTurnResult(
+            success=True, tool_calls=[], latency_ms=5,
+            assistant_message="Your cash on hand looks healthy and AR is "
+                              "under control.")
+    with _patch(_GA_chat, _chat_tool_then_text):
+        rloop = svc.run_turn(bu_loop, "can i check finance?")
+    _txt = rloop.get("text") or ""
+    check("tool-loop: read result returned as NATURAL LANGUAGE",
+          "cash on hand looks healthy" in _txt, _txt[:80])
+    check("tool-loop: NO raw JSON leaked to user",
+          '"kpi"' not in _txt and not _txt.strip().startswith("{"))
+    check("tool-loop: looped once (tool -> NL = 2 model calls)",
+          _lp["n"] == 2, "calls=%d" % _lp["n"])
+
+    # 9b: a model that ALWAYS calls a tool -> stays under the cap and
+    #     returns a graceful (non-JSON) message, not an infinite loop.
+    _cap = {"n": 0}
+
+    def _chat_always_tool(self, messages, tools=None):
+        _cap["n"] += 1
+        return ChatTurnResult(
+            success=True, assistant_message="",
+            tool_calls=[{"tool_call_id": "cX",
+                         "tool_name": "get_dashboard_summary",
+                         "params": {}}], latency_ms=5)
+    with _patch(_GA_chat, _chat_always_tool):
+        rcap = svc.run_turn(bu_loop, "loop please")
+    _ctxt = rcap.get("text") or ""
+    check("tool-loop: capped (model calls <= MAX_TOOL_ITERATIONS=3)",
+          _cap["n"] <= 3, "calls=%d" % _cap["n"])
+    check("tool-loop: cap hit -> graceful reply, NOT raw JSON",
+          '"kpi"' not in _ctxt and not _ctxt.strip().startswith("{"))
+
     # ---- Copilot-unchanged regression bar ----
     nr = len(TR.list_tools(category="read"))
     nw = len(TR.list_tools(category="write"))
