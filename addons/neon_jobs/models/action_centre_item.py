@@ -608,13 +608,23 @@ class ActionCentreItem(models.Model):
         # accurate from_value names. Also enforces the reassign
         # authority gate (manager-only).
         reassignment_log = []
+        # ⚠️ DECISION (escalation-gate fix, Option A): the cron escalation
+        # path runs as base.user_root (.sudo() in _resolve_escalation) and
+        # sets _force_escalated_flag. base.user_root is NOT in the
+        # jobs-manager group on prod, so the manager gate below raised
+        # UserError on EVERY escalation -> the feature was 100% broken
+        # (and noisy). The flag marks the trusted, cron-only escalation
+        # path; skip the manager gate ONLY for it. The normal user-driven
+        # reassign path (no flag) still enforces manager-only. Narrowest
+        # fix -- deliberately NOT a blanket sudo/superuser bypass.
+        is_escalation = bool(self.env.context.get("_force_escalated_flag"))
         if "primary_assignee_id" in vals:
             new_val = vals["primary_assignee_id"]
             new_user = self.env["res.users"].sudo().browse(new_val) if new_val else None
             for rec in self:
                 cur_val = rec.primary_assignee_id.id or False
                 if new_val != cur_val:
-                    if not rec._user_can_reassign():
+                    if not is_escalation and not rec._user_can_reassign():
                         raise UserError(_(
                             "Only Manager can reassign an Action "
                             "Centre item."
@@ -630,7 +640,8 @@ class ActionCentreItem(models.Model):
         # cron-driven escalation from user-driven reassignment, so
         # the history reads as 'escalated' vs 'reassigned' as
         # appropriate.
-        is_escalation = self.env.context.get("_force_escalated_flag")
+        # is_escalation computed above (gate-bypass); reuse here for the
+        # history label ('escalated' vs 'reassigned').
         event_type = "escalated" if is_escalation else "reassigned"
         actor_is_system = bool(is_escalation)
         for item_id, old_name, new_name in reassignment_log:
