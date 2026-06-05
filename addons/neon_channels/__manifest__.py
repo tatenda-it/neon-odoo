@@ -7,7 +7,14 @@
     # tools, X-Hub-Signature-256 verification, verify-token-from-config,
     # Twilio identity converged on neon.bot.user (authorised_numbers
     # deprecated, data retained). DEPENDS on neon_ai_core now.
-    'version': '17.0.1.3.0',
+    # 17.0.1.4.0 = B11/WA-1: stateful WhatsApp Copilot (conversation
+    # memory, last 10 msgs / 30 min per sender, current inbound excluded)
+    # + single-source phone normalization (phone_utils.to_e164) applied at
+    # the handle_inbound boundary -> canonical E.164 stored; resolve() +
+    # history match + lead-intake all canonical, raw `from` kept for the
+    # outbound SEND. Method-only (no schema/data). Interactive renderer
+    # (buttons/list/cards) remains DEFERRED.
+    'version': '17.0.1.4.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

@@ -172,22 +172,32 @@ class WhatsAppMessage(models.Model):
         sender falls through to the existing raw-lead intake
         (process_incoming), UNCHANGED -- no privileged access."""
         from .wa_copilot import WhatsAppCopilotService  # noqa: PLC0415
+        from .phone_utils import to_e164  # noqa: PLC0415
         svc = WhatsAppCopilotService(self.env)
-        from_number = message.get('from')
-        # WA-0 fix: delegate to the SINGLE resolver (digits-only match +
-        # RBAC-defensive >1-match -> UNRESOLVED). This replaced an inline
-        # exact '=' match that the resolve() fix never reached -- the live
-        # fallthrough bug (id 10). One source of truth now.
-        bot_user = svc.resolve(from_number)
+        # WA-1 boundary normalization: canonicalise the sender ONCE here so
+        # everything downstream (storage, resolve, history match, lead-
+        # intake) sees E.164 and a plain == works. raw_from is kept for the
+        # outbound SEND (Meta's exact format, already proven deliverable --
+        # don't risk a send-format regression). Mutate a COPY so the
+        # caller's dict is untouched.
+        raw_from = message.get('from')
+        from_e164 = to_e164(raw_from)
+        message = dict(message)
+        message['from'] = from_e164
+        # WA-0 fix: delegate to the SINGLE resolver (RBAC-defensive
+        # >1-match -> UNRESOLVED). One source of truth.
+        bot_user = svc.resolve(from_e164)
         if not bot_user:
+            # Unmapped -> raw-lead intake; it reads message['from'] (now
+            # canonical), so the created crm.lead phone is E.164 too.
             return self.process_incoming(message, metadata)
 
         msg_type = message.get('type', 'text')
         body = self._extract_body(message, msg_type)
-        self.sudo().create({
-            'name': message.get('id') or f'wa-in-{from_number}',
+        inbound = self.sudo().create({
+            'name': message.get('id') or f'wa-in-{from_e164}',
             'direction': 'inbound',
-            'phone_number': from_number,
+            'phone_number': from_e164,
             'message_body': body,
             'message_type': msg_type,
             'state': 'received',
@@ -200,7 +210,8 @@ class WhatsAppMessage(models.Model):
             'neon_channels.whatsapp_provider_key', 'google')
         try:
             variant = svc.variant_for(bot_user.user_id)
-            result = svc.run_turn(bot_user, body)
+            result = svc.run_turn(bot_user, body,
+                                  exclude_message_id=inbound.id)
         except Exception as e:  # noqa: BLE001
             _logger.error('WhatsApp Copilot turn failed: %s', e,
                           exc_info=True)
@@ -211,14 +222,14 @@ class WhatsAppMessage(models.Model):
         cta = result.get('cta_url')
         if cta:
             self.sudo().send_cta_url(
-                from_number, reply, 'Confirm in Odoo', cta)
+                raw_from, reply, 'Confirm in Odoo', cta)
         else:
-            self.sudo().send_message(from_number, reply)
+            self.sudo().send_message(raw_from, reply)
 
         self.sudo().create({
-            'name': f'wa-out-{from_number}',
+            'name': f'wa-out-{from_e164}',
             'direction': 'outbound',
-            'phone_number': from_number,
+            'phone_number': from_e164,
             'message_body': reply + (f'\n[cta_url] {cta}' if cta else ''),
             'message_type': 'interactive' if cta else 'text',
             'state': 'sent',

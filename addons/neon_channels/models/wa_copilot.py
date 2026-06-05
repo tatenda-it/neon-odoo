@@ -22,7 +22,6 @@ even Robin cannot move money or single-tap an irreversible commit here.
 """
 import json
 import logging
-import re
 
 from odoo.addons.neon_ai_core.models.ai import tool_registry
 from odoo.addons.neon_ai_core.models.ai.chat_adapter_factory import (
@@ -31,6 +30,7 @@ from odoo.addons.neon_ai_core.models.ai.chat_adapter_factory import (
 from odoo.addons.neon_ai_core.models.ai.chat_orchestrator import (
     _stored_variant_for,
 )
+from .phone_utils import to_e164  # WA-1: single-source phone normalization
 
 
 _logger = logging.getLogger(__name__)
@@ -46,7 +46,11 @@ _WA_PROVIDER_PARAM = "neon_channels.whatsapp_provider_key"
 # set is structurally unreachable over WhatsApp, for every variant.
 _WA_SAFE_WRITES = {"log_lead", "move_stage", "post_chatter_note"}
 
-_HISTORY_LIMIT = 6
+# WA-1 conversation memory window (locked): last 10 messages within the
+# last 30 min, oldest-first, both inbound + outbound. Bounds free-tier
+# token cost + keeps context recent. Configurable.
+_HISTORY_LIMIT = 10
+_HISTORY_WINDOW_MIN = 30
 
 # WA-0 tool-use loop: model -> tool_call -> dispatch -> tool result ->
 # model again -> NL text. Capped so a tool-calling model can't loop
@@ -77,33 +81,31 @@ class WhatsAppCopilotService:
     # Resolution + scope  (piece a)
     # ------------------------------------------------------------------
     def resolve(self, phone):
-        """phone_number -> active neon.bot.user via DIGITS-ONLY match.
+        """phone_number -> active neon.bot.user via canonical E.164 match.
 
-        ⚠️ DECISION (WA-0 fix, Option 1): Meta sends the sender as
-        '263771891325' (no '+'); bot.user stores '+263771891325'. An
-        exact '=' match resolved 0 rows and dropped every mapped user to
-        the raw-lead path. Normalise both sides with re.sub(r'\\D','',...)
-        so '+', spaces and dashes don't matter. No data migration; the
-        stored +E.164 format is unchanged.
+        ⚠️ DECISION (WA-1): normalise both sides through the shared
+        to_e164 helper (single source of truth, replacing the WA-0 ad-hoc
+        digits-only re.sub). With WA-1 boundary normalization the stored
+        data is canonical too, but resolve() still normalises defensively
+        so it's correct regardless of caller / stored formatting.
 
         ⚠️ DECISION (WA-0 fix, RBAC safety): this resolver IS the
-        privilege gate. If normalisation yields MORE THAN ONE match we
-        return EMPTY (treat as UNRESOLVED -> raw-lead) rather than guess
-        -- a mis-resolution would be a privilege mis-attribution. Never
-        pick one of several.
+        privilege gate. >1 normalised match -> UNRESOLVED (treat as
+        raw-lead) rather than guess -- a mis-resolution would be a
+        privilege mis-attribution. Never pick one of several.
         """
-        target = re.sub(r"\D", "", phone or "")
+        target = to_e164(phone or "")
         if not target:
             return self.env["neon.bot.user"]
         candidates = self.env["neon.bot.user"].sudo().search(
             [("active", "=", True)])
         matches = candidates.filtered(
-            lambda r: re.sub(r"\D", "", r.phone_number or "") == target)
+            lambda r: to_e164(r.phone_number or "") == target)
         if len(matches) != 1:
             if len(matches) > 1:
                 _logger.warning(
-                    "WA resolve: %d active bot.users share normalised "
-                    "phone %s -- treating as UNRESOLVED (RBAC safety).",
+                    "WA resolve: %d active bot.users share E.164 %s -- "
+                    "treating as UNRESOLVED (RBAC safety).",
                     len(matches), target)
             return self.env["neon.bot.user"]
         return matches
@@ -124,12 +126,14 @@ class WhatsAppCopilotService:
     # ------------------------------------------------------------------
     # Turn  (pieces a + b + c)
     # ------------------------------------------------------------------
-    def run_turn(self, bot_user, inbound_text):
+    def run_turn(self, bot_user, inbound_text, exclude_message_id=None):
         """Drive one privileged inbound turn through the full tool-use
         loop: model -> tool_call -> dispatch -> append tool result ->
         model again -> return the model's NATURAL-LANGUAGE text. Capped at
         _MAX_TOOL_ITERATIONS. A raw tool/JSON payload is NEVER sent to the
         user -- tool results go BACK to the model, not to WhatsApp.
+        ``exclude_message_id`` is the just-created inbound row, excluded
+        from its own history (WA-1 double-count fix).
         Returns {"text", "cta_url", "error", "provider_key"}."""
         user = bot_user.user_id
         env_u = self.env(user=user.id)
@@ -137,7 +141,8 @@ class WhatsAppCopilotService:
         schemas = tool_registry.groq_tool_schemas(
             tools=self.whatsapp_tools(user, variant))
         messages = self._build_messages(
-            user, variant, inbound_text, bot_user.phone_number)
+            user, variant, inbound_text, bot_user.phone_number,
+            exclude_message_id=exclude_message_id)
 
         served_by = None
         last = None
@@ -307,7 +312,8 @@ class WhatsAppCopilotService:
                 f"&model=neon.finance.ai.chat.write.log"
                 f"&view_type=form{suffix}")
 
-    def _build_messages(self, user, variant, text, phone):
+    def _build_messages(self, user, variant, text, phone,
+                        exclude_message_id=None):
         from odoo import fields  # noqa: PLC0415
         sys_prompt = _SYSTEM_PROMPT.format(
             role=(variant or "sales").replace("_", " ").title(),
@@ -315,9 +321,20 @@ class WhatsAppCopilotService:
             today=fields.Date.context_today(user).isoformat(),
         )
         messages = [{"role": "system", "content": sys_prompt}]
+        # WA-1 conversation memory: last _HISTORY_LIMIT messages within
+        # _HISTORY_WINDOW_MIN minutes for THIS sender (canonical E.164),
+        # oldest-first, inbound + outbound. Exclude the just-created
+        # inbound row so the current turn isn't double-counted (it's
+        # appended below). Matches now that the stored phone is canonical.
+        canon = to_e164(phone or "")
+        domain = [("phone_number", "=", canon)]
+        if exclude_message_id:
+            domain.append(("id", "!=", exclude_message_id))
+        cutoff = fields.Datetime.subtract(
+            fields.Datetime.now(), minutes=_HISTORY_WINDOW_MIN)
+        domain.append(("create_date", ">=", cutoff))
         rows = self.env["neon.whatsapp.message"].sudo().search(
-            [("phone_number", "=", phone)],
-            order="create_date desc, id desc", limit=_HISTORY_LIMIT)
+            domain, order="create_date desc, id desc", limit=_HISTORY_LIMIT)
         for m in reversed(rows):
             role = "user" if m.direction == "inbound" else "assistant"
             if m.message_body:

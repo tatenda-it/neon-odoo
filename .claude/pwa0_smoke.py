@@ -243,15 +243,19 @@ try:
          _patch.object(type(WM), "send_message", _stub_send), \
          _patch.object(type(WM), "send_cta_url",
                        lambda self, *a, **k: True):
-        leads_before = _lead_ct("263990887766")
+        # WA-1: handle_inbound canonicalises at the boundary, so the stored
+        # rows (and any fallback lead) are E.164 '+263...'. The inbound
+        # `from` (msg above) stays raw '263...' -- that raw->canonical hop
+        # IS the normalization under test; assert the CANONICAL result.
+        leads_before = _lead_ct("+263990887766")
         WM.handle_inbound(msg, {})
-        inrow = WM.search([("phone_number", "=", "263990887766"),
+        inrow = WM.search([("phone_number", "=", "+263990887766"),
                            ("direction", "=", "inbound")],
                           order="id desc", limit=1)
-        outrow = WM.search([("phone_number", "=", "263990887766"),
+        outrow = WM.search([("phone_number", "=", "+263990887766"),
                             ("direction", "=", "outbound")],
                            order="id desc", limit=1)
-        leads_after = _lead_ct("263990887766")
+        leads_after = _lead_ct("+263990887766")
     check("handle_inbound(Meta-format) -> PRIVILEGED (inbound bot_user_id set)",
           bool(inrow) and inrow.bot_user_id.id == bu_int.id,
           "bu=%s" % (inrow.bot_user_id if inrow else None))
@@ -276,9 +280,12 @@ try:
          _patch.object(type(WM), "send_cta_url",
                        lambda self, *a, **k: True):
         WM.handle_inbound(msg2, {})
-        priv = WM.search_count([("phone_number", "=", "263990112233"),
+        # WA-1: ambiguous -> falls through; the fallback lead + any row are
+        # canonical (+263...). Assert the canonical form so priv==0 means
+        # "genuinely no privileged row", not "query missed the raw form".
+        priv = WM.search_count([("phone_number", "=", "+263990112233"),
                                 ("bot_user_id", "!=", False)])
-        lead_amb = _lead_ct("263990112233")
+        lead_amb = _lead_ct("+263990112233")
     check("handle_inbound ambiguous(>1) -> NO privilege (no bot_user_id row)",
           priv == 0)
     check("handle_inbound ambiguous(>1) -> fell through to raw-lead",
@@ -433,6 +440,111 @@ try:
     check("Groq-fallback: served=groq + looped (tool -> NL)",
           rgl.get("provider_key") == "groq" and _grl["n"] == 2,
           "pk=%s calls=%d" % (rgl.get("provider_key"), _grl["n"]))
+
+    # ---- T10: WA-1 phone normalization + conversation memory ----
+    import json as _json
+    from odoo.addons.neon_channels.models.phone_utils import to_e164 as _e164
+    WMs = env["neon.whatsapp.message"].sudo()
+
+    def _stub_send2(self, *a, **k):
+        return True
+
+    # 10a: to_e164 matrix (the format class that bit us)
+    _matrix = {
+        "+263772336333": "+263772336333", "263772336333": "+263772336333",
+        "+263 77 233-6333": "+263772336333", "00263772336333": "+263772336333",
+        "0772336333": "+263772336333", "263785273824": "+263785273824"}
+    _bad = {k: _e164(k) for k, v in _matrix.items() if _e164(k) != v}
+    check("WA1 to_e164 matrix (+/no-+/spaces/00/local-0)", not _bad, _bad)
+
+    # 10b: conversation memory THROUGH handle_inbound (Gemini path)
+    bu_mem = env["neon.bot.user"].sudo().create({
+        "name": "WA0 mem", "phone_number": "+263 990 22 1100",
+        "user_id": sales.id})
+
+    _seen = []
+
+    def _chat_capture(self, messages, tools=None):
+        _seen.append(_json.dumps(messages))
+        return ChatTurnResult(success=True, tool_calls=[], latency_ms=5,
+                              assistant_message="reply-%d" % (len(_seen)))
+    with _patch(_GA_chat, _chat_capture), \
+         _patch.object(type(WMs), "send_message", _stub_send2), \
+         _patch.object(type(WMs), "send_cta_url", lambda s, *a, **k: True):
+        WMs.handle_inbound({"id": "mem1", "from": "263990221100",
+            "type": "text",
+            "text": {"body": "first question about quotes"}}, {})
+        WMs.handle_inbound({"id": "mem2", "from": "263990221100",
+            "type": "text", "text": {"body": "and the second?"}}, {})
+    check("WA1 memory: 2nd turn prompt CONTAINS the 1st message",
+          len(_seen) >= 2 and "first question about quotes" in _seen[1],
+          "turns=%d" % len(_seen))
+    check("WA1 memory: 2nd turn also carries the 1st assistant reply",
+          len(_seen) >= 2 and "reply-1" in _seen[1])
+    check("WA1 no double-count: current msg appears once in its own turn",
+          len(_seen) >= 1
+          and _seen[0].count("first question about quotes") == 1)
+    check("WA1 boundary: rows stored canonical (+263), not raw",
+          WMs.search_count([("phone_number", "=", "+263990221100")]) >= 2
+          and WMs.search_count([("phone_number", "=", "263990221100")]) == 0)
+
+    # 10c: Groq-fallback path ALSO carries history
+    env["neon.bot.user"].sudo().create({
+        "name": "WA0 memg", "phone_number": "+263 990 33 2200",
+        "user_id": sales.id})
+
+    def _gem_fail2(self, messages, tools=None):
+        return ChatTurnResult(success=False, is_fallback=True,
+                              error_message="forced", latency_ms=1)
+    _gseen = []
+
+    def _groq_capture(self, messages, tools=None):
+        _gseen.append(_json.dumps(messages))
+        return ChatTurnResult(success=True, tool_calls=[], latency_ms=5,
+                              assistant_message="groq-reply-%d" % len(_gseen))
+    with _patch(_GA_chat, _gem_fail2), _patch(_GRP, _groq_capture), \
+         _patch.object(type(WMs), "send_message", _stub_send2), \
+         _patch.object(type(WMs), "send_cta_url", lambda s, *a, **k: True):
+        WMs.handle_inbound({"id": "g1", "from": "263990332200",
+            "type": "text", "text": {"body": "groq first msg"}}, {})
+        WMs.handle_inbound({"id": "g2", "from": "263990332200",
+            "type": "text", "text": {"body": "groq second"}}, {})
+    check("WA1 Groq-fallback path carries history",
+          len(_gseen) >= 2 and "groq first msg" in _gseen[1],
+          "groq_turns=%d" % len(_gseen))
+
+    # 10d: UNMAPPED inbound -> created crm.lead phone is canonical E.164
+    #      (proves boundary normalize reaches _find_or_create_lead)
+    Lead = env["crm.lead"].sudo()
+    WMs.handle_inbound({"id": "u1", "from": "263999888777", "type": "text",
+        "text": {"body": "hello I want a quote"}}, {})
+    check("WA1 lead-intake: unmapped -> crm.lead phone canonical (+263)",
+          bool(Lead.search([("phone", "=", "+263999888777")], limit=1)),
+          "no lead with canonical phone")
+
+    # 10e: migration logic -- normalizes + idempotent + count preserved
+    t1 = WMs.create({"name": "MIGT1", "direction": "inbound",
+                     "phone_number": "263111222333", "message_type": "text"})
+    t2 = WMs.create({"name": "MIGT2", "direction": "inbound",
+                     "phone_number": "+263444555666", "message_type": "text"})
+
+    def _migrate(recs):
+        n = 0
+        for r in recs:
+            new = _e164(r.phone_number or "")
+            if new and new != r.phone_number:
+                r.phone_number = new
+                n += 1
+        return n
+    pair = t1 + t2
+    n1 = _migrate(pair)
+    pair.invalidate_recordset()
+    n2 = _migrate(pair)
+    check("WA1 migration: normalizes + idempotent + count preserved",
+          t1.phone_number == "+263111222333"
+          and t2.phone_number == "+263444555666"
+          and n1 == 1 and n2 == 0 and len(pair) == 2,
+          "n1=%d n2=%d" % (n1, n2))
 
     # ---- Copilot-unchanged regression bar ----
     nr = len(TR.list_tools(category="read"))
