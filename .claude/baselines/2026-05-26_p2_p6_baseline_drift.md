@@ -213,3 +213,36 @@ Surfaced 2026-06-01 during the PB14c regression run.
    Symptom: phr_r1a/phr_r1b_1 fail with superuser AccessError on
    hr.employee. The neon_hr migration re-applies it on each version
    bump; latent risk if neon_core reloads without a neon_hr upgrade.
+
+## Update 2026-06-06 (B11 Programme Status board close) — regression 2569/2584
+
+Run on the long-lived `neon_crm` dev DB during B11 (`neon_status`)
+Gate 2. Failed Python suites: p2m2, p2m4, p2m5, p2m7_7 (6/8),
+p6m3 (18/28), pb1_datamodel (29/30), pb2_conflict (34/35) — all
+prior documented drift — **plus one new entry below**. Improvements
+vs the last capture (now passing): p6m1, p4m2, p4m8, p8a_m7_alerts,
+p9m2_pin_modal.
+
+### pb14c_quantity_on_hand — 23/24 (T-B14c-24)
+T-B14c-24 asserts a freshly-created **quantity-mode** product with no
+`legacy_qty` notes has `quantity_on_hand == 0` (plus `action == SKIP`
++ reason "no unit"). The SKIP + reason parts PASS; only `== 0` fails —
+actual is **1**. Cause: `1` is the **intended B14c quantity-mode
+create-default** (`load = 1 unit/row`, see
+`project_b14b_d1_quantity_count_followup`). Product behaviour is
+CORRECT; the test's `== 0` expectation is STALE. Same class as the
+pb1/pb2 single-test data/default drifts.
+
+**NOT introduced by B11.** `neon_status` is additive (one AbstractModel
++ controller + template), depends only on base/web/neon_core/
+neon_ai_core/neon_channels, touches NO `product.template` / inventory /
+`quantity_on_hand` path, and was installed `-i neon_status` with no
+`-u` of any other module. The test builds its own fixture fresh each
+run → identical result with or without B11.
+
+> **FIX OWED (B14c test-maintenance, NOT B11):** update T-B14c-24 in
+> `.claude/pb14c_quantity_on_hand_smoke.py` (~line 475) to assert
+> against the quantity default-of-1 (`quantity_on_hand == 1`) instead
+> of `== 0`, OR read the configured default rather than hard-coding.
+> Owner: B14c suite. Tracked here so it is not buried. Accepted as
+> drift for the B11 gate per Tatenda 2026-06-06.
