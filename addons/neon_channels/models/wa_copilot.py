@@ -28,8 +28,10 @@ from odoo.addons.neon_ai_core.models.ai.chat_adapter_factory import (
     get_chat_adapter,
 )
 from odoo.addons.neon_ai_core.models.ai.chat_orchestrator import (
+    ChatOrchestrator,
     _stored_variant_for,
 )
+from . import wa_payload  # WA-1: tap-back payload-id scheme
 from .phone_utils import to_e164  # WA-1: single-source phone normalization
 
 
@@ -65,10 +67,106 @@ _SYSTEM_PROMPT = (
     "professional -- this is a phone chat. Use tools to answer factual "
     "questions; never invent numbers, names, or dates. Currency: USD or "
     "ZiG; VAT 15%. You can prepare reversible actions (log a lead, move a "
-    "deal stage, post a note) but they are NEVER done over WhatsApp -- you "
-    "return a confirmation link the user opens in Odoo. You cannot move "
-    "money, send invoices, or take payments here. Today is {today}."
+    "deal stage, post a note); the user confirms each one with a single "
+    "tap here on WhatsApp, or by opening the link in Odoo -- it is never "
+    "done without that explicit confirm. You cannot move money, send "
+    "invoices, or take payments here. Today is {today}."
 )
+
+# ⚠️ DECISION (WA-1): WhatsApp moves from read+propose to
+# read+propose+execute-on-tap, for REVERSIBLE CRM writes ONLY. A Confirm
+# tap drives the IDENTICAL write.log propose->confirm->execute path the
+# Odoo deep-link uses (consume_token: TTL + single-use + user-binding;
+# execute under the user's identity so ACL fires). What makes this
+# acceptable is unchanged + STRUCTURAL: money/irreversible tools are
+# absent from _WA_SAFE_WRITES for every variant, so no tap can reach
+# them. A tap is the confirm, never a bypass of the gate.
+
+# WA-1 Slice 2 -- designated list-producing READ tools. VERIFIED output
+# shapes (the dict-where-list bug class): get_my_pipeline nests leads
+# under stages[].leads[]; get_jobs_this_week is flat rows[]. Each
+# extractor returns a normalised [{id, title, description}]. (Equipment
+# has NO list-shaped tool -- check_stock_availability is a category
+# summary, not a pick-list -- so it is intentionally excluded.)
+def _extract_pipeline_leads(res):
+    out = []
+    for st in (res.get("stages") or []):
+        sname = st.get("stage") or ""
+        for ld in (st.get("leads") or []):
+            if not ld.get("id"):
+                continue
+            desc = " - ".join(x for x in [ld.get("partner_name") or "",
+                                          sname] if x)
+            out.append({"id": ld["id"], "title": ld.get("name") or "",
+                        "description": desc})
+    return out
+
+
+def _extract_jobs(res):
+    out = []
+    for row in (res.get("rows") or []):
+        if not row.get("event_job_id"):
+            continue
+        desc = " - ".join(x for x in [row.get("partner_name") or "",
+                                      row.get("event_date") or "",
+                                      row.get("state_label") or ""] if x)
+        out.append({"id": row["event_job_id"], "title": row.get("ref") or "",
+                    "description": desc})
+    return out
+
+
+_LIST_TOOLS = {
+    "get_my_pipeline": {"extract": _extract_pipeline_leads,
+                        "pick": "pick_lead", "label": "leads",
+                        "button": "View leads"},
+    "get_jobs_this_week": {"extract": _extract_jobs,
+                           "pick": "pick_job", "label": "jobs",
+                           "button": "View jobs"},
+}
+
+# WA-1 Slice 3 -- capability menu. Friendly label per tool (default
+# humanises the name) + a canned invocation phrase routed through
+# run_turn when the option is tapped. Built from whatsapp_tools(), so
+# contents are already variant ∩ groups scoped -- money tools never
+# appear because they are not in that set.
+_MENU_LABELS = {
+    "get_my_pipeline": "My pipeline",
+    "get_open_quotes": "Open quotes",
+    "get_quote_details": "Quote details",
+    "get_overdue_invoices": "Overdue invoices",
+    "get_pending_deposits": "Pending deposits",
+    "get_jobs_this_week": "Jobs this week",
+    "get_readiness_gates": "Job readiness",
+    "get_crew_availability": "Crew availability",
+    "get_cert_expiry": "Cert expiry",
+    "check_stock_availability": "Stock availability",
+    "get_budget_status": "Budget status",
+    "get_partner_history": "Customer history",
+    "get_dashboard_summary": "Dashboard summary",
+    "get_zig_rate": "ZiG rate",
+    "log_lead": "Log a lead",
+    "move_stage": "Move a deal stage",
+    "post_chatter_note": "Post a note",
+}
+_MENU_PHRASES = {
+    "get_my_pipeline": "Show me my pipeline.",
+    "get_open_quotes": "Show my open quotes.",
+    "get_overdue_invoices": "Which invoices are overdue?",
+    "get_pending_deposits": "Show pending deposits.",
+    "get_jobs_this_week": "What jobs are on this week?",
+    "get_readiness_gates": "Show job readiness.",
+    "get_crew_availability": "Who's available in the crew?",
+    "get_cert_expiry": "Which certifications are expiring?",
+    "get_budget_status": "Show budget status.",
+    "get_dashboard_summary": "Give me a dashboard summary.",
+    "get_zig_rate": "What's the current ZiG rate?",
+    "log_lead": "I'd like to log a new lead.",
+    "move_stage": "I'd like to move a deal to another stage.",
+    "post_chatter_note": "I'd like to post a note on a record.",
+}
+_MENU_TRIGGERS = {"menu", "help", "/menu", "/help", "what can you do",
+                  "what can i do", "options", "commands",
+                  "what can you help with"}
 
 
 class WhatsAppCopilotService:
@@ -180,11 +278,15 @@ class WhatsAppCopilotService:
             })
 
             # Dispatch each call; append its result as a tool-role message
-            # fed BACK to the model (never to the user). A write proposal
-            # is TERMINAL -- ends the turn with a confirm-in-Odoo cta_url.
-            saw_proposal = False
-            cta_url = None
-            steer = None
+            # fed BACK to the model (never to the user). Some situations
+            # are TERMINAL -- they end the turn with a structured
+            # (interactive) reply instead of looping back to the model:
+            #   * a reversible write proposal -> Confirm/Cancel buttons
+            #   * a move_stage missing its target stage -> stage picker
+            #     (the <=3-button quick-choice)
+            #   * a list-producing read tool with >=2 rows -> pick list
+            # All triggers are CODE-decided (not model-chosen) this round.
+            terminal = None
             for tc in result.tool_calls:
                 name = tc.get("tool_name") or ""
                 params = tc.get("params") or {}
@@ -197,26 +299,25 @@ class WhatsAppCopilotService:
                         disp = tool_registry.dispatch(
                             name, env_u, user, params)
                         if disp.get("is_proposal"):
-                            prop = self.env[
-                                "neon.finance.ai.chat.write.log"].sudo(
-                            ).propose(self._session(user), user, disp)
-                            if prop.get("ok"):
-                                rec = prop["record"]
-                                cta_url = self._cta_url(rec)
-                                steer = ((rec.human_summary or "Action ready")
-                                         + " - review & confirm in Odoo.")
-                                saw_proposal = True
-                                tool_result = {"ok": True, "proposed": True,
-                                               "summary": rec.human_summary}
-                            else:
-                                tool_result = {"ok": False, "error": prop.get(
-                                    "error", "could not queue action")}
+                            t, tool_result = self._proposal_terminal(
+                                user, disp, served_by)
+                            if t and terminal is None:
+                                terminal = t
                         else:
+                            # Failed propose. A move_stage that just needs
+                            # its target stage -> deterministic stage picker.
+                            t = self._maybe_stage_picker(
+                                env_u, user, name, params, disp, served_by)
+                            if t and terminal is None:
+                                terminal = t
                             tool_result = disp
                 else:
                     # Read tool (dispatch enforces user_can_call defensively).
                     tool_result = tool_registry.dispatch(
                         name, env_u, user, params)
+                    t = self._maybe_pick_list(name, tool_result, served_by)
+                    if t and terminal is None:
+                        terminal = t
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.get("tool_call_id") or "",
@@ -224,12 +325,9 @@ class WhatsAppCopilotService:
                     "content": json.dumps(tool_result, default=str),
                 })
 
-            if saw_proposal:
-                # Confirm-in-Odoo: terminal, do NOT loop back to the model.
-                return {"text": steer or ("I have an action ready - please "
-                                          "confirm it in Odoo."),
-                        "cta_url": cta_url, "error": None,
-                        "provider_key": served_by}
+            if terminal is not None:
+                # Structured reply: terminal, do NOT loop back to the model.
+                return terminal
             # else: loop -- model receives the tool results, replies in NL.
 
         # Iteration cap -- graceful, NEVER raw JSON / tool output.
@@ -341,3 +439,319 @@ class WhatsAppCopilotService:
                 messages.append({"role": role, "content": m.message_body})
         messages.append({"role": "user", "content": text or ""})
         return messages
+
+    # ==================================================================
+    # WA-1 -- interactive renderer directives (Piece A, code-driven)
+    # ==================================================================
+    def _secret(self):
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "database.secret") or ""
+
+    def _payload(self, intent, *parts):
+        return wa_payload.encode(self._secret(), intent, *parts)
+
+    def _safe(self, text):
+        """A graceful, structured-free reply (used for fallbacks + the
+        fail-safe tap routes). NOT an error to the user."""
+        return {"text": text, "cta_url": None, "interactive": None,
+                "text_fallback": text, "error": None, "provider_key": None}
+
+    def _confirm_result(self, rec, cta_url, served_by):
+        """Confirm/Cancel reply buttons for a reversible write proposal.
+        The cta_url 'open in Odoo' link rides in the body (an option the
+        user can still take) AND is the text fallback (Piece C)."""
+        summary = rec.human_summary or "Action ready"
+        body = ("%s\n\nTap Confirm to action it now, or open in Odoo:\n%s"
+                % (summary, cta_url))
+        interactive = {
+            "kind": "buttons",
+            "body": body[:1024],
+            "buttons": [
+                {"id": self._payload("confirm", rec.confirmation_token),
+                 "title": "✅ Confirm"},
+                {"id": self._payload("cancel", rec.confirmation_token),
+                 "title": "❌ Cancel"},
+            ],
+        }
+        text_fallback = ("%s -- review & confirm in Odoo: %s"
+                         % (summary, cta_url))
+        return {"text": summary + " - confirm below.", "cta_url": cta_url,
+                "interactive": interactive, "text_fallback": text_fallback,
+                "error": None, "provider_key": served_by}
+
+    def _proposal_terminal(self, user, disp, served_by):
+        """Persist a write proposal to write.log and return
+        (terminal_result_or_None, tool_result_for_model)."""
+        prop = self.env["neon.finance.ai.chat.write.log"].sudo().propose(
+            self._session(user), user, disp)
+        if not prop.get("ok"):
+            return (None, {"ok": False, "error": prop.get(
+                "error", "could not queue action")})
+        rec = prop["record"]
+        terminal = self._confirm_result(rec, self._cta_url(rec), served_by)
+        return (terminal, {"ok": True, "proposed": True,
+                           "summary": rec.human_summary})
+
+    def _stage_label(self, stage):
+        if not stage:
+            return ""
+        name = stage.name or ""
+        if isinstance(name, dict):  # crm.stage.name is a JSONB translation
+            return name.get("en_US") or next(iter(name.values()), "")
+        return str(name)
+
+    def _resolve_one_lead(self, env_u, ident):
+        ident = (ident or "").strip()
+        if not ident:
+            return None
+        Lead = env_u["crm.lead"]
+        if ident.isdigit():
+            rec = Lead.browse(int(ident))
+            return rec if rec.exists() else None
+        matches = Lead.search(
+            [("name", "ilike", ident), ("active", "=", True)], limit=2)
+        return matches if len(matches) == 1 else None
+
+    def _forward_stages(self, env_u, lead):
+        cur = lead.stage_id.sequence if lead.stage_id else -1
+        return env_u["crm.stage"].search(
+            [("sequence", ">", cur)], order="sequence, id", limit=3)
+
+    def _maybe_stage_picker(self, env_u, user, name, params, disp,
+                            served_by):
+        """move_stage failed because the target stage was missing /
+        ambiguous, but the lead resolved uniquely with 2-3 forward
+        stages -> emit the <=3-button stage picker."""
+        if name != "move_stage" or disp.get("ok"):
+            return None
+        if "stage" not in (disp.get("error") or "").lower():
+            return None
+        lead = self._resolve_one_lead(env_u, params.get("lead_identifier"))
+        if not lead:
+            return None
+        stages = self._forward_stages(env_u, lead)
+        if not (2 <= len(stages) <= 3):
+            return None
+        buttons = [{"id": self._payload("stage", lead.id, s.id),
+                    "title": self._stage_label(s)[:20]} for s in stages]
+        interactive = {
+            "kind": "buttons",
+            "body": ("Which stage should '%s' move to?" % lead.name)[:1024],
+            "buttons": buttons,
+        }
+        fallback = ("Reply with the target stage for '%s': %s"
+                    % (lead.name, ", ".join(
+                        self._stage_label(s) for s in stages)))
+        return {"text": "Pick a stage:", "cta_url": None,
+                "interactive": interactive, "text_fallback": fallback,
+                "error": None, "provider_key": served_by}
+
+    def _maybe_pick_list(self, name, tool_result, served_by):
+        """A designated list-producing read tool returned >=2 rows ->
+        emit a pick-list. >10 -> first 10 + an explicit note (no silent
+        truncation). <=1 -> None (let the model answer normally)."""
+        spec = _LIST_TOOLS.get(name)
+        if not spec or not isinstance(tool_result, dict) \
+                or not tool_result.get("ok"):
+            return None
+        rows = spec["extract"](tool_result)
+        if len(rows) < 2:
+            return None
+        truncated = len(rows) > 10
+        capped = rows[:10]
+        if truncated:
+            _logger.info(
+                "WA pick-list %s: %d rows, showing first 10 (refine in "
+                "Odoo) -- no silent truncation.", name, len(rows))
+        pick = spec["pick"]
+        list_rows = [{"id": self._payload(pick, r["id"]),
+                      "title": (r["title"] or str(r["id"]))[:24],
+                      "description": (r.get("description") or "")[:72]}
+                     for r in capped]
+        body = ("Found %d %s%s. Tap to choose one:"
+                % (len(rows), spec["label"],
+                   " (showing first 10)" if truncated else ""))
+        interactive = {
+            "kind": "list", "body": body[:1024],
+            "button_text": spec["button"][:20],
+            "sections": [{"title": spec["label"][:24], "rows": list_rows}],
+        }
+        lines = ["%d. %s%s" % (
+            i + 1, r["title"],
+            (" - " + r["description"]) if r.get("description") else "")
+            for i, r in enumerate(capped)]
+        fallback = body + "\n" + "\n".join(lines) + "\nReply with the name."
+        return {"text": body, "cta_url": None, "interactive": interactive,
+                "text_fallback": fallback, "error": None,
+                "provider_key": served_by}
+
+    # ==================================================================
+    # WA-1 -- capability menu (Piece A / Slice 3)
+    # ==================================================================
+    def wants_menu(self, text):
+        t = (text or "").strip().lower().rstrip(" ?!.")
+        return t in {x.rstrip(" ?!.") for x in _MENU_TRIGGERS}
+
+    def build_menu_result(self, bot_user):
+        user = bot_user.user_id
+        variant = self.variant_for(user)
+        tools = self.whatsapp_tools(user, variant)
+        opts = [(t.name, _MENU_LABELS.get(
+            t.name, t.name.replace("get_", "").replace("_", " ").title()))
+            for t in tools]
+        if not opts:
+            return self._safe(
+                "You can ask me about your work and I'll help where I can.")
+        body = ("Here's what I can help with, %s. Tap an option:"
+                % (user.name or "there"))
+        if len(opts) <= 3:
+            buttons = [{"id": self._payload("menu", k), "title": lbl[:20]}
+                       for k, lbl in opts[:3]]
+            interactive = {"kind": "buttons", "body": body[:1024],
+                           "buttons": buttons}
+        else:
+            shown = opts[:10]
+            rows = [{"id": self._payload("menu", k), "title": lbl[:24],
+                     "description": ""} for k, lbl in shown]
+            if len(opts) > 10:
+                body += " (and more -- just ask)"
+            interactive = {"kind": "list", "body": body[:1024],
+                           "button_text": "Options",
+                           "sections": [{"title": "What I can do",
+                                         "rows": rows}]}
+        fallback = body + "\n" + "\n".join(
+            "- %s" % lbl for _, lbl in opts[:10])
+        return {"text": body, "cta_url": None, "interactive": interactive,
+                "text_fallback": fallback, "error": None,
+                "provider_key": None}
+
+    # ==================================================================
+    # WA-1 -- tap-back inbound router (Piece B, THE real risk)
+    # ==================================================================
+    def handle_tap(self, bot_user, reply_id, reply_title=None):
+        """Route a tapped button/list reply id back to the right action.
+        Unknown/expired/tampered id -> safe fallback, never a crash or a
+        mis-route (same fail-safe discipline as the resolver)."""
+        user = bot_user.user_id
+        decoded = wa_payload.decode(self._secret(), reply_id)
+        if not decoded:
+            return self._safe(
+                "I couldn't read that selection -- please type your "
+                "request and I'll help.")
+        intent, parts = decoded
+        try:
+            if intent in ("confirm", "cancel"):
+                return self._tap_confirm(user, intent, parts)
+            if intent == "stage":
+                return self._tap_stage(bot_user, parts)
+            if intent in ("pick_lead", "pick_job"):
+                return self._tap_pick(bot_user, intent, parts, reply_title)
+            if intent == "menu":
+                return self._tap_menu(bot_user, parts)
+        except Exception as e:  # noqa: BLE001 -- a tap must never 500
+            _logger.error("WA tap routing failed (intent=%s): %s",
+                          intent, e, exc_info=True)
+            return self._safe(
+                "Sorry -- something went wrong with that. Please try again.")
+        return self._safe(
+            "I couldn't route that selection -- please type your request.")
+
+    def _tap_confirm(self, user, intent, parts):
+        token = parts[0] if parts else ""
+        # Execute under the RESOLVED USER's identity (not the sudo webhook
+        # env) so the write's ACL fires at execute time -- same guarantee
+        # as the WA-0 'confirm in Odoo' deep-link path.
+        orch = ChatOrchestrator(self.env(user=user.id))
+        if intent == "cancel":
+            res = orch.cancel_pending_action(user, token)
+        else:
+            res = orch.confirm_pending_action(user, token)
+        return self._safe(self._confirm_reply_text(intent, res))
+
+    def _confirm_reply_text(self, intent, res):
+        code = res.get("error_code")
+        status = res.get("status")
+        summ = (res.get("result") or {}).get("human_summary") or ""
+        if res.get("ok") and status == "executed":
+            return "✅ Done%s." % ((" -- " + summ) if summ else "")
+        if res.get("ok") and status == "cancelled":
+            return "❌ Cancelled%s." % ((" -- " + summ) if summ else "")
+        if res.get("ok") and res.get("replay"):
+            return "That action was already %s." % (status or "handled")
+        if code == "expired":
+            return ("⏳ That action expired -- just ask again and I'll "
+                    "re-prepare it.")
+        if code == "not_found":
+            return ("I couldn't find that action -- it may already have "
+                    "been handled.")
+        if code == "forbidden":
+            return "That action belongs to a different user."
+        return ("Sorry -- I couldn't complete that: %s"
+                % (res.get("error") or "unknown error"))
+
+    def _propose_and_confirm(self, user, env_u, tool_name, params):
+        """Dispatch a WA-safe write tool -> propose -> Confirm/Cancel
+        buttons. Reused by the stage tap (a tap can only PROPOSE; the
+        confirm gate still fires)."""
+        if tool_name not in _WA_SAFE_WRITES:
+            return self._safe("That action isn't available over WhatsApp.")
+        disp = tool_registry.dispatch(tool_name, env_u, user, params)
+        if not disp.get("is_proposal"):
+            return self._safe(
+                disp.get("error") or "I couldn't prepare that action.")
+        terminal, _ = self._proposal_terminal(user, disp, None)
+        return terminal or self._safe(
+            "I couldn't queue that action -- please try again.")
+
+    def _tap_stage(self, bot_user, parts):
+        user = bot_user.user_id
+        env_u = self.env(user=user.id)
+        if len(parts) < 2:
+            return self._safe(
+                "That stage selection was incomplete -- please try again.")
+        lead_id, stage_id = parts[0], parts[1]
+        stage = (env_u["crm.stage"].browse(int(stage_id))
+                 if str(stage_id).isdigit() else None)
+        if not (stage and stage.exists()):
+            return self._safe(
+                "That stage is no longer available -- please try again.")
+        return self._propose_and_confirm(
+            user, env_u, "move_stage",
+            {"lead_identifier": str(lead_id),
+             "target_stage": self._stage_label(stage)})
+
+    def _tap_pick(self, bot_user, intent, parts, reply_title):
+        """List selection -> feed the chosen record id back into a
+        steered turn (no name-typing). The model continues with WA-1
+        history + the explicit selection."""
+        user = bot_user.user_id
+        env_u = self.env(user=user.id)
+        rid = parts[0] if parts else ""
+        if not str(rid).isdigit():
+            return self._safe(
+                "That selection was invalid -- please type your request.")
+        model = "crm.lead" if intent == "pick_lead" \
+            else "commercial.event.job"
+        label = "lead" if intent == "pick_lead" else "job"
+        try:
+            rec = env_u[model].browse(int(rid))
+            if not rec.exists():
+                raise ValueError("gone")
+            name = reply_title or rec.name or ("#%s" % rid)
+        except Exception:  # noqa: BLE001 -- ACL or gone -> safe fallback
+            return self._safe(
+                "That item is no longer available -- please type your "
+                "request.")
+        steer = "Let's work with %s '%s' (id %s)." % (label, name, rid)
+        return self.run_turn(bot_user, steer)
+
+    def _tap_menu(self, bot_user, parts):
+        user = bot_user.user_id
+        variant = self.variant_for(user)
+        key = parts[0] if parts else ""
+        allowed = {t.name for t in self.whatsapp_tools(user, variant)}
+        if key not in allowed:
+            return self._safe("That option isn't available for your role.")
+        phrase = _MENU_PHRASES.get(
+            key, "Please help me with: %s" % key.replace("_", " "))
+        return self.run_turn(bot_user, phrase)

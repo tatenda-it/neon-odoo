@@ -14,7 +14,19 @@
     # history match + lead-intake all canonical, raw `from` kept for the
     # outbound SEND. Method-only (no schema/data). Interactive renderer
     # (buttons/list/cards) remains DEFERRED.
-    'version': '17.0.1.4.0',
+    # 17.0.1.5.0 = B11/WA-1: interactive renderer (the deferred half).
+    # Outbound reply-buttons + list senders (send_buttons / send_list)
+    # with a MANDATORY text fallback (send_interactive_or_text); a new
+    # HMAC-signed tap-back payload scheme (wa_payload) + handle_tap
+    # router; Confirm/Cancel taps reuse the EXISTING write.log
+    # propose->confirm->execute path (execute under the resolved user's
+    # identity, ACL fires); <=3 stage picker; pick-one list from
+    # list-producing read tools (get_my_pipeline / get_jobs_this_week);
+    # capability menu from whatsapp_tools. Code-driven triggering; money
+    # tools structurally unreachable via any interactive path.
+    # Method-only (no schema/data; reuses database.secret +
+    # action_wa_pending_writes).
+    'version': '17.0.1.5.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

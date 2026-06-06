@@ -193,6 +193,17 @@ class WhatsAppMessage(models.Model):
             return self.process_incoming(message, metadata)
 
         msg_type = message.get('type', 'text')
+        # WA-1: pull the tapped reply id (button_reply / list_reply) so we
+        # ROUTE by id, not by the echoed title. The title is kept for the
+        # stored row body + as the pick-back label.
+        reply_id = reply_title = None
+        if msg_type == 'interactive':
+            inter = message.get('interactive', {}) or {}
+            for k in ('button_reply', 'list_reply'):
+                if inter.get(k):
+                    reply_id = inter[k].get('id')
+                    reply_title = inter[k].get('title')
+                    break
         body = self._extract_body(message, msg_type)
         inbound = self.sudo().create({
             'name': message.get('id') or f'wa-in-{from_e164}',
@@ -210,28 +221,48 @@ class WhatsAppMessage(models.Model):
             'neon_channels.whatsapp_provider_key', 'google')
         try:
             variant = svc.variant_for(bot_user.user_id)
-            result = svc.run_turn(bot_user, body,
-                                  exclude_message_id=inbound.id)
+            if reply_id:
+                # WA-1 Piece B -- a tap-back. Route the payload id.
+                result = svc.handle_tap(bot_user, reply_id, reply_title)
+            elif svc.wants_menu(body):
+                # WA-1 Slice 3 -- deterministic capability-menu intent.
+                result = svc.build_menu_result(bot_user)
+            else:
+                result = svc.run_turn(bot_user, body,
+                                      exclude_message_id=inbound.id)
         except Exception as e:  # noqa: BLE001
             _logger.error('WhatsApp Copilot turn failed: %s', e,
                           exc_info=True)
             result = {'text': 'Sorry -- something went wrong handling '
-                              'that. Please try again.', 'cta_url': None}
+                              'that. Please try again.', 'cta_url': None,
+                      'interactive': None}
 
         reply = result.get('text') or 'Done.'
         cta = result.get('cta_url')
-        if cta:
-            self.sudo().send_cta_url(
-                raw_from, reply, 'Confirm in Odoo', cta)
+        interactive = result.get('interactive')
+        # WA-1 Piece C -- a structured send ALWAYS has a text fallback.
+        if interactive:
+            sent_via = self.sudo().send_interactive_or_text(
+                raw_from, interactive,
+                result.get('text_fallback') or reply, cta_url=cta)
+        elif cta:
+            self.sudo().send_cta_url(raw_from, reply, 'Confirm in Odoo', cta)
+            sent_via = 'cta_url'
         else:
             self.sudo().send_message(raw_from, reply)
+            sent_via = 'text'
 
+        # Outbound audit row. message_type reflects the path actually used;
+        # sent_via is logged AND appended to the stored body so the
+        # fallback path is auditable without a new column (method-only).
+        body_suffix = (f'\n[cta_url] {cta}' if cta else '') \
+            + f'\n[sent_via:{sent_via}]'
         self.sudo().create({
             'name': f'wa-out-{from_e164}',
             'direction': 'outbound',
             'phone_number': from_e164,
-            'message_body': reply + (f'\n[cta_url] {cta}' if cta else ''),
-            'message_type': 'interactive' if cta else 'text',
+            'message_body': reply + body_suffix,
+            'message_type': 'interactive' if (interactive or cta) else 'text',
             'state': 'sent',
             'bot_user_id': bot_user.id,
             'variant': variant or False,
@@ -285,3 +316,119 @@ class WhatsAppMessage(models.Model):
         except Exception as e:  # noqa: BLE001
             _logger.error('Error sending WhatsApp cta_url: %s', str(e))
             return False
+
+    # ==================================================================
+    # WA-1 -- interactive renderer (reply buttons + list) + fallback
+    # ==================================================================
+    def _post_interactive(self, to_number, interactive, label='interactive'):
+        """Shared Meta Cloud API interactive sender. ``interactive`` is
+        the full 'interactive' object (type + body + action). Returns
+        True on a Meta 200, False on any error/non-200 so the caller can
+        fall back to text. Allowed inside Meta's 24h customer-service
+        window (these are replies to an inbound message)."""
+        config = self.env['neon.whatsapp.config'].sudo().search(
+            [('active', '=', True)], limit=1)
+        if not config:
+            _logger.error('No active WhatsApp configuration found.')
+            return False
+        api_url = (f"https://graph.facebook.com/v25.0/"
+                   f"{config.phone_number_id}/messages")
+        headers = {
+            "Authorization": f"Bearer {config.access_token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_number,
+            "type": "interactive",
+            "interactive": interactive,
+        }
+        try:
+            response = requests.post(api_url, json=payload, headers=headers)
+            if response.status_code == 200:
+                _logger.info('WhatsApp %s sent to %s', label, to_number)
+                return True
+            _logger.error('Failed to send WhatsApp %s: %s',
+                          label, response.text)
+            return False
+        except Exception as e:  # noqa: BLE001
+            _logger.error('Error sending WhatsApp %s: %s', label, str(e))
+            return False
+
+    def send_buttons(self, to_number, body_text, buttons):
+        """WA-1 Slice 1 -- reply buttons (interactive type 'button',
+        MAX 3). ``buttons`` = [{'id','title'}]; title clipped to Meta's
+        20-char limit, id to 256."""
+        btns = [{"type": "reply",
+                 "reply": {"id": (b["id"] or "")[:256],
+                           "title": (b.get("title") or "")[:20]}}
+                for b in (buttons or [])[:3]]
+        interactive = {
+            "type": "button",
+            "body": {"text": (body_text or "")[:1024]},
+            "action": {"buttons": btns},
+        }
+        return self._post_interactive(to_number, interactive, 'buttons')
+
+    def send_list(self, to_number, body_text, button_text, sections):
+        """WA-1 Slice 2 -- list message (interactive type 'list', up to
+        10 rows across sections). ``sections`` =
+        [{'title','rows':[{'id','title','description'}]}]. Row title <=24,
+        description <=72, the open-list button <=20 (Meta limits)."""
+        out_sections = []
+        total = 0
+        for sec in (sections or []):
+            rows = []
+            for r in (sec.get('rows') or []):
+                if total >= 10:
+                    break
+                row = {"id": (r["id"] or "")[:200],
+                       "title": (r.get("title") or "")[:24]}
+                if r.get("description"):
+                    row["description"] = r["description"][:72]
+                rows.append(row)
+                total += 1
+            if rows:
+                out_sections.append(
+                    {"title": (sec.get("title") or "")[:24], "rows": rows})
+            if total >= 10:
+                break
+        interactive = {
+            "type": "list",
+            "body": {"text": (body_text or "")[:1024]},
+            "action": {"button": (button_text or "Options")[:20],
+                       "sections": out_sections},
+        }
+        return self._post_interactive(to_number, interactive, 'list')
+
+    def send_interactive_or_text(self, to_number, interactive,
+                                 text_fallback, cta_url=None):
+        """WA-1 Piece C -- MANDATORY text fallback. Try the structured
+        send; if Meta rejects it (or it errors / is skipped), send the
+        proven WA-0 text (or text+cta_url) instead -- a button/list
+        failure NEVER means no reply. Returns the path actually used:
+        'buttons' | 'list' | 'cta_url' | 'text'."""
+        kind = (interactive or {}).get("kind")
+        ok = False
+        if kind == "buttons":
+            ok = self.send_buttons(
+                to_number, interactive.get("body", ""),
+                interactive.get("buttons") or [])
+        elif kind == "list":
+            ok = self.send_list(
+                to_number, interactive.get("body", ""),
+                interactive.get("button_text", "Options"),
+                interactive.get("sections") or [])
+        if ok:
+            return kind
+        _logger.warning(
+            'WA interactive(%s) send failed/unsupported -- falling back '
+            'to text for %s', kind, to_number)
+        if cta_url:
+            self.send_cta_url(
+                to_number, text_fallback or 'Please confirm in Odoo.',
+                'Confirm in Odoo', cta_url)
+            return 'cta_url'
+        self.send_message(to_number, text_fallback or 'Done.')
+        return 'text'
