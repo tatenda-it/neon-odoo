@@ -42,12 +42,12 @@ STATUS_BOARD_GROUPS = ()
 # editable constants. Only the "Live from prod" box reads real-time
 # values (via neon.status.live). Bump these numbers as the programme
 # moves; the donut + bars + WA cards all derive from this one block.
-OVERALL_PCT = 84
+OVERALL_PCT = 85
 
 TRACKS = [
     {"key": "core", "name": "Core ERP Programme", "pct": 91,
      "accent": "purple"},
-    {"key": "ai", "name": "AI Equipment Module", "pct": 70,
+    {"key": "ai", "name": "AI Equipment Module", "pct": 73,
      "accent": "teal"},
     {"key": "hr", "name": "HR & Payroll", "pct": 92,
      "accent": "amber"},
@@ -59,11 +59,12 @@ WA_MODULES = [
      "state": "live",
      "body": "Transport, role-scoped replies, Gemini + Groq fallback, "
              "money guardrail, signed webhook."},
-    {"key": "WA-1", "title": "Memory + interactive renderer", "pct": 60,
-     "state": "active",
+    {"key": "WA-1", "title": "Memory + interactive renderer", "pct": 100,
+     "state": "live",
      "body": "Conversation memory LIVE (phone-format bug class closed); "
-             "interactive renderer (buttons + lists + CTA-URL, "
-             "role-driven) designed, build next."},
+             "interactive renderer LIVE — reply buttons + lists + "
+             "CTA-URL, role-driven; Confirm-tap reuses the write.log "
+             "gate (verified on prod), money walled off."},
     {"key": "WA-2", "title": "WhatsApp-to-ops", "pct": 0,
      "state": "roadmap",
      "body": "Crew confirmations, equipment-ready pings, job reminders "
@@ -93,12 +94,14 @@ TRACK_MILESTONES = [
                      "M12.3 parked.",
     },
     {
-        "name": "AI Equipment Module", "pct": 70, "accent": "teal",
+        "name": "AI Equipment Module", "pct": 73, "accent": "teal",
         "live": "AI core = B1, B2 Conflict Engine, B3, B13 doc-gen, "
                 "B14; B4 / B5 ready-to-fork. Field-tech arm = B11 "
-                "WhatsApp (live frontier; WA-0 done, WA-1 in progress).",
-        "remaining": "B10 crew scheduler pending; B8 mobile / B9 QR / "
-                     "B16 predictive deferred; B12 Drive dropped.",
+                "WhatsApp (live frontier; WA-0 + WA-1 done — rails, "
+                "memory + interactive renderer).",
+        "remaining": "WA-2–WA-5 roadmap; B10 crew scheduler pending; "
+                     "B8 mobile / B9 QR / B16 predictive deferred; "
+                     "B12 Drive dropped.",
     },
     {
         "name": "HR & Payroll", "pct": 92, "accent": "amber",
@@ -125,10 +128,12 @@ DONE_VERIFIED = [
     "two-phase confirmation cards, write-audit log).",
     "HR & Payroll R1a / R1b / R2 / R3a / R3b live (employee master, "
     "leave, payroll, wages, loans, fleet/competency, HR role-lens).",
-    "B11 WA-0 + WA-1 memory live (transport, role-scoped replies, "
-    "Gemini + Groq fallback, money guardrail, signed webhook; "
-    "conversation memory live, phone-format normalized at the "
-    "boundary, 27/27 canonical).",
+    "B11 WA-0 + WA-1 live (WhatsApp Copilot rails — role-scoped "
+    "replies, Gemini + Groq fallback, money guardrail, signed webhook; "
+    "conversation memory + boundary phone normalization; interactive "
+    "renderer — reply buttons + lists + tap-back Confirm/Cancel reusing "
+    "the write.log gate under the resolved-user identity, verified on "
+    "prod, money structurally walled off).",
     "neon_ai_core extraction live (shared AI engine; Copilot Confirm "
     "accepted).",
     "neon_jobs escalation-gate fix live (cron quiet; manager gate "
@@ -136,9 +141,6 @@ DONE_VERIFIED = [
 ]
 
 DECIDED_NOT_BUILT = [
-    "WA-1 interactive renderer — buttons + lists + CTA-URL, "
-    "role-driven (the WA-1 memory half is DONE; only the renderer "
-    "remains — this is the next build).",
     "WA-2 WhatsApp-to-ops (crew confirmations, equipment-ready pings, "
     "job reminders).",
     "WA-3 readiness digest / broadcast (scheduled role-aware digests).",

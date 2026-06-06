@@ -11,7 +11,10 @@
     # dashboard module does not have to take a new neon_channels
     # dependency just to read bot.user / whatsapp.message counts.
     # (Gate-1 decision 1, B11.)
-    "version": "17.0.1.0.0",
+    # 17.0.1.0.1 = planning-constant refresh after WA-1 shipped: WA-1
+    # 60->100 (interactive renderer DONE), AI track 70->73, overall
+    # 84->85; renderer moves Decided->Done. Constants/template only.
+    "version": "17.0.1.0.1",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
