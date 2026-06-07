@@ -141,11 +141,19 @@ try:
             "template", {}).get("components", []) if p1send else []
         qr = [c for c in comps if c.get("sub_type") == "quick_reply"]
         qr_payloads = [c["parameters"][0]["payload"] for c in qr]
+        body_comp = next((c for c in comps if c.get("type") == "body"), None)
+        body_n = len(body_comp.get("parameters", [])) if body_comp else 0
         check("S1: send_template payload = crew_assignment + 2 quick-reply "
               "buttons",
               bool(p1send)
               and p1send["json"]["template"]["name"] == "crew_assignment"
               and len(qr) == 2, "qr=%d" % len(qr))
+        # PARAM-COUNT CONTRACT (the Meta 132000 bug): crew_assignment's
+        # approved template has EXACTLY 5 body vars (name, job, date,
+        # time, role). A mismatch is what Meta rejected on prod.
+        check("S1: crew_assignment body has EXACTLY 5 params (count "
+              "contract vs approved template)", body_n == 5,
+              "body params=%d (expected 5)" % body_n)
         decoded_qr = [wa_payload.decode(secret, p) for p in qr_payloads]
         check("S1: quick-reply payloads decode to crew_confirm/crew_decline "
               "for a1",
@@ -241,6 +249,28 @@ try:
                   gate_blocked)
         else:
             check("S10: a sales-rep fixture exists", False, "no sales user")
+
+        # ---- 11: job_reminder param contract (4 params + URL button) --
+        # a1 was confirmed in S4, so it's reminder-eligible.
+        _posts.clear()
+        a1.invalidate_recordset()
+        rr = a1._wa_send_reminder()
+        rsend = next((p for p in _posts
+                      if p["json"].get("type") == "template"
+                      and p["json"]["template"]["name"] == "job_reminder"),
+                     None)
+        rcomps = (rsend or {}).get("json", {}).get(
+            "template", {}).get("components", [])
+        rbody = next((c for c in rcomps if c.get("type") == "body"), None)
+        rbody_n = len(rbody.get("parameters", [])) if rbody else 0
+        rurl = [c for c in rcomps if c.get("sub_type") == "url"]
+        check("S11: job_reminder send fired for a confirmed crew member",
+              rr.get("ok") and bool(rsend), rr)
+        check("S11: job_reminder body has EXACTLY 4 params (count contract: "
+              "job, time, venue, role)", rbody_n == 4,
+              "body params=%d (expected 4)" % rbody_n)
+        check("S11: job_reminder carries a single URL button",
+              len(rurl) == 1, "url buttons=%d" % len(rurl))
 
     # ---- regression bar: Copilot tool registry unchanged ----------
     nr = len(tool_registry.list_tools(category="read"))

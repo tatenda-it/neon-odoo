@@ -14,7 +14,12 @@
     # The generic channel primitives (send_template, opt-out, STOP) live
     # in neon_channels; crew_confirm/crew_decline intents are registered
     # in neon_channels' wa_payload. (Gate-1 decision 3, WA-2.)
-    "version": "17.0.1.0.0",
+    # 17.0.1.0.1 = fix: crew_assignment body params 4->5 (add call-time
+    # var; Meta 132000 param-count mismatch on the approved 5-var
+    # template: name, job, date, time, role) + job_reminder var2 date->
+    # call-time (job, time, venue, role). New _wa_time_label() sources
+    # the earliest event_job load-in/dispatch/prep time, 'TBC' fallback.
+    "version": "17.0.1.0.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow.",

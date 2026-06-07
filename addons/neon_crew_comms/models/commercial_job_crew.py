@@ -125,6 +125,28 @@ class CommercialJobCrew(models.Model):
         return (self.partner_id.name
                 or (self.user_id.name if self.user_id else _("Crew")))
 
+    def _wa_time_label(self):
+        """Best-effort crew call-time for the templates. commercial.job
+        carries no time-of-day (only event_date), so source the earliest
+        linked event_job's load-in / dispatch / prep time (in the user's
+        tz); 'TBC' when none is set. Always non-empty (the send guard
+        rejects empty params)."""
+        self.ensure_one()
+        job = self.job_id
+        ejs = (job.event_job_ids
+               if "event_job_ids" in job._fields else None)
+        candidates = []
+        for ej in (ejs or []):
+            for fld in ("load_in_start", "dispatch_datetime",
+                        "prep_start_datetime"):
+                if fld in ej._fields and ej[fld]:
+                    candidates.append(ej[fld])
+                    break
+        if candidates:
+            return fields.Datetime.context_timestamp(
+                self, min(candidates)).strftime("%H:%M")
+        return _("TBC")
+
     def _wa_send_assignment_notification(self):
         """Send the crew_assignment template (Confirm / Can't-make-it
         quick-reply buttons carrying the HMAC tap-back payloads). Sets
@@ -144,17 +166,20 @@ class CommercialJobCrew(models.Model):
         confirm_pl = wa_payload.encode(secret, "crew_confirm", self.id)
         decline_pl = wa_payload.encode(secret, "crew_decline", self.id)
         job = self.job_id
+        # crew_assignment approved template = 5 vars IN ORDER:
+        # {{1}} name, {{2}} job, {{3}} date, {{4}} time, {{5}} role.
+        # The count + order is a contract -- a mismatch is Meta 132000.
         body_params = [self._wa_crew_name(),
                        job.name or job.display_name or "",
-                       self._wa_when_label(), self._wa_role_label()]
+                       self._wa_when_label(), self._wa_time_label(),
+                       self._wa_role_label()]
         res = self.env["neon.whatsapp.message"].sudo().send_template(
             phone, TPL_CREW_ASSIGNMENT, language=TPL_LANG,
             body_params=body_params,
             quick_reply_payloads=[confirm_pl, decline_pl],
             recipient_partner=self.partner_id,
-            audit_body=("[crew_assignment] job=%s crew=%s role=%s"
-                        % (job.name, self._wa_crew_name(),
-                           self._wa_role_label())))
+            audit_body=("[crew_assignment] name=%s job=%s date=%s time=%s "
+                        "role=%s" % tuple(body_params)))
         if res.get("ok"):
             self.sudo().write({"notification_sent": True,
                                "notified_on": fields.Datetime.now()})
@@ -175,16 +200,18 @@ class CommercialJobCrew(models.Model):
         job = self.job_id
         venue = getattr(job, "venue_id", False)
         venue_label = (venue.name if venue else _("venue TBC"))
+        # job_reminder approved template = 4 vars IN ORDER:
+        # {{1}} job, {{2}} call-time, {{3}} venue, {{4}} role.
         body_params = [job.name or job.display_name or "",
-                       self._wa_when_label(), venue_label,
+                       self._wa_time_label(), venue_label,
                        self._wa_role_label()]
         res = self.env["neon.whatsapp.message"].sudo().send_template(
             phone, TPL_JOB_REMINDER, language=TPL_LANG,
             body_params=body_params,
             url_button_param=str(job.id),
             recipient_partner=self.partner_id,
-            audit_body=("[job_reminder] job=%s crew=%s"
-                        % (job.name, self._wa_crew_name())))
+            audit_body=("[job_reminder] job=%s time=%s venue=%s role=%s"
+                        % tuple(body_params)))
         if res.get("ok"):
             self.sudo().write({"reminder_on": fields.Datetime.now()})
         return res
