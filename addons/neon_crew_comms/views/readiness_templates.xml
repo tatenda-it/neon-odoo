@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- WA-3 readiness board. Self-contained dark page (inline style +
+         script, no asset bundle). Manager-scoped; the controller
+         prepends the DOCTYPE. -->
+    <template id="readiness_board" name="Neon Readiness Board">
+        <html lang="en">
+        <head>
+            <meta charset="utf-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1"/>
+            <title>Neon Events — Readiness</title>
+            <style><![CDATA[
+:root{--bg:#0f0f17;--panel:#1b1b2a;--panel2:#202033;--border:#2a2a40;
+  --text:#e9e9f3;--muted:#9a9ab4;--faint:#6f6f88;--purple2:#7f60a9;
+  --green:#34d399;--amber:#f5a524;--red:#f87171;}
+*{box-sizing:border-box;}html,body{margin:0;padding:0;}
+body{background:radial-gradient(1200px 600px at 15% -10%,#1d1d33 0%,var(--bg) 55%) fixed,var(--bg);
+  color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;}
+.wrap{max-width:1040px;margin:0 auto;padding:30px 20px 64px;}
+.hdr{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:16px;
+  border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:26px;}
+.hdr h1{margin:0 0 6px;font-size:24px;font-weight:700;}
+.hdr h1 .brand{background:linear-gradient(90deg,var(--purple2),var(--green));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.sub{color:var(--muted);font-size:13px;}
+.btn{appearance:none;border:1px solid var(--purple2);cursor:pointer;background:linear-gradient(180deg,#4f57a8,#3c3f86);
+  color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;}
+.btn:hover{filter:brightness(1.12);}.btn:disabled{opacity:.55;cursor:progress;}
+.sendmsg{font-size:12.5px;color:var(--muted);margin-top:8px;min-height:1em;}
+.rag{display:flex;gap:14px;margin:0 0 24px;flex-wrap:wrap;}
+.rag .card{flex:1 1 150px;background:linear-gradient(180deg,var(--panel),#14141f);border:1px solid var(--border);
+  border-radius:14px;padding:16px;text-align:center;}
+.rag .n{font-size:38px;font-weight:800;line-height:1;}
+.rag .l{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:6px;}
+.rag .green .n{color:var(--green);}.rag .amber .n{color:var(--amber);}.rag .red .n{color:var(--red);}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+th,td{text-align:left;padding:10px 12px;font-size:13.5px;border-bottom:1px solid var(--border);}
+th{color:var(--faint);text-transform:uppercase;font-size:11px;letter-spacing:.8px;}
+tr:last-child td{border-bottom:none;}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;}
+.chip.green{background:rgba(52,211,153,.16);color:var(--green);}
+.chip.amber{background:rgba(245,165,36,.16);color:var(--amber);}
+.chip.red{background:rgba(248,113,113,.16);color:var(--red);}
+.muted{color:var(--muted);}.empty{padding:28px;text-align:center;color:var(--muted);}
+.foot{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--faint);}
+            ]]></style>
+        </head>
+        <body>
+        <div class="wrap">
+            <div class="hdr">
+                <div>
+                    <h1>Neon Events — <span class="brand">Readiness</span></h1>
+                    <div class="sub">Jobs <t t-esc="data['window_start']"/> →
+                        <t t-esc="data['window_end']"/> · read-only, manager view ·
+                        <span class="muted" t-esc="data['generated_at_display']"/></div>
+                </div>
+                <div>
+                    <button id="rd-send" class="btn" type="button">Send digest now</button>
+                    <div id="rd-msg" class="sendmsg"></div>
+                </div>
+            </div>
+
+            <div class="rag">
+                <div class="card green"><div class="n" t-esc="data['counts']['green']"/><div class="l">Ready</div></div>
+                <div class="card amber"><div class="n" t-esc="data['counts']['amber']"/><div class="l">Needs attention</div></div>
+                <div class="card red"><div class="n" t-esc="data['counts']['red']"/><div class="l">Not started</div></div>
+                <div class="card"><div class="n" t-esc="data['total']"/><div class="l">Total in window</div></div>
+            </div>
+
+            <t t-if="data['jobs']">
+                <table>
+                    <tr>
+                        <th>RAG</th><th>Job</th><th>Date</th><th>Crew</th>
+                        <th>Equipment</th><th>Status</th>
+                    </tr>
+                    <t t-foreach="data['jobs']" t-as="j">
+                        <tr>
+                            <td><span t-attf-class="chip #{j['rag']}" t-esc="j['rag']"/></td>
+                            <td t-esc="j['name']"/>
+                            <td t-esc="j['event_date']"/>
+                            <td><t t-esc="j['crew_confirmed']"/>/<t t-esc="j['crew_total']"/></td>
+                            <td><t t-esc="j['equipment_count']"/>
+                                <span class="muted" t-if="j['equipment_summary']"> · <t t-esc="j['equipment_summary']"/></span></td>
+                            <td class="muted" t-esc="j['operational_status_label']"/>
+                        </tr>
+                    </t>
+                </table>
+            </t>
+            <t t-else="">
+                <div class="empty">No jobs in the window. Nothing to report.</div>
+            </t>
+
+            <div class="foot">RAG = operational status + crew confirmation.
+                Green = locked &amp; crew fully confirmed · Amber = locked but crew gap ·
+                Red = not started (planning / soft hold). No financial figures shown.</div>
+        </div>
+        <script><![CDATA[
+(function(){
+  function send(){
+    var btn=document.getElementById("rd-send"), msg=document.getElementById("rd-msg");
+    btn.disabled=true; msg.textContent="Sending...";
+    fetch("/neon/readiness/send",{method:"POST",headers:{"Content-Type":"application/json"},
+      credentials:"same-origin",body:JSON.stringify({jsonrpc:"2.0",method:"call",params:{}})})
+      .then(function(r){return r.json();}).then(function(j){
+        var d=j&&j.result;
+        if(!d||!d.ok){msg.textContent="Not sent (access denied).";btn.disabled=false;return;}
+        var r=d.result||{};
+        msg.textContent = r.empty ? "Nothing to report today (no jobs in window)."
+          : ("Sent "+(r.sent||0)+", skipped "+(r.skipped||0)+".");
+        btn.disabled=false;
+      }).catch(function(){msg.textContent="Send failed.";btn.disabled=false;});
+  }
+  document.addEventListener("DOMContentLoaded",function(){
+    var b=document.getElementById("rd-send"); if(b){b.addEventListener("click",send);}
+  });
+})();
+        ]]></script>
+        </body>
+        </html>
+    </template>
+
+    <template id="readiness_denied" name="Readiness — no access">
+        <html lang="en">
+        <head><meta charset="utf-8"/><title>Neon Events — Readiness</title>
+        <style><![CDATA[
+body{margin:0;background:#0f0f17;color:#e9e9f3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;}
+.box{max-width:440px;padding:32px;border:1px solid #2a2a40;border-radius:16px;background:#1b1b2a;}
+.box h1{font-size:20px;margin:0 0 10px;}.box p{color:#9a9ab4;font-size:14px;margin:0 0 18px;}
+.box a{color:#34d399;text-decoration:none;font-weight:600;}
+        ]]></style></head>
+        <body><div class="box"><h1>Readiness board</h1>
+            <p>This board is for Neon ops managers and crew leaders only.</p>
+            <a href="/web">← Back to Odoo</a></div></body>
+        </html>
+    </template>
+
+</odoo>

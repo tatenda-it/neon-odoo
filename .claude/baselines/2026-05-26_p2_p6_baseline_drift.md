@@ -246,3 +246,24 @@ run → identical result with or without B11.
 > of `== 0`, OR read the configured default rather than hard-coding.
 > Owner: B14c suite. Tracked here so it is not buried. Accepted as
 > drift for the B11 gate per Tatenda 2026-06-06.
+
+## Update 2026-06-07 (B11 WA-3 regression) — p12m1 chat smokes in-chunk dip
+
+During the WA-3 (`neon_crew_comms`) full regression, `p12m1_chat`
+**30/31** and `p12m1_1_chat` **29/30** dipped (were 100% in the WA-1/
+WA-2 chunk runs). **NOT a code regression and NOT WA-3:** both pass
+**100% standalone** (`p12m1_chat` 31/31, `p12m1_1_chat` 30/30). WA-3 is
+`neon_crew_comms`-only and touches neither the Copilot nor the dashboard
+chat. Cause: the two Phase-12 chat smokes share a `chat.session`
+(`get_or_create_for_user`); run back-to-back in the batch, the first
+leaves committed state that perturbs a count/state assertion in the
+second. Surfaced now as dev-DB chat residue crossed a threshold. Same
+class as pb14c: correct product, lagging test harness. In-chunk pollution
+can MASK a real regression in those suites next run, so fix it properly.
+
+> **FIX OWED (Phase-12 test-maintenance, NOT WA-3):** make `p12m1_chat`
+> / `p12m1_1_chat` order-independent — hard-reset / isolate the
+> `chat.session` (+ its messages) in each smoke's setup so neither
+> depends on prior committed state. Owner: Phase-12 test maintenance.
+> Accepted as in-chunk pollution for the WA-3 gate per Tatenda
+> 2026-06-07.

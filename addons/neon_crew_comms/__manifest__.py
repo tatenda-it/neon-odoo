@@ -19,10 +19,17 @@
     # template: name, job, date, time, role) + job_reminder var2 date->
     # call-time (job, time, venue, role). New _wa_time_label() sources
     # the earliest event_job load-in/dispatch/prep time, 'TBC' fallback.
-    "version": "17.0.1.0.1",
+    # 17.0.1.1.0 = B11/WA-3 readiness digest: neon.readiness.digest
+    # collector (composite RAG from operational_status + crew), a
+    # daily_readiness Meta template (4 fixed counts + static board URL),
+    # a DISABLED daily cron + manager-gated manual send, and the served
+    # /neon/readiness manager board (neon_status pattern). New layer; no
+    # new stored columns.
+    "version": "17.0.1.1.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
-               "(Confirm / Can't make it) reusing the crew workflow.",
+               "(Confirm / Can't make it) reusing the crew workflow. "
+               "WA-3: manager readiness digest + served board.",
     "author": "Neon Events Elements Pvt Ltd",
     "website": "https://neonhiring.com",
     "category": "Neon/Operations",
@@ -40,7 +47,9 @@
         "security/ir.model.access.csv",
         "wizards/crew_notify_wizard_views.xml",
         "views/commercial_job_views.xml",
+        "views/readiness_templates.xml",
         "data/ir_cron.xml",
+        "data/readiness_cron.xml",
     ],
     "installable": True,
     "application": False,
