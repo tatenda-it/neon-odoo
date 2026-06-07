@@ -26,7 +26,15 @@
     # tools structurally unreachable via any interactive path.
     # Method-only (no schema/data; reuses database.secret +
     # action_wa_pending_writes).
-    'version': '17.0.1.5.0',
+    # 17.0.1.6.0 = B11/WA-2 channel primitives: send_template (proactive
+    # Meta TEMPLATE send, body params + quick-reply payload buttons OR a
+    # URL button, message_type='template' audit); res.partner.wa_opt_out
+    # (+date) opt-out flag honoured by send_template; STOP/START keyword
+    # intercept in handle_inbound (any sender, before routing); two crew
+    # tap-back intents added to wa_payload.INTENTS (crew_confirm /
+    # crew_decline -- routed by the neon_crew_comms bridge). Adds a
+    # res.partner column -> -u + snapshot.
+    'version': '17.0.1.6.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

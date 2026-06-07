@@ -65,6 +65,7 @@ SMOKES=(
   p7l
   pb11_status
   pwa1_interactive
+  pwa2_crew_ops
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

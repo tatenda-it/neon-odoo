@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- WA-2: day-before crew reminder sweep. Ships DISABLED
+         (active=False), human-first this version. Enable in
+         Settings then Technical then Scheduled Actions when ready.
+         noupdate so a later upgrade keeps a manual toggle. -->
+    <data noupdate="1">
+        <record id="ir_cron_wa2_job_reminders" model="ir.cron">
+            <field name="name">WA-2: Day-before crew job reminders</field>
+            <field name="model_id" ref="neon_jobs.model_commercial_job"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_send_job_reminders()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="False"/>
+        </record>
+    </data>
+</odoo>

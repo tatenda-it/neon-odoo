@@ -2,7 +2,13 @@ from odoo import models, fields, api
 import logging
 import requests
 
+from .phone_utils import to_e164  # WA-1/WA-2: single-source E.164 normaliser
+
 _logger = logging.getLogger(__name__)
+
+# WA-2 -- proactive-send opt-out keywords (any sender, before routing).
+_WA_STOP_WORDS = {"STOP", "UNSUBSCRIBE", "STOPALL"}
+_WA_START_WORDS = {"START", "UNSTOP", "RESUME"}
 
 
 class WhatsAppMessage(models.Model):
@@ -184,6 +190,11 @@ class WhatsAppMessage(models.Model):
         from_e164 = to_e164(raw_from)
         message = dict(message)
         message['from'] = from_e164
+        # WA-2: STOP/START proactive opt-out intercept. Runs for ANY
+        # sender (mapped or not) BEFORE resolve / raw-lead intake, so a
+        # freelancer with no bot.user can still opt out.
+        if self._wa_maybe_opt_out_keyword(message, raw_from):
+            return True
         # WA-0 fix: delegate to the SINGLE resolver (RBAC-defensive
         # >1-match -> UNRESOLVED). One source of truth.
         bot_user = svc.resolve(from_e164)
@@ -432,3 +443,171 @@ class WhatsAppMessage(models.Model):
             return 'cta_url'
         self.send_message(to_number, text_fallback or 'Done.')
         return 'text'
+
+    # ==================================================================
+    # WA-2 -- proactive opt-out + template send (Piece A + Piece D)
+    # ==================================================================
+    @api.model
+    def _wa_partners_for_phone(self, phone):
+        """All non-company res.partner whose canonical (E.164) phone or
+        mobile == ``phone`` -- via the bot.user mapping AND a tail-digit
+        candidate search, both confirmed by an exact to_e164 compare (no
+        false positives). Used by STOP/START + the send opt-out check."""
+        target = to_e164(phone or "")
+        partners = self.env["res.partner"]
+        if not target:
+            return partners
+        bots = self.env["neon.bot.user"].sudo().search([("active", "=", True)])
+        for b in bots:
+            if to_e164(b.phone_number or "") == target and b.user_id.partner_id:
+                partners |= b.user_id.partner_id
+        tail = "".join(ch for ch in target if ch.isdigit())[-9:]
+        if tail:
+            cands = self.env["res.partner"].sudo().search(
+                ["|", ("phone", "=like", "%" + tail),
+                 ("mobile", "=like", "%" + tail)], limit=80)
+            partners |= cands.filtered(
+                lambda p: to_e164(p.phone or "") == target
+                or to_e164(p.mobile or "") == target)
+        return partners
+
+    def _wa_recipient_opted_out(self, to_number, recipient_partner=None):
+        """Proactive opt-out check. Partner-exact when the recipient is
+        known (the usual proactive path); best-effort phone match
+        otherwise."""
+        if recipient_partner:
+            return bool(recipient_partner.sudo().wa_opt_out)
+        return any(p.wa_opt_out for p in self._wa_partners_for_phone(to_number))
+
+    @api.model
+    def _wa_maybe_opt_out_keyword(self, message, raw_from):
+        """STOP/START intercept. Returns True if the inbound was an
+        opt-out/opt-in keyword (handled here, caller returns), else
+        False. Sets res.partner.wa_opt_out (universal -- covers freelance
+        crew with no bot.user) and confirms back to the sender."""
+        if message.get("type", "text") != "text":
+            return False
+        body = ((message.get("text", {}) or {}).get("body", "") or "")
+        word = body.strip().upper()
+        opting_out = word in _WA_STOP_WORDS
+        if not opting_out and word not in _WA_START_WORDS:
+            return False
+        from_e164 = message.get("from")  # already canonical at call site
+        partners = self._wa_partners_for_phone(from_e164)
+        if partners and opting_out:
+            partners.sudo().write({"wa_opt_out": True,
+                                   "wa_opt_out_date": fields.Datetime.now()})
+            reply = ("You've been unsubscribed from Neon proactive WhatsApp "
+                     "messages. Reply START to resume.")
+        elif partners:  # opting back in
+            partners.sudo().write({"wa_opt_out": False,
+                                   "wa_opt_out_date": False})
+            reply = ("You're re-subscribed to Neon WhatsApp updates. Reply "
+                     "STOP to opt out.")
+        else:  # no known contact -- acknowledge gracefully, nothing to store
+            reply = ("Done -- you won't receive proactive Neon messages."
+                     if opting_out else
+                     "You're set to receive Neon WhatsApp updates.")
+        self.sudo().create({
+            "name": message.get("id") or f"wa-in-{from_e164}",
+            "direction": "inbound", "phone_number": from_e164,
+            "message_body": body, "message_type": "text",
+            "state": "received", "raw_payload": str(message)})
+        self.sudo().send_message(raw_from, reply)
+        self.sudo().create({
+            "name": f"wa-out-{from_e164}", "direction": "outbound",
+            "phone_number": from_e164, "message_body": reply,
+            "message_type": "text", "state": "sent"})
+        return True
+
+    def send_template(self, to_number, template_name, language="en",
+                      body_params=None, quick_reply_payloads=None,
+                      url_button_param=None, recipient_partner=None,
+                      audit_body=None):
+        """WA-2 Piece A -- proactive Meta TEMPLATE send (outside the 24h
+        window, where Meta requires a pre-approved template).
+
+        Supports a body with ordered text params PLUS either quick-reply
+        buttons (each ``quick_reply_payloads`` entry becomes the button's
+        payload, echoed back on tap as an inbound type='button' message)
+        OR one URL button (``url_button_param`` = the dynamic suffix).
+        Honours the res.partner WhatsApp opt-out (Piece D). Records an
+        outbound audit row (message_type='template'). Returns
+        {'ok': bool, 'reason': str}.
+
+        ⚠️ The template NAME + language + variable count/order MUST match
+        the Meta-approved template exactly or Meta rejects the send.
+        Parametrised here; approved names/format confirmed at go-live."""
+        def _audit(reason):
+            # WA-2 review fix: even un-attempted sends (opt-out / config /
+            # bad input) leave an auditable outbound row.
+            self.sudo().create({
+                "name": f"wa-tpl-{template_name}",
+                "direction": "outbound", "phone_number": to_number or "",
+                "message_body": (audit_body
+                                 or f"[template:{template_name}]")
+                + f" [{reason}]",
+                "message_type": "template", "state": "failed"})
+        if self._wa_recipient_opted_out(to_number, recipient_partner):
+            _logger.info("WA template %s suppressed -- %s opted out",
+                         template_name, to_number)
+            _audit("opted_out")
+            return {"ok": False, "reason": "opted_out"}
+        # WA-2 review fix: reject an empty body param up front -- Meta
+        # rejects {"text": ""}, so fail fast with a clear reason rather
+        # than a generic send_failed.
+        if body_params and not all(str(p).strip() for p in body_params):
+            _logger.error("WA template %s: empty body param in %s",
+                          template_name, body_params)
+            _audit("empty_body_param")
+            return {"ok": False, "reason": "empty_body_param"}
+        config = self.env["neon.whatsapp.config"].sudo().search(
+            [("active", "=", True)], limit=1)
+        if not config:
+            _logger.error("No active WhatsApp configuration found.")
+            _audit("no_config")
+            return {"ok": False, "reason": "no_config"}
+        components = []
+        if body_params:
+            components.append({"type": "body", "parameters": [
+                {"type": "text", "text": str(p)} for p in body_params]})
+        if quick_reply_payloads:
+            for idx, pl in enumerate(quick_reply_payloads):
+                components.append({
+                    "type": "button", "sub_type": "quick_reply",
+                    "index": str(idx),
+                    "parameters": [{"type": "payload", "payload": pl}]})
+        elif url_button_param is not None:
+            components.append({
+                "type": "button", "sub_type": "url", "index": "0",
+                "parameters": [{"type": "text", "text": str(url_button_param)}]})
+        payload = {
+            "messaging_product": "whatsapp", "to": to_number,
+            "type": "template",
+            "template": {"name": template_name,
+                         "language": {"code": language},
+                         "components": components}}
+        api_url = (f"https://graph.facebook.com/v25.0/"
+                   f"{config.phone_number_id}/messages")
+        headers = {"Authorization": f"Bearer {config.access_token}",
+                   "Content-Type": "application/json"}
+        ok = False
+        try:
+            response = requests.post(api_url, json=payload, headers=headers)
+            ok = response.status_code == 200
+            if ok:
+                _logger.info("WhatsApp template %s sent to %s",
+                             template_name, to_number)
+            else:
+                _logger.error("Failed WhatsApp template %s: %s",
+                              template_name, response.text)
+        except Exception as e:  # noqa: BLE001
+            _logger.error("Error sending WhatsApp template %s: %s",
+                          template_name, str(e))
+        self.sudo().create({
+            "name": f"wa-tpl-{template_name}",
+            "direction": "outbound", "phone_number": to_number,
+            "message_body": audit_body
+            or f"[template:{template_name}] {body_params or []}",
+            "message_type": "template", "state": "sent" if ok else "failed"})
+        return {"ok": ok, "reason": "sent" if ok else "send_failed"}

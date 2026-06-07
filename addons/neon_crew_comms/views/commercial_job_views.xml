@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- WA-2: add ops-only "Notify Crew" + "Send Reminders" to the job
+         header. Gated by can_edit_crew (Manager OR Crew Leader), the
+         same computed that gates the crew tree edit. -->
+    <record id="commercial_job_view_form_wa2" model="ir.ui.view">
+        <field name="name">commercial.job.form.wa2.notify</field>
+        <field name="model">commercial.job</field>
+        <field name="inherit_id" ref="neon_jobs.commercial_job_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/field[@name='state']" position="before">
+                <button name="action_notify_crew" type="object"
+                        string="Notify Crew" class="btn-secondary"
+                        invisible="not can_edit_crew"/>
+                <button name="action_send_job_reminders" type="object"
+                        string="Send Reminders" class="btn-secondary"
+                        invisible="not can_edit_crew"
+                        confirm="Send a WhatsApp reminder to all confirmed crew on this job?"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -28,8 +28,12 @@ SEP = ":"
 _SIG_LEN = 10  # hex chars kept from the HMAC (collision-safe for ids)
 
 # Known intents. An id whose prefix is not here -> decode returns None.
+# WA-2 adds crew_confirm / crew_decline -- carried as the PAYLOAD of a
+# template quick-reply button (inbound type 'button'), routed by the
+# neon_crew_comms bridge, NOT by the Copilot handle_tap router.
 INTENTS = frozenset({
     "confirm", "cancel", "stage", "pick_lead", "pick_job", "menu",
+    "crew_confirm", "crew_decline",
 })
 
 

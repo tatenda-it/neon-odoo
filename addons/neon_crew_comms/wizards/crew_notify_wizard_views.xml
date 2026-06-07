@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="crew_notify_wizard_view_form" model="ir.ui.view">
+        <field name="name">commercial.job.crew.notify.wizard.form</field>
+        <field name="model">commercial.job.crew.notify.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Notify Crew">
+                <field name="job_id" invisible="1"/>
+                <div class="alert alert-info" role="status">
+                    <field name="summary" nolabel="1"/>
+                </div>
+                <field name="candidate_crew_ids" nolabel="1" readonly="1">
+                    <tree>
+                        <field name="partner_id"/>
+                        <field name="role"/>
+                        <field name="state"/>
+                    </tree>
+                </field>
+                <footer>
+                    <button name="action_send" type="object"
+                            string="Send WhatsApp" class="btn-primary"
+                            invisible="not candidate_crew_ids"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
