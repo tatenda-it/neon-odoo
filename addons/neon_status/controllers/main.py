@@ -42,12 +42,12 @@ STATUS_BOARD_GROUPS = ()
 # editable constants. Only the "Live from prod" box reads real-time
 # values (via neon.status.live). Bump these numbers as the programme
 # moves; the donut + bars + WA cards all derive from this one block.
-OVERALL_PCT = 85
+OVERALL_PCT = 86
 
 TRACKS = [
     {"key": "core", "name": "Core ERP Programme", "pct": 91,
      "accent": "purple"},
-    {"key": "ai", "name": "AI Equipment Module", "pct": 73,
+    {"key": "ai", "name": "AI Equipment Module", "pct": 76,
      "accent": "teal"},
     {"key": "hr", "name": "HR & Payroll", "pct": 92,
      "accent": "amber"},
@@ -65,10 +65,12 @@ WA_MODULES = [
              "interactive renderer LIVE — reply buttons + lists + "
              "CTA-URL, role-driven; Confirm-tap reuses the write.log "
              "gate (verified on prod), money walled off."},
-    {"key": "WA-2", "title": "WhatsApp-to-ops", "pct": 0,
-     "state": "roadmap",
-     "body": "Crew confirmations, equipment-ready pings, job reminders "
-             "(roadmap)."},
+    {"key": "WA-2", "title": "WhatsApp-to-ops", "pct": 100,
+     "state": "live",
+     "body": "Human-triggered crew confirmations + reminders LIVE — "
+             "Notify Crew → approved template → tap Confirm / Can't-make-it "
+             "→ assignment confirmed/declined (two-factor: HMAC + phone "
+             "match); opt-out + rate-limit; verified on prod."},
     {"key": "WA-3", "title": "Readiness digest / broadcast", "pct": 0,
      "state": "roadmap",
      "body": "Scheduled role-aware digests (roadmap)."},
@@ -94,12 +96,12 @@ TRACK_MILESTONES = [
                      "M12.3 parked.",
     },
     {
-        "name": "AI Equipment Module", "pct": 73, "accent": "teal",
+        "name": "AI Equipment Module", "pct": 76, "accent": "teal",
         "live": "AI core = B1, B2 Conflict Engine, B3, B13 doc-gen, "
                 "B14; B4 / B5 ready-to-fork. Field-tech arm = B11 "
-                "WhatsApp (live frontier; WA-0 + WA-1 done — rails, "
-                "memory + interactive renderer).",
-        "remaining": "WA-2–WA-5 roadmap; B10 crew scheduler pending; "
+                "WhatsApp (live frontier; WA-0 + WA-1 + WA-2 done — rails, "
+                "memory + interactive renderer, crew-ops confirmations).",
+        "remaining": "WA-3–WA-5 roadmap; B10 crew scheduler pending; "
                      "B8 mobile / B9 QR / B16 predictive deferred; "
                      "B12 Drive dropped.",
     },
@@ -138,11 +140,14 @@ DONE_VERIFIED = [
     "accepted).",
     "neon_jobs escalation-gate fix live (cron quiet; manager gate "
     "intact).",
+    "B11 WA-2 WhatsApp-to-ops live (new neon_crew_comms bridge — ops "
+    "'Notify Crew' sends the approved crew_assignment template; crew tap "
+    "Confirm/Can't-make-it routes two-factor [HMAC + phone-match] to the "
+    "existing confirm/decline workflow; opt-out + 12h rate-limit; "
+    "reminder cron shipped disabled; verified end-to-end on prod).",
 ]
 
 DECIDED_NOT_BUILT = [
-    "WA-2 WhatsApp-to-ops (crew confirmations, equipment-ready pings, "
-    "job reminders).",
     "WA-3 readiness digest / broadcast (scheduled role-aware digests).",
     "WA-4 dual-role & intent routing (answer-by-intent for multi-role "
     "users, guardrail-aware).",
