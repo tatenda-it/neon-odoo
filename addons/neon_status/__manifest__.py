@@ -16,7 +16,9 @@
     # 84->85; renderer moves Decided->Done. Constants/template only.
     # 17.0.1.0.2 = WA-2 shipped: WA-2 card 0->100/live, AI track 73->76,
     # overall 85->86; WA-2 moves Decided->Done. Constants/template only.
-    "version": "17.0.1.0.2",
+    # 17.0.1.0.3 = WA-3 shipped: WA-3 card 0->100/live, AI track 76->79,
+    # overall 86->87; WA-3 moves Decided->Done. Constants/template only.
+    "version": "17.0.1.0.3",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
