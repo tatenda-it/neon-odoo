@@ -38,6 +38,12 @@ INTENTS = frozenset({
     # the ambiguous-intent 2-button ask; the tap sets the lens for that
     # turn and re-runs the original message under it.
     "lens",
+    # WA-5: client-lane handoff -> sales assignment loop (MAPPED staff
+    # taps, routed via the Copilot handle_tap -> _wa5_handle_assign_tap).
+    #   assign_open:<lead_id>            -- Munashe opens the assignee list
+    #   assign_pick:<lead_id>:<user_id>  -- Munashe picks the salesperson
+    #   assignee_decline:<lead_id>:<user_id> -- assignee bounces it back
+    "assign_open", "assign_pick", "assignee_decline",
 })
 
 

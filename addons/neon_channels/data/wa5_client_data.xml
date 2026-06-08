@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    WA-5 client intake lane data.
+
+    * crm.tag / utm.source / utm.medium "WhatsApp": stamped on every raw
+      client-intake lead so the team can filter WhatsApp-sourced
+      enquiries in the CRM. Referenced from code via env.ref(...,
+      raise_if_not_found=False) so the lead-create degrades gracefully if
+      any are absent.
+    * The escalation-target LOGIN (the single backstop). Resolved by
+      LOGIN, never a hardcoded user-id, because prod/local ids diverge.
+
+    noupdate="1": once installed, ops may rename the tag or REPOINT the
+    escalation login without a module upgrade clobbering the change.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="utm_source_whatsapp" model="utm.source">
+            <field name="name">WhatsApp</field>
+        </record>
+
+        <record id="utm_medium_whatsapp" model="utm.medium">
+            <field name="name">WhatsApp</field>
+        </record>
+
+        <record id="crm_tag_whatsapp" model="crm.tag">
+            <field name="name">WhatsApp</field>
+        </record>
+
+        <record id="wa5_escalation_login_param" model="ir.config_parameter">
+            <field name="key">neon_channels.wa5_escalation_login</field>
+            <field name="value">munashe@neonhiring.co.zw</field>
+        </record>
+
+        <!-- OD/owner (Robin): excluded from the assignee list by IDENTITY
+             (login), NOT by the superuser group, so a superuser who is
+             also a salesperson (Tatenda) stays assignable. REPOINT-able. -->
+        <record id="wa5_owner_login_param" model="ir.config_parameter">
+            <field name="key">neon_channels.wa5_owner_login</field>
+            <field name="value">robin@neonhiring.co.zw</field>
+        </record>
+
+    </data>
+</odoo>

@@ -807,6 +807,14 @@ class WhatsAppCopilotService:
                 return self._tap_menu(bot_user, parts)
             if intent == "lens":
                 return self._tap_lens(bot_user, parts)
+            if intent in ("assign_open", "assign_pick", "assignee_decline"):
+                # WA-5 client-lead assignment loop. The actors are MAPPED
+                # staff, so they arrive here; the logic lives on the model
+                # (next to the client lane). Role-gate + two-factor are
+                # enforced inside _wa5_handle_assign_tap.
+                return self.env["neon.whatsapp.message"].sudo() \
+                    ._wa5_handle_assign_tap(bot_user, intent, parts,
+                                            reply_title)
         except Exception as e:  # noqa: BLE001 -- a tap must never 500
             _logger.error("WA tap routing failed (intent=%s): %s",
                           intent, e, exc_info=True)

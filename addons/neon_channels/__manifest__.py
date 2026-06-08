@@ -42,7 +42,23 @@
     # Routing only ever picks among lenses the user already holds (never
     # unlocks a tool their groups don't grant); single-role users
     # unchanged. Method-only (no schema/data).
-    'version': '17.0.1.7.0',
+    # 17.0.1.8.0 = B11/WA-5 client intake lane (FIRST client-facing
+    # surface). An UNMAPPED sender now enters a STRUCTURALLY tool-less
+    # client lane (finite state machine over canned strings + one raw
+    # crm.lead create; no LLM, no Copilot, no tool registry) instead of
+    # the bare raw-lead intake: greet + 3-button menu, canned service
+    # info, quote capture, pricing/bespoke/complaint/"talk to team"
+    # handoff. PART 2 (mapped staff): client lead -> notify the escalation
+    # target (login-resolved, single backstop) with an Assign button ->
+    # WA-1 list of group_neon_finance_sales ∩ bot.user (minus escalation
+    # target + OD/owner, both by login -- a superuser-salesperson stays
+    # assignable) -> set lead.user_id -> notify assignee -> "I'm not free"
+    # clears user_id + bounces to escalation (never auto-reassign, never
+    # unowned; Odoo activity fallback). New 'assign_open'/'assign_pick'/
+    # 'assignee_decline' wa_payload intents + _wa5_handle_assign_tap.
+    # NET-NEW model neon.wa.client.session + WhatsApp crm.tag/utm
+    # source+medium + escalation-login config param -> -u + snapshot.
+    'version': '17.0.1.8.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',
@@ -61,6 +77,8 @@
         # the neon_ai_core->neon_core dependency).
         'data/gemini_provider_seed.xml',
         'data/wa_config_params.xml',
+        # WA-5: WhatsApp crm.tag + utm source/medium + escalation login.
+        'data/wa5_client_data.xml',
         'views/whatsapp_config_views.xml',
         'views/twilio_config_views.xml',
         'views/bot_user_views.xml',

@@ -287,3 +287,31 @@ decision 2: WA-4 changes WHICH lens is picked, not what each contains).
 > lenses are focused like the others, OR make the `["*"]` fallback
 > explicit/intentional. Affects the dashboard Copilot too (shared
 > registry). Owner: Copilot-registry. Logged per Tatenda 2026-06-08.
+
+## Accepted items 2026-06-08 (B11 WA-5 client lane, adversarial review)
+
+WA-5's adversarial review (15 findings -> 7 real / 4 partial / 4 refuted)
+applied 3 D4-guarantee hardenings (human-fallback activity, activity-
+always-lands, no-silent-truncation). Two findings were ACCEPTED as
+limitations rather than fixed:
+
+1. **Assignment-loop TOCTOU races** (`_wa5_tap_assignee_decline` clear,
+   `_wa5_tap_assign_pick` membership re-check). A concurrent Odoo-UI
+   reassign racing a WhatsApp decline/pick is a lost-update window. NOT
+   fixed: WhatsApp taps are human-paced (not an attacker hammering), and
+   the worst case is the DESIGNED safe state -- the lead lands unowned
+   AND the escalation target is re-notified (`_wa5_bounce_to_escalation`
+   + activity), never unowned-and-silent. Row-locking would be over-
+   engineering for a human-paced WhatsApp surface. Revisit only if a real
+   double-action incident is observed.
+
+2. **Session TTL reset clears `lead_id`** (`neon.wa.client.session
+   ._get_or_start`). A client returning >24h later starts a fresh session
+   and (if their message trips a handoff keyword) gets a NEW lead, so the
+   old lead is not re-attached. ACCEPTED: "fresh conversation after 24h
+   idle = fresh intake" is the intended semantics; CRM de-duplication of
+   the same phone is a human task. Low-priority data-quality.
+
+Both are NON-security (the hard sandbox + the assignment two-factor are
+intact and verified). Owner: WA-5 maintenance. Logged per Tatenda
+2026-06-08.

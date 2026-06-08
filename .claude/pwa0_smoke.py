@@ -265,8 +265,9 @@ try:
           leads_after == leads_before)
     check("handle_inbound -> send attempted", len(_sends) >= 1)
 
-    # ambiguous case: two active rows, same normalised digits -> fall
-    # through to raw-lead, NO privilege (RBAC safety at the live layer).
+    # ambiguous case: two active rows, same normalised digits -> resolver
+    # returns UNRESOLVED -> treated as a CLIENT (WA-5), NO privilege (RBAC
+    # safety at the live layer).
     env["neon.bot.user"].sudo().create({
         "name": "WA0 amb A", "phone_number": "+263 990 11 2233",
         "user_id": sales.id})
@@ -277,19 +278,24 @@ try:
             "text": {"body": "hi"}}
     with _patch(_GCA, _stub_chat), \
          _patch.object(type(WM), "send_message", _stub_send), \
+         _patch.object(type(WM), "send_buttons", lambda self, *a, **k: True), \
+         _patch.object(type(WM), "send_list", lambda self, *a, **k: True), \
          _patch.object(type(WM), "send_cta_url",
                        lambda self, *a, **k: True):
         WM.handle_inbound(msg2, {})
-        # WA-1: ambiguous -> falls through; the fallback lead + any row are
-        # canonical (+263...). Assert the canonical form so priv==0 means
-        # "genuinely no privileged row", not "query missed the raw form".
+        # WA-5: an ambiguous (>1 match -> UNRESOLVED) sender is a CLIENT ->
+        # the sandboxed client lane GREETS. The RBAC-safety property under
+        # test is priv==0 (no privileged Copilot turn). The old "fell
+        # through to a raw lead" contract is SUPERSEDED: a bare "hi" no
+        # longer creates a junk lead (a lead is created only on a quote /
+        # handoff), so lead_amb stays 0.
         priv = WM.search_count([("phone_number", "=", "+263990112233"),
                                 ("bot_user_id", "!=", False)])
         lead_amb = _lead_ct("+263990112233")
     check("handle_inbound ambiguous(>1) -> NO privilege (no bot_user_id row)",
           priv == 0)
-    check("handle_inbound ambiguous(>1) -> fell through to raw-lead",
-          lead_amb >= 1)
+    check("handle_inbound ambiguous(>1) -> client lane greeted, NO junk raw lead",
+          lead_amb == 0)
 
     # ---- T8: Gemini 503 resilience (retry -> Groq fallback -> graceful)
     from unittest.mock import MagicMock as _MM
@@ -513,12 +519,21 @@ try:
           len(_gseen) >= 2 and "groq first msg" in _gseen[1],
           "groq_turns=%d" % len(_gseen))
 
-    # 10d: UNMAPPED inbound -> created crm.lead phone is canonical E.164
-    #      (proves boundary normalize reaches _find_or_create_lead)
+    # 10d: UNMAPPED inbound that creates a lead -> the crm.lead phone is
+    #      canonical E.164 (proves boundary normalize reaches the WA-5
+    #      lead-create). NB WA-5: a bare "hi" now GREETS (no junk lead);
+    #      a pricing/handoff message creates the lead. send_buttons/list
+    #      stubbed so the greeting/escalation notify never POSTs to Meta.
     Lead = env["crm.lead"].sudo()
-    WMs.handle_inbound({"id": "u1", "from": "263999888777", "type": "text",
-        "text": {"body": "hello I want a quote"}}, {})
-    check("WA1 lead-intake: unmapped -> crm.lead phone canonical (+263)",
+    with _patch.object(type(WMs), "send_message", lambda s, *a, **k: True), \
+         _patch.object(type(WMs), "send_buttons", lambda s, *a, **k: True), \
+         _patch.object(type(WMs), "send_list", lambda s, *a, **k: True), \
+         _patch.object(type(WMs), "send_cta_url", lambda s, *a, **k: True):
+        WMs.handle_inbound({"id": "u1", "from": "263999888777",
+            "type": "text",
+            "text": {"body": "hello what is your pricing for a wedding"}}, {})
+    check("WA1 lead-intake: unmapped (WA-5 handoff) -> crm.lead phone "
+          "canonical (+263)",
           bool(Lead.search([("phone", "=", "+263999888777")], limit=1)),
           "no lead with canonical phone")
 

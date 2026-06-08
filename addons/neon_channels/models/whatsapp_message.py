@@ -199,9 +199,14 @@ class WhatsAppMessage(models.Model):
         # >1-match -> UNRESOLVED). One source of truth.
         bot_user = svc.resolve(from_e164)
         if not bot_user:
-            # Unmapped -> raw-lead intake; it reads message['from'] (now
-            # canonical), so the created crm.lead phone is E.164 too.
-            return self.process_incoming(message, metadata)
+            # WA-5: an UNMAPPED sender is a CLIENT -> the sandboxed client
+            # intake lane (greet / menu / canned service info / one raw
+            # crm.lead + handoff). STRUCTURALLY tool-less: it never
+            # constructs a Copilot turn, resolves a role/lens, or touches
+            # the tool registry (see wa_client_lane). raw_from is passed
+            # for the outbound SEND format (Meta's exact number); the
+            # stored crm.lead phone is the canonical message['from'].
+            return self._wa_client_lane(message, metadata, raw_from)
 
         msg_type = message.get('type', 'text')
         # WA-1: pull the tapped reply id (button_reply / list_reply) so we
