@@ -84,10 +84,17 @@ WA_MODULES = [
              "'as bookkeeper' override; routes only among lenses held "
              "(never widens access); '🔖 as <lens>' surfaced; verified "
              "on prod (Kudzaiishe)."},
-    {"key": "WA-5", "title": "Client lane", "pct": 0,
-     "state": "roadmap",
-     "body": "Client-facing WhatsApp (beyond the internal team) — next "
-             "scoped phase; exact scope set at its gate."},
+    {"key": "WA-5", "title": "Client lane", "pct": 90,
+     "state": "verifying",
+     "body": "BUILT & deployed (neon_channels 17.0.1.12.0) — first "
+             "client-facing surface: client intake + raw-lead capture, "
+             "3-button assignee message (Chat / Open in Odoo / I'm not "
+             "free), escalation→Munashe + assignment loop; the "
+             "assign-rollback / duplication / decline root cause "
+             "(native CRM assignment notification read as Public → 403 → "
+             "rollback) is fixed on prod. FINAL live pass pending: "
+             "assign-persistence + decline re-test (needs Munashe to "
+             "drive the assign side)."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
@@ -109,8 +116,10 @@ TRACK_MILESTONES = [
                 "WhatsApp (live frontier; WA-0–WA-4 done — rails, memory "
                 "+ interactive renderer, crew-ops confirmations, readiness "
                 "digest, dual-role lens routing).",
-        "remaining": "WA-5 client lane (next scoped phase); B10 crew "
-                     "scheduler pending; B8 mobile / B9 QR / B16 "
+        "remaining": "WA-5 client lane built + deployed, IN FINAL "
+                     "VERIFICATION (live assign-persistence + decline "
+                     "re-test pending — not yet credited as done); B10 "
+                     "crew scheduler pending; B8 mobile / B9 QR / B16 "
                      "predictive deferred; B12 Drive dropped.",
     },
     {
@@ -165,8 +174,9 @@ DONE_VERIFIED = [
 ]
 
 DECIDED_NOT_BUILT = [
-    "WA-5 client lane — client-facing WhatsApp beyond the internal team "
-    "(next scoped phase; scope set at its gate).",
+    # WA-5 client lane is now BUILT + deployed (in final verification) --
+    # see the WhatsApp card; it is deliberately NOT in "Done & verified"
+    # until the live assign-persistence + decline re-test is green.
     "B10 crew scheduler.",
     "B4 sub-hire drafting / B5 post-event reconciliation — "
     "ready-to-fork.",

@@ -21,7 +21,14 @@
     # 17.0.1.0.4 = WA-4 shipped: WA-4 card 0->100/live, AI track 79->82,
     # overall 87->88; WA-4 moves Decided->Done; WA-5 promoted reserved->
     # "Client lane" lead roadmap item. Constants/template only.
-    "version": "17.0.1.0.4",
+    # 17.0.1.0.5 = WA-5 progress (NOT done): WA-5 card -> "In verification"
+    # / 90% (built + deployed neon_channels 17.0.1.12.0; final live
+    # assign-persistence + decline re-test pending). New 'verifying' card
+    # state (label + CSS). WA-5 removed from "Decided · not yet built"
+    # (it's built) but deliberately kept OUT of "Done & verified".
+    # Overall (88) + AI-track (82) figures UNCHANGED -- WA-5 not credited
+    # as complete yet. Constants/template only.
+    "version": "17.0.1.0.5",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

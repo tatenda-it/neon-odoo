@@ -97,6 +97,7 @@ section{margin:34px 0;}
   padding:3px 9px;border-radius:999px;border:1px solid transparent;}
 .state-live{background:rgba(52,211,153,.14);color:var(--green);border-color:rgba(52,211,153,.4);}
 .state-active{background:rgba(245,165,36,.14);color:var(--amber);border-color:rgba(245,165,36,.4);}
+.state-verifying{background:rgba(96,165,250,.16);color:#7db3ff;border-color:rgba(96,165,250,.42);}
 .state-roadmap{background:rgba(122,122,150,.14);color:#aeaecb;border-color:rgba(122,122,150,.35);}
 .note{font-size:12.5px;color:var(--faint);margin:0 0 14px;font-style:italic;}
 
@@ -224,15 +225,15 @@ section{margin:34px 0;}
             <!-- ============ 3. B11 WHATSAPP BREAKDOWN ============ -->
             <section>
                 <p class="sec-title">B11 WhatsApp — module breakdown (inside AI Equipment Module)</p>
-                <p class="note">WA-0 / WA-1 confirmed; WA-2–WA-5 are roadmap scope, exact
-                    phase mapping to be confirmed.</p>
+                <p class="note">WA-0–WA-4 live on prod; WA-5 client lane built + deployed,
+                    in final verification (live assign-persistence + decline re-test pending).</p>
                 <div class="grid cards">
                     <t t-foreach="wa_modules" t-as="m">
                         <div class="card">
                             <div class="ct">
                                 <span class="key" t-esc="m['key']"/>
                                 <span t-attf-class="pill state-#{m['state']}"
-                                      t-esc="'Live' if m['state'] == 'live' else ('In progress' if m['state'] == 'active' else 'Roadmap')"/>
+                                      t-esc="'Live' if m['state'] == 'live' else ('In progress' if m['state'] == 'active' else ('In verification' if m['state'] == 'verifying' else 'Roadmap'))"/>
                             </div>
                             <div class="title" t-esc="m['title']"/>
                             <div class="body" t-esc="m['body']"/>
