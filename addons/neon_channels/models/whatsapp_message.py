@@ -239,8 +239,19 @@ class WhatsAppMessage(models.Model):
                 # WA-1 Slice 3 -- deterministic capability-menu intent.
                 result = svc.build_menu_result(bot_user)
             else:
-                result = svc.run_turn(bot_user, body,
-                                      exclude_message_id=inbound.id)
+                # WA-4 -- dual-role lens routing (single-role users:
+                # resolve_lens returns variant_for + routed=False, so this
+                # is byte-identical to pre-WA-4 behaviour). Ambiguous
+                # multi-role -> a 2-button ask instead of run_turn.
+                lr = svc.resolve_lens(bot_user, body, inbound.id)
+                if lr.get("ask"):
+                    result = lr["ask"]
+                else:
+                    result = svc.run_turn(
+                        bot_user, lr.get("text") or body,
+                        exclude_message_id=inbound.id,
+                        variant=lr.get("variant"),
+                        lens_routed=lr.get("routed"))
         except Exception as e:  # noqa: BLE001
             _logger.error('WhatsApp Copilot turn failed: %s', e,
                           exc_info=True)
@@ -276,7 +287,11 @@ class WhatsAppMessage(models.Model):
             'message_type': 'interactive' if (interactive or cta) else 'text',
             'state': 'sent',
             'bot_user_id': bot_user.id,
-            'variant': variant or False,
+            # WA-4 audit fidelity: record the lens ACTUALLY applied
+            # (run_turn returns it for routed/tap turns); fall back to the
+            # default variant for ask/menu/tap-back paths that don't route.
+            'variant': (result.get('variant') if isinstance(result, dict)
+                        else None) or variant or False,
             # WA-0: record the provider that ACTUALLY served (may be the
             # Groq fallback when Gemini 503'd), not just the configured one.
             'provider_key': result.get('provider_key') or provider_key,

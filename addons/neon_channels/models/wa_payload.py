@@ -34,6 +34,10 @@ _SIG_LEN = 10  # hex chars kept from the HMAC (collision-safe for ids)
 INTENTS = frozenset({
     "confirm", "cancel", "stage", "pick_lead", "pick_job", "menu",
     "crew_confirm", "crew_decline",
+    # WA-4: dual-role lens pick. lens:<variant>:<inbound_msg_id>:<sig> --
+    # the ambiguous-intent 2-button ask; the tap sets the lens for that
+    # turn and re-runs the original message under it.
+    "lens",
 })
 
 

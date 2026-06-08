@@ -267,3 +267,23 @@ can MASK a real regression in those suites next run, so fix it properly.
 > depends on prior committed state. Owner: Phase-12 test maintenance.
 > Accepted as in-chunk pollution for the WA-3 gate per Tatenda
 > 2026-06-07.
+
+## Finding 2026-06-08 (B11 WA-4 discovery) — 'hr' variant = all-entitled
+
+Surfaced verifying WA-4 against the real dual-role user (user 10
+admin@/Kudzaiishe on prod). The Copilot tool registry
+(`neon_ai_core...tool_registry.TOOLS_BY_VARIANT`) has NO `hr` (or `tech`)
+entry, so `filter_tools_for_variant_and_user(user,'hr')` hits
+`TOOLS_BY_VARIANT.get('hr') or ["*"]` -> `"*"` -> returns ALL the user's
+group-entitled tools (17 for her), NOT a curated HR subset. The
+`bookkeeper` lens is a focused 9-tool subset by contrast. So the `hr`
+lens is an over-broad "kitchen sink". NOT a security hole (it is still
+`⊆ the user's Odoo groups` — `user_can_call` gates every tool; nothing
+beyond their RBAC), and WA-4 deliberately does NOT change it (Gate-1
+decision 2: WA-4 changes WHICH lens is picked, not what each contains).
+
+> **FOLLOW-UP (Copilot-registry maintenance, NOT WA-4):** decide whether
+> to add a curated `hr` (and `tech`) entry to `TOOLS_BY_VARIANT` so those
+> lenses are focused like the others, OR make the `["*"]` fallback
+> explicit/intentional. Affects the dashboard Copilot too (shared
+> registry). Owner: Copilot-registry. Logged per Tatenda 2026-06-08.

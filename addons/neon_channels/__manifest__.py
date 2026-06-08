@@ -34,7 +34,15 @@
     # tap-back intents added to wa_payload.INTENTS (crew_confirm /
     # crew_decline -- routed by the neon_crew_comms bridge). Adds a
     # res.partner column -> -u + snapshot.
-    'version': '17.0.1.6.0',
+    # 17.0.1.7.0 = B11/WA-4 dual-role lens routing: for users holding 2+
+    # role-tiers, route each turn to the lens matching the message INTENT
+    # (rule-based finance/HR classifier + explicit override + ambiguous
+    # ->2-button ask reusing the WA-1 renderer; new 'lens' wa_payload
+    # intent + _tap_lens). run_turn gains an optional variant override.
+    # Routing only ever picks among lenses the user already holds (never
+    # unlocks a tool their groups don't grant); single-role users
+    # unchanged. Method-only (no schema/data).
+    'version': '17.0.1.7.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

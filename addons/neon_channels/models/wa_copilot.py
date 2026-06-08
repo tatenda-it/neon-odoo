@@ -22,6 +22,7 @@ even Robin cannot move money or single-tap an irreversible commit here.
 """
 import json
 import logging
+import re
 
 from odoo.addons.neon_ai_core.models.ai import tool_registry
 from odoo.addons.neon_ai_core.models.ai.chat_adapter_factory import (
@@ -168,6 +169,59 @@ _MENU_TRIGGERS = {"menu", "help", "/menu", "/help", "what can you do",
                   "what can i do", "options", "commands",
                   "what can you help with"}
 
+# ======================================================================
+# WA-4 -- dual-role lens routing constants
+# ======================================================================
+# A user's tier groups -> the variants ("lenses") they hold. Mirrors
+# neon.dashboard._default_dashboard_type_for_user, but collected as a SET
+# (not a precedence pick). superuser short-circuits to director-only (they
+# already get all tools; never narrow them). 'hr'/'tech' have no Copilot
+# TOOLS_BY_VARIANT entry, so their lens = all-entitled (the ["*"] fallback)
+# -- WA-4 does NOT change that (Gate-1 decision 2).
+_LENS_GROUP_MAP = [
+    # (variant, [group xmlids that grant it])
+    ("hr", ["neon_hr.group_neon_hr_admin", "hr.group_hr_manager"]),
+    ("bookkeeper", ["neon_core.group_neon_bookkeeper"]),
+    ("lead_tech", ["neon_core.group_neon_lead_tech"]),
+    ("tech", ["neon_core.group_neon_crew"]),
+    ("sales", ["neon_core.group_neon_sales_rep"]),
+]
+_LENS_SUPERUSER_GROUP = "neon_core.group_neon_superuser"
+
+# Display labels for the lens (system-prompt persona + the "as ..."
+# surface). Nicer than variant.title() (e.g. 'hr' -> 'HR', not 'Hr').
+LENS_LABEL = {
+    "director": "Director", "sales": "Sales", "bookkeeper": "Bookkeeper",
+    "lead_tech": "Lead Tech", "tech": "Tech", "hr": "HR",
+}
+
+# Intent -> lens. v1 distinguishes the only live dual-role (finance vs HR).
+_INTENT_LENS = {"finance": "bookkeeper", "hr": "hr"}
+
+# Rule-based intent keywords (EDITABLE -- tune from real
+# misclassifications). Matched as whole-word, case-insensitive.
+FINANCE_KEYWORDS = {
+    "invoice", "invoices", "vat", "payment", "payments", "pay", "paid",
+    "cost", "costs", "quote", "quotes", "quotation", "expense", "expenses",
+    "reconcile", "reconciliation", "deposit", "deposits", "budget",
+    "budgets", "zig", "rate", "overdue", "billing", "bill", "ledger",
+    "credit", "debit", "refund", "tax", "receivable", "payable", "usd",
+}
+HR_KEYWORDS = {
+    "leave", "payroll", "employee", "employees", "attendance", "contract",
+    "contracts", "salary", "salaries", "wage", "wages", "staff", "hire",
+    "hiring", "sick", "absence", "roster", "appraisal", "disciplinary",
+    "nssa", "loan", "loans", "timesheet", "onboarding", "hr",
+}
+
+# Explicit-override prefixes (case-insensitive, at message start). Her
+# word beats the classifier. Maps prefix -> lens.
+_OVERRIDE_PREFIXES = [
+    ("as bookkeeper", "bookkeeper"), ("as finance", "bookkeeper"),
+    ("bookkeeper:", "bookkeeper"), ("finance:", "bookkeeper"),
+    ("as hr admin", "hr"), ("as hr", "hr"), ("hr:", "hr"),
+]
+
 
 class WhatsAppCopilotService:
     """One instance per inbound turn. Pure Python; reuses the engine."""
@@ -212,6 +266,95 @@ class WhatsAppCopilotService:
         """REUSE the core group->variant resolver under the user's env."""
         return _stored_variant_for(self.env(user=user.id), user)
 
+    # ------------------------------------------------------------------
+    # WA-4 -- dual-role lens routing
+    # ------------------------------------------------------------------
+    def _held_lenses(self, user):
+        """The SET of variants ("lenses") the user's tier groups grant.
+        Superuser -> {director} (already all-tools; never narrow them).
+        < 2 lenses => single-role => NO routing (today's behaviour)."""
+        if user.has_group(_LENS_SUPERUSER_GROUP):
+            return {"director"}
+        held = set()
+        for variant, groups in _LENS_GROUP_MAP:
+            if any(user.has_group(g) for g in groups
+                   if self.env.ref(g, raise_if_not_found=False)):
+                held.add(variant)
+        return held
+
+    @staticmethod
+    def classify_intent(text):
+        """Rule-based, deterministic: 'finance' | 'hr' | None. None when
+        BOTH or NEITHER keyword set matches (ambiguous -> ask)."""
+        words = set(re.findall(r"[a-z]+", (text or "").lower()))
+        fin = bool(words & FINANCE_KEYWORDS)
+        hr = bool(words & HR_KEYWORDS)
+        if fin and not hr:
+            return "finance"
+        if hr and not fin:
+            return "hr"
+        return None
+
+    @staticmethod
+    def _explicit_override(text):
+        """Leading 'as bookkeeper' / 'finance:' / 'as hr' ... -> (lens,
+        stripped_text). Her word beats the classifier. Else None."""
+        low = (text or "").lstrip().lower()
+        for prefix, lens in _OVERRIDE_PREFIXES:
+            if low.startswith(prefix):
+                stripped = (text or "").lstrip()[len(prefix):].lstrip(" :,-")
+                return (lens, stripped or (text or ""))
+        return None
+
+    def resolve_lens(self, bot_user, text, inbound_msg_id):
+        """Pick the per-turn lens for a multi-role user. Returns a dict:
+        {variant, ask, routed, text}. Single-role -> today's variant_for,
+        no routing. Override wins; clear intent -> that lens; ambiguous /
+        intent-for-an-unheld-lens -> a 2-button ask (reuses the WA-1
+        renderer). NEVER picks a lens the user doesn't hold."""
+        user = bot_user.user_id
+        held = self._held_lenses(user)
+        if len(held) < 2:
+            return {"variant": self.variant_for(user), "ask": None,
+                    "routed": False, "text": text}
+        # explicit override (only if the user holds that lens)
+        ov = self._explicit_override(text)
+        if ov and ov[0] in held:
+            return {"variant": ov[0], "ask": None, "routed": True,
+                    "text": ov[1]}
+        # rule-based intent -> lens, only if held
+        lens = _INTENT_LENS.get(self.classify_intent(text))
+        if lens and lens in held:
+            return {"variant": lens, "ask": None, "routed": True,
+                    "text": text}
+        # ambiguous -> ask among the lenses she holds
+        return {"variant": None, "ask": self._build_lens_ask(held,
+                inbound_msg_id), "routed": True, "text": text}
+
+    def _build_lens_ask(self, held, inbound_msg_id):
+        """A pick among the user's held lenses, carrying
+        lens:<variant>:<inbound_msg_id> so the tap re-runs the original
+        message under the chosen lens. <=3 -> buttons, else list."""
+        opts = [(v, LENS_LABEL.get(v, v.title())) for v in sorted(held)]
+        body = "Quick check — should I answer as " + " or ".join(
+            lbl for _, lbl in opts) + "?"
+        if len(opts) <= 3:
+            buttons = [{"id": self._payload("lens", v, inbound_msg_id),
+                        "title": lbl[:20]} for v, lbl in opts]
+            interactive = {"kind": "buttons", "body": body[:1024],
+                           "buttons": buttons}
+        else:
+            rows = [{"id": self._payload("lens", v, inbound_msg_id),
+                     "title": lbl[:24], "description": ""}
+                    for v, lbl in opts]
+            interactive = {"kind": "list", "body": body[:1024],
+                           "button_text": "Pick a lens",
+                           "sections": [{"title": "Answer as", "rows": rows}]}
+        fallback = body + "\n" + " / ".join(lbl for _, lbl in opts)
+        return {"text": body, "cta_url": None, "interactive": interactive,
+                "text_fallback": fallback, "error": None,
+                "provider_key": None}
+
     def whatsapp_tools(self, user, variant):
         """Intersection of (variant scope ∩ user groups) THEN the
         WhatsApp policy: all read tools + only the WA-safe writes. Any
@@ -224,7 +367,8 @@ class WhatsAppCopilotService:
     # ------------------------------------------------------------------
     # Turn  (pieces a + b + c)
     # ------------------------------------------------------------------
-    def run_turn(self, bot_user, inbound_text, exclude_message_id=None):
+    def run_turn(self, bot_user, inbound_text, exclude_message_id=None,
+                 variant=None, lens_routed=False):
         """Drive one privileged inbound turn through the full tool-use
         loop: model -> tool_call -> dispatch -> append tool result ->
         model again -> return the model's NATURAL-LANGUAGE text. Capped at
@@ -232,10 +376,18 @@ class WhatsAppCopilotService:
         user -- tool results go BACK to the model, not to WhatsApp.
         ``exclude_message_id`` is the just-created inbound row, excluded
         from its own history (WA-1 double-count fix).
+
+        WA-4: ``variant`` overrides the default lens for THIS turn (None =
+        today's variant_for resolution; all pre-WA-4 callers pass nothing,
+        so single-role behaviour is byte-identical). ``lens_routed`` flags
+        a multi-role routed turn so the reply surfaces the chosen lens.
         Returns {"text", "cta_url", "error", "provider_key"}."""
         user = bot_user.user_id
         env_u = self.env(user=user.id)
-        variant = self.variant_for(user)
+        variant = variant or self.variant_for(user)
+        # WA-4: surface the routed lens on the reply ("🔖 as Bookkeeper").
+        lens_prefix = (("🔖 as %s\n" % LENS_LABEL.get(variant, variant))
+                       if lens_routed else "")
         schemas = tool_registry.groq_tool_schemas(
             tools=self.whatsapp_tools(user, variant))
         messages = self._build_messages(
@@ -254,6 +406,7 @@ class WhatsAppCopilotService:
                 return {"text": "Sorry -- I can't reach the assistant right "
                                 "now. Please try again shortly.",
                         "cta_url": None, "provider_key": served_by,
+                        "variant": variant,
                         "error": (result.error_message
                                   if result is not None else "no_provider")}
 
@@ -261,9 +414,10 @@ class WhatsAppCopilotService:
             if not result.tool_calls:
                 _logger.info("WA: turn served by %s (%dms, iters=%d)",
                              served_by, result.latency_ms or 0, iteration + 1)
-                return {"text": result.assistant_message or "Done.",
+                return {"text": lens_prefix
+                        + (result.assistant_message or "Done."),
                         "cta_url": None, "error": None,
-                        "provider_key": served_by}
+                        "variant": variant, "provider_key": served_by}
 
             # Record the assistant tool-call turn (OpenAI shape; both
             # adapters consume it -- Gemini functionCall, Groq tool_calls).
@@ -327,18 +481,20 @@ class WhatsAppCopilotService:
 
             if terminal is not None:
                 # Structured reply: terminal, do NOT loop back to the model.
+                # WA-4 audit fidelity: stamp the lens actually applied.
+                terminal.setdefault("variant", variant)
                 return terminal
             # else: loop -- model receives the tool results, replies in NL.
 
         # Iteration cap -- graceful, NEVER raw JSON / tool output.
         _logger.info("WA: tool-loop cap (%d) reached for %s",
                      _MAX_TOOL_ITERATIONS, user.login)
-        return {"text": (last.assistant_message if last
+        return {"text": lens_prefix + (last.assistant_message if last
                          and last.assistant_message else
                          "I've gathered the details - could you rephrase "
                          "what you'd like?"),
                 "cta_url": None, "error": "tool_loop_exhausted",
-                "provider_key": served_by}
+                "variant": variant, "provider_key": served_by}
 
     # ------------------------------------------------------------------
     # Helpers
@@ -414,7 +570,8 @@ class WhatsAppCopilotService:
                         exclude_message_id=None):
         from odoo import fields  # noqa: PLC0415
         sys_prompt = _SYSTEM_PROMPT.format(
-            role=(variant or "sales").replace("_", " ").title(),
+            role=LENS_LABEL.get(variant,
+                                (variant or "sales").replace("_", " ").title()),
             name=user.name or "",
             today=fields.Date.context_today(user).isoformat(),
         )
@@ -648,6 +805,8 @@ class WhatsAppCopilotService:
                 return self._tap_pick(bot_user, intent, parts, reply_title)
             if intent == "menu":
                 return self._tap_menu(bot_user, parts)
+            if intent == "lens":
+                return self._tap_lens(bot_user, parts)
         except Exception as e:  # noqa: BLE001 -- a tap must never 500
             _logger.error("WA tap routing failed (intent=%s): %s",
                           intent, e, exc_info=True)
@@ -755,3 +914,27 @@ class WhatsAppCopilotService:
         phrase = _MENU_PHRASES.get(
             key, "Please help me with: %s" % key.replace("_", " "))
         return self.run_turn(bot_user, phrase)
+
+    def _tap_lens(self, bot_user, parts):
+        """WA-4: the ambiguous-intent lens pick. parts = [variant, msgid].
+        GUARDRAIL: the chosen lens must be one the user actually holds
+        (re-checked here, not trusted from the payload). Reloads the
+        original inbound message and re-runs it under the chosen lens."""
+        user = bot_user.user_id
+        variant = parts[0] if parts else ""
+        msgid = parts[1] if len(parts) > 1 else ""
+        if variant not in self._held_lenses(user):
+            return self._safe(
+                "That view isn't available for your role -- please retype "
+                "your question.")
+        # WA-4 review fix: enforce the owner check IN the query (the msgid
+        # must belong to THIS bot_user) rather than browse + post-hoc.
+        msg = (self.env["neon.whatsapp.message"].sudo().search(
+            [("id", "=", int(msgid)), ("bot_user_id", "=", bot_user.id)],
+            limit=1) if str(msgid).isdigit() else None)
+        if not msg:
+            return self._safe(
+                "I lost the original message -- please retype your question "
+                "and I'll answer as %s." % LENS_LABEL.get(variant, variant))
+        return self.run_turn(bot_user, msg.message_body or "",
+                             variant=variant, lens_routed=True)
