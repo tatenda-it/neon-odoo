@@ -42,12 +42,12 @@ STATUS_BOARD_GROUPS = ()
 # editable constants. Only the "Live from prod" box reads real-time
 # values (via neon.status.live). Bump these numbers as the programme
 # moves; the donut + bars + WA cards all derive from this one block.
-OVERALL_PCT = 87
+OVERALL_PCT = 88
 
 TRACKS = [
     {"key": "core", "name": "Core ERP Programme", "pct": 91,
      "accent": "purple"},
-    {"key": "ai", "name": "AI Equipment Module", "pct": 79,
+    {"key": "ai", "name": "AI Equipment Module", "pct": 82,
      "accent": "teal"},
     {"key": "hr", "name": "HR & Payroll", "pct": 92,
      "accent": "amber"},
@@ -77,13 +77,17 @@ WA_MODULES = [
              "(green/amber/red), manager/crew-leader gated, served "
              "/neon/readiness board, opt-out, daily cron shipped disabled; "
              "verified on prod (counts match the collector)."},
-    {"key": "WA-4", "title": "Dual-role & intent routing", "pct": 0,
+    {"key": "WA-4", "title": "Dual-role & intent routing", "pct": 100,
+     "state": "live",
+     "body": "Per-turn intent→lens for multi-role users LIVE — finance→"
+             "Bookkeeper / HR→HR / ambiguous→2-button ask / explicit "
+             "'as bookkeeper' override; routes only among lenses held "
+             "(never widens access); '🔖 as <lens>' surfaced; verified "
+             "on prod (Kudzaiishe)."},
+    {"key": "WA-5", "title": "Client lane", "pct": 0,
      "state": "roadmap",
-     "body": "Answer-by-intent for multi-role users (Kudzaiishe finance "
-             "vs HR), guardrail-aware (roadmap)."},
-    {"key": "WA-5", "title": "(reserved)", "pct": 0,
-     "state": "roadmap",
-     "body": "Scope not yet defined."},
+     "body": "Client-facing WhatsApp (beyond the internal team) — next "
+             "scoped phase; exact scope set at its gate."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
@@ -99,15 +103,15 @@ TRACK_MILESTONES = [
                      "M12.3 parked.",
     },
     {
-        "name": "AI Equipment Module", "pct": 79, "accent": "teal",
+        "name": "AI Equipment Module", "pct": 82, "accent": "teal",
         "live": "AI core = B1, B2 Conflict Engine, B3, B13 doc-gen, "
                 "B14; B4 / B5 ready-to-fork. Field-tech arm = B11 "
-                "WhatsApp (live frontier; WA-0–WA-3 done — rails, memory "
+                "WhatsApp (live frontier; WA-0–WA-4 done — rails, memory "
                 "+ interactive renderer, crew-ops confirmations, readiness "
-                "digest).",
-        "remaining": "WA-4–WA-5 roadmap; B10 crew scheduler pending; "
-                     "B8 mobile / B9 QR / B16 predictive deferred; "
-                     "B12 Drive dropped.",
+                "digest, dual-role lens routing).",
+        "remaining": "WA-5 client lane (next scoped phase); B10 crew "
+                     "scheduler pending; B8 mobile / B9 QR / B16 "
+                     "predictive deferred; B12 Drive dropped.",
     },
     {
         "name": "HR & Payroll", "pct": 92, "accent": "amber",
@@ -153,11 +157,16 @@ DONE_VERIFIED = [
     "status+crew RAG; manager/crew-leader gated; served /neon/readiness "
     "board; opt-out; daily cron shipped disabled; verified end-to-end, "
     "counts match collector).",
+    "B11 WA-4 dual-role lens routing live (per-turn intent→lens for "
+    "multi-role users — finance→Bookkeeper / HR→HR / ambiguous→ask / "
+    "explicit override; routes only among lenses the user holds, never "
+    "widens access; audit records the applied lens; verified on prod "
+    "with Kudzaiishe).",
 ]
 
 DECIDED_NOT_BUILT = [
-    "WA-4 dual-role & intent routing (answer-by-intent for multi-role "
-    "users, guardrail-aware).",
+    "WA-5 client lane — client-facing WhatsApp beyond the internal team "
+    "(next scoped phase; scope set at its gate).",
     "B10 crew scheduler.",
     "B4 sub-hire drafting / B5 post-event reconciliation — "
     "ready-to-fork.",
@@ -169,7 +178,6 @@ PARKED_BACKLOG = [
     "B8 mobile app / B9 QR scanning / B16 predictive maintenance — "
     "deferred.",
     "B12 Google Drive integration — dropped.",
-    "WA-5 — reserved, scope not yet defined.",
     "Phase 11 cross-module scroll-fix sweep + cutover & training.",
     "M12.2 P4–P7 / M12.3 Copilot scope — parked.",
     "Leaflet bootstrap consolidation (deferred from Phase 9).",

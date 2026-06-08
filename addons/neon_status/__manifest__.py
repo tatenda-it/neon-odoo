@@ -18,7 +18,10 @@
     # overall 85->86; WA-2 moves Decided->Done. Constants/template only.
     # 17.0.1.0.3 = WA-3 shipped: WA-3 card 0->100/live, AI track 76->79,
     # overall 86->87; WA-3 moves Decided->Done. Constants/template only.
-    "version": "17.0.1.0.3",
+    # 17.0.1.0.4 = WA-4 shipped: WA-4 card 0->100/live, AI track 79->82,
+    # overall 87->88; WA-4 moves Decided->Done; WA-5 promoted reserved->
+    # "Client lane" lead roadmap item. Constants/template only.
+    "version": "17.0.1.0.4",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
