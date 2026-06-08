@@ -33,6 +33,7 @@ def check(name, cond, detail=""):
 
 
 _sent = []
+_templates = []
 counters = {"run_turn": 0, "handle_tap": 0, "variant_for": 0, "dispatch": 0}
 
 
@@ -122,6 +123,24 @@ try:
     SU_PHONE, SU_FROM = "+263880002004", "263880002004"
     mk_bot(su_u, SU_PHONE)
 
+    # WA-5.1 window control. An INBOUND (recent) opens the 24h window ->
+    # in-window INTERACTIVE notifies. Warm esc + a_u + su_u so the
+    # interactive-path tests hold; leave b_u COLD so the closed-window
+    # TEMPLATE path is exercised.
+    def warm(phone):
+        env["neon.whatsapp.message"].sudo().create({
+            "name": "warm-" + phone, "direction": "inbound",
+            "phone_number": phone, "message_type": "text",
+            "message_body": "warm", "state": "received"})
+
+    def cool(phone):
+        env["neon.whatsapp.message"].sudo().search(
+            [("phone_number", "=", phone),
+             ("direction", "=", "inbound")]).unlink()
+
+    for ph in (ESC_PHONE, A_PHONE, SU_PHONE):
+        warm(ph)
+
     # the unmapped CLIENT
     CLIENT_E164, CLIENT_FROM = "+263880001001", "263880001001"
     check("fixtures: client number is UNMAPPED (no bot.user)",
@@ -144,6 +163,14 @@ try:
 
     def s_cta(self, to, body, disp, url):
         _sent.append(("cta", to, body, url)); return True
+
+    def s_template(self, to, name, language="en", body_params=None,
+                   quick_reply_payloads=None, url_button_param=None,
+                   recipient_partner=None, audit_body=None):
+        _templates.append({"to": to, "name": name, "lang": language,
+                           "params": body_params or [],
+                           "qr": quick_reply_payloads or []})
+        return {"ok": True, "reason": "sent"}
 
     def _stub_chat(self, messages, schemas):
         return (ChatTurnResult(success=True, assistant_message="ok",
@@ -202,6 +229,7 @@ try:
         st.enter_context(patch.object(WMcls, "send_buttons", s_buttons))
         st.enter_context(patch.object(WMcls, "send_list", s_list))
         st.enter_context(patch.object(WMcls, "send_cta_url", s_cta))
+        st.enter_context(patch.object(WMcls, "send_template", s_template))
         st.enter_context(patch.object(
             WhatsAppCopilotService, "_provider_chat", _stub_chat))
         st.enter_context(patch.object(
@@ -465,6 +493,178 @@ try:
         WM.handle_inbound(tap_msg(dec_a, A_FROM), {})
         check("D5: re-decline of an unowned lead is idempotent (no crash)",
               last("text", A_PHONE) is not None)
+
+        # =========================================================
+        # E -- ESCALATE-ONCE GUARD (WA-5.0 #1)
+        # =========================================================
+        CE_E164, CE_FROM = "+263880001010", "263880001010"
+        _sent.clear(); _templates.clear()
+        WM.handle_inbound(tap_msg("cl_quote", CE_FROM), {})
+        WM.handle_inbound(
+            text_msg("Gala dinner, 20/09/2026, Bulawayo", CE_FROM), {})
+        lead_e = Lead.search([("phone", "=", CE_E164)], limit=1)
+
+        def esc_acts(l):
+            return Act.search_count(
+                [("res_model", "=", "crm.lead"), ("res_id", "=", l.id),
+                 ("summary", "ilike", "assign a salesperson")])
+        acts1 = esc_acts(lead_e)
+        # repeated client msgs (handoff keywords) must NOT re-escalate
+        WM.handle_inbound(text_msg("what's the price?", CE_FROM), {})
+        WM.handle_inbound(text_msg("any discount available?", CE_FROM), {})
+        acts2 = esc_acts(lead_e)
+        check("E1: unowned lead escalates ONCE across repeated client msgs",
+              acts1 == 1 and acts2 == 1, "%s -> %s" % (acts1, acts2))
+        check("E1: no duplicate lead for the same client phone",
+              Lead.search_count([("phone", "=", CE_E164)]) == 1)
+        check("E1: follow-up client msgs appended to chatter (no re-fire)",
+              sum(1 for m in lead_e.message_ids
+                  if "follow-up" in (m.body or "")) >= 2)
+
+        # =========================================================
+        # F -- WINDOW-AWARE SEND (WA-5.1) on all 3 notify paths
+        # =========================================================
+        # b_u accumulated an inbound when B_FROM tapped in D6 -> cool it so
+        # the closed-window path is genuinely exercised.
+        cool(B_PHONE)
+        check("F1: window OPEN for a warmed phone, CLOSED for a cold one",
+              WM._wa5_window_open(ESC_PHONE) is True
+              and WM._wa5_window_open(B_PHONE) is False
+              and WM._wa5_window_open("+263000000000") is False)
+
+        # open-window escalation -> interactive (esc warm), NO template
+        _sent.clear(); _templates.clear()
+        WM._wa5_notify_escalation(lead_e, CE_E164)
+        check("F2: open window -> interactive buttons, no template",
+              last("buttons", ESC_PHONE) is not None
+              and not any(t["name"] == "wa5_lead_handoff"
+                          for t in _templates))
+
+        # closed-window assignee -> template wa5_lead_assigned (2 params)
+        _sent.clear(); _templates.clear()
+        WM._wa5_notify_assignee(lead_e, b_u)   # b_u is COLD
+        tA = next((t for t in _templates
+                   if _digits(t["to"]) == _digits(B_PHONE)), None)
+        qrA = wa_payload.decode(secret, tA["qr"][0]) if (tA and tA["qr"]) \
+            else None
+        check("F3: closed window (assignee) -> wa5_lead_assigned, en_US, 2 params",
+              tA and tA["name"] == "wa5_lead_assigned"
+              and len(tA["params"]) == 2 and tA["lang"] == "en_US", tA)
+        check("F3: assignee template carries the assignee_decline payload",
+              qrA and qrA[0] == "assignee_decline"
+              and int(qrA[1][1]) == b_u.id, qrA)
+        check("F3: closed-window send STILL lands the Odoo activity (D4)",
+              Act.search_count(
+                  [("res_model", "=", "crm.lead"),
+                   ("res_id", "=", lead_e.id),
+                   ("user_id", "=", b_u.id)]) >= 1)
+
+        # closed-window escalation -> template wa5_lead_handoff
+        cool(ESC_PHONE)
+        _sent.clear(); _templates.clear()
+        WM._wa5_notify_escalation(lead_e, CE_E164)
+        tH = next((t for t in _templates
+                   if _digits(t["to"]) == _digits(ESC_PHONE)), None)
+        qrH = wa_payload.decode(secret, tH["qr"][0]) if (tH and tH["qr"]) \
+            else None
+        check("F4: closed window (escalation) -> wa5_lead_handoff, 2 params",
+              tH and tH["name"] == "wa5_lead_handoff"
+              and len(tH["params"]) == 2, tH)
+        check("F4: handoff template carries the assign_open payload",
+              qrH and qrH[0] == "assign_open", qrH)
+        warm(ESC_PHONE)   # restore the window for the G-section bounce
+
+        # =========================================================
+        # G -- DECLINE SPLIT-STATES + assign_pick idempotency (WA-5.0 #2/#1)
+        # =========================================================
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_e.id, a_u.id), ESC_FROM), {})
+        lead_e.invalidate_recordset()
+        dec_e = WM._wa5_payload("assignee_decline", lead_e.id, a_u.id)
+        # G1: non-assigned sender -> two-factor refuse, owner intact
+        _sent.clear()
+        WM.handle_inbound(tap_msg(dec_e, B_FROM), {})
+        lead_e.invalidate_recordset()
+        check("G1: decline by a NON-assigned sender refused (two-factor)",
+              lead_e.user_id.id == a_u.id
+              and "isn't linked" in (last("text", B_FROM)
+                                     or ("", "", ""))[2])
+        # G2: current owner declines -> cleared + 'sent back' + re-notify
+        _sent.clear()
+        WM.handle_inbound(tap_msg(dec_e, A_FROM), {})
+        lead_e.invalidate_recordset()
+        ackG = last("text", A_FROM)
+        check("G2: current-owner decline CLEARS user_id", not lead_e.user_id)
+        check("G2: reply = 'sent it back to the team' (NOT 'reassigned')",
+              ackG and "sent it back to the team" in ackG[2]
+              and "reassigned" not in ackG[2].lower(),
+              ackG[2] if ackG else None)
+        check("G2: bounce re-notifies Munashe (warm -> assign_open buttons)",
+              (lambda e: e and (wa_payload.decode(secret, e[3][0]["id"])
+                                or [None])[0] == "assign_open")(
+                  last("buttons", ESC_PHONE)))
+        # G3: same user declines AGAIN (now unowned) -> 'already declined'
+        _sent.clear()
+        WM.handle_inbound(tap_msg(dec_e, A_FROM), {})
+        ackG3 = last("text", A_FROM)
+        check("G3: double-decline -> 'already declined' (idempotent friendly)",
+              ackG3 and "already declined" in ackG3[2].lower(),
+              ackG3[2] if ackG3 else None)
+        # G4: a DIFFERENT user holds it -> 'reassigned to someone else'
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_e.id, b_u.id), ESC_FROM), {})
+        lead_e.invalidate_recordset()
+        _sent.clear()
+        WM.handle_inbound(tap_msg(dec_e, A_FROM), {})  # a_u's old payload
+        ackG4 = last("text", A_FROM)
+        check("G4: decline when a DIFFERENT user holds it -> 'someone else'",
+              ackG4 and "someone else" in ackG4[2].lower(),
+              ackG4[2] if ackG4 else None)
+        # G5: assign_pick IDEMPOTENT -- repeat tap of the SAME pick = no-op
+        _sent.clear()
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_e.id, b_u.id), ESC_FROM), {})
+        ackG5 = last("text", ESC_FROM)
+        check("G5: assign_pick repeat tap -> no-op ack ('already has')",
+              ackG5 and "already has this lead" in ackG5[2].lower(),
+              ackG5[2] if ackG5 else None)
+
+        # =========================================================
+        # H -- TEMPLATE type='button' tap routes to handle_tap
+        # =========================================================
+        _sent.clear()
+        WM.handle_inbound({"id": "wamid.BTN", "from": ESC_FROM,
+                           "type": "button",
+                           "button": {"payload": WM._wa5_payload(
+                               "assign_open", lead_e.id),
+                               "text": "Assign salesperson"}}, {})
+        check("H1: template button tap (type=button) -> handle_tap -> list",
+              last("list", ESC_FROM) is not None)
+
+        # =========================================================
+        # HTML -- html2plaintext on every body + summary (no leaked tags)
+        # =========================================================
+        ht = Lead.sudo().create({
+            "name": "HTMLTEST", "type": "lead",
+            "description": "<p>Corporate <b>gala</b> &amp; awards</p>"})
+        summ = WM._wa5_lead_summary(ht)
+        check("HTML: _wa5_lead_summary strips tags from the Html description",
+              "<" not in summ and ">" not in summ and "gala" in summ, summ)
+        _sent.clear()
+        WM._wa5_notify_escalation(ht, "+263880001099")
+        eb = last("buttons", ESC_PHONE)
+        check("HTML: escalation body has NO raw </> (html2plaintext clean)",
+              eb and "<" not in eb[2] and ">" not in eb[2],
+              eb[2] if eb else None)
+
+        # FIX-A: the activity fallback recipient is ALWAYS a real human
+        # (never empty / OdooBot / a portal user) -- the D4 'never lost'
+        # promise holds even with a broken escalation + empty su/sales set.
+        fb = WM._wa5_fallback_human()
+        check("FIXA: _wa5_fallback_human always resolves a real human",
+              fb and fb.id and not fb.share
+              and fb.id != env.ref("base.user_root").id,
+              fb.login if fb else None)
 
     # ---- regression bar --------------------------------------------
     check("REG: 3 WA-5 intents in wa_payload INTENTS",

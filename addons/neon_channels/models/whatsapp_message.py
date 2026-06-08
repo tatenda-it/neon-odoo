@@ -220,6 +220,16 @@ class WhatsAppMessage(models.Model):
                     reply_id = inter[k].get('id')
                     reply_title = inter[k].get('title')
                     break
+        elif msg_type == 'button':
+            # WA-5.1: a TEMPLATE quick-reply tap arrives as type='button'
+            # with button.payload (our HMAC id). Route it like an
+            # interactive tap-back so the assignment loop is identical
+            # whether entry was an in-window interactive or a template.
+            # (crew_confirm/crew_decline are intercepted earlier by the
+            # neon_crew_comms bridge; only non-crew payloads reach here.)
+            btn = message.get('button', {}) or {}
+            reply_id = btn.get('payload')
+            reply_title = btn.get('text')
         body = self._extract_body(message, msg_type)
         inbound = self.sudo().create({
             'name': message.get('id') or f'wa-in-{from_e164}',

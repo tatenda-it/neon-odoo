@@ -27,8 +27,10 @@ if WhatsApp delivery fails).
 """
 import logging
 import re
+from datetime import timedelta
 
 from odoo import _, api, fields, models
+from odoo.tools import html2plaintext, html_escape
 
 from . import wa_payload
 from .phone_utils import to_e164
@@ -70,6 +72,18 @@ _WA5_SUPERUSER_GROUP = "neon_core.group_neon_superuser"
 _WA5_OWNER_PARAM = "neon_channels.wa5_owner_login"
 _WA5_OWNER_DEFAULT = "robin@neonhiring.co.zw"
 
+# --- WA-5.1 window-aware staff escalation ---------------------------
+# Meta's customer-service window is 24h from the recipient's last INBOUND
+# (an outbound never opens it). We treat the window as open only within
+# this margin BELOW 24h, so we don't fire an interactive right at the
+# edge that Meta then silently drops. Closed -> a UTILITY template
+# re-opens the window. Design Y: template body = name + lead summary
+# only (NO URLs); links ride in the in-window follow-up.
+_WA5_WINDOW_HOURS = 23
+_WA5_TPL_HANDOFF = "wa5_lead_handoff"      # manager (escalation + bounce)
+_WA5_TPL_ASSIGNED = "wa5_lead_assigned"    # assignee
+_WA5_TPL_LANG = "en_US"
+
 
 class WhatsAppMessageClientLane(models.Model):
     _inherit = "neon.whatsapp.message"
@@ -104,6 +118,19 @@ class WhatsAppMessageClientLane(models.Model):
             "state": "received", "raw_payload": str(message)})
 
         sess = self.env["neon.wa.client.session"]._get_or_start(from_e164)
+
+        # WA-5.0 escalate-once guard: once this session already has a lead
+        # (escalation fired ONCE at creation), subsequent client messages
+        # append to the lead's chatter (the team/assignee see the
+        # follow-up) but DO NOT re-create a lead or re-fire the escalation.
+        # (A >24h-idle return resets the session via _get_or_start -> a
+        # genuinely fresh conversation escalates again.)
+        if sess.lead_id and sess.lead_id.exists():
+            self._wa5_append_client_msg(sess.lead_id, body)
+            return self._wa5_send_client(
+                raw_from, from_e164,
+                "Thanks -- that's noted on your enquiry. A member of the "
+                "Neon Events team will be in touch shortly.")
 
         # awaiting quote details: the NEXT text is the event details ->
         # create the lead (checked first so a "1" reply mid-capture is
@@ -243,11 +270,12 @@ class WhatsAppMessageClientLane(models.Model):
         if deadline:
             vals["date_deadline"] = deadline
         lead = Lead.create(vals)
-        # mirror the intake thread to the lead's chatter
+        # mirror the intake thread to the lead's chatter (escape the
+        # client's text -- it lands in an HTML chatter body).
         try:
             lead.message_post(
                 body=_("<b>WhatsApp client intake (%s):</b><br/>%s")
-                % (from_e164, raw_text),
+                % (from_e164, html_escape(raw_text or "")),
                 message_type="comment", subtype_xmlid="mail.mt_note")
         except Exception as e:  # noqa: BLE001 -- chatter must not break intake
             _logger.warning("WA-5 lead chatter failed (%s): %s", lead.id, e)
@@ -298,6 +326,101 @@ class WhatsAppMessageClientLane(models.Model):
         base = self.env["ir.config_parameter"].sudo().get_param(
             "web.base.url") or ""
         return "%s/web#id=%s&model=crm.lead&view_type=form" % (base, lead.id)
+
+    @api.model
+    def _wa5_first_name(self, user):
+        return ((user.name or user.login or "there").split() or ["there"])[0]
+
+    @api.model
+    def _wa5_lead_summary(self, lead):
+        """A clean PLAIN-TEXT one-liner for WhatsApp bodies + template
+        {{2}}. crm.lead.description is an Html field, so strip tags
+        (html2plaintext) and collapse whitespace -- never leak raw <p>."""
+        desc = " ".join(html2plaintext(lead.description or "").split())
+        return (desc[:120] or lead.name or "WhatsApp enquiry")
+
+    @api.model
+    def _wa5_window_open(self, phone_e164):
+        """WA-5.1: True iff the recipient has an INBOUND message within the
+        last ~23h -> Meta's 24h customer-service window is open and a
+        free-form interactive will deliver. Only an inbound opens it; an
+        outbound (template/message) never does."""
+        if not phone_e164:
+            return False
+        cutoff = fields.Datetime.now() - timedelta(hours=_WA5_WINDOW_HOURS)
+        return bool(self.env["neon.whatsapp.message"].sudo().search_count([
+            ("phone_number", "=", phone_e164),
+            ("direction", "=", "inbound"),
+            ("create_date", ">=", cutoff)]))
+
+    @api.model
+    def _wa5_staff_notify(self, recipient_bu, recipient_name, interactive,
+                          body, template_name, template_summary,
+                          button_payload, lead, activity_summary,
+                          activity_user):
+        """WA-5.1 window-aware staff notify -- the ONE primitive behind all
+        three notify paths:
+          * window OPEN  -> the rich free-form interactive (today's path);
+          * window CLOSED -> a UTILITY template (Design Y: name + summary +
+            a quick-reply carrying ``button_payload``) that RE-OPENS the
+            window so the tap-back + in-window follow-up then work;
+          * ALWAYS -> the human-routed Odoo activity (D4 'never lost').
+        Audit records the ACTUAL path (interactive vs template) and result
+        -- no more blanket state='sent'."""
+        partner = recipient_bu.user_id.partner_id if recipient_bu else None
+        if recipient_bu and self._wa5_window_open(recipient_bu.phone_number):
+            # open window: free-form interactive (best-effort -> never
+            # skip the activity fallback).
+            try:
+                path = self.sudo().send_interactive_or_text(
+                    recipient_bu.phone_number, interactive, body)
+                self._wa5_audit_out(
+                    recipient_bu.phone_number, body, path or "interactive",
+                    lead=lead, state="sent")
+            except Exception as e:  # noqa: BLE001
+                _logger.warning(
+                    "WA-5 staff notify (interactive) failed lead %s: %s",
+                    lead.id, e)
+        elif recipient_bu:
+            # closed window: a template re-opens it. send_template honours
+            # res.partner.wa_opt_out + writes its OWN (truthful) audit row.
+            try:
+                res = self.sudo().send_template(
+                    recipient_bu.phone_number, template_name,
+                    language=_WA5_TPL_LANG,
+                    body_params=[recipient_name, template_summary],
+                    quick_reply_payloads=[button_payload],
+                    recipient_partner=partner,
+                    audit_body="[%s] %s" % (template_name, template_summary))
+                # capture the real result (no blanket success) -- a
+                # suppressed (opt-out) or rejected template is visible; the
+                # Odoo activity below is the guaranteed fallback either way.
+                if not (res or {}).get("ok"):
+                    _logger.warning(
+                        "WA-5 staff template %s NOT delivered to %s (%s) -- "
+                        "Odoo activity is the fallback (lead %s).",
+                        template_name, recipient_bu.phone_number,
+                        (res or {}).get("reason"), lead.id)
+            except Exception as e:  # noqa: BLE001
+                _logger.warning(
+                    "WA-5 staff notify (template) failed lead %s: %s",
+                    lead.id, e)
+        # D4: the activity ALWAYS lands on a human, regardless of channel.
+        self._wa5_activity(lead, activity_user, activity_summary, body)
+
+    @api.model
+    def _wa5_append_client_msg(self, lead, body):
+        """WA-5.0: a follow-up client message on an already-escalated lead
+        -> append to the chatter (escaped) so the team/assignee see it,
+        WITHOUT re-firing the escalation."""
+        try:
+            lead.sudo().message_post(
+                body=_("<b>WhatsApp client follow-up:</b><br/>%s")
+                % html_escape(body or ""),
+                message_type="comment", subtype_xmlid="mail.mt_note")
+        except Exception as e:  # noqa: BLE001 -- chatter must not break intake
+            _logger.warning(
+                "WA-5 follow-up chatter failed (%s): %s", lead.id, e)
 
     @api.model
     def _wa5_escalation_botuser(self):
@@ -387,7 +510,19 @@ class WhatsAppMessageClientLane(models.Model):
             if human:
                 return human[0]
         sales = self._wa5_assignee_users()
-        return sales[0] if sales else self.env["res.users"].sudo()
+        if sales:
+            return sales[0]
+        owner = self._wa5_owner_user()
+        if owner and owner.active and not owner.share \
+                and owner.id != root_id:
+            return owner
+        # ULTIMATE backstop: ANY real internal user, so the D4 activity
+        # never fails to land on a human (only impossible on a DB with no
+        # internal users at all). Beats a silent no-op on a misconfigured
+        # escalation target + empty superuser/sales sets.
+        return self.env["res.users"].sudo().search(
+            [("active", "=", True), ("share", "=", False),
+             ("id", "!=", root_id)], limit=1)
 
     @api.model
     def _wa5_activity(self, lead, user, summary, note):
@@ -421,11 +556,12 @@ class WhatsAppMessageClientLane(models.Model):
         return True
 
     @api.model
-    def _wa5_audit_out(self, phone, body, mtype="text", lead=None):
+    def _wa5_audit_out(self, phone, body, mtype="text", lead=None,
+                       state="sent"):
         self.sudo().create({
             "name": "wa-out-%s" % phone, "direction": "outbound",
             "phone_number": phone, "message_body": body,
-            "message_type": mtype, "state": "sent",
+            "message_type": mtype, "state": state,
             "lead_id": lead.id if lead else False})
 
     # ================================================================
@@ -433,37 +569,29 @@ class WhatsAppMessageClientLane(models.Model):
     # ================================================================
     @api.model
     def _wa5_notify_escalation(self, lead, client_e164):
-        """Notify the escalation target with the lead detail + an Assign
-        button. Body carries the wa.me + Odoo deep-links (D3: WhatsApp
-        can't mix URL + reply buttons, so the links ride in text)."""
+        """Notify the escalation target (window-aware -- WA-5.1). The
+        in-window interactive carries the labeled wa.me + Odoo links (D3:
+        links ride in body text, not URL buttons); the closed-window
+        template carries only name + summary + the Assign button."""
         esc = self._wa5_escalation_botuser()
+        summary = self._wa5_lead_summary(lead)
         body = (
-            "\U0001F195 New WhatsApp lead needs an owner:\n%s\nClient: %s\n"
-            "%s\n\n\U0001F4AC Chat with client: %s\n\U0001F4CD Open in "
-            "Odoo: %s\n\nTap below to assign a salesperson."
-            % (lead.name, client_e164, (lead.description or "")[:300],
-               self._wa5_wame_link(client_e164),
+            "\U0001F195 New WhatsApp lead needs an owner:\n%s\nClient: %s\n\n"
+            "\U0001F4AC Chat with client: %s\n\U0001F4CD Open in Odoo: %s\n\n"
+            "Tap below to assign a salesperson."
+            % (summary, client_e164, self._wa5_wame_link(client_e164),
                self._wa5_odoo_lead_link(lead)))
+        payload = self._wa5_payload("assign_open", lead.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],
-            "buttons": [{"id": self._wa5_payload("assign_open", lead.id),
+            "buttons": [{"id": payload,
                          "title": "\U0001F465 Assign salesperson"}]}
-        sent = False
-        if esc:
-            # best-effort: a send/audit failure must NOT skip the activity
-            # fallback below (D4 -- the handoff is never lost).
-            try:
-                sent = self.sudo().send_interactive_or_text(
-                    esc.phone_number, interactive, body)
-                self._wa5_audit_out(
-                    esc.phone_number, body, "interactive", lead=lead)
-            except Exception as e:  # noqa: BLE001
-                _logger.warning(
-                    "WA-5 escalation send failed (lead %s): %s", lead.id, e)
-        self._wa5_activity(
-            lead, esc.user_id if esc else None,
-            _("New WhatsApp lead -- assign a salesperson"), body)
-        return sent
+        self._wa5_staff_notify(
+            esc, self._wa5_first_name(esc.user_id) if esc else "team",
+            interactive, body, _WA5_TPL_HANDOFF, summary, payload, lead,
+            _("New WhatsApp lead -- assign a salesperson"),
+            esc.user_id if esc else None)
+        return True
 
     @api.model
     def _wa5_handle_assign_tap(self, bot_user, intent, parts, reply_title=None):
@@ -527,6 +655,13 @@ class WhatsAppMessageClientLane(models.Model):
         if assignee not in self._wa5_assignee_users():
             return self._wa5_safe(
                 _("That person isn't an assignable salesperson."))
+        # WA-5.0 idempotency: a repeat tap of the SAME pick is a no-op ack
+        # (no second write, no second notify) -- this killed the 5x
+        # "assigned to Tatenda" churn.
+        if lead.sudo().user_id.id == assignee.id:
+            return self._wa5_safe(
+                _("%s already has this lead.")
+                % (assignee.name or assignee.login))
         lead.sudo().write({"user_id": assignee.id})
         self._wa5_notify_assignee(lead, assignee)
         return self._wa5_safe(
@@ -535,32 +670,26 @@ class WhatsAppMessageClientLane(models.Model):
 
     @api.model
     def _wa5_notify_assignee(self, lead, assignee):
+        """Notify the chosen salesperson (window-aware -- WA-5.1)."""
         bu = self.env["neon.bot.user"].sudo().search(
             [("user_id", "=", assignee.id), ("active", "=", True)], limit=1)
         client = lead.phone or ""
+        summary = self._wa5_lead_summary(lead)
         body = (
             "You've been assigned a new WhatsApp lead:\n%s\nClient: %s\n\n"
             "\U0001F4AC Chat with the client: %s\n\U0001F4CD Open in Odoo: "
             "%s\n\nIf you can't take it, tap below and it goes back to the "
             "team."
-            % (lead.name, client, self._wa5_wame_link(client),
+            % (summary, client, self._wa5_wame_link(client),
                self._wa5_odoo_lead_link(lead)))
+        payload = self._wa5_payload("assignee_decline", lead.id, assignee.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],
-            "buttons": [{"id": self._wa5_payload(
-                "assignee_decline", lead.id, assignee.id),
-                "title": "\U0001F645 I'm not free"}]}
-        if bu:
-            try:
-                self.sudo().send_interactive_or_text(
-                    bu.phone_number, interactive, body)
-                self._wa5_audit_out(
-                    bu.phone_number, body, "interactive", lead=lead)
-            except Exception as e:  # noqa: BLE001 -- never skip the activity
-                _logger.warning(
-                    "WA-5 assignee send failed (lead %s): %s", lead.id, e)
-        self._wa5_activity(
-            lead, assignee, _("New WhatsApp lead assigned to you"), body)
+            "buttons": [{"id": payload, "title": "\U0001F645 I'm not free"}]}
+        self._wa5_staff_notify(
+            bu, self._wa5_first_name(assignee), interactive, body,
+            _WA5_TPL_ASSIGNED, summary, payload, lead,
+            _("New WhatsApp lead assigned to you"), assignee)
 
     @api.model
     def _wa5_tap_assignee_decline(self, bot_user, parts):
@@ -576,42 +705,49 @@ class WhatsAppMessageClientLane(models.Model):
                 "(lead %s)", bot_user.user_id.id, assignee.id, lead.id)
             return self._wa5_safe(
                 _("This assignment isn't linked to your number."))
-        # idempotency: only act if still theirs (else already moved)
-        if lead.sudo().user_id.id != assignee.id:
-            return self._wa5_safe(_("That lead has already been reassigned."))
+        # WA-5.0 split-states (the prod bug: all three collapsed into a
+        # wrong "already reassigned"):
+        current = lead.sudo().user_id
+        if not current:
+            # already unowned -> they (or a double-tap) already declined.
+            return self._wa5_safe(
+                _("You've already declined this -- it's back with the team."))
+        if current.id != assignee.id:
+            # a DIFFERENT user now holds it.
+            return self._wa5_safe(
+                _("That lead has been reassigned to someone else."))
+        # the tapper IS the current owner -> decline, clear, bounce.
         lead.sudo().write({"user_id": False})  # unowned -> backstop
         self._wa5_bounce_to_escalation(lead, assignee)
         return self._wa5_safe(
-            _("No problem -- we've passed it back to the team to reassign."))
+            _("You've declined -- we've sent it back to the team."))
 
     @api.model
     def _wa5_bounce_to_escalation(self, lead, declined_by):
         """ALWAYS back to Munashe (never auto-reassign, never unowned-
-        and-silent). Same Assign-button shape as the first notify."""
+        and-silent). Window-aware (WA-5.1); same Assign-button shape as
+        the first notify."""
         esc = self._wa5_escalation_botuser()
+        who = declined_by.name or declined_by.login
+        summary = "%s -- declined by %s, please reassign" % (
+            self._wa5_lead_summary(lead), who)
         body = (
             "⤴️ %s declined the WhatsApp lead -- it's back with "
             "you to reassign:\n%s\n\n\U0001F4AC Client: %s\n\U0001F4CD Open "
             "in Odoo: %s"
-            % (declined_by.name or declined_by.login, lead.name,
+            % (who, self._wa5_lead_summary(lead),
                self._wa5_wame_link(lead.phone or ""),
                self._wa5_odoo_lead_link(lead)))
+        payload = self._wa5_payload("assign_open", lead.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],
-            "buttons": [{"id": self._wa5_payload("assign_open", lead.id),
+            "buttons": [{"id": payload,
                          "title": "\U0001F465 Assign salesperson"}]}
-        if esc:
-            try:
-                self.sudo().send_interactive_or_text(
-                    esc.phone_number, interactive, body)
-                self._wa5_audit_out(
-                    esc.phone_number, body, "interactive", lead=lead)
-            except Exception as e:  # noqa: BLE001 -- never skip the activity
-                _logger.warning(
-                    "WA-5 bounce send failed (lead %s): %s", lead.id, e)
-        self._wa5_activity(
-            lead, esc.user_id if esc else None,
-            _("WhatsApp lead declined -- reassign"), body)
+        self._wa5_staff_notify(
+            esc, self._wa5_first_name(esc.user_id) if esc else "team",
+            interactive, body, _WA5_TPL_HANDOFF, summary, payload, lead,
+            _("WhatsApp lead declined -- reassign"),
+            esc.user_id if esc else None)
 
     # ---- tiny part-parsers (fail-safe) -----------------------------
     @api.model

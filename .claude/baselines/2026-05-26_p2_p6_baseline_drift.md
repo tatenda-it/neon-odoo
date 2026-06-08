@@ -315,3 +315,33 @@ limitations rather than fixed:
 Both are NON-security (the hard sandbox + the assignment two-factor are
 intact and verified). Owner: WA-5 maintenance. Logged per Tatenda
 2026-06-08.
+
+## Accepted items 2026-06-08 (B11 WA-5.1 + WA-5.0 delta review)
+
+The WA-5.1/5.0 adversarial review (10 findings -> 5 real / 2 partial / 3
+refuted) applied 2 hardenings: Fix A (`_wa5_fallback_human` now chains
+superuser -> owner -> sales -> ANY active internal user, so the D4
+activity always lands on a human even with a broken escalation target +
+empty su/sales sets -- closes the "all 3 paths fail" loss case) and Fix B
+(`_wa5_staff_notify` captures `send_template`'s {ok,reason} and WARN-logs
+a suppressed/failed template). ACCEPTED without code change:
+
+1. **Escalation-target opt-out** suppresses the WhatsApp template but the
+   Odoo activity still lands (Munashe sees it IN Odoo; `wa_opt_out` is a
+   WhatsApp-only flag). This is the LOCKED WA-5.1 Gate-1 decision
+   ("respect `wa_opt_out`; activity covers a suppressed staffer"), not a
+   defect. `send_template` already logs + audits the suppression.
+
+2. **Lead-deleted-mid-append race** (escalate-once guard): a sub-ms window
+   between `sess.lead_id.exists()` and `message_post`. `.exists()` self-
+   heals the pre-check; the append is exception-guarded; crm.lead deletion
+   mid-conversation is not a realistic threat (append-only audit
+   discipline). Worst case = one follow-up line not mirrored to a
+   just-deleted lead. Same human-paced TOCTOU class as the WA-5.0 races.
+
+3. **Concurrent assign_pick double-notify race**: two simultaneous taps of
+   the same pick could both pass the idempotency check. Human-paced
+   WhatsApp taps; worst case = a duplicate assignee notify. Row-locking is
+   over-engineering for this surface. Same bucket as the WA-5.0 races.
+
+Owner: WA-5 maintenance. Logged per Tatenda 2026-06-08.

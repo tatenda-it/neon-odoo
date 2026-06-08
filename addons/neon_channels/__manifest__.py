@@ -58,7 +58,22 @@
     # 'assignee_decline' wa_payload intents + _wa5_handle_assign_tap.
     # NET-NEW model neon.wa.client.session + WhatsApp crm.tag/utm
     # source+medium + escalation-login config param -> -u + snapshot.
-    'version': '17.0.1.8.0',
+    # 17.0.1.9.0 = B11/WA-5.1 (window-aware staff escalation) + WA-5.0
+    # (robustness). Staff escalation/assignee/bounce notifies are now
+    # WINDOW-AWARE: recipient's 24h window open -> free-form interactive
+    # (as before); closed -> a UTILITY template (wa5_lead_handoff /
+    # wa5_lead_assigned, Design Y: name+summary+quick-reply, opt-out
+    # respected) that re-opens the window; the human-routed Odoo activity
+    # ALWAYS lands. Template quick-reply taps (inbound type='button')
+    # route through handle_tap. WA-5.0: escalate-ONCE guard (an unowned
+    # lead no longer re-escalates on every client message -> chatter
+    # append + ack); assign_pick idempotent (repeat tap = no-op ack);
+    # decline split-states (unowned / different-owner / current-owner)
+    # with correct "sent back to the team" copy; html2plaintext on every
+    # WhatsApp body + template summary (no leaked <p>); audit records the
+    # real path/result (no blanket state='sent'). Method-only (no
+    # schema/data; the 2 templates live in Meta).
+    'version': '17.0.1.9.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',
