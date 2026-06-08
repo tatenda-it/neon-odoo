@@ -114,7 +114,14 @@
     # 200) so a deferred error is never a silent 403/rollback + Meta-retry
     # storm. FIX 3a: the manager/escalation message is a clean short body +
     # the single Assign button (raw wa.me/Odoo URLs removed). Method-only.
-    'version': '17.0.1.12.0',
+    # WA-5.5 (17.0.1.13.0): the WA-5.4 flush ran in the PUBLIC webhook env --
+    # a deferred crm.lead recompute -> AccessError -> the rollback UNDID the
+    # assignment + audit row + advisory lock while the Meta sends had already
+    # left, so assignments were silently lost and every Meta re-delivery
+    # re-sent (unaudited). Fix: request.env(su=True).flush_all() so the
+    # deferred recompute runs as superuser (matching handle_inbound's sudo).
+    # Method-only.
+    'version': '17.0.1.13.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

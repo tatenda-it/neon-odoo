@@ -915,12 +915,79 @@ try:
               raised is None and lead_p.sudo().user_id.id == a_u.id, raised)
 
         # K5: the webhook controller flushes inside its own try (defense)
+        # AND under SUPERUSER. WA-5.5: K5 used to assert only that flush_all()
+        # + rollback() were present -- it did NOT assert the flush ran as
+        # sudo, which is precisely the gap that let the prod bug through. In
+        # the PUBLIC controller env, request.env.flush_all() recomputed a
+        # deferred crm.lead field -> AccessError -> rollback undid the
+        # assignment + audit + lock (sends already gone) -> unaudited Meta
+        # re-delivery storm. The binding guard is: the flush MUST be
+        # su-scoped, so the deferred recompute bypasses the public ACL.
         import inspect as _insp
         from odoo.addons.neon_channels.controllers import webhook as _wh
         _src = _insp.getsource(_wh.WhatsAppWebhookController.webhook_receive)
-        check("K5: webhook controller calls flush_all() inside its try "
-              "(deferred error -> caught + 200, no retry storm)",
+        _flush_is_sudo = ("(su=True).flush_all()" in _src.replace(" ", "")) \
+            or ("env(su=True).flush_all()" in _src.replace(" ", ""))
+        check("K5: webhook controller flushes inside its try (caught + 200, "
+              "no retry storm)",
               "flush_all()" in _src and "rollback()" in _src)
+        check("K5b: that flush is SUPERUSER-scoped -- env(su=True).flush_all() "
+              "-- so a deferred crm.lead recompute can't 403+rollback the "
+              "assign under the public webhook env (WA-5.5)",
+              _flush_is_sudo,
+              "su-flush present" if _flush_is_sudo else "BARE public flush!")
+
+        # K6: the EXACT controller path -- handle_inbound under a PUBLIC env
+        # (uid 4) THEN the controller's su-scoped flush -- end to end. Proves
+        # the assignment PERSISTS (rollback gone), the audit row SURVIVES, and
+        # a 2nd identical Meta delivery is an idempotent no-op (no re-send).
+        # NOTE: the smoke is single-tx/admin and can't reproduce the deferred
+        # crm.lead 403 in-process (same limitation that hid the bug from
+        # K3/K4) -- K5b is the binding source guard; K6 exercises the
+        # persist/audit/idempotency behaviour the fix must preserve, and the
+        # post-deploy SQL verify on a real assign is the ground-truth proof.
+        WAM = env["neon.whatsapp.message"].sudo()
+        WM.handle_inbound(
+            text_msg("hi pricing for a product launch", "263880001064"), {})
+        lead_k6 = Lead.search([("phone", "=", "+263880001064")], limit=1)
+        audit_before = WAM.search_count([("direction", "=", "outbound")])
+        raised6 = None
+        try:
+            pub = env(user=env.ref("base.public_user").id)
+            # EXACTLY as the controller does it: sudo handle_inbound, then a
+            # su-scoped flush of the public request env.
+            pub["neon.whatsapp.message"].sudo().handle_inbound(
+                list_tap_msg(
+                    WM._wa5_payload("assign_pick", lead_k6.id, a_u.id),
+                    ESC_FROM), {})
+            pub(su=True).flush_all()
+        except Exception as e:  # noqa: BLE001
+            raised6 = type(e).__name__
+        lead_k6.invalidate_recordset()
+        audit_after = WAM.search_count([("direction", "=", "outbound")])
+        check("K6a: controller path (public handle_inbound + su-flush) does "
+              "NOT raise", raised6 is None, raised6)
+        check("K6b: user_id PERSISTS through the public-env flush "
+              "(the prod rollback that lost assignments is gone)",
+              lead_k6.user_id.id == a_u.id,
+              lead_k6.user_id.login if lead_k6.user_id else "UNOWNED")
+        check("K6c: the outbound audit row SURVIVES the flush "
+              "(not rolled back -> no more invisible sends)",
+              audit_after > audit_before,
+              "%d -> %d" % (audit_before, audit_after))
+        _sent.clear()
+        pub2 = env(user=env.ref("base.public_user").id)
+        pub2["neon.whatsapp.message"].sudo().handle_inbound(
+            list_tap_msg(
+                WM._wa5_payload("assign_pick", lead_k6.id, a_u.id),
+                ESC_FROM), {})
+        pub2(su=True).flush_all()
+        rr6 = last("text", ESC_FROM)
+        check("K6d: 2nd identical Meta delivery -> idempotent no-op "
+              "('already has', no re-assign, no re-send to assignee)",
+              lead_k6.user_id.id == a_u.id and rr6
+              and "already has this lead" in rr6[2].lower(),
+              rr6[2] if rr6 else None)
 
     # ---- regression bar --------------------------------------------
     check("REG: 3 WA-5 intents in wa_payload INTENTS",

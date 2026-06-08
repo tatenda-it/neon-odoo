@@ -100,7 +100,21 @@ class WhatsAppWebhookController(http.Controller):
             # retry (the WA-5.3 prod failure class). On error we roll back
             # explicitly so the request-teardown commit can't fail on an
             # aborted transaction.
-            request.env.flush_all()
+            #
+            # WA-5.5 FIX: flush under SUPERUSER. WA-5.4 ran this flush in the
+            # controller's PUBLIC env (auth='public', uid 4); a deferred
+            # crm.lead stored-compute recompute then failed
+            # check_access_rights('read') -> AccessError -> the except below
+            # rolled back the WHOLE request -- the user_id assignment, the
+            # neon.whatsapp.message audit rows, AND the advisory lock all
+            # undone -- while the WhatsApp sends had ALREADY left Meta's API.
+            # Net effect: assignments silently lost + un-audited duplicate
+            # sends on every Meta re-delivery (the idempotency no-op at
+            # _wa5_tap_assign_pick could never fire because the prior assign
+            # never persisted). handle_inbound already ran under .sudo(); the
+            # flush must too, so the deferred recompute runs as superuser and
+            # bypasses the public ACL.
+            request.env(su=True).flush_all()
         except Exception as e:  # noqa: BLE001
             _logger.error('WhatsApp webhook error: %s', e, exc_info=True)
             try:
