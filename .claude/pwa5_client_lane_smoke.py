@@ -381,8 +381,12 @@ try:
         check("C1: escalation notified with a signed assign_open button",
               dec and dec[0] == "assign_open" and int(dec[1][0]) == lead.id,
               dec)
-        check("C1: escalation body carries wa.me + Odoo deep-links",
-              esc_btn and "wa.me/" in esc_btn[2] and "/web#id=" in esc_btn[2])
+        check("C1: WA-5.4 escalation body is CLEAN (no raw wa.me/Odoo URLs) "
+              "+ has the Assign button",
+              esc_btn and "wa.me/" not in esc_btn[2]
+              and "/web#id=" not in esc_btn[2]
+              and "assign a salesperson" in esc_btn[2].lower()
+              and len(esc_btn[3]) == 1, esc_btn[2] if esc_btn else None)
         check("C2: activity fallback on the lead (handoff never lost)",
               Act.search_count(
                   [("res_model", "=", "crm.lead"),
@@ -843,6 +847,80 @@ try:
               lead_j.user_id.id == b_u.id and rr
               and "already has this lead" in rr[2].lower(),
               rr[2] if rr else None)
+
+        # =========================================================
+        # K -- WA-5.4 prod-fix: the user_id write must NOT fire the native
+        #      CRM assignment notification (the public-env read -> 403 ->
+        #      rollback that lost user_id on prod). The smoke runs admin /
+        #      single-tx so it can't reproduce the deferred-flush 403, but
+        #      it CAN prove the trigger is gone: no assignment tracking
+        #      message + no AccessError under a public-user flush.
+        # =========================================================
+        MailMail = env["mail.mail"].sudo()
+        CK_E164, CK_FROM = "+263880001060", "263880001060"
+        WM.handle_inbound(
+            text_msg("hi pricing for a corporate gala", CK_FROM), {})
+        lead_k = Lead.search([("phone", "=", CK_E164)], limit=1)
+        msgs_before = len(lead_k.message_ids)
+        mail_before = MailMail.search_count([])
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_k.id, a_u.id), ESC_FROM), {})
+        lead_k.invalidate_recordset()
+        check("K1: assign persists user_id (write not rolled back)",
+              lead_k.user_id.id == a_u.id,
+              lead_k.user_id.login if lead_k.user_id else None)
+        check("K2: assign fires NO native CRM tracking message on the lead "
+              "(tracking_disable -- the prod 403 trigger is gone)",
+              len(lead_k.message_ids) == msgs_before,
+              "%d -> %d" % (msgs_before, len(lead_k.message_ids)))
+        # K3: the FULL assign+notify+ACTIVITY under a PUBLIC env + flush must
+        # NOT raise an AccessError on crm.lead -- this exercises the actual
+        # WA-5.3 prod 403 path end-to-end (incl. the activity notification,
+        # a possible SECOND trigger the user_id-write fix alone wouldn't
+        # cover). (+1 mail.mail from the activity is legitimate, not the
+        # bug; K2 already proved the CRM tracking notification is gone.)
+        WM.handle_inbound(
+            text_msg("hi pricing for an awards night", "263880001062"), {})
+        lead_p2 = Lead.search([("phone", "=", "+263880001062")], limit=1)
+        raised2 = None
+        try:
+            envp2 = env(user=env.ref("base.public_user").id)
+            WMp2 = envp2["neon.whatsapp.message"].sudo()
+            WMp2._wa5_set_owner(lead_p2, a_u.id)
+            WMp2._wa5_notify_assignee(lead_p2, a_u)
+            envp2.flush_all()
+        except Exception as e:  # noqa: BLE001
+            raised2 = type(e).__name__
+        check("K3: full assign+notify+activity under PUBLIC env + flush does "
+              "NOT raise (the whole prod 403 path)",
+              raised2 is None and lead_p2.sudo().user_id.id == a_u.id,
+              raised2)
+
+        # K4: the WA-5.3 prod failure path -- the user_id write + a flush
+        # under a PUBLIC-user env must NOT raise an AccessError on crm.lead.
+        pub_id = env.ref("base.public_user").id
+        WM.handle_inbound(
+            text_msg("hi pricing for a launch party", "263880001061"), {})
+        lead_p = Lead.search([("phone", "=", "+263880001061")], limit=1)
+        raised = None
+        try:
+            envp = env(user=pub_id)
+            envp["neon.whatsapp.message"].sudo()._wa5_set_owner(
+                lead_p, a_u.id)
+            envp.flush_all()
+        except Exception as e:  # noqa: BLE001
+            raised = type(e).__name__
+        check("K4: user_id write + flush under PUBLIC env does NOT raise "
+              "(no deferred public crm.lead read)",
+              raised is None and lead_p.sudo().user_id.id == a_u.id, raised)
+
+        # K5: the webhook controller flushes inside its own try (defense)
+        import inspect as _insp
+        from odoo.addons.neon_channels.controllers import webhook as _wh
+        _src = _insp.getsource(_wh.WhatsAppWebhookController.webhook_receive)
+        check("K5: webhook controller calls flush_all() inside its try "
+              "(deferred error -> caught + 200, no retry storm)",
+              "flush_all()" in _src and "rollback()" in _src)
 
     # ---- regression bar --------------------------------------------
     check("REG: 3 WA-5 intents in wa_payload INTENTS",

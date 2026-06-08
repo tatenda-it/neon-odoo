@@ -92,6 +92,21 @@ class WhatsAppWebhookController(http.Controller):
                     for message in value.get('messages', []):
                         request.env['neon.whatsapp.message'].sudo()\
                             .handle_inbound(message, value)
+            # WA-5.4 defense-in-depth: force the DEFERRED ORM flush HERE,
+            # inside the try, so any error it raises (e.g. a notification
+            # reading a record under the auth='public' webhook env) is
+            # CAUGHT + logged + a clean 200 returned -- never a silent
+            # post-return 403 that rolls back the request and makes Meta
+            # retry (the WA-5.3 prod failure class). On error we roll back
+            # explicitly so the request-teardown commit can't fail on an
+            # aborted transaction.
+            request.env.flush_all()
         except Exception as e:  # noqa: BLE001
             _logger.error('WhatsApp webhook error: %s', e, exc_info=True)
+            try:
+                request.env.cr.rollback()
+            except Exception as re:  # noqa: BLE001
+                # don't swallow silently -- a failed rollback is exactly the
+                # kind of blind spot the WA-5.3 incident taught us to log.
+                _logger.error('WhatsApp webhook rollback failed: %s', re)
         return request.make_response('OK')

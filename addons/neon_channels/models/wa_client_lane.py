@@ -670,18 +670,18 @@ class WhatsAppMessageClientLane(models.Model):
     # ================================================================
     @api.model
     def _wa5_notify_escalation(self, lead, client_e164):
-        """Notify the escalation target (window-aware -- WA-5.1). The
-        in-window interactive carries the labeled wa.me + Odoo links (D3:
-        links ride in body text, not URL buttons); the closed-window
-        template carries only name + summary + the Assign button."""
+        """Notify the escalation target (window-aware -- WA-5.1). WA-5.4
+        (FIX 3a): clean SHORT body + the single Assign button -- the raw
+        wa.me/Odoo URLs are removed (the manager is assigning, not chatting
+        the client; the cluttered raw links made the button look absent).
+        The cold-window template likewise carries only name + summary +
+        the Assign quick-reply."""
         esc = self._wa5_escalation_botuser()
         summary = self._wa5_lead_summary(lead)
         body = (
             "\U0001F195 New WhatsApp lead needs an owner:\n%s\nClient: %s\n\n"
-            "\U0001F4AC Chat with client: %s\n\U0001F4CD Open in Odoo: %s\n\n"
             "Tap below to assign a salesperson."
-            % (summary, client_e164, self._wa5_wame_link(client_e164),
-               self._wa5_odoo_lead_link(lead)))
+            % (summary, client_e164))
         payload = self._wa5_payload("assign_open", lead.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],
@@ -707,6 +707,26 @@ class WhatsAppMessageClientLane(models.Model):
             "SELECT pg_try_advisory_xact_lock(%s, %s)",
             (_WA5_LOCK_NS, int(lead.id)))
         return bool(self.env.cr.fetchone()[0])
+
+    @api.model
+    def _wa5_set_owner(self, lead, user_id):
+        """WA-5.4: write crm.lead.user_id WITHOUT firing Odoo's native CRM
+        assignment notification.
+
+        ROOT CAUSE it fixes: that notification, under the auth='public'
+        webhook env, reads crm.lead as the PUBLIC user at the deferred
+        flush -> AccessError -> HTTP 403 -> the whole request ROLLS BACK,
+        so user_id never persists (each assign_pick re-assigns + re-acks,
+        Meta retries on 403; the later decline reads None -> 'already
+        declined'). WA-5 already posts its own chatter + activity + the
+        WhatsApp notify, so the native email/inbox is redundant.
+        tracking_disable kills the field-tracking message; the other two
+        keys kill the auto-subscribe ping + the create log."""
+        lead.sudo().with_context(
+            tracking_disable=True,
+            mail_auto_subscribe_no_notify=True,
+            mail_create_nolog=True,
+        ).write({"user_id": user_id})
 
     @api.model
     def _wa5_assignee_buttons(self, lead, assignee):
@@ -819,7 +839,7 @@ class WhatsAppMessageClientLane(models.Model):
             return self._wa5_safe(
                 _("%s already has this lead.")
                 % (assignee.name or assignee.login))
-        lead.sudo().write({"user_id": assignee.id})
+        self._wa5_set_owner(lead, assignee.id)  # WA-5.4: no native notify
         self._wa5_notify_assignee(lead, assignee)
         return self._wa5_safe(
             _("✅ Assigned to %s. They've been notified.")
@@ -882,7 +902,7 @@ class WhatsAppMessageClientLane(models.Model):
             return self._wa5_safe(
                 _("That lead has been reassigned to someone else."))
         # the tapper IS the current owner -> decline, clear, bounce.
-        lead.sudo().write({"user_id": False})  # unowned -> backstop
+        self._wa5_set_owner(lead, False)  # WA-5.4: no native notify; unowned
         self._wa5_bounce_to_escalation(lead, assignee)
         return self._wa5_safe(
             _("You've declined -- we've sent it back to the team."))
@@ -896,13 +916,11 @@ class WhatsAppMessageClientLane(models.Model):
         who = declined_by.name or declined_by.login
         summary = "%s -- declined by %s, please reassign" % (
             self._wa5_lead_summary(lead), who)
+        # WA-5.4 (FIX 3a): clean short body + the Assign button; no raw URLs.
         body = (
             "⤴️ %s declined the WhatsApp lead -- it's back with "
-            "you to reassign:\n%s\n\n\U0001F4AC Client: %s\n\U0001F4CD Open "
-            "in Odoo: %s"
-            % (who, self._wa5_lead_summary(lead),
-               self._wa5_wame_link(lead.phone or ""),
-               self._wa5_odoo_lead_link(lead)))
+            "you to reassign:\n%s\nClient: %s\n\nTap below to reassign."
+            % (who, self._wa5_lead_summary(lead), lead.phone or ""))
         payload = self._wa5_payload("assign_open", lead.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],

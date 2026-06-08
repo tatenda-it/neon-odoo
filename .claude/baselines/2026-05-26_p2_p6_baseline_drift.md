@@ -346,6 +346,22 @@ a suppressed/failed template). ACCEPTED without code change:
 
 Owner: WA-5 maintenance. Logged per Tatenda 2026-06-08.
 
+## Accepted item 2026-06-08 (B11 WA-5.4 delta review)
+
+WA-5.4 prod-fix delta review = 4 findings -> 3 "real" but ALL with
+"production-ready / accept as-is / no change required" verdicts + 1
+refuted (convergence). Applied the one cheap nice-to-have: the webhook's
+rollback-on-error now LOGS instead of `pass` (no silent rollback).
+ACCEPTED without change: the webhook `except -> cr.rollback()` rolls back
+the WHOLE message batch, so if Meta ever sends a MULTI-message webhook and
+one message triggers a deferred error, the good messages in that batch
+roll back too. Negligible: Meta delivers WhatsApp inbound ONE message per
+webhook in practice, and the primary fix (`tracking_disable` on the
+user_id write) means the deferred-error path is essentially never hit.
+Per-message savepoint isolation is beyond the approved WA-5.4 scope;
+revisit only if multi-message batches + a deferred error are ever
+observed together. Owner: WA-5 maintenance.
+
 ## Accepted item 2026-06-08 (B11 WA-5.2 delta review)
 
 WA-5.2 (debounced re-handoff) delta review = 4 findings -> 0 real / 2

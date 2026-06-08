@@ -99,7 +99,22 @@
     # declined" on a first tap). Method-only (no schema/data; the cold-
     # window template is unchanged, still the Meta-approved single
     # quick-reply).
-    'version': '17.0.1.11.0',
+    # 17.0.1.12.0 = B11/WA-5.4 prod-fix. ROOT CAUSE (WA-5.3 prod): the
+    # crm.lead.user_id write fired Odoo's NATIVE CRM assignment
+    # notification, which -- under the auth='public' webhook env -- read
+    # crm.lead as the Public user at the deferred flush -> AccessError ->
+    # HTTP 403 -> the whole request ROLLED BACK (user_id never persisted;
+    # each assign_pick re-assigned + re-acked, Meta retried on 403 -> x5;
+    # the later decline read None -> "already declined"). FIX 1+2:
+    # _wa5_set_owner writes user_id with tracking_disable +
+    # mail_auto_subscribe_no_notify + mail_create_nolog (no native notify
+    # -> no public read -> no 403 -> user_id persists), on BOTH the
+    # assign_pick + decline writes. DEFENSE-IN-DEPTH: the webhook
+    # controller now flush_all()s inside its try (catch + rollback + clean
+    # 200) so a deferred error is never a silent 403/rollback + Meta-retry
+    # storm. FIX 3a: the manager/escalation message is a clean short body +
+    # the single Assign button (raw wa.me/Odoo URLs removed). Method-only.
+    'version': '17.0.1.12.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',
