@@ -43,6 +43,8 @@ def _reset_spies():
 
 
 try:
+    from datetime import timedelta as _td
+    from odoo import fields
     from odoo.addons.neon_channels.models import wa_payload
     from odoo.addons.neon_channels.models.wa_copilot import (
         WhatsAppCopilotService,
@@ -665,6 +667,108 @@ try:
               fb and fb.id and not fb.share
               and fb.id != env.ref("base.user_root").id,
               fb.login if fb else None)
+
+        # =========================================================
+        # I -- WA-5.2 DEBOUNCED RE-HANDOFF (returning-client follow-up)
+        # =========================================================
+        Sess = env["neon.wa.client.session"].sudo()
+
+        def esc_acts_for(l):
+            return Act.search_count(
+                [("res_model", "=", "crm.lead"), ("res_id", "=", l.id),
+                 ("summary", "ilike", "assign a salesperson")])
+
+        # fresh client -> quote -> UNOWNED lead; session done + last_notify
+        CI_E164, CI_FROM = "+263880001020", "263880001020"
+        _sent.clear(); _templates.clear()
+        WM.handle_inbound(tap_msg("cl_quote", CI_FROM), {})
+        WM.handle_inbound(
+            text_msg("Launch event, 02/10/2026, Vic Falls", CI_FROM), {})
+        lead_i = Lead.search([("phone", "=", CI_E164)], limit=1)
+        sess_i = Sess.search([("phone_number", "=", CI_E164)], limit=1)
+        check("I0: initial escalation stamped last_notify, lead unowned",
+              bool(sess_i.last_notify) and not lead_i.user_id)
+
+        # I1: RAPID duplicate (last_notify just set) -> DEBOUNCED, no re-fire
+        _sent.clear(); _templates.clear()
+        before = esc_acts_for(lead_i)
+        WM.handle_inbound(text_msg("any update on pricing?", CI_FROM), {})
+        ackI1 = last("text", CI_FROM)
+        check("I1: rapid follow-up DEBOUNCED -> NO second escalation",
+              esc_acts_for(lead_i) == before
+              and not any(_digits(t["to"]) == _digits(ESC_PHONE)
+                          for t in _templates))
+        check("I1: debounced ack is honest (no false 'be in touch' promise)",
+              ackI1 and "your enquiry" in ackI1[2].lower()
+              and "be in touch" not in ackI1[2].lower(),
+              ackI1[2] if ackI1 else None)
+        check("I1: follow-up still appended to the lead chatter",
+              any("follow-up" in (m.body or "") for m in lead_i.message_ids))
+
+        # I2: STALE follow-up (force last_notify into the past) on an
+        # UNOWNED lead -> RE-ESCALATE Munashe (window cold -> template)
+        sess_i.write(
+            {"last_notify": fields.Datetime.now() - _td(minutes=30)})
+        cool(ESC_PHONE)
+        _sent.clear(); _templates.clear()
+        WM.handle_inbound(
+            text_msg("following up on my quote please", CI_FROM), {})
+        sess_i.invalidate_recordset()
+        tI = next((t for t in _templates
+                   if _digits(t["to"]) == _digits(ESC_PHONE)), None)
+        check("I2: stale follow-up, UNOWNED -> re-escalate Munashe (template)",
+              tI and tI["name"] == "wa5_lead_handoff", tI)
+        check("I2: re-notify stamped a FRESH last_notify",
+              sess_i.last_notify
+              and (fields.Datetime.now() - sess_i.last_notify)
+              < _td(minutes=5))
+        ackI2 = last("text", CI_FROM)
+        check("I2: re-notified ack promises contact ('be in touch')",
+              ackI2 and "be in touch" in ackI2[2].lower(),
+              ackI2[2] if ackI2 else None)
+        warm(ESC_PHONE)
+
+        # I3: ASSIGNED lead + stale follow-up -> ping the ASSIGNEE, not Munashe
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_i.id, a_u.id), ESC_FROM), {})
+        lead_i.invalidate_recordset()
+        sess_i.write(
+            {"last_notify": fields.Datetime.now() - _td(minutes=30)})
+        _sent.clear(); _templates.clear()
+        WM.handle_inbound(text_msg("when can we meet?", CI_FROM), {})
+        pa = last("buttons", A_PHONE)
+        check("I3: assigned-lead follow-up pings the ASSIGNEE (a_u), "
+              "NOT Munashe",
+              pa is not None and last("buttons", ESC_PHONE) is None
+              and not any(_digits(t["to"]) == _digits(ESC_PHONE)
+                          for t in _templates))
+        check("I3: assignee follow-up ping carries the 'follow-up' framing",
+              pa and "follow-up" in pa[2].lower(), pa[2] if pa else None)
+
+        # CHATTER: Markup render -- <b> kept, client text auto-escaped
+        # (fixes the &lt;b&gt; leak seen since WA-5)
+        WM.handle_inbound(
+            text_msg("hi pricing for a & b launch", "263880001030"), {})
+        lead_ch = Lead.search([("phone", "=", "+263880001030")], limit=1)
+        intake = next((m for m in lead_ch.message_ids
+                       if "client intake" in (m.body or "")), None)
+        check("CHATTER: intake renders <b> (NOT &lt;b&gt;) via Markup",
+              intake and "<b>" in intake.body
+              and "&lt;b&gt;" not in intake.body,
+              (intake.body[:90] if intake else None))
+
+        # TTL: a >24h-idle return is a FULL clean slate -- step + lead_id +
+        # last_notify all cleared (so a fresh conversation isn't gated by a
+        # stale debounce stamp).
+        CT_E164 = "+263880001040"
+        Sess.create({"phone_number": CT_E164, "step": "done",
+                     "lead_id": lead_i.id,
+                     "last_inbound": fields.Datetime.now() - _td(hours=30),
+                     "last_notify": fields.Datetime.now() - _td(hours=30)})
+        st2 = Sess._get_or_start(CT_E164)
+        check("TTL: >24h reset clears step + lead_id + last_notify (clean slate)",
+              st2.step == "greeted" and not st2.lead_id
+              and not st2.last_notify)
 
     # ---- regression bar --------------------------------------------
     check("REG: 3 WA-5 intents in wa_payload INTENTS",

@@ -41,5 +41,13 @@
             <field name="value">robin@neonhiring.co.zw</field>
         </record>
 
+        <!-- WA-5.2: debounce window (minutes) for re-handoff. A returning
+             client's follow-up re-alerts the human at most once per this
+             many minutes. Tunable by an admin. -->
+        <record id="wa5_renotify_minutes_param" model="ir.config_parameter">
+            <field name="key">neon_channels.wa5_renotify_minutes</field>
+            <field name="value">10</field>
+        </record>
+
     </data>
 </odoo>

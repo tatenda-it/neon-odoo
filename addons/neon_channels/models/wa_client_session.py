@@ -43,6 +43,11 @@ class WaClientSession(models.Model):
     lead_id = fields.Many2one(
         "crm.lead", string="Lead", ondelete="set null")
     last_inbound = fields.Datetime(string="Last Inbound")
+    # WA-5.2: when a HUMAN was last (re)notified about this session's lead.
+    # Debounces re-handoff -- a returning client's follow-up re-alerts the
+    # owner/Munashe at most once per wa5_renotify_minutes (kills the rapid
+    # triple-fire while still re-notifying a genuine later follow-up).
+    last_notify = fields.Datetime(string="Last Human Notified")
     active = fields.Boolean(default=True)
 
     _sql_constraints = [
@@ -66,6 +71,10 @@ class WaClientSession(models.Model):
         if sess.last_inbound and (
                 now - sess.last_inbound > timedelta(
                     hours=_WA5_SESSION_TTL_HOURS)):
-            sess.write({"step": "greeted", "lead_id": False})
+            # full clean slate for a returning stranger -- also clear the
+            # re-handoff debounce stamp (WA-5.2) so the fresh conversation
+            # isn't gated by a stale last_notify.
+            sess.write({"step": "greeted", "lead_id": False,
+                        "last_notify": False})
         sess.write({"last_inbound": now})
         return sess

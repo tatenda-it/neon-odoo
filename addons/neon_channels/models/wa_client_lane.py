@@ -29,8 +29,10 @@ import logging
 import re
 from datetime import timedelta
 
+from markupsafe import Markup
+
 from odoo import _, api, fields, models
-from odoo.tools import html2plaintext, html_escape
+from odoo.tools import html2plaintext
 
 from . import wa_payload
 from .phone_utils import to_e164
@@ -84,6 +86,14 @@ _WA5_TPL_HANDOFF = "wa5_lead_handoff"      # manager (escalation + bounce)
 _WA5_TPL_ASSIGNED = "wa5_lead_assigned"    # assignee
 _WA5_TPL_LANG = "en_US"
 
+# --- WA-5.2 debounced re-handoff ------------------------------------
+# A returning client's follow-up on an EXISTING lead re-alerts the human
+# (assignee if owned, else Munashe) at most once per this many minutes --
+# kills the rapid triple-fire while still re-notifying a genuine later
+# follow-up. Tunable via the ir.config_parameter below.
+_WA5_RENOTIFY_PARAM = "neon_channels.wa5_renotify_minutes"
+_WA5_RENOTIFY_DEFAULT = 10
+
 
 class WhatsAppMessageClientLane(models.Model):
     _inherit = "neon.whatsapp.message"
@@ -119,18 +129,16 @@ class WhatsAppMessageClientLane(models.Model):
 
         sess = self.env["neon.wa.client.session"]._get_or_start(from_e164)
 
-        # WA-5.0 escalate-once guard: once this session already has a lead
-        # (escalation fired ONCE at creation), subsequent client messages
-        # append to the lead's chatter (the team/assignee see the
-        # follow-up) but DO NOT re-create a lead or re-fire the escalation.
-        # (A >24h-idle return resets the session via _get_or_start -> a
-        # genuinely fresh conversation escalates again.)
+        # WA-5.2 returning-client follow-up: once this session already has
+        # a lead, a new message appends to the chatter and DEBOUNCE-gated
+        # re-notifies the human handling it (assignee if owned, else
+        # re-escalate Munashe) -- at most once per wa5_renotify_minutes, so
+        # a rapid triple-fire is suppressed but a genuine later follow-up
+        # still alerts a human. No new lead is created. (A >24h-idle return
+        # resets the session via _get_or_start -> a fresh conversation.)
         if sess.lead_id and sess.lead_id.exists():
-            self._wa5_append_client_msg(sess.lead_id, body)
-            return self._wa5_send_client(
-                raw_from, from_e164,
-                "Thanks -- that's noted on your enquiry. A member of the "
-                "Neon Events team will be in touch shortly.")
+            return self._wa5_followup(sess, sess.lead_id, body, raw_from,
+                                      from_e164)
 
         # awaiting quote details: the NEXT text is the event details ->
         # create the lead (checked first so a "1" reply mid-capture is
@@ -201,7 +209,10 @@ class WhatsAppMessageClientLane(models.Model):
     @api.model
     def _wa5_complete_quote(self, sess, from_e164, raw_from, details):
         lead = self._wa5_create_client_lead(from_e164, details, "quote")
-        sess.sudo().write({"step": "done", "lead_id": lead.id})
+        # WA-5.2: stamp last_notify at the initial escalation so an
+        # immediate rapid follow-up is debounced.
+        sess.sudo().write({"step": "done", "lead_id": lead.id,
+                           "last_notify": fields.Datetime.now()})
         self._wa5_send_client(
             raw_from, from_e164,
             "Thank you -- we've received your enquiry and a member of the "
@@ -215,13 +226,78 @@ class WhatsAppMessageClientLane(models.Model):
         lead = sess.lead_id if sess.lead_id else self._wa5_create_client_lead(
             from_e164, client_msg or "(client asked to speak to the team)",
             "handoff")
-        sess.sudo().write({"step": "done", "lead_id": lead.id})
+        sess.sudo().write({"step": "done", "lead_id": lead.id,
+                           "last_notify": fields.Datetime.now()})
         self._wa5_send_client(
             raw_from, from_e164,
             "Thanks for reaching out -- a member of the Neon Events team "
             "will contact you shortly to assist.")
         self._wa5_notify_escalation(lead, from_e164)
         return True
+
+    @api.model
+    def _wa5_renotify_minutes(self):
+        val = self.env["ir.config_parameter"].sudo().get_param(
+            _WA5_RENOTIFY_PARAM, _WA5_RENOTIFY_DEFAULT)
+        try:
+            return max(0, int(val))
+        except (TypeError, ValueError):
+            return _WA5_RENOTIFY_DEFAULT
+
+    @api.model
+    def _wa5_followup(self, sess, lead, body, raw_from, from_e164):
+        """WA-5.2: a returning client's message on an EXISTING lead.
+        ALWAYS append to the chatter; DEBOUNCE-gated re-notify of the human
+        handling it -- assignee if the lead is owned, else re-escalate
+        Munashe -- at most once per wa5_renotify_minutes (kills the rapid
+        triple-fire, still alerts a genuine later follow-up). Honest ack:
+        only promise contact when a human was (re)notified or already owns
+        the lead."""
+        self._wa5_append_client_msg(lead, body)
+        now = fields.Datetime.now()
+        mins = self._wa5_renotify_minutes()
+        stale = (not sess.last_notify) or (
+            now - sess.last_notify >= timedelta(minutes=mins))
+        notified = False
+        if stale:
+            if lead.user_id:
+                self._wa5_notify_followup_assignee(lead, lead.user_id, body)
+            else:
+                self._wa5_notify_escalation(lead, lead.phone or from_e164)
+            sess.sudo().write({"last_notify": now})
+            notified = True
+        if notified or lead.user_id:
+            ack = ("Thanks -- we've flagged your follow-up to the team and "
+                   "someone will be in touch shortly.")
+        else:
+            # unowned + debounced: a human was alerted recently; don't
+            # imply fresh contact that isn't being triggered this turn.
+            ack = "Thanks -- we've added that to your enquiry."
+        return self._wa5_send_client(raw_from, from_e164, ack)
+
+    @api.model
+    def _wa5_notify_followup_assignee(self, lead, assignee, client_msg):
+        """WA-5.2: ping the ASSIGNEE that their client sent a follow-up
+        (window-aware; re-engage via wa5_lead_assigned when cold; always
+        the Odoo activity). NOT sent to Munashe -- the assignee owns it."""
+        bu = self.env["neon.bot.user"].sudo().search(
+            [("user_id", "=", assignee.id), ("active", "=", True)], limit=1)
+        client = lead.phone or ""
+        snippet = " ".join((client_msg or "").split())[:160]
+        summary = self._wa5_lead_summary(lead)
+        body = (
+            "\U0001F4E9 Your WhatsApp client sent a follow-up:\n\"%s\"\n%s\n"
+            "Client: %s\n\n\U0001F4AC Chat: %s\n\U0001F4CD Open in Odoo: %s"
+            % (snippet, summary, client, self._wa5_wame_link(client),
+               self._wa5_odoo_lead_link(lead)))
+        payload = self._wa5_payload("assignee_decline", lead.id, assignee.id)
+        interactive = {
+            "kind": "buttons", "body": body[:1024],
+            "buttons": [{"id": payload, "title": "\U0001F645 I'm not free"}]}
+        self._wa5_staff_notify(
+            bu, self._wa5_first_name(assignee), interactive, body,
+            _WA5_TPL_ASSIGNED, "follow-up: " + (snippet or summary), payload,
+            lead, _("Client follow-up -- respond"), assignee)
 
     @api.model
     def _wa5_is_handoff(self, text):
@@ -270,12 +346,14 @@ class WhatsAppMessageClientLane(models.Model):
         if deadline:
             vals["date_deadline"] = deadline
         lead = Lead.create(vals)
-        # mirror the intake thread to the lead's chatter (escape the
-        # client's text -- it lands in an HTML chatter body).
+        # mirror the intake thread to the lead's chatter. Markup keeps the
+        # <b>/<br/> literal and AUTO-ESCAPES the client text -- a plain str
+        # body gets wholesale-escaped + <p>-wrapped by message_post (the
+        # &lt;b&gt; leak seen since WA-5).
         try:
             lead.message_post(
-                body=_("<b>WhatsApp client intake (%s):</b><br/>%s")
-                % (from_e164, html_escape(raw_text or "")),
+                body=Markup("<b>WhatsApp client intake (%s):</b><br/>%s")
+                % (from_e164, raw_text or ""),
                 message_type="comment", subtype_xmlid="mail.mt_note")
         except Exception as e:  # noqa: BLE001 -- chatter must not break intake
             _logger.warning("WA-5 lead chatter failed (%s): %s", lead.id, e)
@@ -415,8 +493,8 @@ class WhatsAppMessageClientLane(models.Model):
         WITHOUT re-firing the escalation."""
         try:
             lead.sudo().message_post(
-                body=_("<b>WhatsApp client follow-up:</b><br/>%s")
-                % html_escape(body or ""),
+                body=Markup("<b>WhatsApp client follow-up:</b><br/>%s")
+                % (body or ""),
                 message_type="comment", subtype_xmlid="mail.mt_note")
         except Exception as e:  # noqa: BLE001 -- chatter must not break intake
             _logger.warning(

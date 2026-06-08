@@ -73,7 +73,19 @@
     # WhatsApp body + template summary (no leaked <p>); audit records the
     # real path/result (no blanket state='sent'). Method-only (no
     # schema/data; the 2 templates live in Meta).
-    'version': '17.0.1.9.0',
+    # 17.0.1.10.0 = B11/WA-5.2 debounced re-handoff: a returning client's
+    # follow-up on an EXISTING lead now appends to the chatter AND
+    # re-notifies the human handling it (assignee if owned, else
+    # re-escalate Munashe) -- DEBOUNCED to at most once per
+    # wa5_renotify_minutes (default 10), so the rapid triple-fire stays
+    # suppressed but a genuine later follow-up alerts a human (the WA-5.1
+    # escalate-once over-correction). Honest client ack (only promise
+    # contact when a human was (re)notified or already owns the lead).
+    # Chatter now uses markupsafe.Markup so <b>/<br/> render + the client
+    # text is auto-escaped (fixes the &lt;b&gt; leak since WA-5). NET-NEW
+    # neon.wa.client.session.last_notify column + wa5_renotify_minutes
+    # param -> -u + snapshot. No new Meta template (reuses the 2 Active).
+    'version': '17.0.1.10.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

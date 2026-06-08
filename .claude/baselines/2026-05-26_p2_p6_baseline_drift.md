@@ -345,3 +345,16 @@ a suppressed/failed template). ACCEPTED without code change:
    over-engineering for this surface. Same bucket as the WA-5.0 races.
 
 Owner: WA-5 maintenance. Logged per Tatenda 2026-06-08.
+
+## Accepted item 2026-06-08 (B11 WA-5.2 delta review)
+
+WA-5.2 (debounced re-handoff) delta review = 4 findings -> 0 real / 2
+partial / 2 refuted (clean). 1 partial applied (TTL reset now also clears
+`last_notify` -> full clean slate; `pwa5` TTL test added). 1 partial
+ACCEPTED without change: **debounce could in theory get stuck if
+`sess.write({last_notify})` fails AFTER the notify fired** (a returning
+follow-up would then never re-notify). Negligible: a single Datetime write
+on a constraint-free column doesn't fail in practice, and a full tx
+rollback would also roll back the notify's DB side-effects (chatter /
+activity), keeping state consistent. Revisit only if a constraint/trigger
+is later added to `last_notify`. Owner: WA-5 maintenance.
