@@ -43,7 +43,13 @@ INTENTS = frozenset({
     #   assign_open:<lead_id>            -- Munashe opens the assignee list
     #   assign_pick:<lead_id>:<user_id>  -- Munashe picks the salesperson
     #   assignee_decline:<lead_id>:<user_id> -- assignee bounces it back
+    # WA-5.3: the assignee message is THREE reply-buttons (Chat / Odoo /
+    # decline); a reply-button can't BE a URL (D3), so Chat/Odoo REPLY
+    # with the wa.me / Odoo deep-link when tapped.
+    #   assignee_chat:<lead_id>  -- bot replies with the client wa.me link
+    #   assignee_odoo:<lead_id>  -- bot replies with the Odoo lead link
     "assign_open", "assign_pick", "assignee_decline",
+    "assignee_chat", "assignee_odoo",
 })
 
 

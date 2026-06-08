@@ -85,7 +85,21 @@
     # text is auto-escaped (fixes the &lt;b&gt; leak since WA-5). NET-NEW
     # neon.wa.client.session.last_notify column + wa5_renotify_minutes
     # param -> -u + snapshot. No new Meta template (reuses the 2 Active).
-    'version': '17.0.1.10.0',
+    # 17.0.1.11.0 = B11/WA-5.3 assignee three-button consolidation +
+    # HARD idempotency lock. The in-window assignee message is now THREE
+    # reply-buttons [Chat with client] [Open in Odoo] [I'm not free]: Chat
+    # /Odoo are reply-buttons that REPLY with the wa.me / Odoo deep-link on
+    # tap (a reply-button can't BE a URL -- D3), decline is unchanged. New
+    # assignee_chat / assignee_odoo wa_payload intents + handlers. HARD
+    # lock: a per-lead pg_try_advisory_xact_lock serializes concurrent
+    # taps / webhook re-entry so assign / decline / re-notify each fire
+    # EXACTLY once (kills any duplicate-message flood). Decline-once: the
+    # first decline by the current owner always replies "sent it back to
+    # the team" + unassigns + notifies Munashe ONCE (never "already
+    # declined" on a first tap). Method-only (no schema/data; the cold-
+    # window template is unchanged, still the Meta-approved single
+    # quick-reply).
+    'version': '17.0.1.11.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

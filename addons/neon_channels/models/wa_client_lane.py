@@ -94,6 +94,14 @@ _WA5_TPL_LANG = "en_US"
 _WA5_RENOTIFY_PARAM = "neon_channels.wa5_renotify_minutes"
 _WA5_RENOTIFY_DEFAULT = 10
 
+# --- WA-5.3 HARD idempotency lock -----------------------------------
+# Postgres transaction-advisory-lock namespace for per-lead assignment
+# actions. Concurrent taps / re-entry on the SAME lead serialize so the
+# idempotency checks are authoritative -> exactly one assign / decline /
+# re-notify per event (kills any duplicate-message flood). Auto-released
+# at commit/rollback; non-blocking (pg_try_*).
+_WA5_LOCK_NS = 5593500
+
 
 class WhatsAppMessageClientLane(models.Model):
     _inherit = "neon.whatsapp.message"
@@ -259,13 +267,26 @@ class WhatsAppMessageClientLane(models.Model):
         stale = (not sess.last_notify) or (
             now - sess.last_notify >= timedelta(minutes=mins))
         notified = False
+        # WA-5.3 HARD lock: only ONE concurrent follow-up re-notifies (no
+        # duplicate ping if two messages land at once).
         if stale:
-            if lead.user_id:
-                self._wa5_notify_followup_assignee(lead, lead.user_id, body)
+            if self._wa5_try_lock(lead):
+                if lead.user_id:
+                    self._wa5_notify_followup_assignee(
+                        lead, lead.user_id, body)
+                else:
+                    self._wa5_notify_escalation(
+                        lead, lead.phone or from_e164)
+                sess.sudo().write({"last_notify": now})
+                notified = True
             else:
-                self._wa5_notify_escalation(lead, lead.phone or from_e164)
-            sess.sudo().write({"last_notify": now})
-            notified = True
+                # lock contention (a concurrent follow-up is handling it):
+                # the message is already on the chatter; log so ops has a
+                # signal rather than a silent skip.
+                _logger.warning(
+                    "WA-5 followup lock contention on lead %s -- re-notify "
+                    "skipped this turn (concurrent handler); message is on "
+                    "the chatter.", lead.id)
         if notified or lead.user_id:
             ack = ("Thanks -- we've flagged your follow-up to the team and "
                    "someone will be in touch shortly.")
@@ -285,19 +306,21 @@ class WhatsAppMessageClientLane(models.Model):
         client = lead.phone or ""
         snippet = " ".join((client_msg or "").split())[:160]
         summary = self._wa5_lead_summary(lead)
+        # WA-5.3: same THREE reply-buttons as the assignment notify; the
+        # follow-up snippet sits in the body, the links behind the buttons.
         body = (
             "\U0001F4E9 Your WhatsApp client sent a follow-up:\n\"%s\"\n%s\n"
-            "Client: %s\n\n\U0001F4AC Chat: %s\n\U0001F4CD Open in Odoo: %s"
-            % (snippet, summary, client, self._wa5_wame_link(client),
-               self._wa5_odoo_lead_link(lead)))
-        payload = self._wa5_payload("assignee_decline", lead.id, assignee.id)
+            "Client: %s\n\nTap an option below."
+            % (snippet, summary, client))
+        decline_payload = self._wa5_payload(
+            "assignee_decline", lead.id, assignee.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],
-            "buttons": [{"id": payload, "title": "\U0001F645 I'm not free"}]}
+            "buttons": self._wa5_assignee_buttons(lead, assignee)}
         self._wa5_staff_notify(
             bu, self._wa5_first_name(assignee), interactive, body,
-            _WA5_TPL_ASSIGNED, "follow-up: " + (snippet or summary), payload,
-            lead, _("Client follow-up -- respond"), assignee)
+            _WA5_TPL_ASSIGNED, "follow-up: " + (snippet or summary),
+            decline_payload, lead, _("Client follow-up -- respond"), assignee)
 
     @api.model
     def _wa5_is_handoff(self, text):
@@ -672,6 +695,35 @@ class WhatsAppMessageClientLane(models.Model):
         return True
 
     @api.model
+    def _wa5_try_lock(self, lead):
+        """WA-5.3 HARD idempotency: a Postgres transaction-advisory lock
+        keyed on the lead. Concurrent taps / re-entry on the same lead
+        SERIALIZE so the idempotency checks below are authoritative ->
+        exactly one assign / decline / re-notify per event. Non-blocking
+        (returns False if another live transaction holds it); auto-released
+        at commit/rollback. Within ONE request the same session re-acquires
+        freely -- the protection is across concurrent transactions."""
+        self.env.cr.execute(
+            "SELECT pg_try_advisory_xact_lock(%s, %s)",
+            (_WA5_LOCK_NS, int(lead.id)))
+        return bool(self.env.cr.fetchone()[0])
+
+    @api.model
+    def _wa5_assignee_buttons(self, lead, assignee):
+        """WA-5.3: the assignee's THREE reply-buttons -- Chat / Open in
+        Odoo / I'm not free. Chat & Odoo are reply-buttons that, on tap,
+        make the bot REPLY with the wa.me / Odoo deep-link (a reply-button
+        can't itself BE a URL -- D3). Decline carries the user_id for the
+        two-factor check."""
+        return [
+            {"id": self._wa5_payload("assignee_chat", lead.id),
+             "title": "\U0001F4AC Chat with client"},
+            {"id": self._wa5_payload("assignee_odoo", lead.id),
+             "title": "\U0001F4CD Open in Odoo"},
+            {"id": self._wa5_payload("assignee_decline", lead.id, assignee.id),
+             "title": "\U0001F645 I'm not free"},
+        ]
+
     def _wa5_handle_assign_tap(self, bot_user, intent, parts, reply_title=None):
         """Router for the assignment-loop taps, delegated from the
         Copilot ``handle_tap``. Returns the tap result dict (the ack to
@@ -682,7 +734,30 @@ class WhatsAppMessageClientLane(models.Model):
             return self._wa5_tap_assign_pick(bot_user, parts)
         if intent == "assignee_decline":
             return self._wa5_tap_assignee_decline(bot_user, parts)
+        if intent == "assignee_chat":
+            return self._wa5_tap_assignee_link(bot_user, parts, "chat")
+        if intent == "assignee_odoo":
+            return self._wa5_tap_assignee_link(bot_user, parts, "odoo")
         return self._wa5_safe(_("I couldn't route that selection."))
+
+    @api.model
+    def _wa5_tap_assignee_link(self, bot_user, parts, kind):
+        """WA-5.3: a Chat / Open-in-Odoo button tap -> reply to the tapper
+        with the wa.me / Odoo deep-link (the link the reply-button can't
+        carry directly). Read-only; no state change, no lock needed."""
+        lead = self._wa5_lead_from_parts(parts)
+        if not lead:
+            return self._wa5_safe(_("That lead is no longer available."))
+        if kind == "chat":
+            link = self._wa5_wame_link(lead.phone or "")
+            if not link:
+                return self._wa5_safe(
+                    _("No client number is on this lead."))
+            return self._wa5_safe(
+                _("\U0001F4AC Chat with the client here:\n%s") % link)
+        return self._wa5_safe(
+            _("\U0001F4CD Open the lead in Odoo:\n%s")
+            % self._wa5_odoo_lead_link(lead))
 
     @api.model
     def _wa5_tap_assign_open(self, bot_user, parts):
@@ -733,9 +808,13 @@ class WhatsAppMessageClientLane(models.Model):
         if assignee not in self._wa5_assignee_users():
             return self._wa5_safe(
                 _("That person isn't an assignable salesperson."))
-        # WA-5.0 idempotency: a repeat tap of the SAME pick is a no-op ack
-        # (no second write, no second notify) -- this killed the 5x
-        # "assigned to Tatenda" churn.
+        # WA-5.3 HARD lock: serialize concurrent taps on this lead so the
+        # idempotency check below is authoritative (exactly one assign +
+        # one notify, even under a rapid double-tap / webhook re-entry).
+        if not self._wa5_try_lock(lead):
+            return self._wa5_safe(_("That's being processed -- one moment."))
+        # idempotency: a repeat tap of the SAME pick is a no-op ack (no
+        # second write, no second notify) -- killed the 5x churn.
         if lead.sudo().user_id.id == assignee.id:
             return self._wa5_safe(
                 _("%s already has this lead.")
@@ -748,25 +827,28 @@ class WhatsAppMessageClientLane(models.Model):
 
     @api.model
     def _wa5_notify_assignee(self, lead, assignee):
-        """Notify the chosen salesperson (window-aware -- WA-5.1)."""
+        """Notify the chosen salesperson (window-aware -- WA-5.1). WA-5.3:
+        in-window message is THREE reply-buttons (Chat / Open in Odoo /
+        I'm not free); the links ride behind the Chat/Odoo buttons, not in
+        the body. The cold-window template (1 quick-reply, Meta-approved)
+        carries the decline payload."""
         bu = self.env["neon.bot.user"].sudo().search(
             [("user_id", "=", assignee.id), ("active", "=", True)], limit=1)
         client = lead.phone or ""
         summary = self._wa5_lead_summary(lead)
         body = (
-            "You've been assigned a new WhatsApp lead:\n%s\nClient: %s\n\n"
-            "\U0001F4AC Chat with the client: %s\n\U0001F4CD Open in Odoo: "
-            "%s\n\nIf you can't take it, tap below and it goes back to the "
-            "team."
-            % (summary, client, self._wa5_wame_link(client),
-               self._wa5_odoo_lead_link(lead)))
-        payload = self._wa5_payload("assignee_decline", lead.id, assignee.id)
+            "\U0001F4E9 You've been assigned a WhatsApp lead:\n%s\n"
+            "Client: %s\n\nTap an option below."
+            % (summary, client))
         interactive = {
             "kind": "buttons", "body": body[:1024],
-            "buttons": [{"id": payload, "title": "\U0001F645 I'm not free"}]}
+            "buttons": self._wa5_assignee_buttons(lead, assignee)}
+        # the template (cold window) keeps its single approved quick-reply.
+        decline_payload = self._wa5_payload(
+            "assignee_decline", lead.id, assignee.id)
         self._wa5_staff_notify(
             bu, self._wa5_first_name(assignee), interactive, body,
-            _WA5_TPL_ASSIGNED, summary, payload, lead,
+            _WA5_TPL_ASSIGNED, summary, decline_payload, lead,
             _("New WhatsApp lead assigned to you"), assignee)
 
     @api.model
@@ -783,6 +865,11 @@ class WhatsAppMessageClientLane(models.Model):
                 "(lead %s)", bot_user.user_id.id, assignee.id, lead.id)
             return self._wa5_safe(
                 _("This assignment isn't linked to your number."))
+        # WA-5.3 HARD lock: serialize concurrent declines so the FIRST tap
+        # alone runs the unassign + bounce (Munashe notified ONCE); a true
+        # double-tap can never duplicate.
+        if not self._wa5_try_lock(lead):
+            return self._wa5_safe(_("That's being processed -- one moment."))
         # WA-5.0 split-states (the prod bug: all three collapsed into a
         # wrong "already reassigned"):
         current = lead.sudo().user_id

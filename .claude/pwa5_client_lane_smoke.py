@@ -460,12 +460,19 @@ try:
         WM.handle_inbound(list_tap_msg(pick_a, ESC_FROM), {})
         lead.invalidate_recordset()
         nbtn = last("buttons", A_PHONE)
-        ndec = wa_payload.decode(secret, nbtn[3][0]["id"]) if nbtn else None
+        dbtns = [wa_payload.decode(secret, b["id"])
+                 for b in (nbtn[3] if nbtn else [])]
+        decb = next((d for d in dbtns if d and d[0] == "assignee_decline"),
+                    None)
         check("D4: assign_pick set lead.user_id = assignee_a",
               lead.user_id.id == a_u.id, lead.user_id.login)
-        check("D4: assignee notified with an assignee_decline button",
-              ndec and ndec[0] == "assignee_decline"
-              and int(ndec[1][1]) == a_u.id, ndec)
+        check("D4: WA-5.3 assignee notify = 3 buttons "
+              "(assignee_chat / assignee_odoo / assignee_decline)",
+              nbtn and len(nbtn[3]) == 3
+              and {d[0] for d in dbtns if d}
+              == {"assignee_chat", "assignee_odoo", "assignee_decline"}
+              and decb and int(decb[1][1]) == a_u.id,
+              [d[0] if d else None for d in dbtns])
 
         # D5/D6: decline two-factor -- WRONG sender refused first
         dec_a = WM._wa5_payload("assignee_decline", lead.id, a_u.id)
@@ -769,6 +776,73 @@ try:
         check("TTL: >24h reset clears step + lead_id + last_notify (clean slate)",
               st2.step == "greeted" and not st2.lead_id
               and not st2.last_notify)
+
+        # =========================================================
+        # J -- WA-5.3 three-button assignee + chat/odoo link replies +
+        #      decline-once + hard-lock idempotency
+        # =========================================================
+        CJ_E164, CJ_FROM = "+263880001050", "263880001050"
+        WM.handle_inbound(
+            text_msg("hi pricing for a product launch", CJ_FROM), {})
+        lead_j = Lead.search([("phone", "=", CJ_E164)], limit=1)
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_j.id, a_u.id), ESC_FROM), {})
+        lead_j.invalidate_recordset()
+
+        # J1: 'Chat with client' tap -> reply carries the wa.me link
+        _sent.clear()
+        WM.handle_inbound(tap_msg(
+            WM._wa5_payload("assignee_chat", lead_j.id), A_FROM), {})
+        rc = last("text", A_FROM)
+        check("J1: 'Chat with client' tap -> reply carries the wa.me link",
+              rc and "wa.me/" in rc[2] and _digits(CJ_E164) in rc[2],
+              rc[2] if rc else None)
+
+        # J2: 'Open in Odoo' tap -> reply carries the /web#id= lead link
+        _sent.clear()
+        WM.handle_inbound(tap_msg(
+            WM._wa5_payload("assignee_odoo", lead_j.id), A_FROM), {})
+        ro = last("text", A_FROM)
+        check("J2: 'Open in Odoo' tap -> reply carries the Odoo lead link",
+              ro and ("/web#id=%s" % lead_j.id) in ro[2],
+              ro[2] if ro else None)
+
+        # J3: FIRST decline by the owner -> 'sent it back', user_id cleared,
+        # NEVER 'already declined' on a first tap
+        _sent.clear()
+        WM.handle_inbound(tap_msg(
+            WM._wa5_payload("assignee_decline", lead_j.id, a_u.id), A_FROM),
+            {})
+        lead_j.invalidate_recordset()
+        ad = last("text", A_FROM)
+        check("J3: first decline -> 'sent it back' + cleared, NOT "
+              "'already declined'",
+              not lead_j.user_id and ad
+              and "sent it back to the team" in ad[2]
+              and "already declined" not in ad[2].lower(),
+              ad[2] if ad else None)
+        be = last("buttons", ESC_PHONE)
+        check("J3b: bounce re-notified Munashe ONCE (assign_open button)",
+              be and (wa_payload.decode(secret, be[3][0]["id"])
+                      or [None])[0] == "assign_open")
+
+        # J4: hard-lock helper acquires (sanity; cross-tx protection isn't
+        # unit-testable in a single shell transaction)
+        check("J4: _wa5_try_lock acquires the per-lead advisory lock",
+              WM._wa5_try_lock(lead_j) is True)
+
+        # J5: repeat assign_pick of the SAME user -> no-op ack (idempotent)
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_j.id, b_u.id), ESC_FROM), {})
+        lead_j.invalidate_recordset()
+        _sent.clear()
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_j.id, b_u.id), ESC_FROM), {})
+        rr = last("text", ESC_FROM)
+        check("J5: repeat assign_pick (same user) -> no-op ack ('already has')",
+              lead_j.user_id.id == b_u.id and rr
+              and "already has this lead" in rr[2].lower(),
+              rr[2] if rr else None)
 
     # ---- regression bar --------------------------------------------
     check("REG: 3 WA-5 intents in wa_payload INTENTS",
