@@ -121,7 +121,19 @@
     # re-sent (unaudited). Fix: request.env(su=True).flush_all() so the
     # deferred recompute runs as superuser (matching handle_inbound's sudo).
     # Method-only.
-    'version': '17.0.1.13.0',
+    # 17.0.1.14.0 = B11/WA-5.6: the MANAGER (escalation) in-window message
+    # now renders the SAME THREE reply-buttons as the assignee --
+    # [Chat with client] [Open in Odoo] [Assign salesperson] (new
+    # escalation_chat / escalation_odoo intents reusing the lead-based link
+    # reply; assign_open = the existing assignee list, unchanged). Applied
+    # to BOTH _wa5_notify_escalation + the decline-bounce. Client number
+    # kept in the body. The assignee interactive path is untouched. Cold-
+    # window templates keep their single approved quick-reply (>3-button
+    # mix is an in-window-only feature -- known cold-template limit).
+    # Method-only. (Cold wa5_lead_assigned enrichment -- client number +
+    # wa.me URL button -- is a SEPARATE Meta-template resubmission, pending
+    # Tatenda's verification of the proposed structure.)
+    'version': '17.0.1.14.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

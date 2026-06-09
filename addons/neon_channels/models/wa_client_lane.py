@@ -670,23 +670,25 @@ class WhatsAppMessageClientLane(models.Model):
     # ================================================================
     @api.model
     def _wa5_notify_escalation(self, lead, client_e164):
-        """Notify the escalation target (window-aware -- WA-5.1). WA-5.4
-        (FIX 3a): clean SHORT body + the single Assign button -- the raw
-        wa.me/Odoo URLs are removed (the manager is assigning, not chatting
-        the client; the cluttered raw links made the button look absent).
-        The cold-window template likewise carries only name + summary +
-        the Assign quick-reply."""
+        """Notify the escalation target (window-aware -- WA-5.1). WA-5.5:
+        the in-window interactive now carries the SAME THREE reply-buttons
+        as the assignee -- [Chat with client] [Open in Odoo] [Assign
+        salesperson] (Chat/Odoo reply with the wa.me/Odoo link on tap;
+        Assign opens the assignee list). Client number kept in the body.
+        Cold-window template stays the single Assign quick-reply (the known
+        cold-template limit -- <=3 reply-buttons is an in-window-only
+        feature)."""
         esc = self._wa5_escalation_botuser()
         summary = self._wa5_lead_summary(lead)
         body = (
             "\U0001F195 New WhatsApp lead needs an owner:\n%s\nClient: %s\n\n"
-            "Tap below to assign a salesperson."
+            "Choose an option below."
             % (summary, client_e164))
+        # the cold-window template carries only the Assign quick-reply.
         payload = self._wa5_payload("assign_open", lead.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],
-            "buttons": [{"id": payload,
-                         "title": "\U0001F465 Assign salesperson"}]}
+            "buttons": self._wa5_escalation_buttons(lead)}
         self._wa5_staff_notify(
             esc, self._wa5_first_name(esc.user_id) if esc else "team",
             interactive, body, _WA5_TPL_HANDOFF, summary, payload, lead,
@@ -744,6 +746,21 @@ class WhatsAppMessageClientLane(models.Model):
              "title": "\U0001F645 I'm not free"},
         ]
 
+    @api.model
+    def _wa5_escalation_buttons(self, lead):
+        """WA-5.5: the MANAGER's THREE reply-buttons -- Chat / Open in Odoo
+        / Assign salesperson. Mirrors the assignee's 3-button treatment
+        (same renderer + the lead-based chat/odoo link replies); the third
+        button is the existing assign-list flow (assign_open)."""
+        return [
+            {"id": self._wa5_payload("escalation_chat", lead.id),
+             "title": "\U0001F4AC Chat with client"},
+            {"id": self._wa5_payload("escalation_odoo", lead.id),
+             "title": "\U0001F4CD Open in Odoo"},
+            {"id": self._wa5_payload("assign_open", lead.id),
+             "title": "\U0001F465 Assign salesperson"},
+        ]
+
     def _wa5_handle_assign_tap(self, bot_user, intent, parts, reply_title=None):
         """Router for the assignment-loop taps, delegated from the
         Copilot ``handle_tap``. Returns the tap result dict (the ack to
@@ -754,9 +771,9 @@ class WhatsAppMessageClientLane(models.Model):
             return self._wa5_tap_assign_pick(bot_user, parts)
         if intent == "assignee_decline":
             return self._wa5_tap_assignee_decline(bot_user, parts)
-        if intent == "assignee_chat":
+        if intent in ("assignee_chat", "escalation_chat"):
             return self._wa5_tap_assignee_link(bot_user, parts, "chat")
-        if intent == "assignee_odoo":
+        if intent in ("assignee_odoo", "escalation_odoo"):
             return self._wa5_tap_assignee_link(bot_user, parts, "odoo")
         return self._wa5_safe(_("I couldn't route that selection."))
 
@@ -910,22 +927,22 @@ class WhatsAppMessageClientLane(models.Model):
     @api.model
     def _wa5_bounce_to_escalation(self, lead, declined_by):
         """ALWAYS back to Munashe (never auto-reassign, never unowned-
-        and-silent). Window-aware (WA-5.1); same Assign-button shape as
-        the first notify."""
+        and-silent). Window-aware (WA-5.1); WA-5.5: SAME three reply-buttons
+        as the first escalation (Chat / Open in Odoo / Assign) for a
+        consistent reassign view. Client number kept in the body."""
         esc = self._wa5_escalation_botuser()
         who = declined_by.name or declined_by.login
         summary = "%s -- declined by %s, please reassign" % (
             self._wa5_lead_summary(lead), who)
-        # WA-5.4 (FIX 3a): clean short body + the Assign button; no raw URLs.
         body = (
             "⤴️ %s declined the WhatsApp lead -- it's back with "
-            "you to reassign:\n%s\nClient: %s\n\nTap below to reassign."
+            "you to reassign:\n%s\nClient: %s\n\nChoose an option below."
             % (who, self._wa5_lead_summary(lead), lead.phone or ""))
+        # cold-window template keeps the single Assign quick-reply.
         payload = self._wa5_payload("assign_open", lead.id)
         interactive = {
             "kind": "buttons", "body": body[:1024],
-            "buttons": [{"id": payload,
-                         "title": "\U0001F465 Assign salesperson"}]}
+            "buttons": self._wa5_escalation_buttons(lead)}
         self._wa5_staff_notify(
             esc, self._wa5_first_name(esc.user_id) if esc else "team",
             interactive, body, _WA5_TPL_HANDOFF, summary, payload, lead,

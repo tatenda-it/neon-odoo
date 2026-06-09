@@ -226,6 +226,17 @@ try:
         return [e for e in _sent
                 if isinstance(e, tuple) and _digits(e[1]) == _digits(to)]
 
+    def has_intent(btn_evt, intent):
+        # WA-5.6: escalation/bounce now carry 3 buttons -- find an intent
+        # among them rather than assuming a fixed position.
+        if not btn_evt:
+            return False
+        for b in btn_evt[3]:
+            d = wa_payload.decode(secret, b["id"])
+            if d and d[0] == intent:
+                return True
+        return False
+
     with ExitStack() as st:
         st.enter_context(patch.object(WMcls, "send_message", s_msg))
         st.enter_context(patch.object(WMcls, "send_buttons", s_buttons))
@@ -377,16 +388,20 @@ try:
         _sent.clear()
         WM._wa5_notify_escalation(lead, CLIENT_E164)
         esc_btn = last("buttons", ESC_PHONE)
-        dec = wa_payload.decode(secret, esc_btn[3][0]["id"]) if esc_btn else None
-        check("C1: escalation notified with a signed assign_open button",
-              dec and dec[0] == "assign_open" and int(dec[1][0]) == lead.id,
-              dec)
-        check("C1: WA-5.4 escalation body is CLEAN (no raw wa.me/Odoo URLs) "
-              "+ has the Assign button",
+        edec = [wa_payload.decode(secret, b["id"])
+                for b in (esc_btn[3] if esc_btn else [])]
+        check("C1: WA-5.6 escalation = 3 reply-buttons incl. signed "
+              "assign_open on the lead",
+              esc_btn and len(esc_btn[3]) == 3
+              and [d[0] for d in edec]
+              == ["escalation_chat", "escalation_odoo", "assign_open"]
+              and all(int(d[1][0]) == lead.id for d in edec),
+              [d[0] if d else None for d in edec])
+        check("C1: WA-5.4/5.6 escalation body is CLEAN (no raw wa.me/Odoo "
+              "URLs) + keeps the client number",
               esc_btn and "wa.me/" not in esc_btn[2]
               and "/web#id=" not in esc_btn[2]
-              and "assign a salesperson" in esc_btn[2].lower()
-              and len(esc_btn[3]) == 1, esc_btn[2] if esc_btn else None)
+              and CLIENT_E164 in esc_btn[2], esc_btn[2] if esc_btn else None)
         check("C2: activity fallback on the lead (handoff never lost)",
               Act.search_count(
                   [("res_model", "=", "crm.lead"),
@@ -494,10 +509,9 @@ try:
         lead.invalidate_recordset()
         check("D5: assigned user's decline CLEARS user_id (unowned)",
               not lead.user_id)
-        check("D5: decline bounces back to escalation (assign_open button)",
-              (lambda e: e and (wa_payload.decode(secret, e[3][0]["id"])
-                                or [None])[0] == "assign_open")(
-                  last("buttons", ESC_PHONE)))
+        check("D5: decline bounces back to escalation (assign_open among "
+              "the 3 buttons)",
+              has_intent(last("buttons", ESC_PHONE), "assign_open"))
         check("D7: NEVER auto-reassigned -- still unowned after decline",
               not lead.user_id)
 
@@ -612,10 +626,9 @@ try:
               ackG and "sent it back to the team" in ackG[2]
               and "reassigned" not in ackG[2].lower(),
               ackG[2] if ackG else None)
-        check("G2: bounce re-notifies Munashe (warm -> assign_open buttons)",
-              (lambda e: e and (wa_payload.decode(secret, e[3][0]["id"])
-                                or [None])[0] == "assign_open")(
-                  last("buttons", ESC_PHONE)))
+        check("G2: bounce re-notifies Munashe (assign_open among the 3 "
+              "buttons)",
+              has_intent(last("buttons", ESC_PHONE), "assign_open"))
         # G3: same user declines AGAIN (now unowned) -> 'already declined'
         _sent.clear()
         WM.handle_inbound(tap_msg(dec_e, A_FROM), {})
@@ -825,10 +838,9 @@ try:
               and "sent it back to the team" in ad[2]
               and "already declined" not in ad[2].lower(),
               ad[2] if ad else None)
-        be = last("buttons", ESC_PHONE)
-        check("J3b: bounce re-notified Munashe ONCE (assign_open button)",
-              be and (wa_payload.decode(secret, be[3][0]["id"])
-                      or [None])[0] == "assign_open")
+        check("J3b: bounce re-notified Munashe ONCE (assign_open among the "
+              "3 buttons)",
+              has_intent(last("buttons", ESC_PHONE), "assign_open"))
 
         # J4: hard-lock helper acquires (sanity; cross-tx protection isn't
         # unit-testable in a single shell transaction)
@@ -988,6 +1000,76 @@ try:
               lead_k6.user_id.id == a_u.id and rr6
               and "already has this lead" in rr6[2].lower(),
               rr6[2] if rr6 else None)
+
+        # =========================================================
+        # L -- WA-5.6 MANAGER (escalation) THREE-button message
+        # =========================================================
+        CL_E164, CL_FROM = "+263880001070", "263880001070"
+        WM.handle_inbound(
+            text_msg("hi pricing for a corporate retreat", CL_FROM), {})
+        lead_l = Lead.search([("phone", "=", CL_E164)], limit=1)
+        _sent.clear()
+        WM._wa5_notify_escalation(lead_l, CL_E164)   # esc warm -> interactive
+        eb = last("buttons", ESC_PHONE)
+        ed = [wa_payload.decode(secret, b["id"]) for b in (eb[3] if eb else [])]
+        check("L1: escalation = 3 reply-buttons "
+              "(escalation_chat / escalation_odoo / assign_open) on the lead",
+              eb and len(eb[3]) == 3
+              and [d[0] for d in ed]
+              == ["escalation_chat", "escalation_odoo", "assign_open"]
+              and all(int(d[1][0]) == lead_l.id for d in ed),
+              [d[0] if d else None for d in ed])
+        check("L1: escalation body keeps the client number",
+              eb and CL_E164 in eb[2], eb[2] if eb else None)
+
+        # L2: Chat tap -> wa.me reply; Odoo tap -> lead-link reply
+        _sent.clear()
+        WM.handle_inbound(tap_msg(
+            WM._wa5_payload("escalation_chat", lead_l.id), ESC_FROM), {})
+        rcl = last("text", ESC_FROM)
+        check("L2: escalation_chat tap -> wa.me link reply",
+              rcl and "wa.me/" in rcl[2] and _digits(CL_E164) in rcl[2],
+              rcl[2] if rcl else None)
+        _sent.clear()
+        WM.handle_inbound(tap_msg(
+            WM._wa5_payload("escalation_odoo", lead_l.id), ESC_FROM), {})
+        rol = last("text", ESC_FROM)
+        check("L2: escalation_odoo tap -> Odoo lead-link reply",
+              rol and ("/web#id=%s" % lead_l.id) in rol[2],
+              rol[2] if rol else None)
+
+        # L3: assign_open still opens the assignee LIST (unchanged flow)
+        _sent.clear()
+        WM.handle_inbound(tap_msg(
+            WM._wa5_payload("assign_open", lead_l.id), ESC_FROM), {})
+        check("L3: assign_open still renders the assignee LIST (unchanged)",
+              last("list", ESC_FROM) is not None)
+
+        # L4: the decline-bounce to Munashe ALSO carries the 3 buttons
+        WM.handle_inbound(list_tap_msg(
+            WM._wa5_payload("assign_pick", lead_l.id, a_u.id), ESC_FROM), {})
+        _sent.clear()
+        WM.handle_inbound(tap_msg(
+            WM._wa5_payload("assignee_decline", lead_l.id, a_u.id), A_FROM),
+            {})
+        bb = last("buttons", ESC_PHONE)
+        bd = [wa_payload.decode(secret, b["id"]) for b in (bb[3] if bb else [])]
+        check("L4: decline-bounce to Munashe = same 3 buttons "
+              "(chat / odoo / assign)",
+              bb and len(bb[3]) == 3
+              and [d[0] for d in bd]
+              == ["escalation_chat", "escalation_odoo", "assign_open"],
+              [d[0] if d else None for d in bd])
+
+        # L5: the ASSIGNEE path is UNCHANGED (its 3 buttons end in
+        # assignee_decline, NOT assign_open)
+        ab = [wa_payload.decode(secret, b["id"])
+              for b in WM._wa5_assignee_buttons(lead_l, a_u)]
+        check("L5: assignee buttons untouched "
+              "(chat / odoo / assignee_decline)",
+              [d[0] for d in ab]
+              == ["assignee_chat", "assignee_odoo", "assignee_decline"],
+              [d[0] for d in ab])
 
     # ---- regression bar --------------------------------------------
     check("REG: 3 WA-5 intents in wa_payload INTENTS",

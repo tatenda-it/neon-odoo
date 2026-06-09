@@ -48,8 +48,14 @@ INTENTS = frozenset({
     # with the wa.me / Odoo deep-link when tapped.
     #   assignee_chat:<lead_id>  -- bot replies with the client wa.me link
     #   assignee_odoo:<lead_id>  -- bot replies with the Odoo lead link
+    # WA-5.5: the MANAGER (escalation) message gets the SAME 3-button
+    # treatment -- Chat / Odoo reply-buttons alongside the existing
+    # assign_open (the assignee list). Same lead-based link replies.
+    #   escalation_chat:<lead_id>  -- bot replies with the client wa.me link
+    #   escalation_odoo:<lead_id>  -- bot replies with the Odoo lead link
     "assign_open", "assign_pick", "assignee_decline",
     "assignee_chat", "assignee_odoo",
+    "escalation_chat", "escalation_odoo",
 })
 
 
