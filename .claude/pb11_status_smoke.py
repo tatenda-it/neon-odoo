@@ -51,14 +51,14 @@ try:
     from odoo.addons.neon_status.models.neon_status_live import (
         _REPORTED_MODULES)
     mv = data["module_versions"]
-    check("module_versions: 3 rows in reported order",
+    check("module_versions: reported modules, in reported order",
           [m["name"] for m in mv] == list(_REPORTED_MODULES),
           [m["name"] for m in mv])
     check("module_versions: every version is a non-empty string",
           all(isinstance(m["version"], str) and m["version"] not in ("", "—")
               for m in mv),
           [(m["name"], m["version"]) for m in mv])
-    check("module_versions: all 3 report state 'installed'",
+    check("module_versions: every reported module is 'installed'",
           all(m["state"] == "installed" for m in mv),
           [(m["name"], m["state"]) for m in mv])
 

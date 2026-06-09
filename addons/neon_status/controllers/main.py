@@ -42,12 +42,12 @@ STATUS_BOARD_GROUPS = ()
 # editable constants. Only the "Live from prod" box reads real-time
 # values (via neon.status.live). Bump these numbers as the programme
 # moves; the donut + bars + WA cards all derive from this one block.
-OVERALL_PCT = 88
+OVERALL_PCT = 89
 
 TRACKS = [
     {"key": "core", "name": "Core ERP Programme", "pct": 91,
      "accent": "purple"},
-    {"key": "ai", "name": "AI Equipment Module", "pct": 82,
+    {"key": "ai", "name": "AI Equipment Module", "pct": 86,
      "accent": "teal"},
     {"key": "hr", "name": "HR & Payroll", "pct": 92,
      "accent": "amber"},
@@ -84,17 +84,32 @@ WA_MODULES = [
              "'as bookkeeper' override; routes only among lenses held "
              "(never widens access); '🔖 as <lens>' surfaced; verified "
              "on prod (Kudzaiishe)."},
-    {"key": "WA-5", "title": "Client lane", "pct": 90,
+    {"key": "WA-5", "title": "Client lane", "pct": 100,
+     "state": "live",
+     "body": "DONE & VERIFIED (neon_channels 17.0.1.17.0) — first "
+             "client-facing surface: sandboxed client intake + raw-lead "
+             "capture, 3-button assignee message (Chat / Open in Odoo / "
+             "I'm not free), escalation→Munashe + assignment loop. The "
+             "morning green run proved assign-persistence (leads keep "
+             "their user_id), clean decline, and no duplication; the "
+             "~hourly Meta re-delivery flood root cause (a public-env "
+             "flush rolling back the assignment) is fixed via the "
+             "su=True webhook flush. Minor sub-checks remain (Munashe "
+             "3-button + cold-template phone round-trips) — post-go-live "
+             "polish, not blocking done."},
+    {"key": "WA-6", "title": "Crew + OD equipment face", "pct": 85,
      "state": "verifying",
-     "body": "BUILT & deployed (neon_channels 17.0.1.12.0) — first "
-             "client-facing surface: client intake + raw-lead capture, "
-             "3-button assignee message (Chat / Open in Odoo / I'm not "
-             "free), escalation→Munashe + assignment loop; the "
-             "assign-rollback / duplication / decline root cause "
-             "(native CRM assignment notification read as Public → 403 → "
-             "rollback) is fixed on prod. FINAL live pass pending: "
-             "assign-persistence + decline re-test (needs Munashe to "
-             "drive the assign side)."},
+     "body": "DEPLOYED (neon_crew_comms 17.0.1.2.0 + neon_channels "
+             "17.0.1.17.0; 11 wa6_ intents live; wa6_od_login set) — "
+             "Face 2 free-text FINALIZE (OD initiates → I'll finalize / "
+             "send to crew chief → text the gear list → matcher → "
+             "confirm / fix → dated reservations) + Face 3 WAREHOUSE "
+             "checkout / check-in (narrow per-job lead/chief gate; runs "
+             "as the real tapping user for an honest audit). Sales "
+             "Face 1 deferred. Built on the PROVEN equipment engine — no "
+             "reimplementation. Pending: in-window real-phone proof + "
+             "Meta approval of the wa6_equip_finalize template "
+             "(submitted)."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
@@ -110,15 +125,18 @@ TRACK_MILESTONES = [
                      "M12.3 parked.",
     },
     {
-        "name": "AI Equipment Module", "pct": 82, "accent": "teal",
+        "name": "AI Equipment Module", "pct": 86, "accent": "teal",
         "live": "AI core = B1, B2 Conflict Engine, B3, B13 doc-gen, "
                 "B14; B4 / B5 ready-to-fork. Field-tech arm = B11 "
-                "WhatsApp (live frontier; WA-0–WA-4 done — rails, memory "
-                "+ interactive renderer, crew-ops confirmations, readiness "
-                "digest, dual-role lens routing).",
-        "remaining": "WA-5 client lane built + deployed, IN FINAL "
-                     "VERIFICATION (live assign-persistence + decline "
-                     "re-test pending — not yet credited as done); B10 "
+                "WhatsApp — WA-0–WA-4 done (rails, memory + interactive "
+                "renderer, crew-ops confirmations, readiness digest, "
+                "dual-role lens routing), WA-5 client lane DONE & "
+                "VERIFIED, WA-6 crew + OD equipment face DEPLOYED (in "
+                "verification). Equipment flow proven end-to-end on prod "
+                "(reserve→checkout→transfer→check-in, cleaned to "
+                "baseline).",
+        "remaining": "WA-6 in final verification (in-window real-phone "
+                     "proof + Meta approval of wa6_equip_finalize); B10 "
                      "crew scheduler pending; B8 mobile / B9 QR / B16 "
                      "predictive deferred; B12 Drive dropped.",
     },
@@ -171,12 +189,23 @@ DONE_VERIFIED = [
     "explicit override; routes only among lenses the user holds, never "
     "widens access; audit records the applied lens; verified on prod "
     "with Kudzaiishe).",
+    "B11 WA-5 client lane live & verified (first client-facing surface — "
+    "sandboxed client intake + raw-lead capture; 3-button assignee "
+    "message [Chat / Open in Odoo / I'm not free]; escalation→Munashe + "
+    "assignment loop with two-factor decline; assign-persistence + clean "
+    "decline + no-duplication proven on prod; the ~hourly Meta "
+    "re-delivery flood root cause — a public-env flush rolling back the "
+    "assignment — fixed via the su=True webhook flush).",
+    "Equipment flow no-compromise prod proof (reserve → checkout → "
+    "transfer → check-in verified end-to-end on the live workshop "
+    "engine, then cleaned back to baseline) — the foundation the WA-6 "
+    "equipment face reuses.",
 ]
 
 DECIDED_NOT_BUILT = [
-    # WA-5 client lane is now BUILT + deployed (in final verification) --
-    # see the WhatsApp card; it is deliberately NOT in "Done & verified"
-    # until the live assign-persistence + decline re-test is green.
+    # WA-5 client lane is DONE & VERIFIED (now in "Done & verified");
+    # WA-6 crew + OD equipment face is DEPLOYED and in final verification
+    # (see the WhatsApp cards) -- neither is "decided not built".
     "B10 crew scheduler.",
     "B4 sub-hire drafting / B5 post-event reconciliation — "
     "ready-to-fork.",

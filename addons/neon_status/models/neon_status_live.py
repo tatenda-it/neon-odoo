@@ -21,9 +21,16 @@ aggregates only.
 """
 from odoo import api, fields, models
 
-# The three modules whose installed versions the board reports. Kept as
-# a module-level constant so it reads as one obvious list. (B11.)
-_REPORTED_MODULES = ("neon_ai_core", "neon_channels", "neon_dashboard")
+# The modules whose installed versions the board reports. Kept as a
+# module-level constant so it reads as one obvious list. (B11.) Read LIVE
+# from prod (ir.module.module), so versions never go stale. Added the
+# operational/field-tech modules so the equipment story is verifiable on
+# the board: neon_jobs (workshop + transfer-accept datetime fix) and
+# neon_crew_comms (the WA-2/WA-3/WA-6 bridge -- WA-6 equipment face home).
+_REPORTED_MODULES = (
+    "neon_ai_core", "neon_channels", "neon_dashboard",
+    "neon_jobs", "neon_crew_comms",
+)
 
 
 class NeonStatusLive(models.AbstractModel):

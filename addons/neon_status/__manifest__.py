@@ -28,7 +28,16 @@
     # (it's built) but deliberately kept OUT of "Done & verified".
     # Overall (88) + AI-track (82) figures UNCHANGED -- WA-5 not credited
     # as complete yet. Constants/template only.
-    "version": "17.0.1.0.5",
+    # 17.0.1.0.6 = WA-5 -> DONE & VERIFIED (card live/100%, into "Done &
+    # verified" with the ~hourly flood root-cause fix); WA-6 NEW card
+    # "Crew + OD equipment face" -> in verification / 85% (deployed
+    # neon_crew_comms 17.0.1.2.0 + neon_channels 17.0.1.17.0, 11 wa6_
+    # intents, wa6_od_login set; pending real-phone proof + Meta
+    # template). Added the equipment end-to-end prod proof to "Done &
+    # verified". AI-track 82->86, overall 88->89 (milestone-count; WA-6
+    # NOT over-claimed). Live box now reports neon_jobs + neon_crew_comms
+    # (read live from prod). Constants + live-collector list only.
+    "version": "17.0.1.0.6",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
