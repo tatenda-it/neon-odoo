@@ -133,7 +133,16 @@
     # Method-only. (Cold wa5_lead_assigned enrichment -- client number +
     # wa.me URL button -- is a SEPARATE Meta-template resubmission, pending
     # Tatenda's verification of the proposed structure.)
-    'version': '17.0.1.14.0',
+    # 17.0.1.15.0 = B11/WA-5.7: wire the cold-window assignee path to the
+    # now Meta-ACTIVE wa5_lead_assigned -- which is 3-param (name, summary,
+    # CLIENT PHONE) + the "I'm not free" quick-reply, NO URL button (wa.me
+    # URL buttons are Meta-banned, so dropped). _wa5_staff_notify gains
+    # template_extra_params (appended in declared order); _wa5_notify_
+    # assignee + _wa5_notify_followup_assignee pass [client phone] as the
+    # 3rd body param so a cold assignee gets the client number in the body.
+    # Param count is a contract (132000). No send_template URL enhancement
+    # needed (URL button dropped). Method-only.
+    'version': '17.0.1.15.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

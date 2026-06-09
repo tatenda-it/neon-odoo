@@ -320,7 +320,8 @@ class WhatsAppMessageClientLane(models.Model):
         self._wa5_staff_notify(
             bu, self._wa5_first_name(assignee), interactive, body,
             _WA5_TPL_ASSIGNED, "follow-up: " + (snippet or summary),
-            decline_payload, lead, _("Client follow-up -- respond"), assignee)
+            decline_payload, lead, _("Client follow-up -- respond"), assignee,
+            template_extra_params=[client or "—"])   # WA-5.7: 3-param tmpl
 
     @api.model
     def _wa5_is_handoff(self, text):
@@ -458,7 +459,7 @@ class WhatsAppMessageClientLane(models.Model):
     def _wa5_staff_notify(self, recipient_bu, recipient_name, interactive,
                           body, template_name, template_summary,
                           button_payload, lead, activity_summary,
-                          activity_user):
+                          activity_user, template_extra_params=None):
         """WA-5.1 window-aware staff notify -- the ONE primitive behind all
         three notify paths:
           * window OPEN  -> the rich free-form interactive (today's path);
@@ -486,10 +487,15 @@ class WhatsAppMessageClientLane(models.Model):
             # closed window: a template re-opens it. send_template honours
             # res.partner.wa_opt_out + writes its OWN (truthful) audit row.
             try:
+                # body params in DECLARED ORDER (count is a contract -- the
+                # 132000 lesson). wa5_lead_handoff = [name, summary] (2);
+                # wa5_lead_assigned = [name, summary, client phone] (3, via
+                # template_extra_params).
                 res = self.sudo().send_template(
                     recipient_bu.phone_number, template_name,
                     language=_WA5_TPL_LANG,
-                    body_params=[recipient_name, template_summary],
+                    body_params=([recipient_name, template_summary]
+                                 + (template_extra_params or [])),
                     quick_reply_payloads=[button_payload],
                     recipient_partner=partner,
                     audit_body="[%s] %s" % (template_name, template_summary))
@@ -881,12 +887,16 @@ class WhatsAppMessageClientLane(models.Model):
             "kind": "buttons", "body": body[:1024],
             "buttons": self._wa5_assignee_buttons(lead, assignee)}
         # the template (cold window) keeps its single approved quick-reply.
+        # WA-5.7: the Meta-Active wa5_lead_assigned is 3-param
+        # (name, summary, CLIENT PHONE) -- pass the client as the 3rd body
+        # param so a cold assignee gets the number in the message body.
         decline_payload = self._wa5_payload(
             "assignee_decline", lead.id, assignee.id)
         self._wa5_staff_notify(
             bu, self._wa5_first_name(assignee), interactive, body,
             _WA5_TPL_ASSIGNED, summary, decline_payload, lead,
-            _("New WhatsApp lead assigned to you"), assignee)
+            _("New WhatsApp lead assigned to you"), assignee,
+            template_extra_params=[client or "—"])
 
     @api.model
     def _wa5_tap_assignee_decline(self, bot_user, parts):

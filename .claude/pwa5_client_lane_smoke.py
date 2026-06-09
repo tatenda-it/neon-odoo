@@ -567,17 +567,21 @@ try:
               and not any(t["name"] == "wa5_lead_handoff"
                           for t in _templates))
 
-        # closed-window assignee -> template wa5_lead_assigned (2 params)
+        # closed-window assignee -> wa5_lead_assigned (WA-5.7: 3 params --
+        # name, summary, CLIENT PHONE -- matching the Meta-Active template)
         _sent.clear(); _templates.clear()
         WM._wa5_notify_assignee(lead_e, b_u)   # b_u is COLD
         tA = next((t for t in _templates
                    if _digits(t["to"]) == _digits(B_PHONE)), None)
         qrA = wa_payload.decode(secret, tA["qr"][0]) if (tA and tA["qr"]) \
             else None
-        check("F3: closed window (assignee) -> wa5_lead_assigned, en_US, 2 params",
+        check("F3: closed window (assignee) -> wa5_lead_assigned, en_US, "
+              "3 params (name, summary, client) in order",
               tA and tA["name"] == "wa5_lead_assigned"
-              and len(tA["params"]) == 2 and tA["lang"] == "en_US", tA)
-        check("F3: assignee template carries the assignee_decline payload",
+              and len(tA["params"]) == 3 and tA["lang"] == "en_US"
+              and tA["params"][2] == (lead_e.phone or "—"), tA)
+        check("F3: assignee template carries the assignee_decline payload "
+              "(no URL button -- wa.me banned)",
               qrA and qrA[0] == "assignee_decline"
               and int(qrA[1][1]) == b_u.id, qrA)
         check("F3: closed-window send STILL lands the Odoo activity (D4)",
