@@ -84,7 +84,7 @@ WA_MODULES = [
              "'as bookkeeper' override; routes only among lenses held "
              "(never widens access); '🔖 as <lens>' surfaced; verified "
              "on prod (Kudzaiishe)."},
-    {"key": "WA-5", "title": "Client lane", "pct": 100,
+    {"key": "WA-5", "title": "Client lane", "pct": 95,
      "state": "live",
      "body": "DONE & VERIFIED (neon_channels 17.0.1.17.0) — first "
              "client-facing surface: sandboxed client intake + raw-lead "

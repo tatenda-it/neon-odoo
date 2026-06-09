@@ -37,7 +37,12 @@
     # verified". AI-track 82->86, overall 88->89 (milestone-count; WA-6
     # NOT over-claimed). Live box now reports neon_jobs + neon_crew_comms
     # (read live from prod). Constants + live-collector list only.
-    "version": "17.0.1.0.6",
+    # 17.0.1.0.7 = WA-5 card 100% -> 95% (still LIVE / Done & verified):
+    # surfaces the two outstanding phone round-trip sub-checks (Munashe
+    # 3-button render + cold-template render) numerically, not just in the
+    # card body. WA-5 stays a DONE milestone -> AI-track (86) + overall
+    # (89) rollups UNCHANGED by milestone count. Single constant.
+    "version": "17.0.1.0.7",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
