@@ -69,6 +69,7 @@ SMOKES=(
   pwa3_readiness
   pwa4_dual_role
   pwa5_client_lane
+  pwa6_equipment
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

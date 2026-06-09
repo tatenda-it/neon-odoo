@@ -316,6 +316,48 @@ Both are NON-security (the hard sandbox + the assignment two-factor are
 intact and verified). Owner: WA-5 maintenance. Logged per Tatenda
 2026-06-08.
 
+## Update 2026-06-09 (B11 WA-6 crew+OD equipment face) — regression 2808/2825
+
+First FULL regression since 2026-06-06 (WA-4/WA-5 closed via delta
+reviews, not full runs). 11 Python suites failed; **all pre-existing
+drift, none a WA-6 regression**. WA-6's diff is `neon_channels/
+wa_payload.py` (intents only) + `neon_crew_comms/*` (new WA-6 method
+bank + equip session + event-job button) — it touches NO HR / neon_core
+/ res.groups / state-machine / pricing / inventory code.
+
+* 8 documented-drift suites unchanged: p2m2, p2m4, p2m5, p2m7_7 (6/8),
+  p6m3 (18/28), pb1_datamodel (29/30), pb2_conflict (34/35),
+  pb14c_quantity_on_hand (23/24).
+* WA-6 + every reused family GREEN: pwa1 28/28, pwa2 27/27, pwa3 18/18,
+  pwa4 29/29, pwa5 125/125, **pwa6 58/58**; p5m5 19/19, p5m7 15/15,
+  pb14 25/25, pb14d 8/8.
+
+### phr_r1a (crash) + phr_r1b_1 (17/18, T-R1b1-17) + phr_r3b_c4_housekeeping (5/6, T-R3b-C4-05)
+NEW vs the 2026-06-06 set, but the SAME `neon_core_groups.xml`
+`(6,0,[...])` REPLACE grant-wipe documented in the 2026-06-01 artifact
+(#2) + memory `neon_core_noupdate_grant_wipe`: a neon_core reload during
+the WA-3→WA-5 era wiped the `hr.group_hr_manager` implied grant that
+neon_hr's `_enforce_hr_confidentiality` adds to
+`neon_core.group_neon_superuser`. The failing assertions are verbatim
+the wipe ("superuser implies hr.group_hr_manager (grant restored):
+False"; "OD/MD (superuser) HAS Time Off manager"; phr_r1a superuser
+AccessError on hr.employee).
+
+**PROVEN not-WA-6 (2026-06-09):** a shell read confirmed
+`group_neon_superuser implies hr.group_hr_manager == False` (wiped);
+calling `_enforce_hr_confidentiality(env)` flipped it to True and ALL
+THREE suites went fully green (phr_r1a 46/46, phr_r1b_1 18/18,
+phr_r3b_c4 6/6) with NO code change. The grant was restored + committed
+on the dev DB. `-u neon_crew_comms` (WA-6's upgrade) runs DOWNSTREAM of
+neon_core and never re-runs it, so WA-6's build could not have caused
+the wipe — it predates this session.
+
+Note: the browser-smoke gate did NOT run — the pre-existing baseline
+Python failures exit run_regression.sh before the browser phase (true
+of every milestone on this dev DB). WA milestones carry no browser
+smokes (WhatsApp surface); WA-6's only Odoo UI is one gated inherited
+header button, verified by the live real-phone proof per the WA-6 plan.
+
 ## Accepted items 2026-06-08 (B11 WA-5.1 + WA-5.0 delta review)
 
 The WA-5.1/5.0 adversarial review (10 findings -> 5 real / 2 partial / 3

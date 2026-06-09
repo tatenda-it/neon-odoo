@@ -25,11 +25,27 @@
     # a DISABLED daily cron + manager-gated manual send, and the served
     # /neon/readiness manager board (neon_status pattern). New layer; no
     # new stored columns.
-    "version": "17.0.1.1.0",
+    # 17.0.1.2.0 = B11/WA-6 crew + OD equipment face. NEW layer:
+    #   * neon.wa.equip.session -- mapped-staff finalize conversation state
+    #     (one row per staff phone; JSON line buffer; TTL).
+    #   * whatsapp_message_wa6 -- the WA-6 method bank, intercepted in
+    #     handle_inbound BEFORE super() (disjoint from crew/WA-5 intents):
+    #     FACE 2 finalize (OD 3-button initiate -> free-text matcher ->
+    #     review/confirm/fix -> proven line.create + allocate) and FACE 3
+    #     warehouse checkout/check-in (reuse action_checkout[_all] + the
+    #     check-in wizard headlessly). Gates are XML-id/login only (the
+    #     group-58 lesson); two-factor = HMAC payload + sender-phone ->
+    #     resolved-user re-check; per-job advisory lock ns 5593600.
+    #   * commercial.event.job header button (OD-initiate), gated to the OD
+    #     login / Neon Superuser in the planning/prep window.
+    # WA-6 intents registered in neon_channels' wa_payload. No new cron.
+    "version": "17.0.1.2.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
-               "WA-3: manager readiness digest + served board.",
+               "WA-3: manager readiness digest + served board. "
+               "WA-6: crew + OD equipment face (finalize + warehouse "
+               "checkout/check-in over WhatsApp).",
     "author": "Neon Events Elements Pvt Ltd",
     "website": "https://neonhiring.com",
     "category": "Neon/Operations",
@@ -47,6 +63,7 @@
         "security/ir.model.access.csv",
         "wizards/crew_notify_wizard_views.xml",
         "views/commercial_job_views.xml",
+        "views/commercial_event_job_views.xml",
         "views/readiness_templates.xml",
         "data/ir_cron.xml",
         "data/readiness_cron.xml",

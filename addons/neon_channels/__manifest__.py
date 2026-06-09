@@ -159,7 +159,14 @@
     # numbers + shows a notification. Shell: env['neon.whatsapp.message']
     # ._wa5_reset_test_client("+263..."). Adds a crm.tag + 2 data records +
     # a server action -> -u + snapshot. No new tool / intent / RBAC change.
-    'version': '17.0.1.16.0',
+    # 17.0.1.17.0 = B11/WA-6 intent registry: +11 wa6_* intents in
+    # wa_payload.INTENTS (the encode/decode contract for the crew + OD
+    # equipment face -- handlers live in the neon_crew_comms bridge). PURE
+    # registry touch: no model / data / schema / RBAC change. Bumped so the
+    # version-only deploy check reflects that wa_payload.py changed; the
+    # running webhook worker picks up the new INTENTS on the force-recreate
+    # (a module-level Python constant -- a -u alone never reloads it).
+    'version': '17.0.1.17.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

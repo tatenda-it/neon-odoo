@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- WA-6: OD-initiated equipment finalize. A header button on the
+         event job that sends the initiator a 3-button finalize choice on
+         WhatsApp. Gated by wa6_can_initiate (OD login OR Neon Superuser)
+         and limited to the planning/prep window where gear is finalized.
+         Mirrors the WA-2 "Notify Crew" header-button pattern. -->
+    <record id="commercial_event_job_view_form_wa6" model="ir.ui.view">
+        <field name="name">commercial.event.job.form.wa6.finalize</field>
+        <field name="model">commercial.event.job</field>
+        <field name="inherit_id"
+               ref="neon_jobs.commercial_event_job_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/field[@name='state']" position="before">
+                <button name="action_wa6_initiate_finalize" type="object"
+                        string="Finalize Equipment (WhatsApp)"
+                        class="btn-secondary"
+                        invisible="not wa6_can_initiate or state not in ('planning', 'prep')"/>
+                <field name="wa6_can_initiate" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

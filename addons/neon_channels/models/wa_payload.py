@@ -56,6 +56,28 @@ INTENTS = frozenset({
     "assign_open", "assign_pick", "assignee_decline",
     "assignee_chat", "assignee_odoo",
     "escalation_chat", "escalation_odoo",
+    # WA-6: crew + OD equipment face (MAPPED staff; routed by the
+    # neon_crew_comms bridge's handle_inbound intercept BEFORE super(),
+    # never by the Copilot handle_tap -- same pattern as crew_confirm).
+    # Face 2 -- OD initiate 3-button choice (each carries event_job_id):
+    #   wa6_fin_self:<event_job_id>   -- "I'll finalize" (OD keeps it)
+    #   wa6_fin_route:<event_job_id>  -- "Send to crew chief" (routes)
+    #   wa6_fin_odoo:<event_job_id>   -- "Open in Odoo" (deep-link reply)
+    # Face 2 -- finalize review (carry the equip session id):
+    #   wa6_confirm:<session_id>          -- confirm the matched list
+    #   wa6_fix:<session_id>              -- "Fix an item" (open row list)
+    #   wa6_fixrow:<session_id>:<index>   -- pick the row to patch
+    # Face 3 -- warehouse checkout (event_job_id / line_id):
+    #   wa6_co_all:<event_job_id>   -- check out ALL gear
+    #   wa6_co_item:<event_job_id>  -- item-by-item (open line list)
+    #   wa6_co_line:<line_id>       -- check out ONE line
+    # Face 3 -- warehouse check-in (event_job_id):
+    #   wa6_ci_good:<event_job_id>  -- all returned good (headless wizard)
+    #   wa6_ci_flag:<event_job_id>  -- flag an item (bounce to Odoo)
+    "wa6_fin_self", "wa6_fin_route", "wa6_fin_odoo",
+    "wa6_confirm", "wa6_fix", "wa6_fixrow",
+    "wa6_co_all", "wa6_co_item", "wa6_co_line",
+    "wa6_ci_good", "wa6_ci_flag",
 })
 
 

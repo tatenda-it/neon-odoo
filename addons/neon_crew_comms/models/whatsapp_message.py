@@ -25,9 +25,16 @@ class WhatsAppMessage(models.Model):
 
     @api.model
     def handle_inbound(self, message, metadata):
-        # Crew tap intercept FIRST (covers unmapped freelancers). If it's
-        # not a crew tap, fall through to the WA-0/WA-1 router unchanged.
+        # Crew tap intercept FIRST (WA-2; covers unmapped freelancers). If
+        # it's not a crew tap, fall through.
         handled = self._wa_maybe_crew_tap(message)
+        if handled is not None:
+            return handled
+        # WA-6 equipment face NEXT: a wa6_* tap, or a finalize free-text
+        # turn for a phone with a live equip session. Disjoint from the
+        # crew/WA-5 intents -- returns None for anything else so the WA-5 /
+        # Copilot router runs unchanged (no WA-4 regression).
+        handled = self._wa6_maybe_intercept(message)
         if handled is not None:
             return handled
         return super().handle_inbound(message, metadata)
