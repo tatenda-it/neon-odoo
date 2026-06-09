@@ -32,6 +32,7 @@ from datetime import timedelta
 from markupsafe import Markup
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.tools import html2plaintext
 
 from . import wa_payload
@@ -101,6 +102,17 @@ _WA5_RENOTIFY_DEFAULT = 10
 # re-notify per event (kills any duplicate-message flood). Auto-released
 # at commit/rollback; non-blocking (pg_try_*).
 _WA5_LOCK_NS = 5593500
+
+# --- WA-5 test-infra: designated standing test number(s) ------------
+# CSV of E.164 in this param == the numbers we may RESET between test
+# runs (so ONE standing number can re-run the whole client flow as a
+# "fresh" client instead of hunting for a new UNMAPPED number each time).
+# EMPTY by default -> nothing is a test number, and the reset helper
+# REFUSES anything not on this list, so it can NEVER wipe a real client.
+# Every lead a designated number creates is stamped the TEST-CLIENT tag
+# (see _wa5_create_client_lead) for easy find + purge.
+_WA5_TEST_NUMBERS_PARAM = "neon_channels.wa5_test_numbers"
+_WA5_TEST_TAG_XMLID = "neon_channels.crm_tag_test_client"
 
 
 class WhatsAppMessageClientLane(models.Model):
@@ -362,6 +374,13 @@ class WhatsAppMessageClientLane(models.Model):
             vals["stage_id"] = stage.id
         if tag:
             vals["tag_ids"] = [(4, tag.id)]
+        # test-infra: stamp the TEST-CLIENT tag on any lead a DESIGNATED
+        # standing test number creates, so the reset helper (and a human)
+        # can find + purge test leads without touching real client data.
+        if self._wa5_is_test_number(from_e164):
+            ttag = self._wa5_test_tag()
+            if ttag:
+                vals.setdefault("tag_ids", []).append((4, ttag.id))
         if src:
             vals["source_id"] = src.id
         if med:
@@ -974,3 +993,125 @@ class WhatsAppMessageClientLane(models.Model):
             return None
         u = self.env["res.users"].sudo().browse(int(parts[idx]))
         return u if u.exists() else None
+
+    # ================================================================
+    # TEST-INFRA -- reset a DESIGNATED test client number (re-runnable)
+    # ================================================================
+    # We designate ONE standing test number (the wa5_test_numbers param)
+    # and RESET it between runs instead of hunting for a fresh UNMAPPED
+    # number every time. Every lead a designated number creates is stamped
+    # the TEST-CLIENT tag (_wa5_create_client_lead) so the reset can find +
+    # purge test leads WITHOUT ever touching real client data -- and the
+    # reset REFUSES any number not on the designated list.
+    @api.model
+    def _wa5_test_numbers(self):
+        """The designated test-number set -- canonical E.164 parsed from
+        the CSV config param (comma- or semicolon-separated). Blank /
+        unparseable tokens are skipped; empty param -> empty set."""
+        raw = self.env["ir.config_parameter"].sudo().get_param(
+            _WA5_TEST_NUMBERS_PARAM, "") or ""
+        out = set()
+        for token in raw.replace(";", ",").split(","):
+            token = token.strip()
+            if not token:
+                continue
+            out.add(to_e164(token) or token)
+        return out
+
+    @api.model
+    def _wa5_is_test_number(self, phone_e164):
+        return bool(phone_e164) and phone_e164 in self._wa5_test_numbers()
+
+    @api.model
+    def _wa5_test_tag(self):
+        return self.env.ref(_WA5_TEST_TAG_XMLID, raise_if_not_found=False)
+
+    @api.model
+    def _wa5_reset_test_client(self, phone):
+        """Reset ONE designated test number to a 'fresh client' slate so
+        the SAME number can re-run greeting -> quote -> handoff -> assign
+        -> decline repeatedly. Deletes the TEST-CLIENT-tagged leads it
+        created, RESETS its intake session in place (step=greeted,
+        lead_id/last_notify cleared), and purges its own WhatsApp audit
+        rows. REFUSES any number not on the designated list, so it can
+        NEVER wipe a real client. Returns a count summary dict."""
+        e164 = to_e164(phone) or (phone or "").strip()
+        if not self._wa5_is_test_number(e164):
+            raise UserError(_(
+                "%s is not a designated WA-5 test number. Add it to the "
+                "'%s' parameter (Settings -> Technical -> Parameters) "
+                "before resetting -- the reset NEVER touches a number that "
+                "isn't explicitly designated, so it can't wipe a real "
+                "client.") % (e164, _WA5_TEST_NUMBERS_PARAM))
+
+        # 1) delete the TEST-CLIENT-tagged leads this number created.
+        #    DOUBLE-gated -- phone match AND the TEST-CLIENT tag -- so a
+        #    real lead that merely shares the number is never caught.
+        tag = self._wa5_test_tag()
+        lead_domain = [("phone", "=", e164)]
+        if tag:
+            lead_domain.append(("tag_ids", "in", tag.id))
+        leads = self.env["crm.lead"].sudo().search(lead_domain)
+        n_leads = len(leads)
+        leads.unlink()
+
+        # 2) reset the intake session IN PLACE (don't delete -- the model
+        #    is perm_unlink=0 and a unique(phone) row is meant to persist;
+        #    clearing its state == a fresh greeting on the next inbound,
+        #    matching _get_or_start's own TTL-reset write).
+        sess = self.env["neon.wa.client.session"].sudo().search(
+            [("phone_number", "=", e164)])
+        n_sess = len(sess)
+        if sess:
+            sess.write({"step": "greeted", "lead_id": False,
+                        "last_notify": False})
+
+        # 3) ⚠️ DECISION: purge the test number's OWN WhatsApp audit rows
+        #    (inbound + client-directed acks) so each run starts clean and
+        #    the audit log isn't flooded with repeated test traffic. This
+        #    is a sudo unlink that DELIBERATELY bypasses the model's
+        #    perm_unlink=0 -- justified + bounded because it ONLY ever
+        #    touches a DESIGNATED test number, never real client/staff
+        #    traffic (staff-notify rows are keyed to staff phones, not the
+        #    client number, so they are untouched).
+        msgs = self.env["neon.whatsapp.message"].sudo().search(
+            [("phone_number", "=", e164)])
+        n_msgs = len(msgs)
+        msgs.unlink()
+
+        _logger.info(
+            "WA-5 test-client reset %s: %d lead(s) deleted, %d session(s) "
+            "reset, %d message(s) purged.", e164, n_leads, n_sess, n_msgs)
+        return {"phone": e164, "leads_deleted": n_leads,
+                "sessions_reset": n_sess, "messages_purged": n_msgs}
+
+    @api.model
+    def _wa5_reset_test_clients_action(self):
+        """Server-action entry: reset EVERY designated test number in one
+        click (selection is ignored -- there is normally one standing test
+        number). Returns a display_notification summarising the purge."""
+        nums = self._wa5_test_numbers()
+        if not nums:
+            return self._wa5_notify_action(
+                _("No designated test numbers"),
+                _("Set the 'neon_channels.wa5_test_numbers' parameter (CSV "
+                  "of E.164) in Settings -> Technical -> Parameters first."),
+                "warning")
+        leads = sess = msgs = 0
+        for num in sorted(nums):
+            res = self._wa5_reset_test_client(num)
+            leads += res["leads_deleted"]
+            sess += res["sessions_reset"]
+            msgs += res["messages_purged"]
+        return self._wa5_notify_action(
+            _("Test client(s) reset"),
+            _("%d number(s): %d lead(s) deleted, %d session(s) reset, %d "
+              "message(s) purged. Re-run the client flow now.")
+            % (len(nums), leads, sess, msgs),
+            "success")
+
+    @api.model
+    def _wa5_notify_action(self, title, message, kind):
+        return {"type": "ir.actions.client", "tag": "display_notification",
+                "params": {"title": title, "message": message,
+                           "type": kind, "sticky": False}}

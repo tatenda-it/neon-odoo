@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    WA-5 test-infra: a one-click server action to reset the DESIGNATED
+    standing test number(s) so the same number can re-run the whole
+    client intake flow as a "fresh" client.
+
+    * Bound to neon.wa.client.session, so it appears in that list's Action
+      (cog) menu, and is runnable from Settings / Technical / Server
+      Actions. Selection is IGNORED: it resets EVERY number on the
+      wa5_test_numbers param (there is normally one standing test number).
+    * groups_id = base.group_system: an admin-only test tool. (Odoo 17
+      server-action wrappers need an explicit groups_id, else run() falls
+      through the write-ACL check.)
+    * NOT noupdate, so code fixes to the action propagate on -u.
+-->
+<odoo>
+
+    <record id="action_wa5_reset_test_client" model="ir.actions.server">
+        <field name="name">Reset WA-5 Test Client</field>
+        <field name="model_id" ref="model_neon_wa_client_session"/>
+        <field name="binding_model_id" ref="model_neon_wa_client_session"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="groups_id" eval="[(4, ref('base.group_system'))]"/>
+        <field name="state">code</field>
+        <field name="code">action = env['neon.whatsapp.message']._wa5_reset_test_clients_action()</field>
+    </record>
+
+</odoo>

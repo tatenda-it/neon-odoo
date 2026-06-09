@@ -49,5 +49,24 @@
             <field name="value">10</field>
         </record>
 
+        <!-- WA-5 test-infra: the TEST-CLIENT tag, stamped on every lead a
+             DESIGNATED standing test number creates, so the reset helper
+             (and a human in the CRM) can find + purge test leads without
+             touching real client data. -->
+        <record id="crm_tag_test_client" model="crm.tag">
+            <field name="name">TEST-CLIENT</field>
+        </record>
+
+        <!-- WA-5 test-infra: the DESIGNATED standing test number(s), a
+             CSV of E.164 (e.g. "+263772000000,+263772000001"). EMPTY by
+             default, so NOTHING is treated as a test number until an admin
+             sets it here (or in Settings / Technical / Parameters). The
+             reset helper REFUSES any number not listed here, so it can
+             never wipe a real client. -->
+        <record id="wa5_test_numbers_param" model="ir.config_parameter">
+            <field name="key">neon_channels.wa5_test_numbers</field>
+            <field name="value"></field>
+        </record>
+
     </data>
 </odoo>

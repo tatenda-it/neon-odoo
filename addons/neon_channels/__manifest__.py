@@ -142,7 +142,24 @@
     # 3rd body param so a cold assignee gets the client number in the body.
     # Param count is a contract (132000). No send_template URL enhancement
     # needed (URL button dropped). Method-only.
-    'version': '17.0.1.15.0',
+    # 17.0.1.16.0 = B11/WA-5 TEST-INFRA: reset a DESIGNATED standing test
+    # number so the SAME number can re-run the whole client intake flow
+    # (greeting -> quote -> handoff -> assign -> decline) as a "fresh"
+    # client, instead of hunting for a new UNMAPPED number each run. New
+    # wa5_test_numbers config param (CSV of E.164; EMPTY default) DESIGNATES
+    # the test number(s); the reset REFUSES anything not listed so it can
+    # never wipe a real client. Every lead a designated number creates is
+    # stamped a new TEST-CLIENT crm.tag (auto, in _wa5_create_client_lead)
+    # for easy find + purge. _wa5_reset_test_client(phone): deletes the
+    # TEST-CLIENT-tagged leads (double-gated on phone AND tag), RESETS the
+    # intake session in place (step=greeted, lead_id/last_notify cleared --
+    # the model is perm_unlink=0), and purges the number's own WhatsApp
+    # audit rows. One-click UI: a base.group_system server action ("Reset
+    # WA-5 Test Client") bound to the session list resets all designated
+    # numbers + shows a notification. Shell: env['neon.whatsapp.message']
+    # ._wa5_reset_test_client("+263..."). Adds a crm.tag + 2 data records +
+    # a server action -> -u + snapshot. No new tool / intent / RBAC change.
+    'version': '17.0.1.16.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',
@@ -163,6 +180,10 @@
         'data/wa_config_params.xml',
         # WA-5: WhatsApp crm.tag + utm source/medium + escalation login.
         'data/wa5_client_data.xml',
+        # WA-5 test-infra: the one-click "Reset WA-5 Test Client" server
+        # action (references model_neon_wa_client_session, so AFTER the
+        # model is loaded; calls a method at run-time, not load-time).
+        'data/wa5_test_reset_action.xml',
         'views/whatsapp_config_views.xml',
         'views/twilio_config_views.xml',
         'views/bot_user_views.xml',

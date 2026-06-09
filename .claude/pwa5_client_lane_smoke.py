@@ -1075,6 +1075,110 @@ try:
               == ["assignee_chat", "assignee_odoo", "assignee_decline"],
               [d[0] for d in ab])
 
+        # =========================================================
+        # M -- TEST-INFRA: reset a DESIGNATED test client (re-runnable)
+        # =========================================================
+        from odoo.exceptions import UserError as _UserErr
+        ttag = env.ref("neon_channels.crm_tag_test_client",
+                       raise_if_not_found=False)
+        check("M0: TEST-CLIENT crm.tag installed", bool(ttag))
+
+        # designate a standing test number
+        TEST_E164, TEST_FROM = "+263880009999", "263880009999"
+        env["ir.config_parameter"].sudo().set_param(
+            "neon_channels.wa5_test_numbers", TEST_E164)
+        check("M0: number is designated; a non-listed number is not",
+              WM._wa5_is_test_number(TEST_E164)
+              and not WM._wa5_is_test_number("+263880008888"))
+
+        # run the flow: greet -> quote -> lead (auto-tagged TEST-CLIENT)
+        _sent.clear()
+        WM.handle_inbound(tap_msg("cl_quote", TEST_FROM), {})
+        WM.handle_inbound(
+            text_msg("Test gala, 01/12/2026, Harare", TEST_FROM), {})
+        lead_t = Lead.search([("phone", "=", TEST_E164)], limit=1)
+        sess_t = env["neon.wa.client.session"].sudo().search(
+            [("phone_number", "=", TEST_E164)], limit=1)
+        check("M1: a designated number's lead is auto-tagged TEST-CLIENT",
+              lead_t and ttag and ttag in lead_t.tag_ids)
+        check("M1: session reached 'done' with a lead (pre-reset state)",
+              sess_t.step == "done" and sess_t.lead_id.id == lead_t.id)
+
+        # reset
+        lead_t_id = lead_t.id
+        res = WM._wa5_reset_test_client(TEST_FROM)
+        sess_t.invalidate_recordset()
+        check("M2: reset DELETES the TEST-CLIENT lead",
+              not Lead.search_count([("id", "=", lead_t_id)])
+              and res["leads_deleted"] >= 1, res)
+        check("M2: reset RESETS the session to a fresh-greeting state",
+              sess_t.step == "greeted" and not sess_t.lead_id
+              and not sess_t.last_notify and res["sessions_reset"] == 1)
+        check("M2: reset PURGES the test number's own WhatsApp audit rows",
+              WM.search_count([("phone_number", "=", TEST_E164)]) == 0
+              and res["messages_purged"] >= 1, res)
+
+        # after reset, the SAME number greets FRESH (not a returning client)
+        _sent.clear(); _reset_spies()
+        WM.handle_inbound(text_msg("hi again", TEST_FROM), {})
+        g2 = last("buttons", TEST_E164)
+        check("M3: SAME number after reset -> fresh 3-button greeting "
+              "(not a returning-client follow-up), spies 0",
+              g2 and [b["id"] for b in g2[3]]
+              == ["cl_quote", "cl_services", "cl_team"]
+              and counters["run_turn"] == 0
+              and counters["handle_tap"] == 0,
+              [b["id"] for b in g2[3]] if g2 else None)
+
+        # SAFETY GATE: a NON-designated number is REFUSED (can't wipe a
+        # real client) -- and that client's lead is NOT deleted.
+        raised_rst = None
+        try:
+            WM._wa5_reset_test_client("+263880008888")
+        except _UserErr:
+            raised_rst = "UserError"
+        except Exception as e:  # noqa: BLE001
+            raised_rst = type(e).__name__
+        check("M4: reset REFUSES a non-designated number (UserError)",
+              raised_rst == "UserError", raised_rst)
+        check("M4: the real client's lead survives a refused reset attempt",
+              Lead.search_count([("id", "=", lead.id)]) == 1)
+
+        # a REAL (never-designated) client's lead is NOT tagged TEST-CLIENT
+        check("M5: a real (non-test) client's lead is NOT tagged TEST-CLIENT",
+              ttag and ttag not in lead.tag_ids)
+
+        # one-click server-action entry resets ALL designated numbers and
+        # returns a display_notification (the UI path)
+        WM.handle_inbound(tap_msg("cl_quote", TEST_FROM), {})
+        WM.handle_inbound(
+            text_msg("Another test, 02/12/2026, Harare", TEST_FROM), {})
+        check("M6: pre-action -- a fresh TEST-CLIENT lead exists",
+              Lead.search_count([("phone", "=", TEST_E164)]) == 1)
+        act = WM._wa5_reset_test_clients_action()
+        check("M6: server-action returns a success display_notification",
+              isinstance(act, dict)
+              and act.get("tag") == "display_notification"
+              and act["params"]["type"] == "success", act)
+        check("M6: server-action reset cleared the re-created test lead",
+              not Lead.search_count([("phone", "=", TEST_E164)]))
+
+        # empty designation -> the action is a friendly warning, no-op
+        env["ir.config_parameter"].sudo().set_param(
+            "neon_channels.wa5_test_numbers", "")
+        act0 = WM._wa5_reset_test_clients_action()
+        check("M7: no designated numbers -> warning notification (no crash)",
+              isinstance(act0, dict)
+              and act0["params"]["type"] == "warning", act0)
+
+        # the server-action record is installed + admin-gated
+        sa = env.ref("neon_channels.action_wa5_reset_test_client",
+                     raise_if_not_found=False)
+        check("M8: 'Reset WA-5 Test Client' server action installed, "
+              "bound to the session model, group_system-gated",
+              sa and sa.model_id.model == "neon.wa.client.session"
+              and env.ref("base.group_system") in sa.groups_id)
+
     # ---- regression bar --------------------------------------------
     check("REG: 3 WA-5 intents in wa_payload INTENTS",
           {"assign_open", "assign_pick", "assignee_decline"}
