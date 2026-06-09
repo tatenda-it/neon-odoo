@@ -266,12 +266,24 @@ class NeonEquipmentMovement(models.Model):
             # New fulfilled reservation on the destination so the
             # unit's "current event_job" is always the latest
             # fulfilled reservation.
+            # ⚠️ FIX (2026-06-09, tag:odoo-datetime-now-equal-strict-check):
+            # When the destination event_job has no event_date / schedule,
+            # _reservation_window_for_autocreate() returns (None, None).
+            # Defaulting BOTH sides to fields.Datetime.now() yields two
+            # equal (second-truncated) timestamps, which violates the
+            # neon.equipment.reservation CHECK (reserve_from < reserve_to)
+            # and rolls back the entire accept. Anchor reserve_from to
+            # now() and guarantee reserve_to is strictly later (rf + 1h).
+            # Surfaced by the 2026-06-09 equipment-flow prod proof (unit
+            # 231); a dated dest masks the bug, an undated one trips it.
             rf, rt = dest._reservation_window_for_autocreate()
+            rf = rf or fields.Datetime.now()
+            rt = rt or (rf + timedelta(hours=1))
             new_res = Reservation.create({
                 "event_job_id": dest.id,
                 "unit_id": unit.id,
-                "reserve_from": rf or fields.Datetime.now(),
-                "reserve_to": rt or fields.Datetime.now(),
+                "reserve_from": rf,
+                "reserve_to": rt,
                 "state": "fulfilled",
             })
             Movement.create({

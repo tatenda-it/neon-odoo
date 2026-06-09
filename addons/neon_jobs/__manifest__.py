@@ -73,7 +73,16 @@
     # snapshot row, attention urgency, click-through to a unit list
     # filtered to state='maintenance'. Patch bump -- additive
     # tile/compute/action; no model changes, no schema risk.
-    "version": "17.0.8.2.0",
+    # 17.0.8.2.1 = Transfer-accept window bugfix. _accept_atomic
+    # defaulted both reserve_from AND reserve_to to fields.Datetime.now()
+    # when the destination event_job had no event_date/schedule -> two
+    # equal (second-truncated) timestamps -> CHECK (reserve_from <
+    # reserve_to) violation -> whole accept rolled back. Now anchors
+    # reserve_from=now() and reserve_to=rf+1h when the window is empty.
+    # Surfaced by the 2026-06-09 equipment-flow prod proof. Method-only,
+    # no schema change. Regression test: p5m6 T333. [tag:odoo-datetime-
+    # now-equal-strict-check]
+    "version": "17.0.8.2.1",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema

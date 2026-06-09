@@ -120,10 +120,10 @@ def _find_pool(min_units, target_count):
     return found
 
 
-products_pool = _find_pool(min_units=1, target_count=16)
-assert len(products_pool) >= 13, (
-    "Need ≥13 distinct serial products with ≥1 active unit each; "
-    "got %d." % len(products_pool))
+products_pool = _find_pool(min_units=1, target_count=18)
+assert len(products_pool) >= 15, (
+    "Need ≥15 distinct serial products with ≥1 active unit each "
+    "(14 tests; T331 consumes 3 + T333 adds 1); got %d." % len(products_pool))
 _pool_iter = iter(products_pool)
 print("source_ej:", source_ej.name, "dest_ej:", dest_ej.name)
 print("crew chiefs: parent_job=", crew.login,
@@ -470,10 +470,65 @@ results["T332"] = ok
 # ============================================================
 print()
 print("=" * 72)
+print("T333 - accept transfer into an UNDATED destination (no "
+      "event_date/schedule) succeeds; reserve_from < reserve_to")
+print("=" * 72)
+# Regression for the 2026-06-09 _accept_atomic window bug
+# [tag:odoo-datetime-now-equal-strict-check]: a destination with an
+# empty reservation window made the accept default both ends to
+# Datetime.now() (equal, second-truncated) -> CHECK (from<to) violation.
+from unittest.mock import patch  # noqa: E402
+
+line333, unit333 = _make_checked_out_unit()
+dest333 = EventJob.sudo().create({"commercial_job_id": other_job.id})
+mvts333 = source_ej.with_user(manager)._initiate_transfer(
+    units=unit333, destination=dest333)
+mvt333 = mvts333[0]
+# Force the empty-window branch. event_date is a stored related off
+# commercial_job (required + NOT NULL) so it can't be NULLed on the dest;
+# stub the window helper to return (None, None) for this accept — the
+# same "reach the code path" affordance T328 uses with raw-SQL date
+# backdating. Pre-fix, _accept_atomic defaulted BOTH ends to now()
+# (equal) -> CHECK (reserve_from < reserve_to) IntegrityError. The fix
+# anchors reserve_from=now(), reserve_to=rf+1h.
+with patch.object(dest333.__class__, "_reservation_window_for_autocreate",
+                  return_value=(False, False)):
+    err333, _v = _try(
+        lambda: mvt333.with_user(manager).action_accept_transfer())
+new_res333 = Reservation.sudo().search([
+    ("unit_id", "=", unit333.id),
+    ("event_job_id", "=", dest333.id),
+    ("state", "=", "fulfilled"),
+], limit=1)
+delta333 = (
+    (new_res333.reserve_to - new_res333.reserve_from)
+    if (new_res333 and new_res333.reserve_from and new_res333.reserve_to)
+    else None)
+ok = (
+    err333 is None
+    and bool(new_res333)
+    and bool(new_res333.reserve_from)
+    and bool(new_res333.reserve_to)
+    and new_res333.reserve_from < new_res333.reserve_to
+    and delta333 == timedelta(hours=1)
+)
+print("  accept error:", type(err333).__name__ if err333 else None,
+      "(want None — pre-fix this raised an IntegrityError on the CHECK)")
+if new_res333:
+    print("  reserve_from:", new_res333.reserve_from,
+          " reserve_to:", new_res333.reserve_to,
+          " delta:", delta333, "(want 1:00:00)")
+print("T333:", "PASS" if ok else "FAIL")
+results["T333"] = ok
+
+
+# ============================================================
+print()
+print("=" * 72)
 print("FULL SUMMARY")
 print("=" * 72)
 order = ["T320", "T321", "T322", "T323", "T324", "T325", "T326",
-         "T327", "T328", "T329", "T330", "T331", "T332"]
+         "T327", "T328", "T329", "T330", "T331", "T332", "T333"]
 for k in order:
     v = results.get(k)
     mark = "PASS" if v is True else ("SKIP" if v is None else "FAIL")
