@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(git:*)",
       "Bash(docker:*)",
@@ -46,6 +47,13 @@
       "Read(./**)",
       "Edit(./**)",
       "Write(./**)"
+    ],
+    "ask": [
+      "Bash(ssh *)",
+      "Bash(docker *)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -r*)"
     ],
     "deny": [
       "Bash(rm -rf /:*)",
