@@ -225,3 +225,38 @@ When a real issue surfaces that's not blocking the current milestone:
 
 No hidden technical debt — every "I'll fix that later" becomes a named 
 backlog item.
+
+## Build ritual (self-managed — surface to the human ONLY at the marked gates)
+
+### Gates
+- GATE-0 (discovery): before any plan, read the real code/data — never design from memory. Report findings.
+- GATE-1 (scope): plan = files touched + data-model changes + test list + migration (if any) + manifest bumps.
+  ⛔ HUMAN GATE — wait for approval before building.
+- BUILD: build exactly to the approved plan. Flag (don't silently add) anything outside scope.
+- GATE-2 (report): footprint table, new-suite results, FULL regression vs the baseline file (any new
+  failure = stop), the ⚠️ decisions made during build.
+  ⛔ HUMAN GATE — wait for approval before commit/deploy.
+
+### Hard rules (non-negotiable, encode in every build)
+- Gate on XML ids via has_group(), NEVER numeric group ids (install-order drift).
+- All writes run as the real acting user (resolved phone→bot.user→res.users); bare sudo poisons actor_id.
+- New WA intents must be added to wa_payload.INTENTS or encode raises.
+- Advisory locks: fresh namespace per feature, never reuse.
+- Tests must exercise the REAL dispatch path (command→list→pick→receive→tap), never synthesised payloads
+  alone. A handler isn't a feature until something reaches it.
+- Tight command parsers: equals/startswith on a small set, never substring; include a false-positive test.
+
+### Deploy ritual
+- Sequence: commit (report sha) → prod git pull → [migration? dry-run on prod first, print row list,
+  ⛔ HUMAN GATE on the rows] → -u <modules> (one process) → ONE force-recreate.
+- The force-recreate is the real switch (module-level Python is in-worker memory; -u alone serves stale).
+  Confirm uptime reset — a swallowed recreate looks deployed but isn't.
+- Never two force-recreates simultaneously.
+- Bump every module whose .py changed, even registry-only (version checks must read true).
+- Post-deploy: report versions + ledger deltas for the human's independent read-only verification.
+
+### Record-keeping
+- After each milestone: append to the journal (what/why/sha/versions), update MEMORY.md (keep under size
+  limit — trim oldest detail, keep decisions), update the status board honestly (in-verification ≠ done;
+  done only after the real-phone/real-path proof passes).
+- Test fixtures: [TEST-*] name prefix, only test handsets, teardown after proof, ledger back to baseline.
