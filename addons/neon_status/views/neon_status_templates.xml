@@ -198,7 +198,7 @@ section{margin:34px 0;}
                         </div>
                         <div class="overall-copy">
                             <h2><t t-esc="overall_pct"/>% complete across three tracks</h2>
-                            <p>By milestone count, reflecting WA-0–WA-7 complete. Core platform
+                            <p>By milestone count, reflecting WA-0–WA-8 complete. Core platform
                                 near-done with the LMS track closed; HR well advanced; the AI
                                 module's active scope tightened — Drive dropped and the
                                 mobile/QR/predictive arm deferred — leaving WhatsApp (B11) as
@@ -225,9 +225,10 @@ section{margin:34px 0;}
             <!-- ============ 3. B11 WHATSAPP BREAKDOWN ============ -->
             <section>
                 <p class="sec-title">B11 WhatsApp — module breakdown (inside AI Equipment Module)</p>
-                <p class="note">WA-0 through WA-7 all live &amp; verified on prod — the
+                <p class="note">WA-0 through WA-8 all live &amp; verified on prod — the
                     phone-native ops cycle (crew select → finalize → checkout → check-in) is proven
-                    end-to-end on real phones; sales availability (Face 1) is the next build.</p>
+                    end-to-end on real phones, and sales availability (Face 1) — a read-only
+                    "free on &lt;date&gt;? &lt;gear&gt;" check — is now live &amp; verified.</p>
                 <div class="grid cards">
                     <t t-foreach="wa_modules" t-as="m">
                         <div class="card">

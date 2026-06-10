@@ -112,8 +112,7 @@ WA_MODULES = [
              "equipment engine (now quantity-aware, P5.M11). WA-6.2: the OD "
              "also STARTS finalize from WhatsApp (text \"finalize\" → list "
              "planning/prep from-scratch jobs → pick → the same 3-button "
-             "choice), retiring the laptop step as the primary entry. Sales "
-             "Face 1 deferred."},
+             "choice), retiring the laptop step as the primary entry."},
     {"key": "WA-7", "title": "Crew selection", "pct": 100,
      "state": "live",
      "body": "DONE & VERIFIED on a real phone (neon_crew_comms 17.0.1.5.0). "
@@ -125,6 +124,24 @@ WA_MODULES = [
              "via her WA-2 tap, crew_chief_id recomputed, nobody else "
              "touched (binding pick held). Two-factor throughout; new wa7_* "
              "intents (neon_channels 17.0.1.18.0)."},
+    {"key": "WA-8", "title": "Sales availability (Face 1)", "pct": 100,
+     "state": "live",
+     "body": "DONE & VERIFIED on a real phone (neon_crew_comms 17.0.1.6.1) — "
+             "the first sales-facing availability surface. An entitled "
+             "mapped staffer texts \"free on <date>? <gear>\" → a per-item "
+             "traffic light for that time-window: 🟢 spare / 🟡 tight, no "
+             "spare / 🔴 short, distinguishing \"only N in inventory\" from "
+             "\"N committed on these dates\" + naming the clashing event. "
+             "PURE READ — never books, holds, or quotes money. Time-window "
+             "overlap (same-day non-overlapping events share gear), "
+             "Harare→UTC conversion; a TYPED edit loop (a new date/time "
+             "re-checks the same gear), conservative full-day default, "
+             "day-before lock. A low-confidence name match is offered as a "
+             "suggestion (Reply 'yes' to check it), never silently answered "
+             "(WA-8.1). Reuses the WA-6 matcher + the P5.M11 availability "
+             "engine directly; neon_jobs unchanged; text-only (no new "
+             "intents). Re-proof passed: 🟡 no-spare + 🔎 suggestion live, "
+             "zero writes after the read."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
@@ -146,14 +163,15 @@ TRACK_MILESTONES = [
                 "checkout/check-in honour quantity_on_hand); B4 / B5 "
                 "ready-to-fork. Field-tech arm = B11 WhatsApp COMPLETE for "
                 "the built scope — WA-0–WA-4, WA-5 client lane, WA-6 crew + "
-                "OD equipment face (finalize + WA-6.1/6.2 dispatch), and WA-7 "
-                "crew selection — all DONE & VERIFIED on prod. The phone-"
+                "OD equipment face (finalize + WA-6.1/6.2 dispatch), WA-7 "
+                "crew selection, and WA-8 sales availability (read-only "
+                "Face 1) — all DONE & VERIFIED on prod. The phone-"
                 "native ops cycle is now real end-to-end: crew select → "
                 "finalize → checkout → check-in, each proven on real phones, "
-                "actor-audited, qoh balanced.",
+                "actor-audited, qoh balanced; sales can now check gear "
+                "availability for a date/time-window before quoting.",
         "remaining": "B10 crew scheduler pending; B8 mobile / B9 QR / B16 "
-                     "predictive deferred; B12 Drive dropped; sales Face 1 "
-                     "deferred.",
+                     "predictive deferred; B12 Drive dropped.",
     },
     {
         "name": "HR & Payroll", "pct": 92, "accent": "amber",

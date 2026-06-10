@@ -57,7 +57,14 @@
     # end-to-end; fixed the stale "WA-0-WA-4" overall + B11 intro paragraphs
     # to WA-0 through WA-7. Text-only; scores unchanged (WA-7 within the
     # already-counted WhatsApp arm).
-    "version": "17.0.1.0.10",
+    # 17.0.1.0.11 = WA-8 DONE (sales availability Face 1, real-phone proof +
+    # WA-8.1 re-proof passed): new WA-8 card live/100% ("Sales availability
+    # (Face 1)"); promoted Face 1 from the AI-track "remaining/deferred" list
+    # to live; intros + overall framing WA-0-WA-7 -> WA-0-WA-8; dropped the
+    # stale "Sales Face 1 deferred" tail from the WA-6 card. Text/constants
+    # only; scores UNCHANGED (90/90/90 -- one read-only face within the
+    # already-90% AI module, within rounding, same call as WA-6.2/WA-7).
+    "version": "17.0.1.0.11",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
