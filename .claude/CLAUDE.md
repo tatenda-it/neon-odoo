@@ -294,3 +294,9 @@ Everything not listed is yours to decide.
 
 When a hard gate is reached: present it in one compact block (what / why / exact blast radius /
 recommendation), then HOLD only on that item — continue any queued work that doesn't depend on it.
+
+## Post-deploy verification
+
+Post-deploy verification: do NOT ssh to prod for read-only checks. Report what should be verified
+(versions, fields, ledger deltas, expected states); the assistant verifies via the browser. SSH to
+prod is for deploy actions only (git pull, -u, force-recreate).
