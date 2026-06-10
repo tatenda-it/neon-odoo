@@ -12,3 +12,7 @@ from . import commercial_event_job_wa6
 # WA-7 -- crew selection (mapped OD/superuser). Method bank on
 # neon.whatsapp.message; intercept hook wired in whatsapp_message.
 from . import whatsapp_message_wa7
+# WA-8 -- Face 1 availability check (read-only). Method bank on
+# neon.whatsapp.message; intercept hook wired in whatsapp_message BETWEEN
+# the WA-7 and WA-6 intercepts.
+from . import whatsapp_message_wa8

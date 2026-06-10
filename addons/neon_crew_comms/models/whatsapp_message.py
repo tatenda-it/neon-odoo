@@ -39,6 +39,16 @@ class WhatsAppMessage(models.Model):
         handled = self._wa7_maybe_intercept(message)
         if handled is not None:
             return handled
+        # WA-8 availability check NEXT (READ-ONLY; broad mapped-staff gate):
+        # a re-check turn for a phone with a live av_check session, or the
+        # "free on <date>? <items>" command. Text-only (no taps/intents).
+        # Runs BEFORE WA-6 so an av_check session (which shares the equip-
+        # session row) is claimed here; returns None for anything else (incl.
+        # WA-6 sessions, non-commands, no-date or no-matched-item messages) so
+        # WA-6 / WA-5 / Copilot run unchanged.
+        handled = self._wa8_maybe_intercept(message)
+        if handled is not None:
+            return handled
         # WA-6 equipment face NEXT: a wa6_* tap, or a finalize free-text
         # turn for a phone with a live equip session. Disjoint from the
         # crew/WA-5 intents -- returns None for anything else so the WA-5 /

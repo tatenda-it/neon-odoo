@@ -87,7 +87,28 @@
     # (17.0.1.18.0). Confirm-time from-scratch re-check + advisory lock ns
     # 5593700. neon_jobs UNCHANGED (reuses the crew model + constraints). No
     # new access power (OD/superuser already holds can_edit_crew via manager).
-    "version": "17.0.1.5.0",
+    # 17.0.1.6.0 = WA-8 Face 1 availability check on WhatsApp (PURE READ; no
+    # books/holds/writes, NO money). An entitled MAPPED user texts a tight
+    # command + a date (+ optional times) + a gear list ("free on 14 Aug?
+    # 2.5 black truss x4, distro x2") -> a traffic-light availability PER ITEM
+    # for that time-window, distinguishing "only N in inventory" from "N
+    # committed on these dates" + naming the competing event. REUSES the WA-6
+    # matcher (_wa6_match_one) + the P5.M11 engine primitives directly
+    # (ConflictEngine._available_for_product supply MINUS
+    # neon.equipment.reservation._committed_qty_for_product committed; serial
+    # = active units, quantity = quantity_on_hand; transfer-destination holds
+    # counted for free) -- neon_jobs UNCHANGED. TEXT-ONLY MVP: the locked edit
+    # loop is TYPED on a sticky av_check session -- items stick, a typed new
+    # date/time re-checks the SAME items, no time -> a conservative FULL-DAY
+    # window, a date that is today/past is locked. Soft 2h TTL (vs the 12h
+    # finalize TTL). TIMEZONE: Harare-local windows converted to UTC before
+    # the overlap math. Entitlement widened (read-only, pre-authorised): OD/
+    # superuser + sales/manager/crew-leader tiers + this-job chief/lead + any
+    # active mapped bot.user. Intercept BETWEEN WA-7 and WA-6, claims ONLY
+    # av_check; the tight parser (command + parseable date + >=1 matched item)
+    # never steals a turn. NO buttons -> NO wa8_* intents -> neon_channels
+    # UNTOUCHED. New av_check session step + _start_av; no new column / RBAC.
+    "version": "17.0.1.6.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
