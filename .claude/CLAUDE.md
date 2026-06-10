@@ -260,3 +260,37 @@ backlog item.
   limit — trim oldest detail, keep decisions), update the status board honestly (in-verification ≠ done;
   done only after the real-phone/real-path proof passes).
 - Test fixtures: [TEST-*] name prefix, only test handsets, teardown after proof, ledger back to baseline.
+
+## Autonomy amendment (supersedes earlier gate behaviour where they conflict)
+
+DEFAULT = DECIDE, LOG, PROCEED. Do not ask the human anything that is not a HARD GATE below.
+For every judgment call (scope cuts, naming, vocabulary, test depth, version bumps, file layout,
+pattern choices), decide it yourself using: (1) precedent in this repo and its memory files,
+(2) the established patterns (list-then-pick, tight parsers, two-factor, real-path tests),
+(3) the safest reversible option. Record each decision in a DECISIONS section of the next report.
+Decisions are surfaced for visibility, not approval — proceed without waiting.
+
+This collapses the former GATE-1 and GATE-2 pauses: plan → build → test → commit → deploy → verify
+runs end-to-end unattended when the SAFE-DEPLOY criteria hold:
+- no migration touching existing rows
+- nothing sent to any real (non-test) phone; only [TEST-*] fixtures and the approved test handsets
+- no money-adjacent behaviour
+- zero new regression failures vs the baseline file
+- footprint within the scoped modules; any cross-module registry touch handled per the deploy ritual
+  (-u all changed modules + ONE force-recreate, uptime confirmed)
+Post-deploy, report versions + ledger deltas for read-only verification; an anomaly = stop + surface.
+
+⛔ HARD GATES — the ONLY things that wait for human approval:
+1. MIGRATIONS that modify existing live rows → present the exact pre-apply row list, wait.
+2. REAL-PHONE / EXTERNAL SENDS → anything that messages a non-test phone (real crew, clients,
+   broadcasts), submits to Meta, or changes templates → wait.
+3. MONEY → anything that could move, promise, quote, or display money over WhatsApp → wait
+   (standing rule: this is walled off; surfacing it is itself exceptional).
+4. IRREVERSIBLE / DESTRUCTIVE → deleting non-[TEST-*] data, force-push, history rewrites,
+   merging to main, dropping columns/tables → wait.
+5. NEW ACCESS POWER → granting any role/group a capability class it did not already hold
+   (a new face for an existing holder = decide; letting a NEW class of user act = gate).
+Everything not listed is yours to decide.
+
+When a hard gate is reached: present it in one compact block (what / why / exact blast radius /
+recommendation), then HOLD only on that item — continue any queued work that doesn't depend on it.
