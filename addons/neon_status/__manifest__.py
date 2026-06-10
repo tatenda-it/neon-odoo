@@ -42,7 +42,12 @@
     # 3-button render + cold-template render) numerically, not just in the
     # card body. WA-5 stays a DONE milestone -> AI-track (86) + overall
     # (89) rollups UNCHANGED by milestone count. Single constant.
-    "version": "17.0.1.0.7",
+    # 17.0.1.0.8 = WA-6 DONE (proof passed end-to-end on real phones): WA-6
+    # card -> live/100%; AI Equipment Module 86->90 + overall 89->90
+    # (milestone count: WA-6 done + P5.M11 quantity engine + WA-6.1 Face-3
+    # dispatch all live). Added P5.M11 + WA-6 to "Done & verified"; AI track
+    # text reflects B11 WhatsApp complete for the built scope. Constants.
+    "version": "17.0.1.0.8",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

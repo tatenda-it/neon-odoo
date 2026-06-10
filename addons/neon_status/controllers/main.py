@@ -42,12 +42,12 @@ STATUS_BOARD_GROUPS = ()
 # editable constants. Only the "Live from prod" box reads real-time
 # values (via neon.status.live). Bump these numbers as the programme
 # moves; the donut + bars + WA cards all derive from this one block.
-OVERALL_PCT = 89
+OVERALL_PCT = 90
 
 TRACKS = [
     {"key": "core", "name": "Core ERP Programme", "pct": 91,
      "accent": "purple"},
-    {"key": "ai", "name": "AI Equipment Module", "pct": 86,
+    {"key": "ai", "name": "AI Equipment Module", "pct": 90,
      "accent": "teal"},
     {"key": "hr", "name": "HR & Payroll", "pct": 92,
      "accent": "amber"},
@@ -97,19 +97,20 @@ WA_MODULES = [
              "su=True webhook flush. Minor sub-checks remain (Munashe "
              "3-button + cold-template phone round-trips) — post-go-live "
              "polish, not blocking done."},
-    {"key": "WA-6", "title": "Crew + OD equipment face", "pct": 85,
-     "state": "verifying",
-     "body": "DEPLOYED (neon_crew_comms 17.0.1.2.0 + neon_channels "
-             "17.0.1.17.0; 11 wa6_ intents live; wa6_od_login set) — "
-             "Face 2 free-text FINALIZE (OD initiates → I'll finalize / "
-             "send to crew chief → text the gear list → matcher → "
-             "confirm / fix → dated reservations) + Face 3 WAREHOUSE "
-             "checkout / check-in (narrow per-job lead/chief gate; runs "
-             "as the real tapping user for an honest audit). Sales "
-             "Face 1 deferred. Built on the PROVEN equipment engine — no "
-             "reimplementation. Pending: in-window real-phone proof + "
-             "Meta approval of the wa6_equip_finalize template "
-             "(submitted)."},
+    {"key": "WA-6", "title": "Crew + OD equipment face", "pct": 100,
+     "state": "live",
+     "body": "DONE & VERIFIED end-to-end on real phones (neon_crew_comms "
+             "17.0.1.3.0). Face 2 free-text FINALIZE (OD initiates → I'll "
+             "finalize / send to crew chief → text the gear list → matcher "
+             "→ confirm / fix → reservations); Face 3 WAREHOUSE checkout / "
+             "check-in via WA-6.1 crew-initiated dispatch (chief texts "
+             "\"check out\"/\"check in\" → bot lists ONLY their eligible "
+             "jobs → pick → buttons → action). Proof: finalize reserved "
+             "full quantities, checkout + check-in movements logged with "
+             "actor = the real crew member, qoh balanced. Narrow per-job "
+             "lead/chief gate + two-factor throughout; built on the proven "
+             "equipment engine (now quantity-aware, P5.M11). Sales Face 1 "
+             "deferred."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
@@ -125,20 +126,19 @@ TRACK_MILESTONES = [
                      "M12.3 parked.",
     },
     {
-        "name": "AI Equipment Module", "pct": 86, "accent": "teal",
+        "name": "AI Equipment Module", "pct": 90, "accent": "teal",
         "live": "AI core = B1, B2 Conflict Engine, B3, B13 doc-gen, "
-                "B14; B4 / B5 ready-to-fork. Field-tech arm = B11 "
-                "WhatsApp — WA-0–WA-4 done (rails, memory + interactive "
-                "renderer, crew-ops confirmations, readiness digest, "
-                "dual-role lens routing), WA-5 client lane DONE & "
-                "VERIFIED, WA-6 crew + OD equipment face DEPLOYED (in "
-                "verification). Equipment flow proven end-to-end on prod "
-                "(reserve→checkout→transfer→check-in, cleaned to "
-                "baseline).",
-        "remaining": "WA-6 in final verification (in-window real-phone "
-                     "proof + Meta approval of wa6_equip_finalize); B10 "
-                     "crew scheduler pending; B8 mobile / B9 QR / B16 "
-                     "predictive deferred; B12 Drive dropped.",
+                "B14, P5.M11 quantity-aware reservation engine (reserve/"
+                "checkout/check-in honour quantity_on_hand); B4 / B5 "
+                "ready-to-fork. Field-tech arm = B11 WhatsApp COMPLETE for "
+                "the built scope — WA-0–WA-4, WA-5 client lane, and WA-6 "
+                "crew + OD equipment face (finalize + WA-6.1 crew-initiated "
+                "checkout/check-in dispatch) all DONE & VERIFIED on prod, "
+                "WA-6 proven end-to-end on real phones (finalize → checkout "
+                "→ check-in, actor-audited, qoh balanced).",
+        "remaining": "B10 crew scheduler pending; B8 mobile / B9 QR / B16 "
+                     "predictive deferred; B12 Drive dropped; sales Face 1 "
+                     "deferred.",
     },
     {
         "name": "HR & Payroll", "pct": 92, "accent": "amber",
@@ -200,6 +200,19 @@ DONE_VERIFIED = [
     "transfer → check-in verified end-to-end on the live workshop "
     "engine, then cleaned back to baseline) — the foundation the WA-6 "
     "equipment face reuses.",
+    "P5.M11 quantity-aware reservation engine live (neon_jobs 17.0.8.3.0 "
+    "— reserve/allocate/checkout/check-in now honour quantity_on_hand for "
+    "bulk products [unit-less COUNT reservations] instead of only counting "
+    "unit rows; serial per-unit binding unchanged; damaged-at-check-in "
+    "decrements on-hand, actor-audited; migration collapsed the legacy "
+    "one-unit-per-bulk-product gap).",
+    "B11 WA-6 crew + OD equipment face live & verified end-to-end on real "
+    "phones (neon_crew_comms 17.0.1.3.0 — Face 2 OD-initiated free-text "
+    "finalize [matcher → confirm/fix → reservations]; WA-6.1 crew-"
+    "initiated Face 3 [chief texts \"check out\"/\"check in\" → bot lists "
+    "ONLY their eligible jobs → pick → checkout/check-in], movements "
+    "actor-audited; narrow per-job gate + two-factor; sales Face 1 "
+    "deferred).",
 ]
 
 DECIDED_NOT_BUILT = [
