@@ -661,28 +661,30 @@ class WhatsAppMessageWA6(models.Model):
         EqLine = self.env["commercial.event.job.equipment.line"].sudo()
         results = []
         for it in buf:
-            # PROVEN path: create the line (auto-spawns soft_hold
-            # reservations) then bind the available units + confirm them.
-            # Face 2 writes NO movements (reservations carry no actor), so
-            # sudo here loses no audit fidelity; the gate already ran in the
-            # real-user context above.
+            # P5.M11 unified path: create the line (auto-spawns the right
+            # reservation shape -- N unit rows for serial, ONE COUNT row
+            # for quantity) then action_allocate() (binds units / reserves
+            # the count). It returns {ok, allocated, requested, reason};
+            # the reason already distinguishes "only N in inventory" from
+            # "M committed on those dates" (honest short message). Face 2
+            # writes NO movements, so sudo here loses no audit fidelity;
+            # the gate already ran in the real-user context above.
             line = EqLine.create({
                 "event_job_id": ej.id,
                 "product_template_id": it["product_id"],
                 "quantity_planned": it["qty"]})
-            avail = line._find_available_units(line.quantity_remaining)
-            if avail:
-                line._bind_units_to_reservations(avail)
-            results.append((it["product_name"], it["qty"], len(avail)))
+            res = line.action_allocate()
+            results.append((it["product_name"], it["qty"], res))
         sess.sudo().write({"step": "done", "active": False})
         lines_txt = "\n".join(
-            ("✅ %s x%d (reserved %d)" % (n, q, r)) if r >= q
-            else ("⚠️ %s x%d (reserved %d, %d short)"
-                  % (n, q, r, q - r))
-            for n, q, r in results)
-        short = sum(max(0, q - r) for _n, q, r in results)
-        tail = (_("\n\n%d unit(s) couldn't be reserved (not enough free for "
-                  "the dates) -- check in Odoo.") % short) if short else ""
+            ("✅ %s x%d (reserved %d)"
+             % (n, q, res.get("allocated", 0))) if res.get("ok")
+            else ("⚠️ %s x%d — %s"
+                  % (n, q, res.get("reason") or _("could not reserve")))
+            for n, q, res in results)
+        any_short = any(not res.get("ok") for _n, _q, res in results)
+        tail = (_("\n\nThe ⚠️ lines couldn't be fully reserved -- check in "
+                  "Odoo.")) if any_short else ""
         return self._wa6_reply(
             raw_from, from_e164,
             _("✅ Finalized %s:\n%s%s") % (ej.name, lines_txt, tail))

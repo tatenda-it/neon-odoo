@@ -82,7 +82,19 @@
     # Surfaced by the 2026-06-09 equipment-flow prod proof. Method-only,
     # no schema change. Regression test: p5m6 T333. [tag:odoo-datetime-
     # now-equal-strict-check]
-    "version": "17.0.8.2.1",
+    # 17.0.8.3.0 = P5.M11 quantity-aware reservation engine. The
+    # reserve->allocate->checkout->checkin path (M4-M7) now honours
+    # quantity_on_hand for tracking_mode='quantity'/'batch' (unit-less
+    # COUNT reservations) instead of only counting unit rows; serial
+    # per-unit binding is UNCHANGED. New: reservation.quantity + product/
+    # category computed-stored (unit_id.* else line product); movement
+    # unit_id optional + movement.quantity + product_template_id;
+    # line.action_allocate (unified) + _available_qty_for_window; quantity
+    # checkout/check-in (damaged count -> stock_adjust + qoh decrement,
+    # actor-audited). Migration 17.0.8.3.0 recomputes product_template_id,
+    # collapses the pre-M11 N-soft_hold quantity pattern to one COUNT row,
+    # cancels true orphans (idempotent; dry-run reportable).
+    "version": "17.0.8.3.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema

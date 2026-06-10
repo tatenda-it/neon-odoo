@@ -76,9 +76,25 @@ class NeonEquipmentMovement(models.Model):
     unit_id = fields.Many2one(
         "neon.equipment.unit",
         string="Unit",
-        required=True,
         index=True,
         ondelete="restrict",
+        help="The physical unit this movement records. P5.M11: OPTIONAL — "
+        "unit-based movement types (serial checkout/transfer/checkin) "
+        "always set it; a quantity-tracked COUNT movement is unit-less "
+        "and carries product_template_id + quantity instead.",
+    )
+    quantity = fields.Integer(
+        string="Quantity",
+        default=1,
+        help="P5.M11 — units moved. 1 for a serial per-unit movement; N "
+        "for a quantity-tracked COUNT movement (unit-less).",
+    )
+    product_template_id = fields.Many2one(
+        "product.template",
+        string="Product",
+        index=True,
+        help="P5.M11 — set on unit-less quantity COUNT movements (a serial "
+        "movement reads the product via unit_id).",
     )
     event_job_id = fields.Many2one(
         "commercial.event.job",

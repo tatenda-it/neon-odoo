@@ -92,25 +92,33 @@ class NeonEquipmentCheckinWizard(models.TransientModel):
         if not event_job_id:
             return vals
         Reservation = self.env["neon.equipment.reservation"].sudo()
-        domain = [
-            ("event_job_id", "=", event_job_id),
-            ("state", "=", "fulfilled"),
-            ("unit_id.state", "in", ("checked_out", "transferred")),
-        ]
+        base = [("event_job_id", "=", event_job_id),
+                ("state", "=", "fulfilled")]
         if line_id:
-            domain.append(("equipment_line_id", "=", line_id))
-        reservations = Reservation.search(domain)
-        # One wizard line per unit. Dedupe in case a unit somehow has
-        # two fulfilled reservations on this event_job.
-        seen_unit_ids = set()
+            base.append(("equipment_line_id", "=", line_id))
         line_vals = []
-        for res in reservations:
+        # Serial: one wizard line per checked-out / transferred unit.
+        # Dedupe in case a unit somehow has two fulfilled reservations.
+        seen_unit_ids = set()
+        for res in Reservation.search(base + [
+                ("unit_id.state", "in", ("checked_out", "transferred"))]):
             if res.unit_id.id in seen_unit_ids:
                 continue
             seen_unit_ids.add(res.unit_id.id)
             line_vals.append((0, 0, {
                 "unit_id": res.unit_id.id,
+                "product_template_id": res.unit_id.product_template_id.id,
                 "reservation_id": res.id,
+                "quantity": res.quantity,
+                "condition_at_event": "good",
+            }))
+        # P5.M11 quantity: one wizard line per unit-less COUNT reservation
+        # (held against quantity_on_hand; no unit state to inspect).
+        for res in Reservation.search(base + [("unit_id", "=", False)]):
+            line_vals.append((0, 0, {
+                "reservation_id": res.id,
+                "product_template_id": res.product_template_id.id,
+                "quantity": res.quantity,
                 "condition_at_event": "good",
             }))
         if line_vals:
@@ -140,10 +148,16 @@ class NeonEquipmentCheckinWizard(models.TransientModel):
         photo_missing = []
         resolution_missing = []
         for line in self.checkin_line_ids:
+            label = (line.unit_id.display_name
+                     or line.product_template_id.display_name)
             if line.requires_photo and not line.photo:
-                photo_missing.append(line.unit_id.display_name)
-            if line.requires_resolution and not line.resolution_path:
-                resolution_missing.append(line.unit_id.display_name)
+                photo_missing.append(label)
+            # P5.M11: a quantity COUNT line is unit-less and resolves a
+            # damaged/missing SUBSET by decrement, not a per-unit
+            # resolution_path -- so it never blocks on resolution_missing.
+            if (line.unit_id and line.requires_resolution
+                    and not line.resolution_path):
+                resolution_missing.append(label)
         errors = []
         if photo_missing:
             errors.append(_(
@@ -176,11 +190,25 @@ class NeonEquipmentCheckinWizardLine(models.TransientModel):
     unit_id = fields.Many2one(
         "neon.equipment.unit",
         string="Unit",
-        required=True,
+        help="P5.M11: OPTIONAL — set for a serial per-unit check-in; a "
+        "quantity COUNT check-in is unit-less (product + quantity).",
     )
     product_template_id = fields.Many2one(
-        related="unit_id.product_template_id",
+        "product.template",
+        string="Product",
         readonly=True,
+        help="P5.M11 — set in default_get (the unit's product for serial, "
+        "the reservation's product for a quantity COUNT line).",
+    )
+    quantity = fields.Integer(
+        string="Quantity", default=1,
+        help="P5.M11 — count being checked in (1 for a serial unit).",
+    )
+    damaged_qty = fields.Integer(
+        string="Damaged Qty", default=0,
+        help="P5.M11 — for a quantity COUNT check-in: how many of the "
+        "count are damaged / missing. Drives a stock_adjust movement + "
+        "a quantity_on_hand decrement (audited by actor).",
     )
     current_state = fields.Selection(
         related="unit_id.state",
@@ -244,10 +272,56 @@ class NeonEquipmentCheckinWizardLine(models.TransientModel):
         """Per-line check-in. Runs inside the wizard's savepoint —
         any unhandled raise rolls back the whole batch."""
         self.ensure_one()
+        Movement = self.env["neon.equipment.movement"].sudo()
+        # P5.M11 — quantity COUNT check-in (unit-less). good/fair: just a
+        # checkin movement, no quantity_on_hand change. damaged/missing/
+        # poor with a damaged_qty: a stock_adjust movement + decrement
+        # quantity_on_hand by that count (actor-audited -- it changes
+        # every future availability answer). Repair-restores-qoh is a
+        # noted follow-on, not this milestone.
+        if not self.unit_id and self.product_template_id:
+            prod = self.product_template_id.sudo()
+            ej = self.wizard_id.event_job_id.sudo()
+            src = self.reservation_id.sudo()
+            cond_q = self.condition_at_event
+            dmg = (max(0, self.damaged_qty or 0)
+                   if cond_q in ("damaged", "missing", "poor") else 0)
+            Movement.create({
+                "product_template_id": prod.id,
+                "quantity": self.quantity,
+                "event_job_id": ej.id,
+                "equipment_line_id": (
+                    src.equipment_line_id.id if src else False),
+                "reservation_id": src.id if src else False,
+                "movement_type": "checkin",
+                "actor_id": actor_uid,
+                "condition_at_event": cond_q,
+                "to_location_text": (
+                    self.wizard_id.to_location_text or "Workshop A"),
+                "photo": self.photo or False,
+                "notes": self.notes or "",
+            })
+            if dmg > 0:
+                old_qoh = prod.quantity_on_hand or 0
+                new_qoh = max(0, old_qoh - dmg)
+                prod.write({"quantity_on_hand": new_qoh})
+                Movement.create({
+                    "product_template_id": prod.id,
+                    "quantity": dmg,
+                    "event_job_id": ej.id,
+                    "movement_type": "stock_adjust",
+                    "actor_id": actor_uid,
+                    "condition_at_event": cond_q,
+                    "notes": _(
+                        "P5.M11 damaged/missing at check-in: on-hand "
+                        "%(old)d -> %(new)d (-%(d)d). %(n)s") % {
+                        "old": old_qoh, "new": new_qoh, "d": dmg,
+                        "n": self.resolution_notes or ""},
+                })
+            return
         unit = self.unit_id.sudo()
         cond = self.condition_at_event
         event_job = self.wizard_id.event_job_id.sudo()
-        Movement = self.env["neon.equipment.movement"].sudo()
         Reservation = self.env["neon.equipment.reservation"].sudo()
 
         source_res = self.reservation_id.sudo()

@@ -358,6 +358,29 @@ of every milestone on this dev DB). WA milestones carry no browser
 smokes (WhatsApp surface); WA-6's only Odoo UI is one gated inherited
 header button, verified by the live real-phone proof per the WA-6 plan.
 
+## Update 2026-06-10 (P5.M11 quantity-aware reservation engine) — 2826/2843
+
+11 Python suites failed; **all pre-existing drift, ZERO new from P5.M11**.
+P5.M11's diff is the neon_jobs reservation/movement/line/event-job/checkin
+engine + a migration + the WA-6 finalize touchpoint — it REUSES the B2
+conflict engine (doesn't alter it) and changes NO HR / neon_core / group /
+pricing / state-machine code.
+
+* 8 documented-drift suites unchanged: p2m2, p2m4, p2m5, p2m7_7 (6/8),
+  p6m3 (18/28), pb1_datamodel (29/30), **pb2_conflict (34/35)**,
+  **pb14c_quantity_on_hand (23/24)**. pb2 + pb14c specifically watched
+  (M11 touches the conflict + quantity paths): both unchanged at baseline.
+* P5.M11 + every serial/quantity/WA suite GREEN: **p5m11 18/18**; serial
+  byte-unchanged p5m4 10 · p5m5 19 · p5m6 14 · p5m7 15 · p5m8 14 · p5m9 20 ·
+  p5m10 20; pb14 25 · pb14d 8 · pb4 33; pwa1 28 · pwa2 27 · pwa3 18 ·
+  pwa4 29 · pwa5 125 · pwa6 58.
+* phr_r1a / phr_r1b_1 (17/18) / phr_r3b_c4_housekeeping (5/6): the
+  recurring `group_neon_superuser` HR-manager grant-wipe (the 2026-06-01
+  artifact #2 + 2026-06-09 finding). PROVEN non-code: calling
+  `_enforce_hr_confidentiality` flips all three green with no code change;
+  the grant gets re-wiped by repeated `-u`/force-recreate cycles on this
+  long-lived dev DB. P5.M11 touches no HR code.
+
 ## Accepted items 2026-06-08 (B11 WA-5.1 + WA-5.0 delta review)
 
 The WA-5.1/5.0 adversarial review (10 findings -> 5 real / 2 partial / 3

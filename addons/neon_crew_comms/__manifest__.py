@@ -39,7 +39,12 @@
     #   * commercial.event.job header button (OD-initiate), gated to the OD
     #     login / Neon Superuser in the planning/prep window.
     # WA-6 intents registered in neon_channels' wa_payload. No new cron.
-    "version": "17.0.1.2.0",
+    # 17.0.1.2.1 = P5.M11 touchpoint: WA-6 finalize confirm now calls the
+    # unified line.action_allocate() (serial binds units / quantity
+    # reserves a COUNT against quantity_on_hand) instead of the serial-only
+    # _find_available_units + _bind path, and surfaces the engine's honest
+    # short reason ("only N in inventory" vs "M committed on those dates").
+    "version": "17.0.1.2.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

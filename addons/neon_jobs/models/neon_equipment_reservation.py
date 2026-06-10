@@ -109,17 +109,32 @@ class NeonEquipmentReservation(models.Model):
         "blocker so the event can close while the unit is physically "
         "still out. Cleared when the unit is eventually checked in.",
     )
+    quantity = fields.Integer(
+        string="Quantity",
+        default=1,
+        help="P5.M11 — units this reservation holds. 1 for a serial "
+        "per-unit hold; N for a quantity-tracked COUNT hold (unit-less — "
+        "the count is held against the product's quantity_on_hand).",
+    )
     product_template_id = fields.Many2one(
-        related="unit_id.product_template_id",
+        "product.template",
+        string="Product",
+        compute="_compute_product_category",
         store=True,
         readonly=True,
-        string="Product",
+        index=True,
+        help="P5.M11 — computed-stored: the bound unit's product when a "
+        "unit is set (serial), else the equipment line's product "
+        "(quantity COUNT holds are unit-less but always carry a product). "
+        "Replaces the old related-from-unit field so a quantity hold is "
+        "never product-less.",
     )
     equipment_category_id = fields.Many2one(
-        related="unit_id.equipment_category_id",
+        "neon.equipment.category",
+        string="Category",
+        compute="_compute_product_category",
         store=True,
         readonly=True,
-        string="Category",
     )
     state = fields.Selection(
         _STATES,
@@ -176,14 +191,21 @@ class NeonEquipmentReservation(models.Model):
          "Reservation start must be before end."),
     ]
 
-    @api.constrains("state", "unit_id")
+    @api.constrains("state", "unit_id", "product_template_id", "quantity")
     def _check_unit_set_when_active(self):
         """A reservation can sit in soft_hold without a unit assigned
         (P5.M5 auto-creation flow), but any transition to confirmed /
-        fulfilled requires a unit. This guard catches direct writes
+        fulfilled requires a unit -- EXCEPT a P5.M11 quantity COUNT hold,
+        which is deliberately unit-less (the count is held against the
+        product's quantity_on_hand) and so needs only a quantity-tracked
+        product + a positive quantity. This guard catches direct writes
         that bypass _do_transition."""
         for rec in self:
             if rec.state in ("confirmed", "fulfilled") and not rec.unit_id:
+                prod = rec.product_template_id
+                if (prod and prod.tracking_mode in ("quantity", "batch")
+                        and rec.quantity > 0):
+                    continue
                 raise UserError(_(
                     "Reservation %(name)s cannot be %(state)s without "
                     "a unit assigned. Allocate a unit first."
@@ -200,6 +222,95 @@ class NeonEquipmentReservation(models.Model):
             rec.can_confirm = "confirmed" in allowed
             rec.can_fulfil = "fulfilled" in allowed
             rec.can_cancel = "cancelled" in allowed
+
+    @api.depends("unit_id", "unit_id.product_template_id",
+                 "unit_id.equipment_category_id",
+                 "equipment_line_id",
+                 "equipment_line_id.product_template_id")
+    def _compute_product_category(self):
+        """P5.M11 — bound unit's product (serial) else the line's product
+        (quantity COUNT hold). Stored, so existing rows recompute on -u and
+        a unit-less quantity hold is never product-less."""
+        for rec in self:
+            prod = (rec.unit_id.product_template_id
+                    or rec.equipment_line_id.product_template_id)
+            rec.product_template_id = prod
+            rec.equipment_category_id = (
+                prod.equipment_category_id if prod else False)
+
+    @api.model
+    def _p5m11_reservation_cleanup(self, dry_run=True):
+        """P5.M11 data migration (idempotent; dry_run=True = report only,
+        change NOTHING). (1) Recompute product_template_id on rows that are
+        product-less but line/unit-linked (the related→computed-stored
+        switch). (2) Collapse the pre-M11 N-soft_hold pattern on quantity-
+        tracked lines into ONE COUNT reservation (quantity=quantity_planned),
+        cancelling the extras + releasing any bogus unit binding back to
+        'active'. (3) Cancel true-orphan reservations (no unit AND no line).
+        Returns the exact rows it touches so the prod row-list can be
+        reviewed BEFORE the upgrade applies it."""
+        Res = self.sudo()
+        Line = self.env["commercial.event.job.equipment.line"].sudo()
+        report = {"recompute_product": [], "collapse": [],
+                  "orphan_cancel": []}
+        # (1) product-less but resolvable -> recompute
+        fixable = Res.search([("product_template_id", "=", False)]).filtered(
+            lambda r: r.equipment_line_id or r.unit_id)
+        report["recompute_product"] = fixable.ids
+        if not dry_run and fixable:
+            fixable._compute_product_category()
+        # (2) collapse quantity-line N-soft_hold pattern -> one COUNT row
+        qty_lines = Line.search([]).filtered(
+            lambda l: l.reservation_ids and l._is_quantity_line())
+        for line in qty_lines:
+            open_res = line.reservation_ids.filtered(
+                lambda r: r.state in ("soft_hold", "confirmed"))
+            if (len(open_res) == 1 and not open_res.unit_id
+                    and open_res.quantity == line.quantity_planned):
+                continue  # already in canonical COUNT shape
+            report["collapse"].append({
+                "line": line.id, "event_job": line.event_job_id.id,
+                "product": line.product_template_id.display_name,
+                "cancel_reservation_ids": open_res.ids,
+                "respawn_quantity": line.quantity_planned})
+            if not dry_run:
+                for r in open_res:
+                    if r.unit_id and r.unit_id.state == "reserved":
+                        r.unit_id._do_transition("active")
+                    r._do_transition("cancelled")
+                if line.quantity_planned > 0:
+                    line.event_job_id._spawn_one_reservation_for_line(
+                        line, quantity=line.quantity_planned)
+        # (3) true orphans (no unit AND no line) -> cancel
+        orphans = Res.search([
+            ("unit_id", "=", False), ("equipment_line_id", "=", False),
+            ("state", "in", ("soft_hold", "confirmed"))])
+        report["orphan_cancel"] = orphans.ids
+        if not dry_run and orphans:
+            for r in orphans:
+                r._do_transition("cancelled")
+        return report
+
+    @api.model
+    def _committed_qty_for_product(self, product_id, reserve_from,
+                                   reserve_to, exclude_line_id=None):
+        """P5.M11 — total quantity held by NON-cancelled reservations for
+        this product whose window overlaps [reserve_from, reserve_to).
+        Serial holds count 1 each (quantity defaults to 1); quantity holds
+        count their N. Optionally exclude one equipment line's own
+        reservations so that line can compute its headroom EXCLUDING
+        itself."""
+        if not (product_id and reserve_from and reserve_to):
+            return 0
+        domain = [
+            ("product_template_id", "=", product_id),
+            ("state", "in", ("soft_hold", "confirmed", "fulfilled")),
+            ("reserve_from", "<", reserve_to),
+            ("reserve_to", ">", reserve_from),
+        ]
+        if exclude_line_id:
+            domain.append(("equipment_line_id", "!=", exclude_line_id))
+        return sum(self.sudo().search(domain).mapped("quantity"))
 
     @api.depends("unit_id", "reserve_from", "reserve_to", "state")
     def _compute_conflicts(self):

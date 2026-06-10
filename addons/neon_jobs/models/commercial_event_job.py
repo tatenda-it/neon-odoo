@@ -1080,20 +1080,33 @@ class CommercialEventJob(models.Model):
         for line in lines:
             if line.reservation_ids:
                 continue
-            for _i in range(line.quantity_planned):
-                self._spawn_one_reservation_for_line(line)
+            # P5.M11: a quantity-tracked product gets ONE unit-less COUNT
+            # soft_hold carrying quantity_planned (held against
+            # quantity_on_hand). Serial products keep one row per unit so
+            # allocation can bind specific units.
+            tm = line.product_template_id.tracking_mode or "serial"
+            if tm in ("quantity", "batch"):
+                self._spawn_one_reservation_for_line(
+                    line, quantity=line.quantity_planned)
+            else:
+                for _i in range(line.quantity_planned):
+                    self._spawn_one_reservation_for_line(line)
 
-    def _spawn_one_reservation_for_line(self, line):
+    def _spawn_one_reservation_for_line(self, line, quantity=1):
         """Spawn a single soft_hold reservation on this event_job
         bound to the given equipment line. Returns the new record.
         Used by both initial auto-creation and the line's quantity
-        reconciliation (upsize path)."""
+        reconciliation (upsize path). P5.M11: ``quantity`` carries the
+        COUNT for a quantity-tracked line (1 for a serial per-unit hold);
+        the reservation's product_template_id computes from the line, so a
+        unit-less COUNT hold is never product-less."""
         self.ensure_one()
         rf, rt = self._reservation_window_for_autocreate()
         return self.env["neon.equipment.reservation"].sudo().create({
             "event_job_id": self.id,
             "equipment_line_id": line.id,
             "unit_id": False,
+            "quantity": quantity,
             "reserve_from": rf,
             "reserve_to": rt,
             "state": "soft_hold",
