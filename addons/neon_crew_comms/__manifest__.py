@@ -56,7 +56,22 @@
     # mapped role-holder with >=1 eligible job; everyone else falls through
     # to Copilot/client lane UNCHANGED. New co_pick/ci_pick session steps.
     # Reuses wa6_co_*/wa6_ci_* intents -- no neon_channels touch.
-    "version": "17.0.1.3.0",
+    # 17.0.1.4.0 = WA-6.2 OD WhatsApp-initiated finalize (kills the laptop
+    # step as the PRIMARY entry; the Odoo header button stays SECONDARY).
+    # The OD/superuser texts a TIGHT command ("finalize"/"finalise"/
+    # "finalize equipment"; equals/startswith, never substring) -> bot lists
+    # ONLY planning/prep jobs with NO equipment lines yet (strictly
+    # from-scratch -- the WhatsApp finalize BUILDS the lines; an already-
+    # finalized or pre-seeded job is edited in Odoo) -> OD picks a number ->
+    # bot SENDS the EXISTING 3-button choice [I'll finalize][Send to crew
+    # chief][Open in Odoo] for that job -> the proven Face-2 _wa6_route_
+    # initiate flow takes over UNCHANGED. New fin_pick session step; reuses
+    # wa6_fin_* intents -- NO neon_channels touch. Mirrors WA-6.1 exactly
+    # (command -> list -> pick -> send buttons). Gated to OD/superuser via
+    # has_group (XML id); a non-OD mapped sender falls through to Copilot,
+    # an unmapped sender to the client lane -- the parser never steals a
+    # turn. No new access power (a new face for the existing initiate gate).
+    "version": "17.0.1.4.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

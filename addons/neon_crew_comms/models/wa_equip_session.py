@@ -57,13 +57,15 @@ class WaEquipSession(models.Model):
          ("fixing", "Fixing one item"),
          ("co_pick", "Awaiting checkout job pick"),
          ("ci_pick", "Awaiting check-in job pick"),
+         ("fin_pick", "Awaiting finalize job pick"),
          ("done", "Done")],
         string="Step", default="await_items", required=True)
     buffer = fields.Text(
         string="Buffer (JSON)",
         help="Step-dependent: in review/fixing it is the matched/not-found "
-        "finalize line list; in co_pick/ci_pick (WA-6.1) it is the ordered "
-        "list of eligible event_job ids the crew member is picking from.")
+        "finalize line list; in co_pick/ci_pick (WA-6.1) and fin_pick "
+        "(WA-6.2) it is the ordered list of eligible event_job ids the "
+        "staff member is picking from.")
     fix_index = fields.Integer(
         string="Row Being Fixed", default=-1,
         help="0-based index into the buffer that the next free-text patch "

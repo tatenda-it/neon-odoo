@@ -114,6 +114,13 @@ _WA6_CHECKOUT_COMMANDS = (
 _WA6_CHECKIN_COMMANDS = (
     "check in equipment", "check in gear", "return equipment",
     "checkin", "check in")
+# WA-6.2 Face-2 dispatch -- OD-initiated finalize command. Same tight
+# match (equals / startswith-then-space, never substring). Both spellings
+# (Zimbabwe writes British English). "I'll finalize it later" never matches
+# (starts with "i'll", not "finalize"); only an OD/superuser with >=1
+# eligible job is grabbed -- everyone else falls through unchanged.
+_WA6_FINALIZE_COMMANDS = (
+    "finalize equipment", "finalise equipment", "finalize", "finalise")
 
 
 class WhatsAppMessageWA6(models.Model):
@@ -170,13 +177,31 @@ class WhatsAppMessageWA6(models.Model):
             if cmd:
                 sender = self._wa6_resolve_user(from_e164)
                 if sender and sender.id:
-                    jobs = (self._wa6_eligible_checkout_jobs(sender)
-                            if cmd == "checkout"
-                            else self._wa6_eligible_checkin_jobs(sender))
-                    if jobs:
-                        self._wa6_start_pick_flow(
-                            cmd, sender, jobs, from_e164, raw_from, message)
-                        return True
+                    if cmd == "finalize":
+                        # WA-6.2: WhatsApp-initiated finalize is OD/superuser
+                        # ONLY. A mapped NON-OD ("finalize" from a crew
+                        # member) is NOT grabbed -> falls through to the
+                        # Copilot (the Odoo button + routed-chief paths cover
+                        # non-OD finalize). Unmapped never reaches here
+                        # (sender empty -> client lane). An OD with no
+                        # from-scratch job also falls through. The parser
+                        # never steals a turn.
+                        if self._wa6_can_initiate(sender):
+                            jobs = self._wa6_eligible_finalize_jobs(sender)
+                            if jobs:
+                                self._wa6_start_finalize_flow(
+                                    sender, jobs, from_e164, raw_from,
+                                    message)
+                                return True
+                    else:
+                        jobs = (self._wa6_eligible_checkout_jobs(sender)
+                                if cmd == "checkout"
+                                else self._wa6_eligible_checkin_jobs(sender))
+                        if jobs:
+                            self._wa6_start_pick_flow(
+                                cmd, sender, jobs, from_e164, raw_from,
+                                message)
+                            return True
         return None
 
     @api.model
@@ -195,6 +220,8 @@ class WhatsAppMessageWA6(models.Model):
             return "checkout"
         if hit(_WA6_CHECKIN_COMMANDS):
             return "checkin"
+        if hit(_WA6_FINALIZE_COMMANDS):
+            return "finalize"
         return None
 
     @api.model
@@ -471,14 +498,7 @@ class WhatsAppMessageWA6(models.Model):
             "Choose an option below."
             % (ej.name, ej.partner_id.name or "client",
                ej.event_date or "date TBC"))
-        buttons = [
-            {"id": self._wa6_payload("wa6_fin_self", ej.id),
-             "title": "✅ I'll finalize"},
-            {"id": self._wa6_payload("wa6_fin_route", ej.id),
-             "title": "\U0001F464 Send to crew chief"},
-            {"id": self._wa6_payload("wa6_fin_odoo", ej.id),
-             "title": "\U0001F4CB Open in Odoo"},
-        ]
+        buttons = self._wa6_finalize_buttons(ej)
         interactive = {"kind": "buttons", "body": body[:1024],
                        "buttons": buttons}
         # cold-window template carries the single self-finalize quick-reply
@@ -570,6 +590,11 @@ class WhatsAppMessageWA6(models.Model):
         # tapped) -- NOT the finalize path below.
         if sess.step in ("co_pick", "ci_pick"):
             return self._wa6_handle_pick(sess, body, from_e164, raw_from)
+        # WA-6.2: a finalize-job-pick session routes to its own pick handler
+        # (OD gate re-checked there) -- NOT the finalize free-text path.
+        if sess.step == "fin_pick":
+            return self._wa6_handle_finalize_pick(
+                sess, body, from_e164, raw_from)
         # defense: the session's user must still be allowed to finalize it.
         if not self._wa6_can_finalize(sess.event_job_id, sess.user_id):
             sess.sudo().write({"active": False})
@@ -949,6 +974,133 @@ class WhatsAppMessageWA6(models.Model):
             {"id": self._wa6_payload("wa6_ci_flag", ej.id),
              "title": "⚠️ Flag an item"}]
         return self._wa6_send_buttons(raw_from, from_e164, body, buttons)
+
+    # ================================================================
+    # WA-6.2 -- OD WhatsApp-initiated finalize (command -> list -> pick ->
+    # the EXISTING 3-button choice). Mirrors WA-6.1 exactly; the Odoo header
+    # button stays as the SECONDARY entry. Reuses wa6_fin_* intents (no
+    # neon_channels touch). Strictly FROM-SCRATCH (empty equipment lines).
+    # ================================================================
+    @api.model
+    def _wa6_eligible_finalize_jobs(self, user):
+        """Event jobs in the planning/prep window with NO equipment lines
+        yet -- the from-scratch finalize set. 'No finalized equipment' has
+        no boolean flag in the schema; an empty equipment_line_ids IS the
+        signal -- the WhatsApp finalize BUILDS the lines (Face-2 confirm is
+        the only line-create path), so a job that already carries lines
+        (pre-seeded from a quote/template OR previously finalized) is edited
+        in Odoo, never re-finalized here. Listed ORG-WIDE: initiate
+        authority (_wa6_can_initiate) is OD/superuser, not per-job, unlike
+        the Face-3 warehouse gate. (⚠️ DECISION WA-6.2.)"""
+        return self.env["commercial.event.job"].sudo().search(
+            [("state", "in", ("planning", "prep")),
+             ("equipment_line_ids", "=", False)], order="id")
+
+    @api.model
+    def _wa6_start_finalize_flow(self, sender, jobs, from_e164, raw_from,
+                                 message):
+        """Open the list-then-pick session (step fin_pick) and send the
+        numbered list of jobs awaiting a from-scratch finalize. 1 job is
+        still listed (no silent auto-assume) -- mirrors WA-6.1."""
+        self._wa6_audit_in(from_e164, message, "finalize")
+        jobs = jobs.sorted(key=lambda j: j.id)
+        self.env["neon.wa.equip.session"]._start_pick(
+            from_e164, sender, "fin_pick", jobs.ids)
+        lines = "\n".join(
+            "%d. %s" % (i + 1, j.sudo().name)
+            for i, j in enumerate(jobs))
+        return self._wa6_reply(
+            raw_from, from_e164,
+            _("Jobs ready to finalize equipment:\n%s\n\nReply with the "
+              "number to finalize that job.") % lines)
+
+    def _wa6_handle_finalize_pick(self, sess, body, from_e164, raw_from):
+        """A number reply during fin_pick -> resolve to that job and SEND
+        the existing 3-button finalize choice (handing off to the proven
+        Face-2 _wa6_route_initiate flow). A re-typed 'finalize' restarts;
+        anything else re-shows the list. Defense: the picker must STILL be
+        OD/superuser (re-checked, not trusted from session open)."""
+        sender = sess.user_id
+        if not self._wa6_can_initiate(sender):
+            sess.sudo().write({"active": False})
+            return self._wa6_reply(
+                raw_from, from_e164,
+                _("You're no longer authorised to finalize from here."))
+        job_ids = sess._get_buffer()
+        norm = (body or "").strip()
+        # a re-typed finalize command restarts the pick (if still eligible)
+        if self._wa6_is_command(body) == "finalize":
+            jobs = self._wa6_eligible_finalize_jobs(sender)
+            if jobs:
+                return self._wa6_start_finalize_flow(
+                    sender, jobs, from_e164, raw_from,
+                    {"type": "text", "text": {"body": body}})
+        if norm.isdigit() and 1 <= int(norm) <= len(job_ids):
+            ej = self.env["commercial.event.job"].sudo().browse(
+                job_ids[int(norm) - 1]).exists()
+            if not ej:
+                return self._wa6_reply(
+                    raw_from, from_e164,
+                    _("That job is no longer available -- text "
+                      "\"finalize\" again."))
+            # HARDENING (⚠️ DECISION WA-6.2): re-check the FROM-SCRATCH
+            # contract at PICK time, not just at list time. The buffered
+            # list can be up to the session TTL (12h) old, and a concurrent
+            # Odoo finalize (or manual lines) could have made this job no
+            # longer from-scratch in the interval. Mirrors WA-6's
+            # re-check-every-turn discipline; never re-finalize a job that
+            # already carries gear (which would duplicate equipment lines).
+            if ej.equipment_line_ids or ej.state not in ("planning", "prep"):
+                sess.sudo().write({"active": False})
+                return self._wa6_reply(
+                    raw_from, from_e164,
+                    _("%s isn't awaiting a from-scratch finalize anymore "
+                      "(it already has equipment, or has moved on). Edit it "
+                      "in Odoo, or text \"finalize\" for the current list.")
+                    % ej.name)
+            # close the pick session; the 3-button choice goes out and the
+            # [I'll finalize] tap opens a FRESH finalize session (await_items)
+            # via _wa6_route_initiate -> _start -- identical to the Odoo
+            # header-button path from here on.
+            sess.sudo().write({"event_job_id": ej.id, "step": "done",
+                               "active": False})
+            return self._wa6_send_finalize_buttons(ej, raw_from, from_e164)
+        # not a number in range -> re-show the list
+        lines = "\n".join(
+            "%d. %s" % (i + 1, self.env["commercial.event.job"].sudo()
+                        .browse(jid).name)
+            for i, jid in enumerate(job_ids))
+        return self._wa6_reply(
+            raw_from, from_e164,
+            _("Reply with a number from your list to finalize:\n%s") % lines)
+
+    def _wa6_finalize_buttons(self, ej):
+        """The 3 finalize-choice buttons, shared by the Odoo-button initiate
+        (_wa6_send_initiate, wrapped for the window-aware notify) and the
+        WA-6.2 command pick (_wa6_send_finalize_buttons, sent in-window).
+        Same titles + wa6_fin_* intents, so the downstream tap routing is
+        byte-identical."""
+        ej = ej.sudo()
+        return [
+            {"id": self._wa6_payload("wa6_fin_self", ej.id),
+             "title": "✅ I'll finalize"},
+            {"id": self._wa6_payload("wa6_fin_route", ej.id),
+             "title": "\U0001F464 Send to crew chief"},
+            {"id": self._wa6_payload("wa6_fin_odoo", ej.id),
+             "title": "\U0001F4CB Open in Odoo"}]
+
+    def _wa6_send_finalize_buttons(self, ej, raw_from, from_e164):
+        """WA-6.2 -- emit the 3-button finalize choice in-window (mirrors
+        WA-6.1's _wa6_send_checkout_buttons). The OD is live in-chat here
+        (they just texted), so no cold-window template / Odoo activity is
+        needed; the [I'll finalize] tap opens the proven Face-2 session."""
+        ej = ej.sudo()
+        body = (
+            "\U0001F4E6 Equipment finalize for %s (%s) -- %s.\nChoose:"
+            % (ej.name, ej.partner_id.name or "client",
+               ej.event_date or "date TBC"))
+        return self._wa6_send_buttons(
+            raw_from, from_e164, body, self._wa6_finalize_buttons(ej))
 
     # ================================================================
     # FACE 3 -- WAREHOUSE CHECKOUT (run as the real tapping user)
