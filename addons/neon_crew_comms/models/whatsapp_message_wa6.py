@@ -102,6 +102,19 @@ _WA6_CAT_SYNONYMS = {
                 "bubbles", "snow"],
 }
 
+# WA-6.1 Face-3 dispatch -- crew-initiated checkout / check-in commands.
+# Matched by EQUALS or STARTSWITH-then-space on the normalised (lowered,
+# whitespace-collapsed) body -- NEVER substring -- AND only fired for a
+# mapped lead_tech/crew_chief who has >=1 eligible job. So normal chat
+# ("can I check out the venue options") never triggers: it neither equals
+# nor startswith a command phrase, and even if it did the sender has no
+# eligible job. Tight, unambiguous phrases only (no bare "returned").
+_WA6_CHECKOUT_COMMANDS = (
+    "check out equipment", "check out gear", "checkout", "check out")
+_WA6_CHECKIN_COMMANDS = (
+    "check in equipment", "check in gear", "return equipment",
+    "checkin", "check in")
+
 
 class WhatsAppMessageWA6(models.Model):
     _inherit = "neon.whatsapp.message"
@@ -148,6 +161,40 @@ class WhatsAppMessageWA6(models.Model):
                 self._wa6_handle_text(
                     sess, body, from_e164, raw_from, message)
                 return True
+            # WA-6.1: no active session -> is this a Face-3 command from a
+            # mapped lead_tech/crew_chief who actually HAS eligible gear?
+            # Grab ONLY then; a non-command, an unmapped phone, or a mapped
+            # user with no eligible job all fall through UNCHANGED (Copilot
+            # / client lane) -- the parser never steals a turn.
+            cmd = self._wa6_is_command(body)
+            if cmd:
+                sender = self._wa6_resolve_user(from_e164)
+                if sender and sender.id:
+                    jobs = (self._wa6_eligible_checkout_jobs(sender)
+                            if cmd == "checkout"
+                            else self._wa6_eligible_checkin_jobs(sender))
+                    if jobs:
+                        self._wa6_start_pick_flow(
+                            cmd, sender, jobs, from_e164, raw_from, message)
+                        return True
+        return None
+
+    @api.model
+    def _wa6_is_command(self, body):
+        """Tight Face-3 command match: EQUALS or STARTSWITH-then-space on
+        the normalised body. Returns 'checkout' / 'checkin' / None. Never
+        substring (so 'can I check out the venue' does NOT match)."""
+        norm = " ".join((body or "").strip().lower().split())
+        if not norm:
+            return None
+
+        def hit(cmds):
+            return any(norm == c or norm.startswith(c + " ") for c in cmds)
+
+        if hit(_WA6_CHECKOUT_COMMANDS):
+            return "checkout"
+        if hit(_WA6_CHECKIN_COMMANDS):
+            return "checkin"
         return None
 
     @api.model
@@ -516,8 +563,13 @@ class WhatsAppMessageWA6(models.Model):
     # ================================================================
     @api.model
     def _wa6_handle_text(self, sess, body, from_e164, raw_from, message):
-        self._wa6_audit_in(from_e164, message, "finalize-text")
+        self._wa6_audit_in(from_e164, message, "wa6-text")
         sess.sudo().write({"last_inbound": fields.Datetime.now()})
+        # WA-6.1: a checkout / check-in pick session routes to the pick
+        # handler (warehouse gate, re-checked when the buttons are sent /
+        # tapped) -- NOT the finalize path below.
+        if sess.step in ("co_pick", "ci_pick"):
+            return self._wa6_handle_pick(sess, body, from_e164, raw_from)
         # defense: the session's user must still be allowed to finalize it.
         if not self._wa6_can_finalize(sess.event_job_id, sess.user_id):
             sess.sudo().write({"active": False})
@@ -771,6 +823,132 @@ class WhatsAppMessageWA6(models.Model):
         return {"raw": raw, "qty": qty, "product_id": False,
                 "product_name": "", "category": cat.name if cat else "",
                 "status": "not_found", "suggestions": sugg}
+
+    # ================================================================
+    # WA-6.1 -- Face-3 crew-initiated dispatch (command -> list -> pick ->
+    # send the checkout/check-in buttons). The previously-missing trigger.
+    # ================================================================
+    @api.model
+    def _wa6_eligible_checkout_jobs(self, user):
+        """Event jobs where this user is THIS job's lead_tech/crew_chief
+        (warehouse gate) AND there is gear allocated-not-yet-out (>=1
+        reservation in state 'confirmed'). No date gate -- the chief is
+        trusted on timing; terminal jobs drop out naturally (no live
+        confirmed holds)."""
+        EJ = self.env["commercial.event.job"].sudo()
+        jobs = EJ.search(["|", ("lead_tech_id", "=", user.id),
+                          ("crew_chief_id", "=", user.id)])
+        return jobs.filtered(
+            lambda ej: self._wa6_can_warehouse(ej, user)
+            and ej.equipment_line_ids.reservation_ids.filtered(
+                lambda r: r.state == "confirmed"))
+
+    @api.model
+    def _wa6_eligible_checkin_jobs(self, user):
+        """Event jobs where this user is lead_tech/crew_chief AND gear is
+        still OUT: a fulfilled reservation whose serial unit is checked_out
+        /transferred, OR a quantity COUNT reservation with no 'checkin'
+        movement yet (so a quantity job CLEARS the list once checked in --
+        incl. after a partial check-in, since the checkin movement exists)."""
+        EJ = self.env["commercial.event.job"].sudo()
+        Move = self.env["neon.equipment.movement"].sudo()
+        jobs = EJ.search(["|", ("lead_tech_id", "=", user.id),
+                          ("crew_chief_id", "=", user.id)])
+
+        def has_out(ej):
+            if not self._wa6_can_warehouse(ej, user):
+                return False
+            for r in ej.equipment_line_ids.reservation_ids.filtered(
+                    lambda r: r.state == "fulfilled"):
+                if r.unit_id:
+                    if r.unit_id.state in ("checked_out", "transferred"):
+                        return True
+                elif not Move.search_count([
+                        ("reservation_id", "=", r.id),
+                        ("movement_type", "=", "checkin")]):
+                    return True
+            return False
+        return jobs.filtered(has_out)
+
+    @api.model
+    def _wa6_start_pick_flow(self, cmd, sender, jobs, from_e164, raw_from,
+                             message):
+        """Open the list-then-pick session and send the numbered list of
+        the crew member's OWN eligible jobs. 1 job is still listed (no
+        silent auto-assume)."""
+        self._wa6_audit_in(from_e164, message, cmd)
+        jobs = jobs.sorted(key=lambda j: j.id)
+        step = "co_pick" if cmd == "checkout" else "ci_pick"
+        self.env["neon.wa.equip.session"]._start_pick(
+            from_e164, sender, step, jobs.ids)
+        verb = "check out" if cmd == "checkout" else "check in"
+        lines = "\n".join(
+            "%d. %s" % (i + 1, j.sudo().name)
+            for i, j in enumerate(jobs))
+        return self._wa6_reply(
+            raw_from, from_e164,
+            _("Your jobs ready to %(v)s:\n%(l)s\n\nReply with the number "
+              "to %(v)s that job.") % {"v": verb, "l": lines})
+
+    def _wa6_handle_pick(self, sess, body, from_e164, raw_from):
+        """A number reply during co_pick/ci_pick -> resolve to that job +
+        send the checkout/check-in buttons (the dispatch). A re-typed
+        command restarts; anything else re-shows the list."""
+        is_checkin = sess.step == "ci_pick"   # capture BEFORE any write
+        job_ids = sess._get_buffer()
+        norm = (body or "").strip()
+        # a re-typed command restarts the relevant flow (if still eligible)
+        recmd = self._wa6_is_command(body)
+        if recmd:
+            sender = sess.user_id
+            jobs = (self._wa6_eligible_checkin_jobs(sender)
+                    if recmd == "checkin"
+                    else self._wa6_eligible_checkout_jobs(sender))
+            if jobs:
+                return self._wa6_start_pick_flow(
+                    recmd, sender, jobs, from_e164, raw_from,
+                    {"type": "text", "text": {"body": body}})
+        if norm.isdigit() and 1 <= int(norm) <= len(job_ids):
+            ej = self.env["commercial.event.job"].sudo().browse(
+                job_ids[int(norm) - 1]).exists()
+            if not ej:
+                return self._wa6_reply(
+                    raw_from, from_e164,
+                    _("That job is no longer available -- text the command "
+                      "again."))
+            sess.sudo().write({"event_job_id": ej.id, "step": "done",
+                               "active": False})
+            if is_checkin:
+                return self._wa6_send_checkin_buttons(ej, raw_from, from_e164)
+            return self._wa6_send_checkout_buttons(ej, raw_from, from_e164)
+        # not a number in range -> re-show the list
+        verb = "check in" if is_checkin else "check out"
+        lines = "\n".join(
+            "%d. %s" % (i + 1, self.env["commercial.event.job"].sudo()
+                        .browse(jid).name)
+            for i, jid in enumerate(job_ids))
+        return self._wa6_reply(
+            raw_from, from_e164,
+            _("Reply with a number from your list to %(v)s:\n%(l)s")
+            % {"v": verb, "l": lines})
+
+    def _wa6_send_checkout_buttons(self, ej, raw_from, from_e164):
+        body = _("%s -- ready to check out. Choose:") % ej.sudo().name
+        buttons = [
+            {"id": self._wa6_payload("wa6_co_all", ej.id),
+             "title": "📦 Check out all"},
+            {"id": self._wa6_payload("wa6_co_item", ej.id),
+             "title": "📋 Item-by-item"}]
+        return self._wa6_send_buttons(raw_from, from_e164, body, buttons)
+
+    def _wa6_send_checkin_buttons(self, ej, raw_from, from_e164):
+        body = _("%s -- checking gear back in. Choose:") % ej.sudo().name
+        buttons = [
+            {"id": self._wa6_payload("wa6_ci_good", ej.id),
+             "title": "✅ All returned good"},
+            {"id": self._wa6_payload("wa6_ci_flag", ej.id),
+             "title": "⚠️ Flag an item"}]
+        return self._wa6_send_buttons(raw_from, from_e164, body, buttons)
 
     # ================================================================
     # FACE 3 -- WAREHOUSE CHECKOUT (run as the real tapping user)

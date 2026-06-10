@@ -44,7 +44,19 @@
     # reserves a COUNT against quantity_on_hand) instead of the serial-only
     # _find_available_units + _bind path, and surfaces the engine's honest
     # short reason ("only N in inventory" vs "M committed on those dates").
-    "version": "17.0.1.2.1",
+    # 17.0.1.3.0 = WA-6.1 Face-3 crew-initiated dispatch (the trigger WA-6
+    # omitted). A mapped lead_tech/crew_chief texts a TIGHT command
+    # ("check out"/"checkout"/"check in"/"checkin" + equipment/gear
+    # variants; equals/startswith, never substring) -> bot lists ONLY their
+    # eligible jobs (checkout: confirmed holds; check-in: gear still out,
+    # quantity clears once a checkin movement exists) -> they pick a number
+    # -> bot SENDS the existing [Check out all][Item-by-item] /
+    # [All returned good][Flag an item] buttons (the previously-missing
+    # dispatch) -> existing _wa6_route_checkout/checkin. Fires ONLY for a
+    # mapped role-holder with >=1 eligible job; everyone else falls through
+    # to Copilot/client lane UNCHANGED. New co_pick/ci_pick session steps.
+    # Reuses wa6_co_*/wa6_ci_* intents -- no neon_channels touch.
+    "version": "17.0.1.3.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

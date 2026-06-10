@@ -55,13 +55,15 @@ class WaEquipSession(models.Model):
         [("await_items", "Awaiting item list"),
          ("review", "Reviewing interpreted list"),
          ("fixing", "Fixing one item"),
+         ("co_pick", "Awaiting checkout job pick"),
+         ("ci_pick", "Awaiting check-in job pick"),
          ("done", "Done")],
         string="Step", default="await_items", required=True)
     buffer = fields.Text(
-        string="Parsed Lines (JSON)",
-        help="The matched/not-found line list under review. JSON list of "
-        "{raw, qty, product_id, product_name, category, status, "
-        "suggestions}.")
+        string="Buffer (JSON)",
+        help="Step-dependent: in review/fixing it is the matched/not-found "
+        "finalize line list; in co_pick/ci_pick (WA-6.1) it is the ordered "
+        "list of eligible event_job ids the crew member is picking from.")
     fix_index = fields.Integer(
         string="Row Being Fixed", default=-1,
         help="0-based index into the buffer that the next free-text patch "
@@ -123,6 +125,28 @@ class WaEquipSession(models.Model):
             "user_id": user.id if user else False,
             "event_job_id": event_job.id if event_job else False,
             "step": "await_items", "buffer": "[]", "fix_index": -1,
+            "active": True, "last_inbound": fields.Datetime.now()}
+        if sess:
+            sess.write(vals)
+        else:
+            vals["phone_number"] = phone_e164
+            sess = self.sudo().create(vals)
+        return sess
+
+    @api.model
+    def _start_pick(self, phone_e164, user, step, job_ids):
+        """WA-6.1 — open (or rebind) the single session into a checkout/
+        check-in list-then-pick state. ``step`` is 'co_pick' or 'ci_pick';
+        ``job_ids`` is the ordered list of the crew member's eligible event
+        jobs (stored in buffer; the reply lists them numbered, the next
+        number reply picks one). active_test=False to rebind a prior
+        finished session (same unique-phone reasoning as _start)."""
+        sess = self.sudo().with_context(active_test=False).search(
+            [("phone_number", "=", phone_e164)], limit=1)
+        vals = {
+            "user_id": user.id if user else False,
+            "event_job_id": False, "step": step,
+            "buffer": json.dumps(list(job_ids or [])), "fix_index": -1,
             "active": True, "last_inbound": fields.Datetime.now()}
         if sess:
             sess.write(vals)
