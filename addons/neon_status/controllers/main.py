@@ -114,6 +114,17 @@ WA_MODULES = [
              "planning/prep from-scratch jobs → pick → the same 3-button "
              "choice), retiring the laptop step as the primary entry. Sales "
              "Face 1 deferred."},
+    {"key": "WA-7", "title": "Crew selection", "pct": 100,
+     "state": "live",
+     "body": "DONE & VERIFIED on a real phone (neon_crew_comms 17.0.1.5.0). "
+             "The OD texts \"select crew\" → bot lists from-scratch "
+             "planning/prep jobs → pick → multi-pick the team from mapped "
+             "staff → pick the crew chief → Confirm (rows created as the "
+             "real OD, silent) → 📣 Notify fires the existing WA-2 confirm/"
+             "decline. Proof: Robin picked one crew member, she confirmed "
+             "via her WA-2 tap, crew_chief_id recomputed, nobody else "
+             "touched (binding pick held). Two-factor throughout; new wa7_* "
+             "intents (neon_channels 17.0.1.18.0)."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
@@ -134,11 +145,12 @@ TRACK_MILESTONES = [
                 "B14, P5.M11 quantity-aware reservation engine (reserve/"
                 "checkout/check-in honour quantity_on_hand); B4 / B5 "
                 "ready-to-fork. Field-tech arm = B11 WhatsApp COMPLETE for "
-                "the built scope — WA-0–WA-4, WA-5 client lane, and WA-6 "
-                "crew + OD equipment face (finalize + WA-6.1 crew-initiated "
-                "checkout/check-in dispatch) all DONE & VERIFIED on prod, "
-                "WA-6 proven end-to-end on real phones (finalize → checkout "
-                "→ check-in, actor-audited, qoh balanced).",
+                "the built scope — WA-0–WA-4, WA-5 client lane, WA-6 crew + "
+                "OD equipment face (finalize + WA-6.1/6.2 dispatch), and WA-7 "
+                "crew selection — all DONE & VERIFIED on prod. The phone-"
+                "native ops cycle is now real end-to-end: crew select → "
+                "finalize → checkout → check-in, each proven on real phones, "
+                "actor-audited, qoh balanced.",
         "remaining": "B10 crew scheduler pending; B8 mobile / B9 QR / B16 "
                      "predictive deferred; B12 Drive dropped; sales Face 1 "
                      "deferred.",

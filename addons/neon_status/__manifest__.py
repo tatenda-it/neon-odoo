@@ -51,7 +51,13 @@
     # initiated finalize entry (text "finalize" → list from-scratch
     # planning/prep jobs → pick → existing 3-button choice). Text-only;
     # scores unchanged (WA-6.2 is part of the equipment face: 100/90/90).
-    "version": "17.0.1.0.9",
+    # 17.0.1.0.10 = WA-7 DONE (crew selection, real-phone proof passed):
+    # new WA-7 card live/100%; AI-track "live" text now claims the full
+    # phone-native ops cycle (crew select -> finalize -> checkout -> checkin)
+    # end-to-end; fixed the stale "WA-0-WA-4" overall + B11 intro paragraphs
+    # to WA-0 through WA-7. Text-only; scores unchanged (WA-7 within the
+    # already-counted WhatsApp arm).
+    "version": "17.0.1.0.10",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
