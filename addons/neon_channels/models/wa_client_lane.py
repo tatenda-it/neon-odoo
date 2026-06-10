@@ -228,6 +228,11 @@ class WhatsAppMessageClientLane(models.Model):
     # ---- terminal client actions (both -> a lead + notify Munashe) --
     @api.model
     def _wa5_complete_quote(self, sess, from_e164, raw_from, details):
+        # WA-9 D1: a returning client whose prior session expired but whose
+        # OPEN lead is still live -> FOLD into it (no duplicate orphan),
+        # routed through the existing follow-up notify. Else create.
+        if self._wa9_try_fold(sess, from_e164, raw_from, details):
+            return True
         lead = self._wa5_create_client_lead(from_e164, details, "quote")
         # WA-5.2: stamp last_notify at the initial escalation so an
         # immediate rapid follow-up is debounced.
@@ -243,6 +248,12 @@ class WhatsAppMessageClientLane(models.Model):
 
     @api.model
     def _wa5_handoff(self, sess, from_e164, raw_from, client_msg, reason):
+        # WA-9 D1 cross-session fold (same as the quote path): an existing
+        # OPEN lead for this number folds in rather than creating a duplicate.
+        if self._wa9_try_fold(
+                sess, from_e164, raw_from,
+                client_msg or "(client asked to speak to the team)"):
+            return True
         lead = sess.lead_id if sess.lead_id else self._wa5_create_client_lead(
             from_e164, client_msg or "(client asked to speak to the team)",
             "handoff")
@@ -388,6 +399,14 @@ class WhatsAppMessageClientLane(models.Model):
         deadline = self._wa5_parse_date(raw_text)
         if deadline:
             vals["date_deadline"] = deadline
+        # WA-9: link a RECOGNISED customer -- exact E.164 phone_sanitized
+        # match to a res.partner (else the partner of a prior CLOSED lead
+        # for this number = a new opportunity under the same contact). No
+        # match -> partner_id stays empty; a human qualifies it (NO auto
+        # res.partner creation, ever). The ONLY new write WA-9 makes.
+        partner = self._wa9_match_partner(from_e164)
+        if partner:
+            vals["partner_id"] = partner.id
         lead = Lead.create(vals)
         # mirror the intake thread to the lead's chatter. Markup keeps the
         # <b>/<br/> literal and AUTO-ESCAPES the client text -- a plain str
@@ -417,6 +436,122 @@ class WhatsAppMessageClientLane(models.Model):
             return date(y, mo, d)
         except ValueError:
             return None
+
+    # ================================================================
+    # WA-9 -- CRM contact-matching for the client lane
+    # Fixes the orphan-lead gap: WA-5 leads carry partner_id=False, so a
+    # repeat client number made duplicate UNLINKED leads. WA-9 matches the
+    # sender to an existing res.partner by exact phone_sanitized and links
+    # the new lead; and dedupes across sessions (fold an open lead / new
+    # opportunity after a closed one). NEVER creates a res.partner (D2 --
+    # a human qualifies an unknown). The ONLY new write is partner_id on a
+    # NEW lead; the cross-session fold reuses the existing follow-up path.
+    # ================================================================
+    @api.model
+    def _wa9_match_partner(self, from_e164):
+        """The res.partner this number belongs to, or empty. Exact E.164
+        ``phone_sanitized`` match first (a recognised customer); else the
+        partner of a prior CLOSED (won OR lost/archived) lead for the same
+        number (a new opportunity under the SAME contact). NEVER creates a
+        res.partner -- no match returns empty so partner_id stays blank and
+        a human qualifies the lead (D2). phone_sanitized is the stock
+        phone_validation field on BOTH models, sanitised from mobile/phone;
+        from_e164 is already canonical E.164, so the compare aligns (a rare
+        format edge fails SAFE -> no match -> human-qualify)."""
+        empty = self.env["res.partner"].sudo().browse()
+        if not from_e164:
+            return empty
+        Partner = self.env["res.partner"].sudo()
+        p = Partner.search(
+            [("phone_sanitized", "=", from_e164)],
+            order="write_date desc, id desc", limit=1)
+        if p:
+            return p
+        closed = self.env["crm.lead"].sudo().with_context(
+            active_test=False).search([
+                ("phone_sanitized", "=", from_e164),
+                ("partner_id", "!=", False),
+                "|", ("active", "=", False), ("stage_id.is_won", "=", True),
+            ], order="write_date desc, id desc", limit=1)
+        return closed.partner_id if closed else empty
+
+    @api.model
+    def _wa9_open_lead_for(self, from_e164):
+        """D1: the most-recent OPEN crm.lead for this number (active AND not
+        won == not lost/archived, not won) for the cross-session fold. Empty
+        recordset if none."""
+        Lead = self.env["crm.lead"].sudo()
+        if not from_e164:
+            return Lead.browse()
+        return Lead.search([
+            ("phone_sanitized", "=", from_e164),
+            ("active", "=", True),
+            ("stage_id.is_won", "=", False),
+        ], order="write_date desc, id desc", limit=1)
+
+    @api.model
+    def _wa9_try_fold(self, sess, from_e164, raw_from, body):
+        """D1 cross-session fold: when THIS session has no lead yet but an
+        OPEN lead already exists for the number (a prior, now-expired
+        session), bind the session to it and route through the EXISTING
+        follow-up notify (owned->assignee / unowned->escalate, debounced) --
+        folding the enquiry in instead of creating a duplicate orphan.
+        Returns True if it folded. Does NOT touch the existing lead's
+        partner_id (that is the gated D3 backfill); the only write here is
+        the session binding + the existing follow-up's chatter/last_notify.
+        (The within-session fold is unchanged -- the lane already routes a
+        session that HAS a lead straight to _wa5_followup before this.)"""
+        if sess.lead_id:
+            return False
+        existing = self._wa9_open_lead_for(from_e164)
+        if not existing:
+            return False
+        sess.sudo().write({"step": "done", "lead_id": existing.id})
+        self._wa5_followup(sess, existing, body, raw_from, from_e164)
+        return True
+
+    @api.model
+    def _wa9_backfill_orphans(self, lead_ids=None, dry_run=True):
+        """D3 (⛔ GATED -- modifies existing live rows): one-off link of
+        orphan WA-5 leads (partner_id=False) to a res.partner by exact
+        phone_sanitized. dry_run=True (DEFAULT) = READ-ONLY: returns the row
+        list for the approval gate and writes NOTHING. dry_run=False applies
+        partner_id ONLY where a match exists and the lead is still
+        partner-less (idempotent; never creates a partner, never overwrites
+        an existing partner_id). Pass explicit lead_ids (e.g. [651,652,653]);
+        with none, scans WhatsApp-tagged partner-less leads."""
+        Lead = self.env["crm.lead"].sudo().with_context(active_test=False)
+        if lead_ids:
+            leads = Lead.browse(lead_ids)
+        else:
+            dom = [("partner_id", "=", False)]
+            tag = self.env.ref(
+                "neon_channels.crm_tag_whatsapp", raise_if_not_found=False)
+            if tag:
+                dom.append(("tag_ids", "in", tag.id))
+            leads = Lead.search(dom)
+        rows = []
+        for lead in leads:
+            if not lead.exists():
+                rows.append({"lead_id": lead.id, "status": "MISSING"})
+                continue
+            match = self._wa9_match_partner(
+                lead.phone_sanitized or lead.phone or "")
+            applied = False
+            if not dry_run and match and not lead.partner_id:
+                lead.write({"partner_id": match.id})
+                applied = True
+            rows.append({
+                "lead_id": lead.id,
+                "lead_name": lead.name,
+                "phone": lead.phone,
+                "phone_sanitized": lead.phone_sanitized or "",
+                "current_partner_id": lead.partner_id.id or None,
+                "would_set_partner_id": match.id if match else None,
+                "match": ("%s (id=%d)" % (match.name, match.id)) if match
+                         else "NO MATCH -> human-qualify",
+                "applied": applied})
+        return rows
 
     # ================================================================
     # Shared WA-5 helpers (used by the lane AND the assignment taps)

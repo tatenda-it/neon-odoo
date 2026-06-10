@@ -174,7 +174,22 @@
     # RBAC change. Bumped so the version-only deploy check reflects
     # wa_payload.py changed; the webhook worker reloads INTENTS on the
     # force-recreate (a -u alone never reloads a module-level constant).
-    'version': '17.0.1.18.0',
+    # 17.0.1.19.0 = B11/WA-9 CRM contact-matching for the client lane. Fixes
+    # the orphan-lead gap (WA-5 leads were partner_id=False, so a repeat
+    # client number made duplicate UNLINKED leads). On a new client lead the
+    # lane now sets partner_id from an EXACT phone_sanitized match to a
+    # res.partner (else the partner of a prior CLOSED lead for the number = a
+    # new opportunity under the same contact); no match -> partner_id stays
+    # empty and a human qualifies it (D2: NEVER auto-creates a res.partner).
+    # Cross-session dedupe (D1): a still-OPEN lead for the number folds the
+    # enquiry in (via the existing follow-up notify) instead of creating a
+    # duplicate. The ONLY new write is partner_id on a NEW lead (reversible);
+    # the fold writes nothing new on the existing lead. A separate GATED
+    # _wa9_backfill_orphans(lead_ids, dry_run) links the 3 existing orphan
+    # leads (651/652/653) -- read-only dry-run for the approval gate; the
+    # apply is the hard gate. Method-only: no new field / intent / schema /
+    # RBAC change (phone_sanitized + is_won are stock). neon_channels only.
+    'version': '17.0.1.19.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',
