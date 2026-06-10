@@ -47,7 +47,11 @@
     # (milestone count: WA-6 done + P5.M11 quantity engine + WA-6.1 Face-3
     # dispatch all live). Added P5.M11 + WA-6 to "Done & verified"; AI track
     # text reflects B11 WhatsApp complete for the built scope. Constants.
-    "version": "17.0.1.0.8",
+    # 17.0.1.0.9 = WA-6.2 note: WA-6 card text gains the OD WhatsApp-
+    # initiated finalize entry (text "finalize" → list from-scratch
+    # planning/prep jobs → pick → existing 3-button choice). Text-only;
+    # scores unchanged (WA-6.2 is part of the equipment face: 100/90/90).
+    "version": "17.0.1.0.9",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

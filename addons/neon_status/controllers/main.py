@@ -100,7 +100,7 @@ WA_MODULES = [
     {"key": "WA-6", "title": "Crew + OD equipment face", "pct": 100,
      "state": "live",
      "body": "DONE & VERIFIED end-to-end on real phones (neon_crew_comms "
-             "17.0.1.3.0). Face 2 free-text FINALIZE (OD initiates → I'll "
+             "17.0.1.4.0). Face 2 free-text FINALIZE (OD initiates → I'll "
              "finalize / send to crew chief → text the gear list → matcher "
              "→ confirm / fix → reservations); Face 3 WAREHOUSE checkout / "
              "check-in via WA-6.1 crew-initiated dispatch (chief texts "
@@ -109,8 +109,11 @@ WA_MODULES = [
              "full quantities, checkout + check-in movements logged with "
              "actor = the real crew member, qoh balanced. Narrow per-job "
              "lead/chief gate + two-factor throughout; built on the proven "
-             "equipment engine (now quantity-aware, P5.M11). Sales Face 1 "
-             "deferred."},
+             "equipment engine (now quantity-aware, P5.M11). WA-6.2: the OD "
+             "also STARTS finalize from WhatsApp (text \"finalize\" → list "
+             "planning/prep from-scratch jobs → pick → the same 3-button "
+             "choice), retiring the laptop step as the primary entry. Sales "
+             "Face 1 deferred."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
