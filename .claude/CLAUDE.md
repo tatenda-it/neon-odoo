@@ -295,8 +295,10 @@ Everything not listed is yours to decide.
 When a hard gate is reached: present it in one compact block (what / why / exact blast radius /
 recommendation), then HOLD only on that item — continue any queued work that doesn't depend on it.
 
-## Post-deploy verification
+## Prod writes & post-deploy verification (supersedes the earlier ssh-only post-deploy rule)
 
-Post-deploy verification: do NOT ssh to prod for read-only checks. Report what should be verified
-(versions, fields, ledger deltas, expected states); the assistant verifies via the browser. SSH to
-prod is for deploy actions only (git pull, -u, force-recreate).
+Prod writes via ANY surface (ssh, JSON-RPC, API) follow the same rules as deploys: [TEST-*] fixtures
+and approved teardowns are within autonomy; anything touching non-test live rows is hard gate 1/4
+regardless of transport. Post-deploy verification: do NOT ssh or JSON-RPC prod for read-only checks —
+report what should be verified (versions, fields, ledger deltas, expected states) and the assistant
+verifies via the browser. SSH/RPC to prod is for deploy actions and approved fixture/teardown work only.
