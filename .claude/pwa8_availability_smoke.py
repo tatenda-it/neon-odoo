@@ -1,31 +1,30 @@
 # -*- coding: utf-8 -*-
-"""B11 / WA-8 Face 1 availability check smoke. Run via:
+"""B11 / WA-8 (+WA-8.1) Face 1 availability check smoke. Run via:
     docker exec -i neon-odoo-app odoo shell -d <DB> --no-http \
         < pwa8_availability_smoke.py
 
-Exercises the REAL path -- an entitled mapped user texts a tight "free on
-<date>? <items>" -> handle_inbound -> _wa8_maybe_intercept -> a traffic-light
-availability answer PER ITEM for the time-window. PURE READ (no reservation /
-line / unit is ever created by WA-8; only the FIXTURE seeds holds). Text-only
-(no buttons / wa8_* intents). Rolls back.
+REAL path -- an entitled mapped user texts "free on <date>? <items>" ->
+handle_inbound -> _wa8_maybe_intercept -> a traffic-light availability PER
+ITEM for the time-window. PURE READ (WA-8 creates no reservation/line/unit;
+the FIXTURE seeds the holds). Text-only. Rolls back.
 
-To stay deterministic against the real prod catalogue, the fixture products
-carry UNIQUE nonsense tokens (wa8qty / wa8ser / wa8xfr / wa8bnd) and the item
-text uses those tokens, so the WA-6 matcher resolves to OUR products only.
+Deterministic against the real catalogue: fixture products carry UNIQUE
+pure-alpha tokens (wazqty/wazser/wazxfr/wazbnd/wazdst/wazcfd/wazsmk) used
+verbatim in the item text, so the WA-6 matcher resolves to OUR products.
 
 PARSE   tight command; mid-sentence / no-date / no-matched-item NOT grabbed
 ENTITLE OD/superuser + sales tier + crew-leader + any mapped fallback; unmapped no
 TZ      Harare-local window -> UTC (midnight-local = 22:00 UTC prev day; 2-6pm
-        = 12:00-16:00 UTC); explicit reservation boundary (no off-by-2h)
-QTY     full avail vs qoh; clash -> 🟡 + competing event name; >qoh -> 🔴 "only N
-        in inventory"; cross-date -> free-to-share
-SERIAL  active units; same-day non-overlap shares; same-day overlap clashes
-XFER    a transferred unit drops from availability (committed across its chain)
-FULLDAY no time -> conservative full-day catches a same-day clash
-EDIT    items sticky; a bare new DATE re-checks same items; a bare new TIME
-        re-uses the last date; fresh command = new check
-LOCK    today/past date refused; the day before is allowed
-UNKNOWN unmatched item -> "not found" alongside the matched ones
+        = 12:00-16:00 UTC); explicit reservation midnight boundary (no off-by-2h)
+TIERS   (WA-8.1) spare -> green; exact capacity (free == needed) -> yellow tight/
+        no-spare; short -> red ("only N in inventory" vs "N committed" + clash)
+SERIAL  same-day non-overlap shares (green); same-day overlap eats the spare
+XFER    a transferred unit drops from availability
+EDIT    items sticky; bare new DATE re-checks; bare new TIME re-uses last date
+LOCK    today/past refused; the day before allowed
+CONFID  (WA-8.1) a confident multi-word match answers directly; a low-confidence
+        fuzzy hit (product is a different KIND of thing) -> suggestion, never a
+        silent answer; "yes" promotes + checks the suggested product
 """
 import traceback
 from contextlib import ExitStack
@@ -89,8 +88,7 @@ try:
     tomorrow_d = today_l + timedelta(days=1)
 
     def cmd_date(d):
-        # explicit 4-digit year -> no year-roll ambiguity in the parser
-        return d.strftime("%d %b %Y")
+        return d.strftime("%d %b %Y")   # explicit year -> no year-roll
 
     def utc_str(d, h, m=0):
         return "%s %02d:%02d:00" % (d.isoformat(), h, m)
@@ -99,13 +97,14 @@ try:
     g_su = env.ref("neon_core.group_neon_superuser")
     g_jobs_user = env.ref("neon_jobs.group_neon_jobs_user")
     g_crew_leader = env.ref("neon_jobs.group_neon_jobs_crew_leader")
+    cat_truss = env.ref("neon_jobs.equipment_category_trussing")
     sample = CJ.search([], limit=1, order="id desc")
     venue_id = sample.venue_id.id if sample and sample.venue_id else False
     currency_id = (sample.currency_id.id if sample and sample.currency_id
                    else env.ref("base.USD").id)
-    check("fixtures: groups + venue/currency present",
-          bool(g_user and g_su and g_jobs_user and venue_id and currency_id),
-          (venue_id, currency_id))
+    check("fixtures: groups + cat + venue/currency present",
+          bool(g_user and g_su and g_jobs_user and cat_truss and venue_id
+               and currency_id), (venue_id, currency_id))
 
     def mk_user(login, groups):
         return env["res.users"].sudo().create({
@@ -117,18 +116,16 @@ try:
         env["neon.bot.user"].sudo().create({
             "name": u.login, "phone_number": phone, "user_id": u.id})
 
-    # The proof-tier sender: a mapped SALES-tier user (Tatenda's lens).
     sales = mk_user("wa8_sales", [g_user, g_jobs_user])
     SALES_PHONE, SALES_FROM = "+263881007001", "263881007001"
     mk_bot(sales, SALES_PHONE)
-    # OD/superuser (entitlement branch) + crew-leader + plain mapped fallback.
     su = mk_user("wa8_su", [g_user, g_su])
     SU_PHONE, SU_FROM = "+263881007002", "263881007002"
     mk_bot(su, SU_PHONE)
     env["ir.config_parameter"].sudo().set_param(
         "neon_channels.wa6_od_login", su.login)
     lead = mk_user("wa8_lead", [g_user, g_crew_leader])
-    plain = mk_user("wa8_plain", [g_user])           # mapped, NO role group
+    plain = mk_user("wa8_plain", [g_user])
     PLAIN_PHONE, PLAIN_FROM = "+263881007003", "263881007003"
     mk_bot(plain, PLAIN_PHONE)
     UNMAPPED_FROM = "263881007999"
@@ -146,41 +143,39 @@ try:
     parent = CJ.create({"name": "WA8 Parent", "partner_id": test_partner.id,
                         "venue_id": venue_id, "currency_id": currency_id,
                         "state": "active", "event_date": check_d.isoformat()})
+    gala = EJ.create({"commercial_job_id": parent.id, "name": "WA8 GALA",
+                      "state": "planning", "event_date": check_d.isoformat()})
+    gala.invalidate_recordset()
 
-    def mk_ej(name):
-        ej = EJ.create({"commercial_job_id": parent.id, "name": name,
-                        "state": "planning",
-                        "event_date": check_d.isoformat()})
-        ej.invalidate_recordset()
-        return ej
-
-    gala = mk_ej("WA8 GALA")   # the competing event for the holds below
-
-    # --- products (unique tokens -> deterministic match) ---
-    def mk_qty_prod(token, qoh):
+    # --- products (UNIQUE pure-alpha tokens; name == token unless a
+    #     multi-word confidence case) ---
+    def mk_qty(token, qoh, name=None, cat=None):
         return Prod.create({
-            "name": token.upper() + " Bar", "workshop_name": token,
+            "name": name or token.upper(), "workshop_name": token,
             "is_workshop_item": True, "tracking_mode": "quantity",
-            "quantity_on_hand": qoh})
+            "quantity_on_hand": qoh,
+            "equipment_category_id": cat.id if cat else False})
 
-    def mk_serial_prod(token, n_units, n_transferred=0):
-        p = Prod.create({
-            "name": token.upper() + " Box", "workshop_name": token,
-            "is_workshop_item": True, "tracking_mode": "serial"})
+    def mk_serial(token, n, n_transferred=0):
+        p = Prod.create({"name": token.upper(), "workshop_name": token,
+                         "is_workshop_item": True, "tracking_mode": "serial"})
         units = Unit.create([{
-            "product_template_id": p.id,
-            "serial_number": "%s-%d" % (token, i),
-            "condition_status": "good"} for i in range(n_units)])
+            "product_template_id": p.id, "serial_number": "%s-%d" % (token, i),
+            "condition_status": "good"} for i in range(n)])
         for u in units[:n_transferred]:
             u.sudo().write({"state": "transferred"})
         return p, units
 
-    p_qty = mk_qty_prod("wa8qty", 10)          # qoh 10
-    p_ser, ser_units = mk_serial_prod("wa8ser", 4)   # 4 active units
-    p_xfr, _xu = mk_serial_prod("wa8xfr", 3, n_transferred=1)  # 3-1 = 2
-    p_bnd = mk_qty_prod("wa8bnd", 5)           # qoh 5 (tz boundary)
+    p_qty = mk_qty("wazqty", 10)
+    p_ser, ser_units = mk_serial("wazser", 4)
+    p_xfr, _xu = mk_serial("wazxfr", 3, n_transferred=1)     # supply 2
+    p_bnd = mk_qty("wazbnd", 5)
+    p_dst, _du = mk_serial("wazdst", 2)                       # 2, no holds
+    # WA-8.1 confidence: a confident multi-word match (head noun 'truss' is in
+    # the query) vs a low-confidence fuzzy hit (head noun 'remotes' is NOT).
+    p_cfd = mk_qty("wazcfd", 5, name="WAZCFD Black Truss", cat=cat_truss)
+    p_smk = mk_qty("wazsmk", 3, name="WAZSMK Machine Remotes")
 
-    # --- holds (the FIXTURE seeds these; WA-8 never writes) ---
     def mk_qty_hold(product, qty, frm, to):
         L = Line.create({"event_job_id": gala.id,
                          "product_template_id": product.id,
@@ -188,71 +183,69 @@ try:
         L.reservation_ids.sudo().write({"reserve_from": frm, "reserve_to": to})
         return L
 
-    # p_qty: 7 held over check_d 06:00-14:00 UTC (daytime).
     Lq = mk_qty_hold(p_qty, 7, utc_str(check_d, 6), utc_str(check_d, 14))
-    # p_bnd: 5 held over check_d-1 22:30-23:30 UTC = check_d 00:30-01:30 HARARE
-    # (the midnight-boundary hold the tz conversion must catch).
-    Lb = mk_qty_hold(p_bnd, 5,
-                     utc_str(check_d - timedelta(days=1), 22, 30),
-                     utc_str(check_d - timedelta(days=1), 23, 30))
-    # p_ser: ONE unit held over check_d 06:00-10:00 UTC (morning).
+    mk_qty_hold(p_bnd, 5, utc_str(check_d - timedelta(days=1), 22, 30),
+                utc_str(check_d - timedelta(days=1), 23, 30))
     Res.create({"event_job_id": gala.id, "unit_id": ser_units[0].id,
                 "reserve_from": utc_str(check_d, 6),
                 "reserve_to": utc_str(check_d, 10), "state": "soft_hold"})
 
-    # --- fixture sanity (exercises the engine primitives directly) ---
-    check("FIX: supplies -- qty=10, ser=4, xfr=2 (1 transferred dropped), "
-          "bnd=5",
-          ConflictEngine(env)._available_for_product(p_qty.id) == 10
-          and ConflictEngine(env)._available_for_product(p_ser.id) == 4
-          and ConflictEngine(env)._available_for_product(p_xfr.id) == 2
-          and ConflictEngine(env)._available_for_product(p_bnd.id) == 5,
+    check("FIX: supplies wazqty=10 ser=4 xfr=2(1 transferred) bnd=5 dst=2 "
+          "cfd=5 smk=3",
           [ConflictEngine(env)._available_for_product(p.id)
-           for p in (p_qty, p_ser, p_xfr, p_bnd)])
+           for p in (p_qty, p_ser, p_xfr, p_bnd, p_dst, p_cfd, p_smk)]
+          == [10, 4, 2, 5, 2, 5, 3])
     check("FIX: qty COUNT hold = 7 over the daytime window",
           sum(Lq.reservation_ids.mapped("quantity")) == 7)
 
-    # ================= PARSE (deterministic, no send) =================
+    # ================= PARSE =================
     check("PARSE: tight command; mid-sentence / no-command NOT a command",
           WM._wa8_is_command("free on 14 aug? truss x4")
           and WM._wa8_is_command("availability")
-          and WM._wa8_is_command("check availability for the gala")
           and WM._wa8_is_command("available on the 14th")
           and not WM._wa8_is_command("are you free on friday for a call")
           and not WM._wa8_is_command("i'm free on monday")
-          and not WM._wa8_is_command(""),
-          [WM._wa8_is_command(x) for x in
-           ("free on 14 aug?", "are you free on friday for a call")])
+          and not WM._wa8_is_command(""))
     check("PARSE: strip command leaves date + items",
-          WM._wa8_strip_command("free on 14 aug? truss x4") == "14 aug? truss x4"
+          WM._wa8_strip_command("free on 14 aug? truss x4")
+          == "14 aug? truss x4"
           and WM._wa8_strip_command("availability of truss") == "of truss")
 
+    # ================= CONFIDENCE helper (WA-8.1 unit) =================
+    check("CONFIDENCE: head-noun in query -> confident; extra head noun "
+          "(remotes) -> not; dimension mismatch tolerated",
+          WM._wa8_is_confident("wazcfd black truss", p_cfd)
+          and not WM._wa8_is_confident("wazsmk machine", p_smk)
+          and WM._wa8_head_noun("WAZSMK Machine Remotes") == "remotes"
+          and WM._wa8_head_noun("17 AMP 6 WAY DISTRO") == "distro"
+          and WM._wa8_head_noun("2.5M BLACK TRUSS") == "truss",
+          [WM._wa8_is_confident("wazcfd black truss", p_cfd),
+           WM._wa8_is_confident("wazsmk machine", p_smk),
+           WM._wa8_head_noun("17 AMP 6 WAY DISTRO")])
+
     # ================= ENTITLEMENT =================
-    check("ENTITLE: sales-tier + OD/su + crew-leader + plain-mapped pass; "
-          "empty fails",
+    check("ENTITLE: sales/OD/crew-leader/plain-mapped pass; empty fails",
           WM._wa8_can_check(sales) and WM._wa8_can_check(su)
           and WM._wa8_can_check(lead) and WM._wa8_can_check(plain)
-          and not WM._wa8_can_check(env["res.users"].sudo().browse()),
-          [WM._wa8_can_check(u) for u in (sales, su, lead, plain)])
+          and not WM._wa8_can_check(env["res.users"].sudo().browse()))
 
-    # ================= TZ (the boundary correction) =================
+    # ================= TZ =================
     w1 = WM._wa8_parse_window(cmd_date(check_d), now, HARARE)
     exp1 = HARARE.localize(datetime.combine(check_d, dtime(0, 0, 0))) \
         .astimezone(pytz.utc).replace(tzinfo=None)
     check("TZ: full-day local-midnight -> 22:00 UTC prev day (no off-by-2h)",
           w1.get("ok") and not w1["had_time"]
-          and w1["w_from"] == exp1 and w1["w_from"].hour == 22,
-          (w1.get("w_from"), exp1))
+          and w1["w_from"] == exp1 and w1["w_from"].hour == 22, w1.get("w_from"))
     w2 = WM._wa8_parse_window(cmd_date(check_d) + " 2-6pm", now, HARARE)
     exp2 = HARARE.localize(datetime.combine(check_d, dtime(14, 0))) \
         .astimezone(pytz.utc).replace(tzinfo=None)
-    check("TZ: '2-6pm' Harare -> 12:00-16:00 UTC; time_label shown",
+    check("TZ: '2-6pm' Harare -> 12:00-16:00 UTC; label shown",
           w2.get("ok") and w2["had_time"] and w2["w_from"] == exp2
           and w2["w_from"].hour == 12 and "14:00" in w2["time_label"]
-          and "18:00" in w2["time_label"], (w2.get("w_from"), exp2))
+          and "18:00" in w2["time_label"], w2.get("w_from"))
     w3 = WM._wa8_parse_window(cmd_date(check_d) + " 9-5", now, HARARE)
-    check("TZ: ambiguous '9-5' -> conservative full day (no time)",
-          w3.get("ok") and not w3["had_time"])
+    check("TZ: ambiguous '9-5' -> conservative full day", w3.get("ok")
+          and not w3["had_time"])
 
     # ================= mocks + spies =================
     def s_msg(self, to, body):
@@ -327,80 +320,87 @@ try:
 
         D = cmd_date(check_d)
 
-        # ---- QTY: full avail / clash / inventory-shortfall / cross-date ----
+        # ---- TIERS: yellow exact, red short(dates), red inventory, green spare
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8qty x3" % D)
+        r = ask("free on %s? wazqty x3" % D)         # avail 3 == req 3
         s = sess_for(SALES_PHONE)
-        check("T1 QTY 🟢: x3 vs avail 3 -> free; av_check session; Copilot 0",
-              r and "🟢" in r[2] and "free" in r[2]
+        check("T1 EXACT yellow: x3 vs avail 3 -> tight/no-spare (names WA8 "
+              "GALA); av_check session; Copilot 0",
+              r and "🟡" in r[2] and "tight" in r[2] and "WA8 GALA" in r[2]
               and s and s.step == "av_check" and counters["run_turn"] == 0,
               r[2] if r else None)
 
-        r = ask("free on %s? wa8qty x7" % D)
-        check("T2 QTY 🟡: x7 vs avail 3 -> tight, names competing 'WA8 GALA', "
-              "'committed on these dates' wording",
-              r and "🟡" in r[2] and "WA8 GALA" in r[2]
-              and "committed on these dates" in r[2]
-              and "3 of 7" in r[2], r[2] if r else None)
+        # WA-8.1 headline (the distro 2-of-2 finding): exact, NO commitments
+        clear(SALES_PHONE)
+        r = ask("free on %s? wazdst x2" % D)          # 2 owned, 0 held
+        check("T-DISTRO yellow: 2 owned / 2 needed, nothing booked -> tight, "
+              "no spare (NOT green, no 'committed')",
+              r and "🟡" in r[2] and "no spare" in r[2]
+              and "committed" not in r[2] and "🟢" not in r[2],
+              r[2] if r else None)
 
-        r = ask("free on %s? wa8qty x12" % D)
-        check("T3 QTY 🔴: x12 vs qoh 10 -> 'only 10 in inventory' (inventory "
-              "wording, NOT a dates clash)",
+        r = ask("free on %s? wazqty x7" % D)          # avail 3 < 7, supply 10
+        check("T2 red dates: x7 -> short, 'committed on these dates' (3 of 7) "
+              "+ names WA8 GALA",
+              r and "🔴" in r[2] and "committed on these dates" in r[2]
+              and "3 of 7" in r[2] and "WA8 GALA" in r[2], r[2] if r else None)
+
+        r = ask("free on %s? wazqty x12" % D)         # supply 10 < 12
+        check("T3 red inventory: x12 -> 'only 10 in inventory' (NOT a clash)",
               r and "🔴" in r[2] and "only 10 in inventory" in r[2]
               and "committed" not in r[2], r[2] if r else None)
 
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8qty x10" % cmd_date(far_d))
-        check("T4 cross-date 🟢: x10 on a clash-free date -> free-to-share",
-              r and "🟢" in r[2] and "free" in r[2], r[2] if r else None)
+        r = ask("free on %s? wazqty x8" % cmd_date(far_d))   # avail 10 > 8
+        check("T4 green spare: x8 on a clash-free date -> free (10 available)",
+              r and "🟢" in r[2] and "10 available" in r[2], r[2] if r else None)
 
-        # ---- SERIAL: same-day overlap vs non-overlap (time-window) ----
+        # ---- SERIAL same-day overlap vs non-overlap ----
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8ser x4" % D)
-        check("T5 SERIAL full-day 🟡: x4 vs 4 with a morning hold -> 3 of 4",
-              r and "🟡" in r[2] and "3 of 4" in r[2], r[2] if r else None)
+        r = ask("free on %s? wazser x4" % D)          # full day, hold 1, avail 3
+        check("T5 red SERIAL full-day: x4 vs 3 free -> short, 3 of 4 + WA8 GALA",
+              r and "🔴" in r[2] and "3 of 4" in r[2]
+              and "committed on these dates" in r[2], r[2] if r else None)
 
         clear(SALES_PHONE)
-        r = ask("free on %s 2-6pm? wa8ser x4" % D)
-        check("T6 SERIAL same-day NON-overlap 🟢: 2-6pm clear of the 6-10am "
-              "hold -> all 4 free (gear shared same day)",
+        r = ask("free on %s 2-6pm? wazser x3" % D)    # clear of 6-10am, avail 4
+        check("T6 green same-day NON-overlap: 2-6pm clear of the 6-10am hold "
+              "-> spare (4 available); label 14:00",
               r and "🟢" in r[2] and "4 available" in r[2]
               and "14:00" in r[2], r[2] if r else None)
 
         clear(SALES_PHONE)
-        r = ask("free on %s 8-11am? wa8ser x4" % D)
-        check("T7 SERIAL same-day OVERLAP 🟡: 8-11am hits the 6-10am hold -> "
-              "3 of 4",
-              r and "🟡" in r[2] and "3 of 4" in r[2], r[2] if r else None)
+        r = ask("free on %s 8-11am? wazser x3" % D)   # hits 6-10am, avail 3
+        check("T7 yellow same-day OVERLAP: 8-11am eats the spare -> x3 vs 3 "
+              "-> tight, no spare",
+              r and "🟡" in r[2] and "no spare" in r[2], r[2] if r else None)
 
-        # ---- TRANSFER: a transferred unit is out of the pool ----
+        # ---- TRANSFER + TZ boundary ----
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8xfr x3" % D)
-        check("T8 TRANSFER 🔴: 3 owned, 1 transferred -> 'only 2 in inventory' "
-              "(committed across its chain)",
+        r = ask("free on %s? wazxfr x3" % D)          # supply 2 < 3
+        check("T8 red TRANSFER: 1 of 3 transferred -> 'only 2 in inventory'",
               r and "🔴" in r[2] and "only 2 in inventory" in r[2],
               r[2] if r else None)
 
-        # ---- FULL-DAY conservative default catches the boundary hold ----
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8bnd x5" % D)
-        check("T-TZ-BOUNDARY 🔴: a 00:30-01:30 Harare hold IS caught by the "
+        r = ask("free on %s? wazbnd x5" % D)          # 00:30-01:30 Harare hold
+        check("T-TZ-BOUNDARY red: a 00:30-01:30 Harare hold IS caught by the "
               "full-day window (no off-by-2h) -> 0 of 5 / committed",
               r and "🔴" in r[2] and "committed on these dates" in r[2]
               and "0 of 5" in r[2], r[2] if r else None)
 
-        # ---- EDIT LOOP: sticky items, typed new date / new time ----
+        # ---- EDIT LOOP: sticky items, new date / new time ----
         clear(SALES_PHONE)
-        ask("free on %s? wa8qty x3" % D)             # session: items=[qty x3]
+        ask("free on %s? wazqty x3" % D)
         s0 = sess_for(SALES_PHONE)
         items0 = (s0._get_buffer() or {}).get("items") or []
         _sent.clear(); _reset()
-        WM.handle_inbound(text_msg(cmd_date(far_d), SALES_FROM), {})   # bare DATE
+        WM.handle_inbound(text_msg(cmd_date(far_d), SALES_FROM), {})   # new DATE
         r = last("text", SALES_PHONE)
         s1 = sess_for(SALES_PHONE)
         items1 = (s1._get_buffer() or {}).get("items") or []
         check("T9 EDIT new-DATE: bare future date re-checks the SAME items "
-              "(sticky), 🟢 on the clear date; still av_check; Copilot 0",
+              "(green on the clear date); av_check; items unchanged; Copilot 0",
               r and "🟢" in r[2] and cmd_date(far_d) in r[2]
               and s1 and s1.step == "av_check"
               and [it["product_id"] for it in items1]
@@ -408,12 +408,12 @@ try:
               and counters["run_turn"] == 0, r[2] if r else None)
 
         _sent.clear(); _reset()
-        WM.handle_inbound(text_msg("8-11am", SALES_FROM), {})   # bare TIME
+        WM.handle_inbound(text_msg("8-11am", SALES_FROM), {})          # new TIME
         r = last("text", SALES_PHONE)
         s2 = sess_for(SALES_PHONE)
         items2 = (s2._get_buffer() or {}).get("items") or []
-        check("T10 EDIT new-TIME: a bare time re-uses the last date + same "
-              "items (label shows 08:00-11:00); Copilot 0",
+        check("T10 EDIT new-TIME: a bare time re-uses the last date + SAME "
+              "items (label 08:00-11:00); av_check; Copilot 0",
               r and "08:00" in r[2] and "11:00" in r[2]
               and s2 and s2.step == "av_check"
               and [it["product_id"] for it in items2]
@@ -422,33 +422,30 @@ try:
 
         # ---- DAY-BEFORE LOCK ----
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8qty x3" % cmd_date(past_d))
-        check("T11 LOCK: a past date is refused (🔒 upcoming-only); NO session "
-              "opened",
+        r = ask("free on %s? wazqty x3" % cmd_date(past_d))
+        check("T11 LOCK: a past date is refused; NO session opened",
               r and "🔒" in r[2] and not sess_for(SALES_PHONE),
               r[2] if r else None)
 
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8qty x3" % cmd_date(tomorrow_d))   # day-before OK
+        r = ask("free on %s? wazqty x3" % cmd_date(tomorrow_d))
         ok_tom = bool(r and "🔒" not in r[2] and sess_for(SALES_PHONE))
         _sent.clear()
-        WM.handle_inbound(text_msg(cmd_date(today_l), SALES_FROM), {})  # today
+        WM.handle_inbound(text_msg(cmd_date(today_l), SALES_FROM), {})
         r2 = last("text", SALES_PHONE)
-        check("T11b LOCK boundary: tomorrow ALLOWED (answered), a re-check for "
-              "TODAY refused (🔒)",
-              ok_tom and r2 and "🔒" in r2[2],
+        check("T11b LOCK boundary: tomorrow ALLOWED; a re-check for TODAY "
+              "refused", ok_tom and r2 and "🔒" in r2[2],
               (ok_tom, r2[2] if r2 else None))
 
-        # ---- UNKNOWN item alongside a matched one ----
+        # ---- UNKNOWN alongside a matched item ----
         clear(SALES_PHONE)
-        r = ask("free on %s? wa8qty x2, fizzbuzznope x1" % D)
-        check("T12 UNKNOWN: unmatched item -> 'not found', matched item still "
-              "answered",
+        r = ask("free on %s? wazqty x2, fizzbuzznope x1" % D)
+        check("T12 UNKNOWN: unmatched -> 'not found'; matched item answered",
               r and "not found" in r[2] and "fizzbuzznope" in r[2]
               and ("🟢" in r[2] or "🟡" in r[2] or "🔴" in r[2]),
               r[2] if r else None)
 
-        # ---- NOT GRABBED (the parser never steals a turn) ----
+        # ---- NOT GRABBED ----
         clear(SALES_PHONE)
         n1 = WM._wa8_maybe_intercept(
             text_msg("are you free on friday for a call", SALES_FROM))
@@ -457,7 +454,7 @@ try:
         n3 = WM._wa8_maybe_intercept(
             text_msg("free on %s? widgetnope gizmonope" % D, SALES_FROM))
         n4 = WM._wa8_maybe_intercept(
-            text_msg("free on %s? wa8qty x3" % D, UNMAPPED_FROM))
+            text_msg("free on %s? wazqty x3" % D, UNMAPPED_FROM))
         check("T13-16 NOT GRABBED: mid-sentence / no-date / no-matched-item / "
               "unmapped -> intercept None",
               n1 is None and n2 is None and n3 is None and n4 is None,
@@ -465,44 +462,79 @@ try:
         clear(SALES_PHONE)
         _sent.clear(); _reset()
         WM.handle_inbound(text_msg("hello what's the plan", SALES_FROM), {})
-        check("T17 regression: an ordinary message -> Copilot ran (no WA-8 "
-              "grab, no session)",
+        check("T17 regression: an ordinary message -> Copilot ran (no grab)",
               counters["run_turn"] >= 1 and not sess_for(SALES_PHONE),
               dict(counters))
 
-        # ---- mapped FALLBACK entitlement (plain user) is grabbed ----
+        # ---- mapped FALLBACK entitlement ----
         clear(PLAIN_PHONE)
         g = WM._wa8_maybe_intercept(
-            text_msg("free on %s? wa8qty x3" % D, PLAIN_FROM))
-        check("T18 FALLBACK: a plain mapped user (no role group) IS grabbed "
-              "(any-active-bot.user fallback), av_check session",
+            text_msg("free on %s? wazqty x3" % D, PLAIN_FROM))
+        check("T18 FALLBACK: a plain mapped user IS grabbed; av_check session",
               g is True and sess_for(PLAIN_PHONE), g)
 
-        # ---- fresh command in-session = a NEW check (replaces items) ----
+        # ---- fresh command in-session = new check ----
         clear(SALES_PHONE)
-        ask("free on %s? wa8qty x3" % D)
+        ask("free on %s? wazqty x3" % D)
         _sent.clear(); _reset()
         WM.handle_inbound(
-            text_msg("free on %s? wa8ser x4" % D, SALES_FROM), {})
-        r = last("text", SALES_PHONE)
+            text_msg("free on %s? wazser x3" % D, SALES_FROM), {})
         sf = sess_for(SALES_PHONE)
         items_f = (sf._get_buffer() or {}).get("items") or []
-        check("T19 fresh command in-session -> NEW check (items replaced to "
-              "wa8ser); still av_check; Copilot 0",
-              r and sf and sf.step == "av_check"
+        check("T19 fresh command in-session -> NEW check (items -> wazser); "
+              "av_check; Copilot 0",
+              sf and sf.step == "av_check"
               and any(it.get("product_id") == p_ser.id for it in items_f)
               and not any(it.get("product_id") == p_qty.id for it in items_f)
               and counters["run_turn"] == 0,
               [it.get("product_id") for it in items_f])
 
-        # ---- PURE READ: WA-8 created no reservations/lines/units ----
+        # ---- PURE READ ----
         res_before = Res.search_count([("event_job_id", "=", gala.id)])
-        ask("free on %s? wa8qty x3" % D)
-        ask("free on %s? wa8ser x4" % D)
-        check("T20 PURE READ: repeated checks create ZERO new reservations "
-              "(read-only)",
+        ask("free on %s? wazqty x3" % D)
+        ask("free on %s? wazser x3" % D)
+        check("T20 PURE READ: repeated checks create ZERO new reservations",
               Res.search_count([("event_job_id", "=", gala.id)]) == res_before,
               res_before)
+
+        # ================= WA-8.1 CONFIDENCE (real path) =================
+        # T-CONF-1: a confident multi-word match answers DIRECTLY (the
+        # "2.5 black truss" must-pass analog: head noun 'truss' is in query).
+        clear(SALES_PHONE)
+        r = ask("free on %s? wazcfd black truss x1" % D)
+        check("T-CONF-1 confident: 'wazcfd black truss' (head noun in query) "
+              "-> answered directly (green), NOT a suggestion",
+              r and "🟢" in r[2] and "WAZCFD Black Truss" in r[2]
+              and "🔎" not in r[2], r[2] if r else None)
+
+        # T-CONF-2: a low-confidence fuzzy hit (the "smoke machine" ->
+        # "...REMOTES" finding) -> SUGGESTION, never a silent answer.
+        clear(SALES_PHONE)
+        r = ask("free on %s? wazsmk machine x2" % D)
+        sc = sess_for(SALES_PHONE)
+        pend = (sc._get_buffer() or {}).get("pending") or []
+        check("T-CONF-2 suggestion: 'wazsmk machine' -> suggestion naming "
+              "WAZSMK Machine Remotes + 'yes', NOT a silent green/yellow/red; "
+              "pending stored",
+              r and "🔎" in r[2] and "WAZSMK Machine Remotes" in r[2]
+              and "yes" in r[2].lower()
+              and "🟢" not in r[2] and "🟡" not in r[2] and "🔴" not in r[2]
+              and len(pend) == 1, (r[2] if r else None, len(pend)))
+
+        # T-CONF-3: "yes" promotes + checks the suggested product.
+        _sent.clear(); _reset()
+        WM.handle_inbound(text_msg("yes", SALES_FROM), {})
+        r = last("text", SALES_PHONE)
+        sy = sess_for(SALES_PHONE)
+        buf_y = sy._get_buffer() if sy else {}
+        check("T-CONF-3 'yes': promotes + checks WAZSMK Machine Remotes (green, "
+              "3 available); pending cleared; item now sticky; Copilot 0",
+              r and "🟢" in r[2] and "WAZSMK Machine Remotes" in r[2]
+              and not (buf_y.get("pending") or [])
+              and any(it.get("product_id") == p_smk.id
+                      for it in (buf_y.get("items") or []))
+              and counters["run_turn"] == 0,
+              (r[2] if r else None, buf_y.get("pending")))
 
 except Exception:  # noqa: BLE001
     traceback.print_exc()

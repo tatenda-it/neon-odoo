@@ -108,7 +108,22 @@
     # av_check; the tight parser (command + parseable date + >=1 matched item)
     # never steals a turn. NO buttons -> NO wa8_* intents -> neon_channels
     # UNTOUCHED. New av_check session step + _start_av; no new column / RBAC.
-    "version": "17.0.1.6.0",
+    # 17.0.1.6.1 = WA-8.1 (two real-phone-proof fixes; still neon_crew_comms
+    # only, text-only): (1) TIGHTNESS TIER -- exact capacity (available ==
+    # requested, free == needed) renders "tight, no spare" (was free); free
+    # requires a genuine spare (available > requested); short only when
+    # available < requested. (2) STRICTER FACE-1 ACCEPTANCE on top of the
+    # shared matcher (NOT retuned -- Face 2 relies on its loose behaviour
+    # behind its confirm step): a no-confirm answer is given only when the
+    # matched product IS the kind of thing named -- its HEAD NOUN (last alpha
+    # word, ignoring numbers/dimensions/model-codes, plural-folded) appears
+    # in the query; else it is offered as a suggestion ("...closest: X. Reply
+    # yes to check it, or refine") stored as a pending session item, and a
+    # typed "yes" promotes + checks it. Fixes "smoke machine" silently
+    # answering VERTICAL SMOKE MACHINE REMOTES. New _wa8_prepare/_is_confident
+    # /_head_noun/_words/_fold + pending/last_window buffer keys. pwa8 33/33;
+    # pwa6 Face-2 byte-unchanged (58/58).
+    "version": "17.0.1.6.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

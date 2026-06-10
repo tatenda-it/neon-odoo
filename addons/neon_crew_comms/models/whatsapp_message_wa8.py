@@ -57,6 +57,9 @@ import pytz
 from odoo import _, api, fields, models
 
 from odoo.addons.neon_channels.models.phone_utils import to_e164
+# The shared matcher's stopword set -- reused so WA-8's confidence
+# tokeniser folds the SAME noise words as _wa6_match_one (single source).
+from .whatsapp_message_wa6 import _WA6_STOP
 
 _logger = logging.getLogger(__name__)
 
@@ -83,6 +86,11 @@ _WA8_STEPS = ("av_check",)
 
 # Opt-out keywords we never hijack mid-flow (mirrors WA-6/WA-7).
 _WA8_OPTOUT = {"STOP", "START", "UNSUBSCRIBE", "STOPALL", "UNSTOP", "RESUME"}
+
+# Affirmatives that confirm a pending low-confidence suggestion ("yes" ->
+# check the suggested product). Tight equals-set, never substring.
+_WA8_YES = {"yes", "y", "yeah", "yep", "yup", "ok", "okay", "sure",
+            "yes please", "check it", "check that", "go ahead"}
 
 # A time RANGE: "2-6pm", "2pm-6pm", "10am-2pm", "14:00-18:00", "2 to 6pm".
 # A single time or a bare "9-5" (ambiguous) deliberately falls back to a
@@ -214,6 +222,7 @@ class WhatsAppMessageWA8(models.Model):
         now = fields.Datetime.now()
         win, items_text = self._wa8_extract_request(rest, now, tz)
         items = self._wa6_match_items(items_text) if items_text else []
+        self._wa8_prepare(items)   # tag _wa8_confirmed (Face-1 confidence)
         if not (win.get("ok")
                 and any(it["status"] == "matched" for it in items)):
             return False
@@ -222,12 +231,18 @@ class WhatsAppMessageWA8(models.Model):
         if self._wa8_locked(win, now, tz):
             self._wa6_reply(raw_from, from_e164, self._wa8_lock_msg(win))
             return True
-        # open (or rebind) the sticky session with the matched + not-found
-        # item list + the checked date (so a later bare TIME re-uses it),
-        # then answer. Read-only: nothing is reserved.
+        # open (or rebind) the sticky session: the CONFIDENT matches are the
+        # sticky item list (a later date/time re-checks them); the low-
+        # confidence ones are PENDING suggestions a "yes" promotes; the full
+        # window is kept so "yes" (and a bare TIME) re-use it. Read-only.
+        confident = [it for it in items if it.get("_wa8_confirmed")]
+        pending = [it for it in items
+                   if it.get("status") == "matched"
+                   and not it.get("_wa8_confirmed")]
         self.env["neon.wa.equip.session"]._start_av(
             from_e164, sender,
-            {"items": items, "last_date": win["local_date"]})
+            {"items": confident, "pending": pending,
+             "last_window": self._wa8_win_store(win)})
         self._wa8_reply_answer(items, win, raw_from, from_e164)
         return True
 
@@ -245,6 +260,24 @@ class WhatsAppMessageWA8(models.Model):
             return self._wa6_reply(
                 raw_from, from_e164,
                 _("You're no longer authorised to check availability here."))
+        buf = sess._get_buffer()
+        buf = buf if isinstance(buf, dict) else {}
+        norm = " ".join((body or "").strip().lower().split())
+        # "yes" -> confirm the pending low-confidence suggestion(s): promote
+        # them to sticky CONFIRMED items + answer them at the last window.
+        if norm in _WA8_YES and buf.get("pending"):
+            promoted = buf.get("pending") or []
+            for it in promoted:
+                it["_wa8_confirmed"] = True
+            items = (buf.get("items") or []) + promoted
+            buf["items"] = items
+            buf["pending"] = []
+            sess._set_buffer(buf)
+            win = buf.get("last_window")
+            if not win:
+                return self._wa6_reply(
+                    raw_from, from_e164, self._wa8_reprompt_text())
+            return self._wa8_reply_answer(items, win, raw_from, from_e164)
         if self._wa8_is_command(body):
             # a fresh command -> a brand-new check (new items + window).
             if self._wa8_run(sender, body, from_e164, raw_from, message,
@@ -253,25 +286,27 @@ class WhatsAppMessageWA8(models.Model):
             return self._wa6_reply(
                 raw_from, from_e164, self._wa8_reprompt_text())
         # otherwise: a bare date/time -> re-check the SAME sticky items.
-        buf = sess._get_buffer()
-        buf = buf if isinstance(buf, dict) else {}
         items = buf.get("items")
         tz = self._wa8_tz(sender)
         now = fields.Datetime.now()
         win = self._wa8_parse_window(body, now, tz)
         # a bare TIME ("2-6pm") carries no date -> re-use the last checked
         # date so "change the time" works without re-typing the date.
-        if not win.get("ok") and buf.get("last_date") \
+        last = buf.get("last_window") or {}
+        if not win.get("ok") and last.get("local_date") \
                 and self._wa8_time_match(body):
             win = self._wa8_parse_window(
-                buf["last_date"] + " " + body, now, tz)
+                last["local_date"] + " " + body, now, tz)
         if not (win.get("ok") and items):
             return self._wa6_reply(
                 raw_from, from_e164, self._wa8_reprompt_text())
         if self._wa8_locked(win, now, tz):
             return self._wa6_reply(
                 raw_from, from_e164, self._wa8_lock_msg(win))
-        buf["last_date"] = win["local_date"]
+        # a non-"yes" turn lapses any pending suggestion (it was for the prior
+        # window); refresh the window + answer the sticky items.
+        buf["pending"] = []
+        buf["last_window"] = self._wa8_win_store(win)
         sess._set_buffer(buf)
         return self._wa8_reply_answer(items, win, raw_from, from_e164)
 
@@ -317,42 +352,129 @@ class WhatsAppMessageWA8(models.Model):
         return names
 
     # ================================================================
+    # FACE-1 CONFIDENCE (WA-8.1) -- a STRICTER acceptance ON TOP of the
+    # shared matcher. Face 2's loose matching is safe behind its confirm
+    # step; Face 1 answers directly, so a fuzzy hit whose product is a
+    # DIFFERENT KIND of thing ("smoke machine" -> "...REMOTES") must be a
+    # suggestion, not a silent answer. We do NOT retune _wa6_match_one.
+    # ================================================================
+    def _wa8_prepare(self, items):
+        """Tag each matched item with _wa8_confirmed: True = answer it
+        directly; False = offer it as a suggestion. not-found items stay
+        not-found. Mutates + returns the list."""
+        Prod = self.env["product.template"].sudo()
+        for it in items:
+            it["_wa8_confirmed"] = bool(
+                it.get("status") == "matched" and it.get("product_id")
+                and self._wa8_is_confident(
+                    it["raw"], Prod.browse(it["product_id"])))
+        return items
+
+    def _wa8_is_confident(self, raw, product):
+        """Confident == the matched product IS the kind of thing the user
+        named: its HEAD NOUN (the last noun-like word of the name, ignoring
+        numbers / dimensions / model codes) appears in the query (case +
+        plural folded). Robust to dimension mismatches like '2.5' vs '2.5m'
+        (head-noun, not full token containment). Empty head -> trust the
+        matcher (nothing noun-like to disambiguate on)."""
+        qdesc = self._wa6_parse_qty(raw)[1]
+        qtoks = {self._wa8_fold(t) for t in self._wa8_words(qdesc)}
+        head = self._wa8_head_noun(product.name or product.workshop_name or "")
+        if not head:
+            return True
+        return self._wa8_fold(head) in qtoks
+
+    @api.model
+    def _wa8_words(self, text):
+        """Significant query tokens (matcher-consistent: [a-z0-9.]+ minus the
+        shared stopwords) -- keeps dimensions like '2.5'."""
+        return [t for t in re.findall(r"[a-z0-9.]+", (text or "").lower())
+                if t not in _WA6_STOP]
+
+    @api.model
+    def _wa8_head_noun(self, name):
+        """The product's head noun: the LAST purely-alphabetic word (len>=3,
+        non-stopword) of the name -- so model codes ('f34'), dimensions
+        ('2.5m'), units and bare numbers are skipped as modifiers."""
+        head = ""
+        for t in re.findall(r"[a-z]+", (name or "").lower()):
+            if len(t) >= 3 and t not in _WA6_STOP:
+                head = t
+        return head
+
+    @staticmethod
+    def _wa8_fold(t):
+        """Case + naive-plural fold so 'remotes' == 'remote', 'mics' == 'mic'
+        symmetrically on both query and product head."""
+        t = (t or "").lower()
+        return t[:-1] if (len(t) > 3 and t.endswith("s")) else t
+
+    def _wa8_win_store(self, win):
+        """Serialise a window for the session buffer (datetimes -> Odoo
+        strings; the availability domain accepts the strings verbatim, so the
+        stored dict is itself a valid 'win' for re-rendering on 'yes')."""
+        def s(v):
+            return v if isinstance(v, str) else fields.Datetime.to_string(v)
+        return {"w_from": s(win["w_from"]), "w_to": s(win["w_to"]),
+                "had_time": bool(win.get("had_time")),
+                "time_label": win.get("time_label", ""),
+                "date_label": win["date_label"],
+                "local_date": win["local_date"]}
+
+    # ================================================================
     # ANSWER RENDERING
     # ================================================================
     def _wa8_render_answer(self, items, win):
         out = []
         for it in items:
-            if it["status"] != "matched":
+            if it.get("status") != "matched":
                 sug = ((" — try: %s" % ", ".join(it["suggestions"]))
                        if it.get("suggestions") else "")
                 out.append("⚠️ not found: \"%s\"%s" % (it["raw"], sug))
+                continue
+            if not it.get("_wa8_confirmed"):
+                # WA-8.1: a low-confidence fuzzy match is NEVER answered
+                # silently in this no-confirm face -- it is offered as a
+                # suggestion (a 'yes' promotes + checks it).
+                out.append(
+                    "🔎 I don't have \"%s\" by that exact name — closest: "
+                    "%s. Reply \"yes\" to check it, or refine."
+                    % (it["raw"], it["product_name"]))
                 continue
             pid = it["product_id"]
             req = it["qty"]
             name = it["product_name"]
             supply, committed, available = self._wa8_availability(
                 pid, win["w_from"], win["w_to"])
-            if supply < req:
-                # never enough in inventory, regardless of dates.
+            if available > req:
+                # a spare exists -> genuinely free.
+                out.append(
+                    "🟢 %dx %s — free (%d available)" % (req, name, available))
+            elif available == req:
+                # WA-8.1: exact capacity = TIGHT, no spare (free == needed).
+                comp = (self._wa8_competing_events(
+                    pid, win["w_from"], win["w_to"]) if committed else [])
+                clash = ((" — also booked elsewhere: %s" % ", ".join(comp))
+                         if comp else "")
+                out.append(
+                    "🟡 %dx %s — tight, no spare (exactly %d available)%s"
+                    % (req, name, available, clash))
+            elif supply < req:
+                # short on inventory regardless of dates.
                 out.append(
                     "🔴 %dx %s — only %d in inventory (need %d)"
                     % (req, name, supply, req))
-            elif available >= req:
-                out.append(
-                    "🟢 %dx %s — free (%d available)" % (req, name, available))
             else:
-                # enough in stock, but committed on these dates: 🟡 if some
-                # free, 🔴 if none (mirrors _short_reason's wording).
+                # short because committed on these dates (mirrors
+                # _short_reason's wording) -- name the clash.
                 comp = self._wa8_competing_events(
                     pid, win["w_from"], win["w_to"])
                 clash = ((" — clashes with %s" % ", ".join(comp))
                          if comp else "")
-                light = "🟡" if available > 0 else "🔴"
                 out.append(
-                    "%s %dx %s — %d already committed on these dates "
+                    "🔴 %dx %s — %d already committed on these dates "
                     "(%d of %d available)%s"
-                    % (light, req, name, supply - available, available, req,
-                       clash))
+                    % (req, name, supply - available, available, req, clash))
         return "\n".join(out)
 
     def _wa8_reply_answer(self, items, win, raw_from, from_e164):
