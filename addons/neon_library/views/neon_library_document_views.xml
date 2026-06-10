@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="action_library_document" model="ir.actions.act_window">
+        <field name="name">Documents</field>
+        <field name="res_model">neon.library.document</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Upload a file</p>
+            <p>Keep PDFs, docs and any company files here — tagged, foldered,
+               and full-text searchable.</p>
+        </field>
+    </record>
+
+    <record id="view_library_document_kanban" model="ir.ui.view">
+        <field name="name">neon.library.document.kanban</field>
+        <field name="model">neon.library.document</field>
+        <field name="arch" type="xml">
+            <kanban>
+                <field name="id"/>
+                <field name="file_icon"/>
+                <field name="file_name"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click oe_kanban_card">
+                            <div class="o_kanban_record_top mb-2 d-flex">
+                                <i t-attf-class="fa fa-2x #{record.file_icon.raw_value} text-primary me-2" title="File type"/>
+                                <div class="o_kanban_record_headings flex-grow-1">
+                                    <strong class="o_kanban_record_title">
+                                        <field name="name"/>
+                                    </strong>
+                                    <div class="text-muted small">
+                                        <field name="file_name"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-1">
+                                <field name="tag_ids" widget="many2many_tags"
+                                       options="{'color_field': 'color'}"/>
+                            </div>
+                            <div class="o_kanban_record_bottom d-flex justify-content-between">
+                                <span class="text-muted small">
+                                    <field name="uploaded_by"/>
+                                </span>
+                                <a t-attf-href="/web/content/neon.library.document/#{record.id.raw_value}/file_data?download=true&amp;filename=#{record.file_name.raw_value}"
+                                   title="Download" class="btn btn-sm btn-link">
+                                    <i class="fa fa-download"/> Download
+                                </a>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_library_document_tree" model="ir.ui.view">
+        <field name="name">neon.library.document.tree</field>
+        <field name="model">neon.library.document</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="folder_id"/>
+                <field name="tag_ids" widget="many2many_tags"
+                       options="{'color_field': 'color'}"/>
+                <field name="file_name"/>
+                <field name="uploaded_by"/>
+                <field name="create_date" string="Uploaded"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_library_document_form" model="ir.ui.view">
+        <field name="name">neon.library.document.form</field>
+        <field name="model">neon.library.document</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Document name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="folder_id"/>
+                            <field name="tag_ids" widget="many2many_tags"
+                                   options="{'color_field': 'color'}"/>
+                            <field name="uploaded_by"/>
+                        </group>
+                        <group>
+                            <field name="file_data" filename="file_name"/>
+                            <field name="file_name"/>
+                        </group>
+                    </group>
+                    <separator string="Notes"/>
+                    <field name="description" placeholder="Optional notes..."/>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_library_document_search" model="ir.ui.view">
+        <field name="name">neon.library.document.search</field>
+        <field name="model">neon.library.document</field>
+        <field name="arch" type="xml">
+            <search>
+                <!-- the search box matches name, file name, tags AND the
+                     full-text indexed CONTENT (attachment_indexation). -->
+                <field name="name" string="Search"
+                       filter_domain="['|', '|', '|', ('name', 'ilike', self), ('index_content', 'ilike', self), ('file_name', 'ilike', self), ('tag_ids.name', 'ilike', self)]"/>
+                <field name="folder_id"/>
+                <field name="tag_ids"/>
+                <field name="uploaded_by"/>
+                <filter name="my_uploads" string="My Uploads"
+                        domain="[('create_uid', '=', uid)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_folder" string="Folder"
+                            context="{'group_by': 'folder_id'}"/>
+                    <filter name="group_uploader" string="Uploaded By"
+                            context="{'group_by': 'uploaded_by'}"/>
+                    <filter name="group_tag" string="Tag"
+                            context="{'group_by': 'tag_ids'}"/>
+                </group>
+                <searchpanel>
+                    <field name="folder_id" string="Folders" icon="fa-folder"
+                           enable_counters="1"/>
+                    <field name="tag_ids" string="Tags" icon="fa-tags"
+                           select="multi" enable_counters="1"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
+</odoo>

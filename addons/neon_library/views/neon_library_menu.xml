@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Top-level "Library" menu. All internal users see Documents +
+         Folders; Configuration (Tags) is manager-only. -->
+    <menuitem id="menu_library_root"
+              name="Library"
+              sequence="84"
+              groups="base.group_user"/>
+
+    <menuitem id="menu_library_documents"
+              name="Documents"
+              parent="menu_library_root"
+              action="action_library_document"
+              sequence="10"
+              groups="base.group_user"/>
+
+    <menuitem id="menu_library_folders"
+              name="Folders"
+              parent="menu_library_root"
+              action="action_library_folder"
+              sequence="20"
+              groups="base.group_user"/>
+
+    <menuitem id="menu_library_configuration"
+              name="Configuration"
+              parent="menu_library_root"
+              sequence="90"
+              groups="neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_library_tags"
+              name="Tags"
+              parent="menu_library_configuration"
+              action="action_library_tag"
+              sequence="10"
+              groups="neon_core.group_neon_superuser"/>
+
+</odoo>

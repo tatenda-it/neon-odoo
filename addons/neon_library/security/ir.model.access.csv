@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_library_tag_user,Library Tag - Internal,model_neon_library_tag,base.group_user,1,1,1,0
+access_library_tag_manager,Library Tag - Manager,model_neon_library_tag,neon_core.group_neon_superuser,1,1,1,1
+access_library_folder_user,Library Folder - Internal,model_neon_library_folder,base.group_user,1,1,1,0
+access_library_folder_manager,Library Folder - Manager,model_neon_library_folder,neon_core.group_neon_superuser,1,1,1,1
+access_library_document_user,Library Document - Internal,model_neon_library_document,base.group_user,1,1,1,0
+access_library_document_manager,Library Document - Manager,model_neon_library_document,neon_core.group_neon_superuser,1,1,1,1
