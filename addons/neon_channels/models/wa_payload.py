@@ -78,6 +78,14 @@ INTENTS = frozenset({
     "wa6_confirm", "wa6_fix", "wa6_fixrow",
     "wa6_co_all", "wa6_co_item", "wa6_co_line",
     "wa6_ci_good", "wa6_ci_flag",
+    # WA-7: crew selection (MAPPED OD/superuser; routed by the
+    # neon_crew_comms bridge intercept BEFORE WA-6). The list-then-pick
+    # steps (job / people / chief) use NUMBER replies via the crew session
+    # FSM; only the final buttons carry intents (each = the session id):
+    #   wa7_confirm:<session_id>  -- create the crew rows (as the real OD)
+    #   wa7_change:<session_id>   -- re-pick the team (back to people step)
+    #   wa7_notify:<session_id>   -- fire the EXISTING WA-2 confirm/decline
+    "wa7_confirm", "wa7_change", "wa7_notify",
 })
 
 

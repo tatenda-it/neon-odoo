@@ -30,6 +30,15 @@ class WhatsAppMessage(models.Model):
         handled = self._wa_maybe_crew_tap(message)
         if handled is not None:
             return handled
+        # WA-7 crew selection NEXT (MAPPED OD/superuser): a wa7_* tap, or a
+        # crew-select turn for a phone with a live cs_* session, or the
+        # "select crew" command. Runs BEFORE WA-6 so a cs_* session (which
+        # shares the equip-session row) is claimed here, not by the WA-6
+        # equip router. Returns None for anything else (incl. WA-6 sessions),
+        # so WA-6 / WA-5 / Copilot run unchanged.
+        handled = self._wa7_maybe_intercept(message)
+        if handled is not None:
+            return handled
         # WA-6 equipment face NEXT: a wa6_* tap, or a finalize free-text
         # turn for a phone with a live equip session. Disjoint from the
         # crew/WA-5 intents -- returns None for anything else so the WA-5 /

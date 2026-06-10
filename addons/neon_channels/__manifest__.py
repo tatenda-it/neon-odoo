@@ -166,7 +166,15 @@
     # version-only deploy check reflects that wa_payload.py changed; the
     # running webhook worker picks up the new INTENTS on the force-recreate
     # (a module-level Python constant -- a -u alone never reloads it).
-    'version': '17.0.1.17.0',
+    # 17.0.1.18.0 = B11/WA-7 intent registry: +3 wa7_* intents
+    # (wa7_confirm / wa7_change / wa7_notify) in wa_payload.INTENTS for the
+    # crew-selection face (handlers live in the neon_crew_comms bridge; the
+    # job/people/chief picks are NUMBER replies, only the final buttons
+    # carry these intents). PURE registry touch: no model / data / schema /
+    # RBAC change. Bumped so the version-only deploy check reflects
+    # wa_payload.py changed; the webhook worker reloads INTENTS on the
+    # force-recreate (a -u alone never reloads a module-level constant).
+    'version': '17.0.1.18.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

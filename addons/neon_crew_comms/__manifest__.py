@@ -71,7 +71,23 @@
     # has_group (XML id); a non-OD mapped sender falls through to Copilot,
     # an unmapped sender to the client lane -- the parser never steals a
     # turn. No new access power (a new face for the existing initiate gate).
-    "version": "17.0.1.4.0",
+    # 17.0.1.5.0 = WA-7 crew selection on WhatsApp (the last laptop seam).
+    # The OD/superuser texts "select crew"/"assign crew" (tight parser) ->
+    # list-then-pick ×3 in one session: (1) JOB = planning/prep event jobs
+    # whose PARENT commercial.job has NO crew yet (from-scratch) -> (2)
+    # PEOPLE = active mapped bot.users, multi-select "1, 3, 4" -> (3) CHIEF =
+    # one of the picked -> [Confirm team][Change] -> create
+    # commercial.job.crew rows on the parent (default role 'tech',
+    # is_crew_chief on the chosen one) AS THE REAL ACTING USER (with_user;
+    # holds can_edit_crew) -> crew_chief_id recomputes (the seam WA-6 reads)
+    # -> [Notify the crew] fires the EXISTING WA-2 confirm/decline to each
+    # picked person (NO send without the tap; D4). New cs_* steps on
+    # neon.wa.equip.session; WA-7's intercept runs BEFORE WA-6 + claims ONLY
+    # cs_* sessions, so WA-6 is untouched. New wa7_* intents in neon_channels
+    # (17.0.1.18.0). Confirm-time from-scratch re-check + advisory lock ns
+    # 5593700. neon_jobs UNCHANGED (reuses the crew model + constraints). No
+    # new access power (OD/superuser already holds can_edit_crew via manager).
+    "version": "17.0.1.5.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

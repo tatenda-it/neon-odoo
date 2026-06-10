@@ -9,3 +9,6 @@ from . import neon_readiness_digest
 from . import wa_equip_session
 from . import whatsapp_message_wa6
 from . import commercial_event_job_wa6
+# WA-7 -- crew selection (mapped OD/superuser). Method bank on
+# neon.whatsapp.message; intercept hook wired in whatsapp_message.
+from . import whatsapp_message_wa7
