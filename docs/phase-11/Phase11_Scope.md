@@ -35,6 +35,44 @@ business off the old tools (Zoho CRM / Zoho Books / PHP) onto Odoo.
 - [ ] Phone numbers normalised to E.164 on partner load (WA-9 + WhatsApp).
 - [ ] A dry-run load into a staging copy first; reconcile counts before prod.
 
+### 1b-2. Data-load mapping (FamCal → Odoo)
+
+**Source: FamCal portal calendar "Team Neon", 23 members.** This is the
+operational events calendar — the third legacy source alongside Zoho CRM and
+Zoho Books. Verified (read-only, live) stored fields per event: title (client
+names embedded, freeform), start/end epoch + all-day + multi-day flags, venue
+`evWhere` (~70% coverage), notes `dataContent` (~88% coverage), participants/
+notify-by-email, alarms, rare RRULEs, authorship + update timestamps.
+
+| FamCal source | Odoo target | Notes |
+|---|---|---|
+| Future events | `commercial.job` + event job | Provisional bookings load as **draft** (not confirmed). |
+| Past events | completed-job history import | **Recommend importing** — feeds the WA-11 per-client satisfaction timelines. |
+| Event titles (client names) | `res.partner` | Via a **human-reviewed** client-name mapping pass, **joined with the Zoho contact import** (one partner per entity — dedup against §1b). |
+| The 23-member roster (names + emails, incl. ~16 freelance crew not yet in Odoo) | `hr.employee` freelancer records + future WA crew mapping | **Fills the crew-pool gap** the event-wage grades need (see §4). |
+| Venue `evWhere` | event job venue / `venue` model | ~70% populated; backfill the rest at review. |
+| Notes `dataContent` | event job notes | ~88% populated. |
+| Tasks (e.g. PRAZ renewal) | `mail.activity` | Hand-migrate as activities. |
+| Reminders / colours / unused calendar types | — | **Drop.** |
+
+**Extraction method:** the FamCal API is signed (direct replay fails) → use an
+**in-page month-walk capture** → JSON export → transform → the Phase-11 load
+ritual with **count verification** (§4d pattern: reconcile counts after each
+layer).
+
+**⛔ OPEN DECISIONS for Robin:**
+1. **History depth** — recommend **full** (richer WA-11 timelines).
+2. **Crew-pool import timing** — recommend **with the HR load** (§4): the ~16
+   freelance crew become `hr.employee` freelancer records so the event-wage
+   grades + future WA crew mapping have a populated pool.
+3. **FamCal retirement** — **read-only archive at cutover** (mirrors the Zoho
+   freeze in §1a/§3).
+
+> Cross-refs: the client-name → `res.partner` pass must run jointly with §1b's
+> Zoho contact load (shared dedup). The freelancer roster feeds §4's HR load
+> (crew pool). Past-event history is what makes the WA-11 insights layer
+> non-empty on day one.
+
 ### 1c. HR data load — **concrete order + templates** (see §4)
 
 ---
