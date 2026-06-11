@@ -1,5 +1,15 @@
 # WA-12 — Pricing capture sheet (Robin + Munashe)
 
+> ⛔ **HOLD — granularity under review (GATE-0 finding 2026-06-11).** The quote
+> engine prices **per equipment-CATEGORY** (`neon.finance.pricing.rule` =
+> `base_rate` per `neon.equipment.category` × currency — only **~9 categories**),
+> NOT per-product. The $1 product `list_price` placeholders do **not** drive
+> quote pricing. So **Sections A/B below are likely the WRONG shape** (276
+> per-product rows). **Do not fill yet** — pending Tatenda/Robin's decision on
+> pricing granularity (per-category vs per-product vs hybrid). If per-category,
+> this sheet collapses to ~9 category base-rates × {USD, ZiG} + a dimensional
+> section, which is far simpler. See the WA-12 memory / the GATE-0 report.
+
 **Purpose:** capture the REAL day-rates that unlock WA-12 (and every quote in
 Odoo). Today **275/276 products carry a $1 placeholder** — honest, but unusable
 for quoting. Fill the rates here the same way the R3 governance sheet was
