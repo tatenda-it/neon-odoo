@@ -94,7 +94,19 @@
     # actor-audited). Migration 17.0.8.3.0 recomputes product_template_id,
     # collapses the pre-M11 N-soft_hold quantity pattern to one COUNT row,
     # cancels true orphans (idempotent; dry-run reportable).
-    "version": "17.0.8.3.0",
+    # 17.0.8.4.0 = B11/WA-10 post-event feedback. Extends commercial.event.
+    # feedback (P3.M7) with wa_role (sales/od/crew_chief/crew) + client_relayed
+    # + a 'whatsapp' channel; the create-gate now also allows a staff member's
+    # OWN whatsapp self-log (crew included), with a crew create/write ir.rule
+    # scoping it to own whatsapp rows and the crew READ rule amended so crew
+    # see CLIENT rows on their events (unchanged, wa_role=False) but only their
+    # OWN staff-voice rows. commercial.event.job.feedback_ids is now domain-
+    # scoped to wa_role=False (client-only BY CONSTRUCTION -> count/closeout/
+    # views stay client-only); + wa_feedback_ids (staff voices) + wa10_prompted
+    # sent-marker. The check-in wizard's action_confirm fires the WA-10 push
+    # (guarded soft cross-module call -> neon_crew_comms; neon_jobs stays
+    # standalone-installable). New nullable columns only -> no row migration.
+    "version": "17.0.8.4.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema

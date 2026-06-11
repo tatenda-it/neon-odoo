@@ -123,7 +123,23 @@
     # answering VERTICAL SMOKE MACHINE REMOTES. New _wa8_prepare/_is_confident
     # /_head_noun/_words/_fold + pending/last_window buffer keys. pwa8 33/33;
     # pwa6 Face-2 byte-unchanged (58/58).
-    "version": "17.0.1.6.1",
+    # 17.0.1.7.0 = B11/WA-10 post-event feedback loop. NEW method bank
+    # (whatsapp_message_wa10) on neon.whatsapp.message, intercepted AFTER
+    # WA-8 / before WA-6: on CHECK-IN LANDING (the neon_jobs check-in wizard
+    # calls _wa10_on_checkin once per job, guarded by event_job.wa10_prompted)
+    # it pushes sentiment prompts to THREE voices -- the sales owner (relayed
+    # client CSAT), the OD, and every assigned crew member with a mapped
+    # bot.user. A wa10_fb tap records a commercial.event.feedback row (the
+    # extended P3.M7 model, channel='whatsapp') via with_user(the real voice)
+    # -- honest create_uid, NO sudo -- find-or-update one-per-(event, author,
+    # role) under a fresh advisory lock (ns 5593800); a short fb_notes session
+    # UPDATES the row with a free-text note. A "feedback" PULL command lists
+    # the sender's role-eligible WRAPPED events (fb_pull) to give feedback out
+    # of band. New fb_pull/fb_notes session steps + _start_fb. Window-aware
+    # push with an Odoo-activity fallback; the create sends NOTHING (mail
+    # suppressed). New wa10_* intents in neon_channels (17.0.1.20.0); the model
+    # extension + check-in hook live in neon_jobs (17.0.8.4.0).
+    "version": "17.0.1.7.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

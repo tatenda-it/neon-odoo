@@ -16,3 +16,7 @@ from . import whatsapp_message_wa7
 # neon.whatsapp.message; intercept hook wired in whatsapp_message BETWEEN
 # the WA-7 and WA-6 intercepts.
 from . import whatsapp_message_wa8
+# WA-10 -- post-event feedback loop. Method bank on neon.whatsapp.message;
+# intercept hook wired in whatsapp_message AFTER WA-8, before WA-6. Extends
+# the P3.M7 commercial.event.feedback model (neon_jobs) with staff voices.
+from . import whatsapp_message_wa10

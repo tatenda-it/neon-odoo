@@ -86,6 +86,15 @@ INTENTS = frozenset({
     #   wa7_change:<session_id>   -- re-pick the team (back to people step)
     #   wa7_notify:<session_id>   -- fire the EXISTING WA-2 confirm/decline
     "wa7_confirm", "wa7_change", "wa7_notify",
+    # WA-10: post-event feedback loop (MAPPED staff; routed by the
+    # neon_crew_comms bridge intercept AFTER WA-8, before WA-6). The
+    # check-in push sends sentiment buttons; a tap records a
+    # commercial.event.feedback row + opens a short note session.
+    #   wa10_fb:<event_job_id>:<role>:<sentiment>  -- record the sentiment
+    #   wa10_notes:<fb_id>:done                    -- close the note session
+    #   wa10_pull (reserved; the "feedback" PULL pick uses NUMBER replies
+    #     via the fb_pull session, not a tap)
+    "wa10_fb", "wa10_notes", "wa10_pull",
 })
 
 

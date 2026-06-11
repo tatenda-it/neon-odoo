@@ -23,8 +23,12 @@ State transitions per condition (D5):
   missing write_off    → checked_out → returned → decommissioned
   missing incident     → UserError stub (P5.M9 deferred)
 """
+import logging
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 _CONDITIONS = [
@@ -175,6 +179,21 @@ class NeonEquipmentCheckinWizard(models.TransientModel):
         with self.env.cr.savepoint():
             for line in self.checkin_line_ids:
                 line.sudo()._process_checkin(actor_uid)
+        # WA-10 (B11): post-event feedback prompts fire on CHECK-IN LANDING --
+        # the cleanest once-per-job hook. The bridge method guards re-fire
+        # (event_job.wa10_prompted), resolves the three voices, and is window-
+        # aware with an Odoo-activity fallback. Soft cross-module call (the
+        # bridge lives in neon_crew_comms, which depends on neon_jobs, NOT the
+        # reverse) -- guarded so neon_jobs stays installable standalone and a
+        # prompt-push failure NEVER breaks a check-in.
+        if "neon.whatsapp.message" in self.env:
+            try:
+                self.env["neon.whatsapp.message"].sudo()._wa10_on_checkin(
+                    self.event_job_id, actor_uid)
+            except Exception as e:  # noqa: BLE001
+                _logger.warning(
+                    "WA-10 check-in prompt push failed (job %s): %s",
+                    self.event_job_id.id, e)
         return {"type": "ir.actions.act_window_close"}
 
 

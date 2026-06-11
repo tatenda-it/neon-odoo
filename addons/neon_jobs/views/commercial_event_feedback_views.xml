@@ -182,6 +182,10 @@
         <field name="name">Client Feedback</field>
         <field name="res_model">commercial.event.feedback</field>
         <field name="view_mode">tree,form</field>
+        <!-- WA-10 (c): client-feedback reporting stays client-only; the
+             WhatsApp staff-voice rows (wa_role set) are excluded here so a
+             crew note never silently lands in the Client Feedback list. -->
+        <field name="domain">[('wa_role', '=', False)]</field>
         <field name="search_view_id" ref="commercial_event_feedback_view_search"/>
         <field name="groups_id" eval="[(6, 0, [
             ref('neon_jobs.group_neon_jobs_user'),

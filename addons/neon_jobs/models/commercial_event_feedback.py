@@ -32,6 +32,7 @@ FEEDBACK_CHANNELS = [
     ("phone",        "Phone Call"),
     ("in_person",    "In Person"),
     ("written",      "Written / Letter"),
+    ("whatsapp",     "WhatsApp (staff voice)"),  # WA-10
 ]
 FEEDBACK_SENTIMENTS = [
     ("positive", "Positive"),
@@ -123,6 +124,23 @@ class CommercialEventFeedback(models.Model):
         help="Numeric score from a survey. Leave 0 when not applicable.",
     )
 
+    # === WA-10 (B11) — post-event STAFF-voice feedback ===
+    wa_role = fields.Selection(
+        [("sales", "Sales (relayed client CSAT)"),
+         ("od", "Operations Director"),
+         ("crew_chief", "Crew Chief"),
+         ("crew", "Crew")],
+        string="WhatsApp Voice", index=True,
+        help="Set on a post-event feedback row captured over WhatsApp "
+        "(WA-10). EMPTY on P3.M7 client-feedback rows -- which keeps the "
+        "client-feedback views / closeout / count client-only BY "
+        "CONSTRUCTION (commercial.event.job.feedback_ids is domain-scoped "
+        "to wa_role=False; staff-voice rows live on wa_feedback_ids).")
+    client_relayed = fields.Boolean(
+        string="Client-relayed",
+        help="WA-10: the Sales voice relays how the CLIENT felt (not the "
+        "rep's own view). Direct client CSAT is a parked follow-on.")
+
     # === Follow-up workflow ===
     is_follow_up_required = fields.Boolean(
         string="Follow-up Required",
@@ -177,6 +195,33 @@ class CommercialEventFeedback(models.Model):
         log client feedback."""
         return self._user_in_any_group(("user", "crew_leader", "manager"))
 
+    @api.model
+    def _wa10_can_self_log(self, vals):
+        """WA-10: a staff member may SELF-log a WhatsApp-voice feedback row
+        on an event they are tied to -- their OWN ground-truth -- even
+        without the client-feedback group (this is what lets plain CREW post
+        their voice). Strictly bounded: channel='whatsapp', the author IS the
+        acting user (create runs with_user(<the real voice>), so create_uid is
+        honest -- NO sudo), and that user is assigned crew on the job, OR its
+        sales-owner, OR a superuser/OD. A create ir.rule re-enforces the same
+        for the crew group. Returns False for anything outside that."""
+        if vals.get("channel") != "whatsapp":
+            return False
+        uid = self.env.uid
+        if (vals.get("captured_by") or uid) != uid:
+            return False
+        ej = self.env["commercial.event.job"].sudo().browse(
+            vals.get("event_job_id"))
+        if not ej.exists():
+            return False
+        job = ej.commercial_job_id
+        if uid in job.crew_assignment_ids.mapped("user_id").ids:
+            return True
+        owner = job.crm_lead_id.user_id
+        if owner and owner.id == uid:
+            return True
+        return self.env.user.has_group("neon_core.group_neon_superuser")
+
     @api.constrains("rating")
     def _check_rating_range(self):
         for rec in self:
@@ -199,7 +244,8 @@ class CommercialEventFeedback(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             ej_id = vals.get("event_job_id")
-            if ej_id and not self._user_can_log_feedback():
+            if (ej_id and not self._user_can_log_feedback()
+                    and not self._wa10_can_self_log(vals)):
                 raise UserError(_(
                     "Only Sales, Crew Leader, or Manager can log "
                     "client feedback. Crew members should escalate."

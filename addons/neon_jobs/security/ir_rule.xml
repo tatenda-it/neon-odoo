@@ -115,20 +115,42 @@
         </record>
 
         <!--
-            P3.M7 — Feedback visibility for crew tier. Crew sees
-            feedback records on event_jobs they're assigned to
-            (same scoping pattern as scope_change). Crew cannot
-            create or write feedback — only Sales / Crew Leader /
-            Manager can (D6 authority matrix).
+            P3.M7 — Feedback visibility for crew tier. Crew sees feedback on
+            event_jobs they're assigned to.
+            WA-10 (b) AMENDMENT: a crew member reads a CLIENT row (wa_role
+            unset) on their events exactly as before, but a staff-voice
+            (WA-10) row ONLY if they authored it, so crew never read each
+            other's post-event notes. Every P3.M7 client row has
+            wa_role=False, so the OR is always satisfied for them and their
+            crew visibility is byte-unchanged by construction.
         -->
         <record id="commercial_event_feedback_rule_crew_read_own" model="ir.rule">
-            <field name="name">Event Feedback: crew reads own events' feedback only</field>
+            <field name="name">Event Feedback: crew read own events' client rows + own staff-voice rows</field>
             <field name="model_id" ref="model_commercial_event_feedback"/>
-            <field name="domain_force">[('event_job_id.commercial_job_id.crew_assignment_ids.user_id', '=', user.id)]</field>
+            <field name="domain_force">['&amp;', ('event_job_id.commercial_job_id.crew_assignment_ids.user_id', '=', user.id), '|', ('wa_role', '=', False), ('captured_by', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!--
+            WA-10 — crew may CREATE + WRITE their OWN WhatsApp staff-voice
+            feedback row (their post-event ground truth), and ONLY that:
+            author = self AND channel = whatsapp. The create runs
+            with_user(the real crew member) so create_uid is honest, never
+            sudo. perm_read stays False here; read is governed solely by the
+            rule above (own client rows + own staff-voice rows).
+        -->
+        <record id="commercial_event_feedback_rule_crew_write_own_wa" model="ir.rule">
+            <field name="name">Event Feedback: crew create/write own WhatsApp staff-voice rows</field>
+            <field name="model_id" ref="model_commercial_event_feedback"/>
+            <field name="domain_force">['&amp;', ('captured_by', '=', user.id), ('channel', '=', 'whatsapp')]</field>
+            <field name="groups" eval="[(4, ref('neon_jobs.group_neon_jobs_crew'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
             <field name="perm_unlink" eval="False"/>
         </record>
 

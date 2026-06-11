@@ -189,7 +189,14 @@
     # leads (651/652/653) -- read-only dry-run for the approval gate; the
     # apply is the hard gate. Method-only: no new field / intent / schema /
     # RBAC change (phone_sanitized + is_won are stock). neon_channels only.
-    'version': '17.0.1.19.0',
+    # 17.0.1.20.0 = B11/WA-10 intent registry: +3 wa10_* intents (wa10_fb /
+    # wa10_notes / wa10_pull) in wa_payload.INTENTS for the post-event
+    # feedback loop (handlers live in the neon_crew_comms bridge; the PULL
+    # pick uses NUMBER replies, only the sentiment + close buttons carry
+    # intents). PURE registry touch: no model / data / schema / RBAC change.
+    # The webhook worker reloads INTENTS on the force-recreate (a -u alone
+    # never reloads a module-level constant).
+    'version': '17.0.1.20.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

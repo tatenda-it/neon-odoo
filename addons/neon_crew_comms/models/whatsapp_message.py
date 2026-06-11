@@ -49,6 +49,14 @@ class WhatsAppMessage(models.Model):
         handled = self._wa8_maybe_intercept(message)
         if handled is not None:
             return handled
+        # WA-10 post-event feedback NEXT: a wa10_* tap (sentiment / notes), an
+        # fb_pull/fb_notes session turn, or the "feedback" PULL command. Claims
+        # ONLY its own taps / fb_* sessions / command; returns None for
+        # anything else (incl. other sessions) so WA-6 / WA-5 / Copilot run
+        # unchanged.
+        handled = self._wa10_maybe_intercept(message)
+        if handled is not None:
+            return handled
         # WA-6 equipment face NEXT: a wa6_* tap, or a finalize free-text
         # turn for a phone with a live equip session. Disjoint from the
         # crew/WA-5 intents -- returns None for anything else so the WA-5 /

@@ -63,6 +63,8 @@ class WaEquipSession(models.Model):
          ("cs_chief", "Crew select — awaiting chief pick"),
          ("cs_confirm", "Crew select — awaiting confirm/change/notify"),
          ("av_check", "Availability — sticky items, awaiting a re-check"),
+         ("fb_pull", "Feedback — awaiting wrapped-event pick (WA-10)"),
+         ("fb_notes", "Feedback — awaiting free-text note after a tap (WA-10)"),
          ("done", "Done")],
         string="Step", default="await_items", required=True)
     buffer = fields.Text(
@@ -158,6 +160,27 @@ class WaEquipSession(models.Model):
             "user_id": user.id if user else False,
             "event_job_id": False, "step": step,
             "buffer": json.dumps(list(job_ids or [])), "fix_index": -1,
+            "active": True, "last_inbound": fields.Datetime.now()}
+        if sess:
+            sess.write(vals)
+        else:
+            vals["phone_number"] = phone_e164
+            sess = self.sudo().create(vals)
+        return sess
+
+    @api.model
+    def _start_fb(self, phone_e164, user, step, buf):
+        """WA-10 — open (or rebind) the single session into a feedback step:
+        'fb_pull' (DICT buffer {event_ids:[...]} -- the role-aware wrapped-
+        event list the staffer picks from) or 'fb_notes' (DICT buffer
+        {event_job_id, role, fb_id} -- the row a free-text note updates after
+        a sentiment tap). Same rebind-the-unique-row reasoning as _start."""
+        sess = self.sudo().with_context(active_test=False).search(
+            [("phone_number", "=", phone_e164)], limit=1)
+        vals = {
+            "user_id": user.id if user else False,
+            "event_job_id": False, "step": step,
+            "buffer": json.dumps(buf or {}), "fix_index": -1,
             "active": True, "last_inbound": fields.Datetime.now()}
         if sess:
             sess.write(vals)

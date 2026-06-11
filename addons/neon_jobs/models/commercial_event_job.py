@@ -980,11 +980,27 @@ class CommercialEventJob(models.Model):
         "commercial.event.feedback",
         "event_job_id",
         string="Client Feedback",
+        # WA-10: client-only BY CONSTRUCTION. Every existing consumer of
+        # feedback_ids (feedback_count, the closeout soft-requirement +
+        # missing-summary computes, the embedded form view) stays client-
+        # scoped when staff-voice rows appear -- so a crew note never
+        # silently satisfies the "client feedback present" closeout need.
+        domain=[("wa_role", "=", False)],
+    )
+    wa_feedback_ids = fields.One2many(
+        "commercial.event.feedback",
+        "event_job_id",
+        string="Post-event Staff Feedback (WA-10)",
+        domain=[("wa_role", "!=", False)],
     )
     feedback_count = fields.Integer(
         string="Feedback Count",
         compute="_compute_feedback_count",
     )
+    # WA-10 sent-marker: once the post-event feedback prompts have gone out
+    # on check-in landing, guard against a second check-in re-prompting.
+    wa10_prompted = fields.Boolean(
+        string="WA-10 Feedback Prompted", copy=False)
 
     # === Closeout UI gates ===
     can_override_gear_reconciled = fields.Boolean(
