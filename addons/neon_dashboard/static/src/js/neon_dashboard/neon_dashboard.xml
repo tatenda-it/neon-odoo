@@ -826,6 +826,94 @@
         </div>
     </t>
 
+    <!-- ====================================================== HR variant -->
+    <!-- HR panels (P-HR-R3b client render, 2026-06-11). Each mirrors the
+         director block contract (getter.empty / .empty_message / .rows).
+         The empty-state line is the folded polish: on near-empty prod
+         data the panel reads as *empty* (pointing to the load checklist),
+         not *broken*. Inert for non-HR variants (no block_hr_* layout
+         rows -> isWidgetVisible false). -->
+    <t t-name="neon_dashboard.block.block_hr_contracts">
+        <div class="o_neon_block o_neon_block_hr_contracts widget--block_hr_contracts">
+            <div class="o_neon_block_header"><h3>Contracts Expiring (30 days)</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="hrContractsBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="hrContractsBlock.empty_message"/>
+                </div>
+                <table t-if="!hrContractsBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Employee</th><th>Contract</th>
+                            <th class="text-end">Ends in</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="hrContractsBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row">
+                                <td t-esc="row.employee_name"/>
+                                <td t-esc="row.contract_name"/>
+                                <td class="text-end"
+                                    t-esc="row.days_to_end + ' days'"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_hr_licences">
+        <div class="o_neon_block o_neon_block_hr_licences widget--block_hr_licences">
+            <div class="o_neon_block_header"><h3>Driver Licences Expiring (30 days)</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="hrLicencesBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="hrLicencesBlock.empty_message"/>
+                </div>
+                <table t-if="!hrLicencesBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Employee</th><th>Class</th>
+                            <th class="text-end">Expires in</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="hrLicencesBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row">
+                                <td t-esc="row.employee_name"/>
+                                <td t-esc="row.licence_class"/>
+                                <td class="text-end"
+                                    t-esc="row.days_to_expiry + ' days'"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_dashboard.block.block_hr_pending_leaves">
+        <div class="o_neon_block o_neon_block_hr_pending_leaves widget--block_hr_pending_leaves">
+            <div class="o_neon_block_header"><h3>Pending Leave Approvals</h3></div>
+            <div class="o_neon_block_body">
+                <div t-if="hrPendingLeavesBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg" t-esc="hrPendingLeavesBlock.empty_message"/>
+                </div>
+                <table t-if="!hrPendingLeavesBlock.empty" class="o_neon_variant_table">
+                    <thead>
+                        <tr><th>Employee</th><th>Type</th><th>From</th>
+                            <th class="text-end">Days</th></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="hrPendingLeavesBlock.rows" t-as="row" t-key="row.id">
+                            <tr class="o_neon_variant_row">
+                                <td t-esc="row.employee_name"/>
+                                <td t-esc="row.holiday_status"/>
+                                <td t-esc="row.date_from"/>
+                                <td class="text-end" t-esc="row.number_of_days"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
     <!-- ==================================================================== -->
 
     <t t-name="neon_dashboard.NeonDashboard">
@@ -1167,6 +1255,68 @@
                         <div class="o_neon_kpi_subtitle"
                              t-esc="kpi.kpi_certs_30 and kpi.kpi_certs_30.subtitle"/>
                     </div>
+
+                    <!-- HR variant KPI tiles (P-HR-R3b client render,
+                         shipped 2026-06-11). Inert for every non-HR
+                         variant: their layouts carry no kpi_hr_* rows,
+                         so isWidgetVisible() is false and the divs are
+                         never emitted. Headcount alone is clickable
+                         (deeplink to Employees). -->
+                    <div class="o_neon_kpi_tile widget--kpi_hr_headcount"
+                         t-if="isWidgetVisible('kpi_hr_headcount')"
+                         t-att-class="kpi.kpi_hr_headcount and kpi.kpi_hr_headcount.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hr_headcount)">
+                        <div class="o_neon_kpi_label">Headcount</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hr_headcount and kpi.kpi_hr_headcount.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hr_headcount and kpi.kpi_hr_headcount.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hr_headcount and kpi.kpi_hr_headcount.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_hr_on_leave_today"
+                         t-if="isWidgetVisible('kpi_hr_on_leave_today')"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hr_on_leave_today)">
+                        <div class="o_neon_kpi_label">On Leave Today</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hr_on_leave_today and kpi.kpi_hr_on_leave_today.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hr_on_leave_today and kpi.kpi_hr_on_leave_today.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hr_on_leave_today and kpi.kpi_hr_on_leave_today.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_hr_contracts_30"
+                         t-if="isWidgetVisible('kpi_hr_contracts_30')"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hr_contracts_30)">
+                        <div class="o_neon_kpi_label">Contracts Expiring</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hr_contracts_30 and kpi.kpi_hr_contracts_30.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hr_contracts_30 and kpi.kpi_hr_contracts_30.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hr_contracts_30 and kpi.kpi_hr_contracts_30.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_hr_licences_30"
+                         t-if="isWidgetVisible('kpi_hr_licences_30')"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hr_licences_30)">
+                        <div class="o_neon_kpi_label">Licences Expiring</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hr_licences_30 and kpi.kpi_hr_licences_30.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hr_licences_30 and kpi.kpi_hr_licences_30.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hr_licences_30 and kpi.kpi_hr_licences_30.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile widget--kpi_hr_pending_leave"
+                         t-if="isWidgetVisible('kpi_hr_pending_leave')"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hr_pending_leave)">
+                        <div class="o_neon_kpi_label">Pending Leave</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hr_pending_leave and kpi.kpi_hr_pending_leave.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hr_pending_leave and kpi.kpi_hr_pending_leave.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hr_pending_leave and kpi.kpi_hr_pending_leave.subtitle"/>
+                    </div>
                 </section>
 
                 <!-- Filter chips - hidden during edit mode (D4). -->
@@ -1228,6 +1378,21 @@
                            t-call="neon_dashboard.block.block_tasks"/>
                         <t t-if="isWidgetVisible('block_ai_insights')"
                            t-call="neon_dashboard.block.block_ai_insights"/>
+                    </section>
+                    <!-- HR variant blocks in the rich (non-customised)
+                         path. The section WRAPPER is itself guarded so a
+                         non-HR lens emits ZERO o_neon_row_hr nodes (true
+                         byte-equivalence, not just zero widget children).
+                         The unified/edit path renders these via
+                         orderedBlocks + getBlockTemplate. -->
+                    <section class="o_neon_row_hr"
+                             t-if="isWidgetVisible('block_hr_contracts') or isWidgetVisible('block_hr_licences') or isWidgetVisible('block_hr_pending_leaves')">
+                        <t t-if="isWidgetVisible('block_hr_contracts')"
+                           t-call="neon_dashboard.block.block_hr_contracts"/>
+                        <t t-if="isWidgetVisible('block_hr_licences')"
+                           t-call="neon_dashboard.block.block_hr_licences"/>
+                        <t t-if="isWidgetVisible('block_hr_pending_leaves')"
+                           t-call="neon_dashboard.block.block_hr_pending_leaves"/>
                     </section>
                 </t>
                 <t t-else="">

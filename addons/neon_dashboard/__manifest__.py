@@ -47,7 +47,22 @@
     # orphan-removed) but broke on any later neon_dashboard reload (e.g.
     # the WA-0 -u neon_ai_core dependency cascade). Surfaced by the WA-0
     # staging dry-run.
-    "version": "17.0.11.1.1",
+    # 17.0.11.2.0 = HR client render (new render layer). R3b (17.0.11.0.0)
+    # shipped the HR lens SERVER-side -- the RBAC rail, the 5 _kpi_hr_*
+    # computes, the 3 _compute_hr_*_block payloads, the default_layout_hr
+    # seed -- but NEVER the OWL client widgets to draw them, so the HR
+    # dashboard rendered blank (masked at the time by near-empty prod HR
+    # data reading as a legit empty-state). This version adds: 5 HR KPI
+    # tiles + 3 HR block templates (+ their rich-path t-calls + 3 block
+    # getters) + an `hr` filter-chip set + the empty-state line on each
+    # panel (the folded empty-KPI polish), plus an HR-scoped server
+    # reshape giving the 5 _kpi_hr_* dicts `value_display`+`empty` so the
+    # tiles reuse the director tile contract verbatim. Strictly additive
+    # and HR-scoped: every non-HR variant is byte-equivalent (HR markup
+    # is guarded by isWidgetVisible('*_hr_*'), false for their layouts).
+    # No RBAC change, no new access power. Asset-bundle: -u +
+    # delete web.assets_* + force-recreate; users hard-refresh once.
+    "version": "17.0.11.2.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

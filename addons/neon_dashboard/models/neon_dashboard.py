@@ -885,11 +885,35 @@ class NeonDashboard(models.Model):
     def _kpi_hr_headcount(self):
         Employee = self.env["hr.employee"].sudo()
         total = Employee.search_count([("active", "=", True)])
+        # ⚠️ DECISION (HR client render, 2026-06-11): the 5 _kpi_hr_*
+        # dicts gain `value_display` (str) + `empty` (bool) so the OWL
+        # KPI tile markup -- which reads `.value_display` + `.empty`
+        # like every director/sales/bookkeeper tile -- can render them
+        # verbatim. R3b shipped the server `value`/`label`/`subtitle`
+        # shape but never the client tiles, so the tile contract was
+        # never exercised. value/label/subtitle/currency are PRESERVED
+        # (the phr_r3b C1 smoke asserts `value` is an int).
+        #
+        # Headcount is never "empty": it renders from the count alone
+        # (the count IS data), unlike the four 30-day watch KPIs which
+        # grey out at zero. Its deeplink is an inline act_window dict
+        # (NOT an xmlid) so the click never depends on a version-
+        # specific core Employees action xmlid resolving.
         return {
             "value": int(total or 0),
+            "value_display": str(int(total or 0)),
             "label": "Headcount",
             "subtitle": "Active employees",
             "currency": "",
+            "empty": False,
+            "deeplink_action": {
+                "type": "ir.actions.act_window",
+                "name": "Employees",
+                "res_model": "hr.employee",
+                "view_mode": "tree,form",
+                "views": [[False, "list"], [False, "form"]],
+                "domain": [("active", "=", True)],
+            },
         }
 
     def _kpi_hr_on_leave_today(self):
@@ -902,9 +926,11 @@ class NeonDashboard(models.Model):
         ])
         return {
             "value": int(count or 0),
+            "value_display": str(int(count or 0)),
             "label": "On Leave Today",
             "subtitle": "Validated, overlapping today",
             "currency": "",
+            "empty": (count or 0) == 0,
         }
 
     def _kpi_hr_contracts_expiring_30(self):
@@ -917,9 +943,11 @@ class NeonDashboard(models.Model):
         ])
         return {
             "value": int(count or 0),
+            "value_display": str(int(count or 0)),
             "label": "Contracts Expiring (30d)",
             "subtitle": "Renewal action window",
             "currency": "",
+            "empty": (count or 0) == 0,
         }
 
     def _kpi_hr_licences_expiring_30(self):
@@ -927,9 +955,11 @@ class NeonDashboard(models.Model):
         Licence = self.env.get("neon.hr.licence")
         if Licence is None:
             return {"value": 0,
+                     "value_display": "0",
                      "label": "Licences Expiring (30d)",
                      "subtitle": "neon_hr R3a not installed",
-                     "currency": ""}
+                     "currency": "",
+                     "empty": True}
         count = Licence.sudo().search_count([
             ("state", "=", "valid"),
             ("expiry_date", ">=", today),
@@ -937,9 +967,11 @@ class NeonDashboard(models.Model):
         ])
         return {
             "value": int(count or 0),
+            "value_display": str(int(count or 0)),
             "label": "Licences Expiring (30d)",
             "subtitle": "Driver fleet renewal window",
             "currency": "",
+            "empty": (count or 0) == 0,
         }
 
     def _kpi_hr_pending_leave_approvals(self):
@@ -947,9 +979,11 @@ class NeonDashboard(models.Model):
         count = Leave.search_count([("state", "=", "confirm")])
         return {
             "value": int(count or 0),
+            "value_display": str(int(count or 0)),
             "label": "Pending Leave Approvals",
             "subtitle": "Awaiting approver action",
             "currency": "",
+            "empty": (count or 0) == 0,
         }
 
     # ==================================================================

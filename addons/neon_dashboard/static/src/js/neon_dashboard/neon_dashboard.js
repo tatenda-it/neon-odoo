@@ -35,6 +35,9 @@ const BLOCK_LABELS = {
     block_crew_gaps: "Crew Gaps Watch",
     block_cert_expiry: "Cert Expiry Watch",
     block_conflicts: "Equipment Conflicts",
+    block_hr_contracts: "HR · Contracts Expiring",
+    block_hr_licences: "HR · Licences Expiring",
+    block_hr_pending_leaves: "HR · Pending Leave",
 };
 
 // block_alerts is the only mandatory CONTENT block (D6); the UI never
@@ -924,6 +927,44 @@ export class NeonDashboard extends Component {
         };
     }
 
+    // HR variant block getters (P-HR-R3b client render, 2026-06-11).
+    // The server payloads carry {rows, title, row_count[, note]} but no
+    // `empty`/`empty_message` -- they are derived here so the panel
+    // shows the honest empty-state line (the folded polish) instead of
+    // a blank card on near-empty prod data. The licence payload's
+    // `note` ("neon_hr R3a not installed") is surfaced when present.
+    get hrContractsBlock() {
+        const b = (this.state.data && this.state.data.hr_contracts_block) || {};
+        const rows = b.rows || [];
+        return {
+            ...b, rows, empty: rows.length === 0,
+            empty_message: b.note
+                || "No contract data yet — see the Phase 11 load checklist.",
+        };
+    }
+
+    get hrLicencesBlock() {
+        const b = (this.state.data && this.state.data.hr_licences_block) || {};
+        const rows = b.rows || [];
+        return {
+            ...b, rows, empty: rows.length === 0,
+            empty_message: b.note
+                || "No driver-licence data yet — see the Phase 11 load checklist.",
+        };
+    }
+
+    get hrPendingLeavesBlock() {
+        const b = (this.state.data
+            && this.state.data.hr_pending_leaves_block) || {};
+        const rows = b.rows || [];
+        return {
+            ...b, rows, empty: rows.length === 0,
+            empty_message: b.note
+                || "No leave requests awaiting approval — see the "
+                + "Phase 11 load checklist.",
+        };
+    }
+
     async onQuoteRowClick(row) {
         // Hot Deals + Aging Quotes rows share the pipeline action.
         if (!row || !row.deeplink_action) return;
@@ -1064,6 +1105,13 @@ export class NeonDashboard extends Component {
                 { key: "next7", label: "Next 7 Days" },
                 { key: "next30", label: "Next 30 Days" },
             ],
+            // HR variant (P-HR-R3b client render): a single clean "All"
+            // chip. Before this the HR lens fell through to the
+            // `|| sets.director` default and showed director chips
+            // (Operations/Sales/Finance) whose SCSS hide-rules don't
+            // know HR keys. Adding `hr` here does not touch any other
+            // variant's chip set (byte-equivalent).
+            hr: [{ key: "all", label: "All" }],
             tech: [{ key: "all", label: "All" }],
         };
         return sets[t] || sets.director;
