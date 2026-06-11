@@ -73,7 +73,10 @@
     # after a ~48h window gap); buttons/rendering confirmed. The two in-window
     # link-reply buttons stay optional (read-only). Text/constants only;
     # scores unchanged (WA-5 was already milestone-counted).
-    "version": "17.0.1.0.13",
+    # 17.0.1.0.14 = WA-10 DONE (post-event feedback loop, staff-send proof
+    # passed on real phones): new WA-10 card live/100%. Text/constants only;
+    # scores unchanged (within the already-counted B11 WhatsApp arm).
+    "version": "17.0.1.0.14",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

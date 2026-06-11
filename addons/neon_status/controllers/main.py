@@ -161,6 +161,24 @@ WA_MODULES = [
              "clean; Proof A passed on a real phone (the lead was born linked "
              "to the contact). Final check pending a handset: the cross-"
              "session FOLD (one keyword text) + teardown."},
+    {"key": "WA-10", "title": "Post-event feedback loop", "pct": 100,
+     "state": "live",
+     "body": "DONE & VERIFIED on real phones (neon_jobs 17.0.8.4.0 + "
+             "neon_crew_comms 17.0.1.7.0 + neon_channels 17.0.1.20.0). On "
+             "CHECK-IN landing the bot asks three voices how the event went "
+             "— the sales owner (how the CLIENT felt), the OD (operations), "
+             "and every assigned crew member — each a one-tap sentiment + an "
+             "optional typed note, building a feedback corpus on the existing "
+             "event-feedback record (extended, not a new model). A "
+             "\"feedback\" command pulls a staffer's wrapped events to "
+             "comment out of band. Proof: a wrapped test event messaged "
+             "EXACTLY the OD + the sales owner (nobody else, never a client "
+             "phone), the taps recorded as the REAL person with the right "
+             "voice, notes attached (find-or-update, no duplicates), zero "
+             "stray sends. Written as the real author (no sudo); a person "
+             "filling two roles is asked ONCE (crew voice proven in tests); "
+             "crew read only their own notes. Read-only INSIGHTS over this "
+             "corpus = WA-11 (queued)."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
