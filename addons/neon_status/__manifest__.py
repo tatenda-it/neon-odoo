@@ -93,7 +93,13 @@
     # the stale "M12.2 P4-P7" label; parked-backlog refreshed to that queue
     # + WA-12 (pricing-gated). Text/constants + one template string; scores
     # unchanged.
-    "version": "17.0.1.0.16",
+    # 17.0.1.0.17 = build-queue RE-ORDER (Tatenda) — Copilot de-prioritised
+    # to LAST. Ratified-queue line + the Core-ERP "remaining" Copilot tail
+    # now read: R3 code + polish (on the 3 R3 verifies; scroll-sweep findings
+    # fold in) → WA-12 (pricing-gated; Meta template drafts early) →
+    # M12.3-B/WA-11.1 digest (when corpus grows) → Copilot M12.2 + M12.3-A
+    # LAST. Text/constants only; scores unchanged.
+    "version": "17.0.1.0.17",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

@@ -207,9 +207,9 @@ TRACK_MILESTONES = [
         "remaining": "Phase 11 cutover & training — three legacy-source "
                      "data-load mappings (Zoho / FamCal / Workshop) "
                      "documented + R3 governance gates signed 11 Jun; "
-                     "awaiting Robin's walkthrough to schedule. Copilot "
-                     "M12.2 (variant-reverts + precedence) → M12.3-A "
-                     "(provider plurality) parked.",
+                     "awaiting Robin's walkthrough to schedule. Build "
+                     "lane: R3 + polish → WA-12 (pricing-gated) → WA-11.1 "
+                     "digest → Copilot M12.2 / M12.3-A LAST (no hurry).",
     },
     {
         "name": "AI Equipment Module", "pct": 90, "accent": "teal",
@@ -323,8 +323,11 @@ PARKED_BACKLOG = [
     "deferred.",
     "B12 Google Drive integration — dropped.",
     "Phase 11 cross-module scroll-fix sweep + cutover & training.",
-    "Copilot M12.2 (variant-reverts + precedence) → M12.3-A (provider "
-    "plurality) → WA-12 quote-by-WhatsApp (pricing-gated) — queued.",
+    "Build-lane order: R3 code + polish batch (on the 3 R3 verifies; "
+    "scroll-sweep findings fold in) → WA-12 quote-by-WhatsApp "
+    "(pricing-gated; Meta template drafts early) → M12.3-B / WA-11.1 "
+    "digest (when feedback corpus grows) → Copilot M12.2 (variant fixes) "
+    "+ M12.3-A (provider plurality) LAST.",
     "Leaflet bootstrap consolidation (deferred from Phase 9).",
     "main-branch reconciliation (production line tracked via phase tags).",
 ]
