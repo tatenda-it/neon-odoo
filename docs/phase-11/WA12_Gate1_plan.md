@@ -70,7 +70,7 @@ audit trail attribute to the real MD/OD.
 | `send_document` outbound | new send type on `neon.whatsapp.message` (inbound already recognises `document`); **Meta `/media` upload → media_id → send by id**. Used at **TWO points**: the approver's [View PDF] tap (draft PDF) AND on approval (final PDF → requester) | **new** |
 | email-to-client | `action_send` already mails; **SMTP sender fix scope confirmed INSIDE this Gate-1** (outgoing-mail server / from-address / deliverability must be prod-ready) | confirm |
 | Meta template | the **MD/OD approval-ping template** (cold-window) — drafted + submitted EARLY (separate track, see the template draft) | **new (in flight)** |
-| tests | `pwa12` real-path (command→parse→draft→submit→approve-tap→PDF→send-tap), false-positive, reject+comment, self-approval, first-tap-wins, dimensional parse; + a staged `[TEST-WA12]` handset proof | new |
+| tests | `pwa12` real-path (command→parse→draft→submit→approve-tap→PDF→send-tap), false-positive, reject+comment, self-approval, first-tap-wins, dimensional parse, **placeholder-rate BLOCKS submit (add 1)**, **entitlement denial — non-sales-mapped (add 2)**, **one-currency-per-quote / mixed-asks (add 3)**; + a staged `[TEST-WA12]` handset proof | new |
 
 ## 4. ⛔ Gates / guardrails (binding)
 
@@ -87,17 +87,37 @@ audit trail attribute to the real MD/OD.
    + approver phones; zero sends to real clients) → teardown → Robin's go →
    LIVE.
 
-## 5. Open decisions for Gate-1 review
+## 4a. ⛔ Gate-1 BINDING ADDITIONS (Tatenda, approval conditions 2026-06-11)
 
-1. Template variable count — lean (3: requester/client/total) vs detailed
-   (4: + item summary). Draft proposes **4** (matches "quote summary + total").
-2. Dimensional rule storage — a config rule per dimensional product
-   (per-m² + per-panel rates on the product) vs a global rule. Recommend
-   **per-product** fields populated from the pricing sheet's dimensional section.
-3. `[Send to client]` channel — email (confirmed) vs also a client WhatsApp doc
-   (that is **phase 2**, separate Meta template + media rules; out of v1).
-4. Currency — the quote carries currency; the sheet's CURRENCY column (USD/ZiG)
-   drives the line `unit_rate` currency. Confirm ZiG handling (house rule).
+1. **PLACEHOLDER-RATE GUARD.** Any quote line with an unset / $1 placeholder
+   rate renders **"no rate set"** and **BLOCKS `submit_for_approval`** until
+   every line is genuinely priced — with an honest reply to the requester
+   ("can't submit — these lines have no rate yet: …"). The build lands BEFORE
+   the pricing load, so this guarantees **no $6 / placeholder quote ever reaches
+   an approver**. **`pwa12` test REQUIRED** (placeholder line → submit blocked +
+   honest message).
+2. **ENTITLEMENT GATE.** The `Quote:` command answers **sales-capable mapped
+   staff ONLY** (reuse the WA-8 entitlement rail). A non-entitled / unmapped
+   sender falls through (no quote lane). **Denial test REQUIRED.**
+3. **ONE CURRENCY PER QUOTE (v1).** A quote carries a single currency; a mixed
+   request → **the bot asks** which. **ZiG only where a rate is configured;
+   unset → exclude** (per the house rule / the manual ZiG↔USD rate). Test:
+   mixed-currency ask path.
+4. **`[TEST-WA12]` TEARDOWN SCOPE.** The teardown explicitly removes **the quote
+   rows (quote + quote.line) + any action-centre rows + the uploaded Meta media**
+   (the `/media` doc), atomically — closing the orphan-ACT class the WA-9 sweep
+   exposed (the durable teardown-helper fix applies here too).
+
+## 5. Open decisions — SETTLED at Gate-1 (2026-06-11)
+
+1. **Template variable count → 4-var** (requester / client / item-summary /
+   total). SETTLED.
+2. **Dimensional rule → per-product fields** populated from the pricing sheet's
+   **Section B** (per-m² + per-panel + panel size on the product). SETTLED.
+3. **`[Send to client]` → email in v1.** Client WhatsApp doc = **phase 2**
+   (separate Meta template + media rules). SETTLED.
+4. **Currency → per binding addition 4a.3** — one currency per quote; mixed →
+   bot asks; ZiG only where a rate is configured, unset → exclude. SETTLED.
 
 ---
 
@@ -121,11 +141,14 @@ Robin says yes** (hard gate 2 — Meta submission).
   ```
   - {{1}} = requester name · {{2}} = client name · {{3}} = item summary
     (e.g. "Truss ×4, LED wall 3×2m, Distro ×2") · {{4}} = total + currency
-- **Quick-reply buttons (3):** `[Approve]` `[Reject]` `[📄 View PDF]` → intents
-  `wa12_approve` / `wa12_reject` / `wa12_view_pdf`. View PDF sends the **draft
-  quote PDF into the approver's chat** (in-window); the Reject comment is
-  captured in-session after the tap. (WHATSAPP-NATIVE: the approver never needs
-  Odoo to read the quote.)
+- **Quick-reply buttons (3, PLAIN labels):** `[Approve]` `[Reject]` `[View PDF]`
+  → intents `wa12_approve` / `wa12_reject` / `wa12_view_pdf`. **⚠️ BUILD FLAG
+  (corrects bea5d73):** Meta **strips emoji from BUTTONS** (verified) — the
+  button label + tap-back payload is **`View PDF`** (no 📄), so the dispatch
+  MUST match `wa12_view_pdf` ⇄ payload **`"View PDF"`**, NOT `"📄 View PDF"`. The
+  **body keeps 📄** (body emoji is fine). View PDF sends the draft quote PDF into
+  the approver's chat (in-window); the Reject comment is captured in-session.
+  (WhatsApp-native: the approver never needs Odoo to read the quote.)
 - **Param count (132000 lesson):** 4 body params, 0 URL, **3 static QR** — the
   send call MUST pass exactly `body_params=[requester, client, item_summary, total]`.
 
@@ -133,8 +156,9 @@ Robin says yes** (hard gate 2 — Meta submission).
 — inherent to approving a price). That is the money-adjacent surface gated on
 Robin's sign-off; flagging explicitly.
 
-**On Robin's "yes" (now applies to the 3-button form):** submit via WhatsApp
-Manager (same path as `wa6_equip_finalize`). The assistant then verifies its
-status in the Manager (Pending → Active). Lean alternative if Robin prefers
-fewer variables: drop {{3}} (item summary) → 3-var body; the lines then come via
-**[📄 View PDF]** (never "see Odoo" — the loop is WhatsApp-native).
+**SUBMIT NOW (Tatenda go, 3-button form):** ready to submit via WhatsApp Manager
+(the team's UI action, same path as `wa6_equip_finalize`) — button labels PLAIN
+`[Approve] [Reject] [View PDF]`, body as above (keeps 📄). The assistant verifies
+status post-submission (Pending → Active). 4-var body is settled (no lean
+fallback). Meta's review then runs in the background starting today; the cold-
+window approval ping can't deliver until it's Active.
