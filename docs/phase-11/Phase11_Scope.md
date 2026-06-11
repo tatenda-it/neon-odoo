@@ -29,7 +29,7 @@ business off the old tools (Zoho CRM / Zoho Books / PHP) onto Odoo.
 | Zoho CRM — leads/deals | `crm.lead` | Map Zoho stages → Neon CRM stages (New/Qualified/Proposal Sent/Negotiation/Closed Won/Lost). |
 | Zoho Books — customers | `res.partner` | Dedup against the CRM contact load (one partner per entity). |
 | Zoho Books — products/services | `product.template` | Workshop/equipment items already exist; map the rest. |
-| Zoho Books — open invoices/quotes | `account.move` / quote model | Decide: migrate open balances only, or full history. Include ZIMRA reg + 15% VAT. |
+| Zoho Books — open invoices/quotes | `account.move` / quote model | Decide: migrate open balances only, or full history. Include ZIMRA reg + 15.5% VAT. |
 | Zoho Books — chart of accounts / opening balances | accounting | Finance-led; reconcile to a cut-off date. |
 - [ ] Decide migration depth per stream (open-only vs full history).
 - [ ] Phone numbers normalised to E.164 on partner load (WA-9 + WhatsApp).

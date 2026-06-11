@@ -1,17 +1,16 @@
 # WA-12 — Pricing capture sheet (Robin + Munashe)
 
-> ⛔ **HOLD — this sheet is SUPERSEDED by Robin's data; granularity reopened
-> (2026-06-11).** Two findings collide: (1) the quote engine prices per
-> equipment-CATEGORY (`pricing.rule`, ~9 categories); (2) **Robin's actual
-> pricing (`Document from Chief.csv`, 314 items) is PER-PRODUCT** — each item
-> its own USD rate, with huge intra-category spread (AUDIO $1–$1350, VISUAL
-> $1–$1200). So **Option 1 (per-category) is CONTRADICTED by the data** — the
-> "material exceptions" answer is *the whole catalog*. **Do NOT fill this sheet
-> and do NOT reshape to Option 1.** The recommendation is **per-product pricing**
-> (promote WA-12.1 to primary) with **Robin's CSV as the source** (no manual
-> fill needed). Pending Tatenda's revised granularity call + Robin's follow-ups
-> (VAT 15% vs 15.5%, ZiG, LED dimensional, $1 leftovers, Rate vs CF.Unit Rate,
-> 314-vs-276 coverage). See the WA-12 memory / the CSV analysis report.
+> ⛔ **RETIRED — do NOT fill this template.** Superseded 2026-06-11 by Robin's
+> actual pricing (`Document from Chief.csv`, 314 items, **per-product** USD) +
+> the **decision worksheet** (`WA12_pricing_decision_worksheet.csv`). RESOLVED:
+> granularity = **per-product** (rate → `unit_rate` via the existing
+> `duration_days` compute, no new field/engine); VAT = **15.5%** (code already
+> correct); LED = **named size-variant** only (no per-m²); the 3 $1 receivers =
+> **add-ons** (never quoted alone); 314-vs-276 handled by the worksheet (map 29
+> / confirm 29 / create 256). **Load = the ticked worksheet under the ⛔ money
+> gate.** Only 2 follow-ups remain for Robin: (1) `Rate` vs `CF.Unit Rate` on
+> the 41 dual-value items; (2) ZiG — USD-only v1 (noted, not asked). The
+> category template below is kept for reference only.
 
 **Purpose:** capture the REAL day-rates that unlock WA-12 (and every quote in
 Odoo). Today **275/276 products carry a $1 placeholder** — honest, but unusable
@@ -104,9 +103,11 @@ Leave blank if WA-12 v1 quotes equipment-only — confirm with the team.
 - ZiG rates: the dashboard's manual ZiG↔USD rate
   (`neon_dashboard.zig_usd_rate_manual`) governs any conversion; rate unset →
   ZiG excluded (don't guess a rate).
-- **VAT:** Zimbabwe VAT is **15%**; quotes/invoices must carry **ZIMRA
-  registration**. The quote/invoice templates handle VAT — the DAY RATE you
-  enter is the **ex-VAT** hire rate unless you note otherwise.
+- **VAT:** Zimbabwe VAT is **15.5%** (ZIMRA standard, effective 1 Jan 2026 —
+  Robin's 18 May correction; the finance module's `account.tax` records are
+  already 15.5%). Quotes/invoices must carry **ZIMRA registration**. The
+  quote/invoice templates handle VAT — the DAY RATE you enter is the **ex-VAT**
+  hire rate unless you note otherwise.
 - Payment terms default to **7 days** unless agreed (set per-quote in Odoo).
 
 ---
