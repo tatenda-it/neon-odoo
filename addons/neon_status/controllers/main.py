@@ -178,7 +178,21 @@ WA_MODULES = [
              "stray sends. Written as the real author (no sudo); a person "
              "filling two roles is asked ONCE (crew voice proven in tests); "
              "crew read only their own notes. Read-only INSIGHTS over this "
-             "corpus = WA-11 (queued)."},
+             "corpus = WA-11 (now live)."},
+    {"key": "WA-11", "title": "Client feedback insights", "pct": 100,
+     "state": "live",
+     "body": "LIVE (neon_insights 17.0.1.0.0) — a read-only, manager-tier "
+             "page at /neon/insights over the WA-10 feedback corpus: a "
+             "per-client satisfaction timeline (who's happy, who's drifting), "
+             "a recent-feedback stream (filter by voice + sentiment), and "
+             "sentiment trends by month (Africa/Harare) with recurring-"
+             "concern flags. OD + managers ONLY — the gate is enforced at "
+             "the DATA layer (a sales user is denied at the RPC, not just "
+             "menu-hidden), strictly read-only, no sends. Installs with "
+             "honest empty-states and fills as events wrap (built as a "
+             "separate addon so the dashboard's variants are untouched). The "
+             "AI \"how are clients feeling lately\" digest is the follow-on "
+             "(WA-11.1)."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).

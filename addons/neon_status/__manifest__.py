@@ -76,7 +76,11 @@
     # 17.0.1.0.14 = WA-10 DONE (post-event feedback loop, staff-send proof
     # passed on real phones): new WA-10 card live/100%. Text/constants only;
     # scores unchanged (within the already-counted B11 WhatsApp arm).
-    "version": "17.0.1.0.14",
+    # 17.0.1.0.15 = WA-11 client-feedback insights LIVE (neon_insights
+    # 17.0.1.0.0; read-only /neon/insights, manager-tier): new WA-11 card
+    # live/100%; WA-10 card "WA-11 (queued)" -> "(now live)". Text/constants
+    # only; scores unchanged.
+    "version": "17.0.1.0.15",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
