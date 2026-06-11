@@ -73,6 +73,39 @@ layer).
 > (crew pool). Past-event history is what makes the WA-11 insights layer
 > non-empty on day one.
 
+### 1b-3. Data-load mapping (Workshop PHP → Odoo)
+
+**Source: the legacy PHP inventory/jobs system at `neonhiring.com/workshop`.**
+The third legacy source (alongside Zoho and FamCal) — and the only one with a
+real **attendance + reconciliation** record. Verified (read-only, live): **55
+jobs** (17 Feb – 8 Jun 2026; **~50 real** after excluding test/QA), **14 user
+accounts**. Per job: code, client/title, venue, dates, status (Draft / Scheduled
+/ InProgress / Completed), a `Crew:` roster, **per-equipment-line technician
+attribution** with checkout/return timestamps, and reconciliation stats (units
+out / returned / damaged, % accounted).
+
+| Workshop source | Odoo target | Notes |
+|---|---|---|
+| Jobs | `commercial.job` + event jobs | Completed → history; Scheduled → live pipeline. **Dedupe against FamCal events** (§1b-2): Reghart / Peech / Prime Agro / Csuite / Oasis appear in BOTH sources. |
+| `Crew:` rosters | `commercial.job.crew` rows on the historical jobs | This is the **ACTUAL attendance record** — who really worked each job. |
+| Per-person tallies | evidence sheet for **Kudzai's wage-grade assignments** | mutasa 20, tadiwa 14, stanley 11, adam 8, trymore 7, kelvin 3, others ≤2. **These are FLOORS** — a shared `"tech"` account masks **51/55** jobs (real counts are higher). |
+| Workspace usernames | identity join table: **workshop username ↔ FamCal email ↔ `hr.employee`** | The join that resolves crew identity across all three sources. Workshop adds **"mutasa"** — absent from FamCal's 23-member roster. |
+| Equipment-line history | — | **DO NOT migrate granularly** — Odoo's movement/reservation history starts fresh at cutover. Workshop becomes a **read-only archive** (same as FamCal/Zoho). |
+
+**⚠️ Flag for the team — the shared `"tech"` account anonymises attendance.**
+Because 51/55 jobs were logged under one shared login, the per-person tallies
+under-count everyone. At cutover **every crew member gets their own identity**
+(already the Odoo + WhatsApp design — bot.user → res.users, actor-audited
+movements), so this blind spot ends: from go-live, attendance and equipment
+attribution are per-person and honest.
+
+> Cross-refs: the **three-source identity join** (Zoho contacts §1b + FamCal
+> roster §1b-2 + Workshop usernames here) resolves to one `res.partner` per
+> client and one `hr.employee` per crew member — run the dedup pass ONCE across
+> all three. Workshop attendance + FamCal freelancer roster together populate
+> §4's crew pool with an evidence trail for the wage grades. All three legacy
+> systems retire to read-only archive at cutover (§1a/§3).
+
 ### 1c. HR data load — **concrete order + templates** (see §4)
 
 ---
