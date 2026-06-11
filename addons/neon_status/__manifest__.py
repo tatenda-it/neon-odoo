@@ -99,7 +99,14 @@
     # fold in) → WA-12 (pricing-gated; Meta template drafts early) →
     # M12.3-B/WA-11.1 digest (when corpus grows) → Copilot M12.2 + M12.3-A
     # LAST. Text/constants only; scores unchanged.
-    "version": "17.0.1.0.17",
+    # 17.0.1.0.18 = WA-9 DONE & VERIFIED (Proof B cross-session fold passed on
+    # a real phone — LED-wall enquiry folded into the open lead, zero new
+    # leads/partners; [TEST-WA9] fixture torn down to baseline leads 2 /
+    # partners 37). WA-9 card verifying/90 -> live/100; the B11 intro drops the
+    # "WA-9 in final verification" caveat -> "B11 is COMPLETE, every WhatsApp
+    # module phone-proven (WA-0 through WA-11)". Text/constants only; scores
+    # unchanged (WA-9 already milestone-counted).
+    "version": "17.0.1.0.18",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

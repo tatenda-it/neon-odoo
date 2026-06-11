@@ -198,8 +198,8 @@ section{margin:34px 0;}
                         </div>
                         <div class="overall-copy">
                             <h2><t t-esc="overall_pct"/>% complete across three tracks</h2>
-                            <p>By milestone count, reflecting WA-0–WA-11 complete (WA-9 in
-                                final verification). Core platform
+                            <p>By milestone count, reflecting WA-0–WA-11 complete — B11 closed
+                                entire. Core platform
                                 near-done with the LMS track closed; HR well advanced; the AI
                                 module's active scope tightened — Drive dropped and the
                                 mobile/QR/predictive arm deferred — leaving WhatsApp (B11) as
@@ -226,12 +226,12 @@ section{margin:34px 0;}
             <!-- ============ 3. B11 WHATSAPP BREAKDOWN ============ -->
             <section>
                 <p class="sec-title">B11 WhatsApp — module breakdown (inside AI Equipment Module)</p>
-                <p class="note">WA-0 through WA-11 all live &amp; verified on prod (WA-9 client
-                    contact-matching in final verification) — the phone-native ops cycle
-                    (crew select → finalize → checkout → check-in) is proven end-to-end on real
-                    phones; sales availability (Face 1) is live; and the client lane now CRM-matches
-                    contacts (WA-9), the post-event feedback loop closes to staff (WA-10), and the
-                    manager insights layer reads the feedback corpus (WA-11).</p>
+                <p class="note">WA-0 through WA-11 all live &amp; verified on prod — B11 is
+                    COMPLETE, every WhatsApp module phone-proven: the phone-native ops cycle
+                    (crew select → finalize → checkout → check-in) end-to-end on real phones;
+                    sales availability (Face 1) live; the client lane CRM-matches contacts
+                    (WA-9, cross-session fold proven), the post-event feedback loop closes to
+                    staff (WA-10), and the manager insights layer reads the feedback corpus (WA-11).</p>
                 <div class="grid cards">
                     <t t-foreach="wa_modules" t-as="m">
                         <div class="card">

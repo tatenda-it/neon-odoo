@@ -147,9 +147,9 @@ WA_MODULES = [
              "engine directly; neon_jobs unchanged; text-only (no new "
              "intents). Re-proof passed: 🟡 no-spare + 🔎 suggestion live, "
              "zero writes after the read."},
-    {"key": "WA-9", "title": "Client contact-matching", "pct": 90,
-     "state": "verifying",
-     "body": "LIVE, in final verification (neon_channels 17.0.1.19.0). The "
+    {"key": "WA-9", "title": "Client contact-matching", "pct": 100,
+     "state": "live",
+     "body": "DONE & VERIFIED on real phones (neon_channels 17.0.1.19.0). The "
              "client lane now links a new WhatsApp enquiry to an existing "
              "contact by exact phone match — a recognised customer's lead "
              "carries partner_id (else a prior closed lead's contact = a new "
@@ -158,9 +158,11 @@ WA_MODULES = [
              "client whose session expired folds into their still-open lead "
              "instead of spawning a duplicate orphan. pwa9 10/10, pwa5 "
              "125/125 unchanged, adversarial review 0 confirmed, regression "
-             "clean; Proof A passed on a real phone (the lead was born linked "
-             "to the contact). Final check pending a handset: the cross-"
-             "session FOLD (one keyword text) + teardown."},
+             "clean. Proof A: a real-phone enquiry was born linked to the "
+             "contact. Proof B: a second keyword text after the session "
+             "expired FOLDED into the same open lead (chatter follow-up, zero "
+             "new leads/partners, owner re-ping correct). [TEST-WA9] fixture "
+             "torn down to baseline (leads 2 / partners 37)."},
     {"key": "WA-10", "title": "Post-event feedback loop", "pct": 100,
      "state": "live",
      "body": "DONE & VERIFIED on real phones (neon_jobs 17.0.8.4.0 + "
