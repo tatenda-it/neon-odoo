@@ -1,14 +1,17 @@
 # WA-12 — Pricing capture sheet (Robin + Munashe)
 
-> ⛔ **HOLD — granularity under review (GATE-0 finding 2026-06-11).** The quote
-> engine prices **per equipment-CATEGORY** (`neon.finance.pricing.rule` =
-> `base_rate` per `neon.equipment.category` × currency — only **~9 categories**),
-> NOT per-product. The $1 product `list_price` placeholders do **not** drive
-> quote pricing. So **Sections A/B below are likely the WRONG shape** (276
-> per-product rows). **Do not fill yet** — pending Tatenda/Robin's decision on
-> pricing granularity (per-category vs per-product vs hybrid). If per-category,
-> this sheet collapses to ~9 category base-rates × {USD, ZiG} + a dimensional
-> section, which is far simpler. See the WA-12 memory / the GATE-0 report.
+> ⛔ **HOLD — this sheet is SUPERSEDED by Robin's data; granularity reopened
+> (2026-06-11).** Two findings collide: (1) the quote engine prices per
+> equipment-CATEGORY (`pricing.rule`, ~9 categories); (2) **Robin's actual
+> pricing (`Document from Chief.csv`, 314 items) is PER-PRODUCT** — each item
+> its own USD rate, with huge intra-category spread (AUDIO $1–$1350, VISUAL
+> $1–$1200). So **Option 1 (per-category) is CONTRADICTED by the data** — the
+> "material exceptions" answer is *the whole catalog*. **Do NOT fill this sheet
+> and do NOT reshape to Option 1.** The recommendation is **per-product pricing**
+> (promote WA-12.1 to primary) with **Robin's CSV as the source** (no manual
+> fill needed). Pending Tatenda's revised granularity call + Robin's follow-ups
+> (VAT 15% vs 15.5%, ZiG, LED dimensional, $1 leftovers, Rate vs CF.Unit Rate,
+> 314-vs-276 coverage). See the WA-12 memory / the CSV analysis report.
 
 **Purpose:** capture the REAL day-rates that unlock WA-12 (and every quote in
 Odoo). Today **275/276 products carry a $1 placeholder** — honest, but unusable
