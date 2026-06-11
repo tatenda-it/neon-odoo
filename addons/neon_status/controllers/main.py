@@ -204,8 +204,12 @@ TRACK_MILESTONES = [
                 "Finance Module, Dashboards, Venue Maps) + Phase 12 "
                 "Copilot through M12.2 (read + write tools, confirmation "
                 "cards).",
-        "remaining": "Phase 11 cutover & training; M12.2 P4–P7 / "
-                     "M12.3 parked.",
+        "remaining": "Phase 11 cutover & training — three legacy-source "
+                     "data-load mappings (Zoho / FamCal / Workshop) "
+                     "documented + R3 governance gates signed 11 Jun; "
+                     "awaiting Robin's walkthrough to schedule. Copilot "
+                     "M12.2 (variant-reverts + precedence) → M12.3-A "
+                     "(provider plurality) parked.",
     },
     {
         "name": "AI Equipment Module", "pct": 90, "accent": "teal",
@@ -248,7 +252,11 @@ DONE_VERIFIED = [
     "Phase 12 AI Sales Copilot through M12.2 (read + write tools, "
     "two-phase confirmation cards, write-audit log).",
     "HR & Payroll R1a / R1b / R2 / R3a / R3b live (employee master, "
-    "leave, payroll, wages, loans, fleet/competency, HR role-lens).",
+    "leave, payroll, wages, loans, fleet/competency); HR role-lens "
+    "CLIENT RENDER live & verified 11 Jun — R3b shipped the lens "
+    "server-side, the dashboard now DRAWS its 5 KPI tiles + 3 panels "
+    "(headcount + contracts/licences/leave) with honest empty-states; "
+    "every non-HR lens byte-equivalent.",
     "B11 WA-0 + WA-1 live (WhatsApp Copilot rails — role-scoped "
     "replies, Gemini + Groq fallback, money guardrail, signed webhook; "
     "conversation memory + boundary phone normalization; interactive "
@@ -315,7 +323,8 @@ PARKED_BACKLOG = [
     "deferred.",
     "B12 Google Drive integration — dropped.",
     "Phase 11 cross-module scroll-fix sweep + cutover & training.",
-    "M12.2 P4–P7 / M12.3 Copilot scope — parked.",
+    "Copilot M12.2 (variant-reverts + precedence) → M12.3-A (provider "
+    "plurality) → WA-12 quote-by-WhatsApp (pricing-gated) — queued.",
     "Leaflet bootstrap consolidation (deferred from Phase 9).",
     "main-branch reconciliation (production line tracked via phase tags).",
 ]

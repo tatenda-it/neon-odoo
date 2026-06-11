@@ -80,7 +80,20 @@
     # 17.0.1.0.0; read-only /neon/insights, manager-tier): new WA-11 card
     # live/100%; WA-10 card "WA-11 (queued)" -> "(now live)". Text/constants
     # only; scores unchanged.
-    "version": "17.0.1.0.15",
+    # 17.0.1.0.16 = post-HR-render-verify board bump (one commit). (1) HR
+    # role-lens DONE_VERIFIED line -> "client render live & verified 11 Jun"
+    # (R3b shipped server-side; neon_dashboard 17.0.11.2.0 added the OWL
+    # tiles/panels, verified live, every non-HR lens byte-equivalent).
+    # (2) B11 intro (template) "WA-0 through WA-8" -> "WA-0 through WA-11"
+    # (WA-9 in final verification; WA-10/WA-11 now named). (3) Core ERP
+    # "remaining" carries the Phase-11 cutover line (three legacy-source
+    # mappings Zoho/FamCal/Workshop documented + R3 gates signed 11 Jun,
+    # awaiting Robin's walkthrough) + the RATIFIED Copilot queue (M12.2
+    # variant-reverts+precedence -> M12.3-A provider plurality), retiring
+    # the stale "M12.2 P4-P7" label; parked-backlog refreshed to that queue
+    # + WA-12 (pricing-gated). Text/constants + one template string; scores
+    # unchanged.
+    "version": "17.0.1.0.16",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
