@@ -142,6 +142,20 @@ WA_MODULES = [
              "engine directly; neon_jobs unchanged; text-only (no new "
              "intents). Re-proof passed: 🟡 no-spare + 🔎 suggestion live, "
              "zero writes after the read."},
+    {"key": "WA-9", "title": "Client contact-matching", "pct": 90,
+     "state": "verifying",
+     "body": "LIVE, in final verification (neon_channels 17.0.1.19.0). The "
+             "client lane now links a new WhatsApp enquiry to an existing "
+             "contact by exact phone match — a recognised customer's lead "
+             "carries partner_id (else a prior closed lead's contact = a new "
+             "opportunity under the same client; an unknown number stays "
+             "blank for a human to qualify, NEVER auto-created). A returning "
+             "client whose session expired folds into their still-open lead "
+             "instead of spawning a duplicate orphan. pwa9 10/10, pwa5 "
+             "125/125 unchanged, adversarial review 0 confirmed, regression "
+             "clean; Proof A passed on a real phone (the lead was born linked "
+             "to the contact). Final check pending a handset: the cross-"
+             "session FOLD (one keyword text) + teardown."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).

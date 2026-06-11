@@ -64,7 +64,11 @@
     # stale "Sales Face 1 deferred" tail from the WA-6 card. Text/constants
     # only; scores UNCHANGED (90/90/90 -- one read-only face within the
     # already-90% AI module, within rounding, same call as WA-6.2/WA-7).
-    "version": "17.0.1.0.11",
+    # 17.0.1.0.12 = WA-9 client contact-matching card -> "In verification"
+    # (live, neon_channels 17.0.1.19.0; Proof A passed, cross-session fold
+    # proof pending a handset). Honest house rule: live but NOT done while a
+    # proof is outstanding. Text/constants only; scores unchanged.
+    "version": "17.0.1.0.12",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
