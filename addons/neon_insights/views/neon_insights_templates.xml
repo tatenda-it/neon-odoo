@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 403 denied page (non-manager who reaches the URL) -->
+    <template id="insights_denied" name="Neon Insights — Access Denied">
+        <html>
+            <head><meta charset="utf-8"/><title>Neon Insights</title></head>
+            <body style="font-family:system-ui,sans-serif;background:#16161f;color:#e6e6ee;padding:48px;">
+                <h1 style="color:#ff8a8a;">Access denied</h1>
+                <p>Feedback Insights is restricted to the Operations Director
+                    and managers. If you need access, contact the OD.</p>
+            </body>
+        </html>
+    </template>
+
+    <!-- the insights page (read-only; manager-tier) -->
+    <template id="insights_page" name="Neon Insights">
+        <html>
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <title>Neon — Client Feedback Insights</title>
+                <style><![CDATA[
+:root{--bg:#16161f;--panel:#1e1e2c;--border:#2c2c40;--ink:#e6e6ee;--faint:#9a9ab0;
+  --pos:#2dd4bf;--neu:#7f8bb0;--neg:#ff6b6b;--mix:#f5a623;--brand:#7f60a9;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--ink);}
+.wrap{max-width:1200px;margin:0 auto;padding:24px;}
+h1{font-size:22px;margin:0 0 2px;} h1 .b{color:#2dd4bf;}
+.sub{color:var(--faint);font-size:13px;margin-bottom:20px;}
+.grid{display:grid;grid-template-columns:1.1fr 1.3fr 1fr;gap:16px;}
+@media(max-width:980px){.grid{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.panel h2{font-size:14px;margin:0 0 12px;color:#cfcfe6;text-transform:uppercase;letter-spacing:.04em;}
+.empty{color:var(--faint);font-style:italic;padding:18px 4px;}
+.client{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;}
+.client:hover{border-color:var(--brand);}
+.client .nm{font-weight:600;} .client .meta{color:var(--faint);font-size:12px;}
+.badge{display:inline-block;border-radius:6px;padding:1px 7px;font-size:11px;margin-right:4px;}
+.s-positive{background:rgba(45,212,191,.18);color:var(--pos);}
+.s-neutral{background:rgba(127,139,176,.18);color:var(--neu);}
+.s-negative{background:rgba(255,107,107,.18);color:var(--neg);}
+.s-mixed{background:rgba(245,166,35,.18);color:var(--mix);}
+.row{border-bottom:1px solid var(--border);padding:8px 0;font-size:13px;}
+.row .top{display:flex;justify-content:space-between;gap:8px;}
+.row .snip{color:var(--faint);font-size:12px;margin-top:2px;}
+.filters{margin-bottom:10px;} .filters select{background:var(--bg);color:var(--ink);
+  border:1px solid var(--border);border-radius:6px;padding:4px 6px;margin-right:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;} th,td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);}
+th{color:var(--faint);font-weight:500;}
+.flag{color:var(--neg);font-size:13px;margin:4px 0;}
+.foot{margin-top:20px;color:var(--faint);font-size:11px;}
+#tl{margin-top:10px;}
+                ]]></style>
+            </head>
+            <body>
+                <div class="wrap">
+                    <h1>Neon — <span class="b">Client Feedback Insights</span></h1>
+                    <div class="sub">Read-only · OD + managers · post-event feedback corpus
+                        (month buckets in <t t-esc="data['aggregates']['tz']"/>)</div>
+
+                    <t t-if="not data['has_data']">
+                        <div class="panel"><div class="empty">No feedback yet — this page fills
+                            in as events wrap and the team replies to the post-event prompts
+                            (WA-10).</div></div>
+                    </t>
+
+                    <t t-if="data['has_data']">
+                    <div class="grid">
+
+                        <!-- 1. per-client satisfaction -->
+                        <div class="panel">
+                            <h2>Clients by feedback</h2>
+                            <t t-if="not data['top_clients']">
+                                <div class="empty">No client feedback yet.</div>
+                            </t>
+                            <t t-foreach="data['top_clients']" t-as="c">
+                                <div class="client" t-att-data-pid="c['partner_id']" onclick="neonTL(this)">
+                                    <div class="nm"><t t-esc="c['name']"/></div>
+                                    <div class="meta"><t t-esc="c['event_count']"/> event(s) ·
+                                        <t t-esc="c['feedback_count']"/> feedback</div>
+                                    <div style="margin-top:4px;">
+                                        <span t-if="c['sentiment']['positive']" class="badge s-positive">😊 <t t-esc="c['sentiment']['positive']"/></span>
+                                        <span t-if="c['sentiment']['neutral']" class="badge s-neutral">😐 <t t-esc="c['sentiment']['neutral']"/></span>
+                                        <span t-if="c['sentiment']['negative']" class="badge s-negative">😞 <t t-esc="c['sentiment']['negative']"/></span>
+                                        <span t-if="c['sentiment']['mixed']" class="badge s-mixed">◆ <t t-esc="c['sentiment']['mixed']"/></span>
+                                    </div>
+                                </div>
+                            </t>
+                            <div id="tl"></div>
+                        </div>
+
+                        <!-- 2. recent stream -->
+                        <div class="panel">
+                            <h2>Recent feedback</h2>
+                            <div class="filters">
+                                <select id="f-role" onchange="neonStream()">
+                                    <option value="all">All voices</option>
+                                    <option value="client">Client only</option>
+                                    <option value="staff">Staff only</option>
+                                </select>
+                                <select id="f-sent" onchange="neonStream()">
+                                    <option value="all">All sentiment</option>
+                                    <option value="positive">Positive</option>
+                                    <option value="neutral">Neutral</option>
+                                    <option value="negative">Negative</option>
+                                    <option value="mixed">Mixed</option>
+                                </select>
+                            </div>
+                            <div id="stream">
+                                <t t-if="not data['stream']"><div class="empty">No feedback yet.</div></t>
+                                <t t-foreach="data['stream']" t-as="r">
+                                    <div class="row">
+                                        <div class="top">
+                                            <span><b t-esc="r['partner']"/> · <t t-esc="r['event']"/></span>
+                                            <span><span t-attf-class="badge s-#{r['sentiment']}"><t t-esc="r['role']"/>: <t t-esc="r['sentiment']"/></span></span>
+                                        </div>
+                                        <div class="snip"><t t-esc="r['snippet']"/></div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+
+                        <!-- 3. aggregates -->
+                        <div class="panel">
+                            <h2>Sentiment by month</h2>
+                            <t t-if="not data['aggregates']['months']">
+                                <div class="empty">No feedback yet.</div>
+                            </t>
+                            <table t-if="data['aggregates']['months']">
+                                <tr><th>Month</th><th>😊</th><th>😐</th><th>😞</th><th>◆</th></tr>
+                                <t t-foreach="data['aggregates']['months']" t-as="m">
+                                    <tr><td t-esc="m['month']"/><td t-esc="m['positive']"/>
+                                        <td t-esc="m['neutral']"/><td t-esc="m['negative']"/>
+                                        <td t-esc="m['mixed']"/></tr>
+                                </t>
+                            </table>
+                            <h2 style="margin-top:16px;">Recurring concerns</h2>
+                            <div class="sub" style="margin:0 0 6px;">clients with
+                                <t t-esc="data['aggregates']['threshold']"/>+ negatives in
+                                <t t-esc="data['aggregates']['window_days']"/> days</div>
+                            <t t-if="not data['aggregates']['recurring']">
+                                <div class="empty">None — no recurring negatives.</div>
+                            </t>
+                            <t t-foreach="data['aggregates']['recurring']" t-as="rf">
+                                <div class="flag">⚠️ <t t-esc="rf['partner']"/> — <t t-esc="rf['count']"/> negative</div>
+                            </t>
+                        </div>
+
+                    </div>
+                    </t>
+
+                    <div class="foot">Neon Events Elements · read-only insights · the AI digest is a
+                        follow-on (WA-11.1).</div>
+                </div>
+
+                <script type="text/javascript"><![CDATA[
+function neonRpc(params){
+  return fetch('/neon/insights/data',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',method:'call',params:params})})
+   .then(function(r){return r.json();}).then(function(d){return d.result;});
+}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function neonStream(){
+  var role=document.getElementById('f-role').value;
+  var sent=document.getElementById('f-sent').value;
+  neonRpc({view:'stream',role_filter:role,sentiment_filter:sent}).then(function(res){
+    if(!res||!res.ok){return;}
+    var h='';
+    if(!res.stream.length){h='<div class="empty">No feedback for this filter.</div>';}
+    res.stream.forEach(function(r){
+      h+='<div class="row"><div class="top"><span><b>'+esc(r.partner)+'</b> · '+esc(r.event)+
+         '</span><span><span class="badge s-'+esc(r.sentiment)+'">'+esc(r.role)+': '+esc(r.sentiment)+
+         '</span></span></div><div class="snip">'+esc(r.snippet)+'</div></div>';});
+    document.getElementById('stream').innerHTML=h;
+  });
+}
+function neonTL(el){
+  var pid=el.getAttribute('data-pid');
+  neonRpc({view:'timeline',partner_id:parseInt(pid)}).then(function(res){
+    if(!res||!res.ok){return;}
+    var h='<div class="sub" style="margin-top:8px;">Timeline — '+esc(el.querySelector('.nm').textContent)+'</div>';
+    if(!res.timeline.length){h+='<div class="empty">No events.</div>';}
+    res.timeline.forEach(function(ev){
+      h+='<div class="row"><div class="top"><span><b>'+esc(ev.event_name)+'</b></span><span>'+esc(ev.event_date)+'</span></div>';
+      ev.voices.forEach(function(v){
+        h+='<div class="snip"><span class="badge s-'+esc(v.sentiment)+'">'+esc(v.role)+': '+esc(v.sentiment)+'</span> '+esc(v.snippet)+'</div>';});
+      h+='</div>';});
+    document.getElementById('tl').innerHTML=h;
+  });
+}
+                ]]></script>
+            </body>
+        </html>
+    </template>
+
+</odoo>

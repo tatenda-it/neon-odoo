@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- URL action -> the served /neon/insights page -->
+    <record id="action_neon_insights" model="ir.actions.act_url">
+        <field name="name">Client Feedback Insights</field>
+        <field name="url">/neon/insights</field>
+        <field name="target">self</field>
+    </record>
+
+    <!-- Top-level menu, gated to OD/superuser + Jobs Manager ONLY.
+         Sales / lead-tech / crew never see it; the controller + collector
+         re-check the same groups so a direct URL hit is also denied. -->
+    <menuitem id="menu_neon_insights_root"
+              name="Feedback Insights"
+              action="action_neon_insights"
+              sequence="95"
+              groups="neon_core.group_neon_superuser,neon_jobs.group_neon_jobs_manager"/>
+</odoo>
