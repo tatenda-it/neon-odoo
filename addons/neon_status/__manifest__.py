@@ -68,7 +68,12 @@
     # (live, neon_channels 17.0.1.19.0; Proof A passed, cross-session fold
     # proof pending a handset). Honest house rule: live but NOT done while a
     # proof is outstanding. Text/constants only; scores unchanged.
-    "version": "17.0.1.0.12",
+    # 17.0.1.0.13 = WA-5 card 95 -> 100 (DONE): the cold-template
+    # handoff->assign loop is proven on real flows (Munashe assigned twice
+    # after a ~48h window gap); buttons/rendering confirmed. The two in-window
+    # link-reply buttons stay optional (read-only). Text/constants only;
+    # scores unchanged (WA-5 was already milestone-counted).
+    "version": "17.0.1.0.13",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

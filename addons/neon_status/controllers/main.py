@@ -84,7 +84,7 @@ WA_MODULES = [
              "'as bookkeeper' override; routes only among lenses held "
              "(never widens access); '🔖 as <lens>' surfaced; verified "
              "on prod (Kudzaiishe)."},
-    {"key": "WA-5", "title": "Client lane", "pct": 95,
+    {"key": "WA-5", "title": "Client lane", "pct": 100,
      "state": "live",
      "body": "DONE & VERIFIED (neon_channels 17.0.1.17.0) — first "
              "client-facing surface: sandboxed client intake + raw-lead "
@@ -94,9 +94,14 @@ WA_MODULES = [
              "their user_id), clean decline, and no duplication; the "
              "~hourly Meta re-delivery flood root cause (a public-env "
              "flush rolling back the assignment) is fixed via the "
-             "su=True webhook flush. Minor sub-checks remain (Munashe "
-             "3-button + cold-template phone round-trips) — post-go-live "
-             "polish, not blocking done."},
+             "su=True webhook flush. CLOSED OUT: the COLD-template "
+             "handoff→assign loop is proven on real flows (Munashe got the "
+             "wa5_lead_handoff template after a ~48h gap, tapped Assign, "
+             "picked from the list, lead assigned + assignee notified — "
+             "twice); buttons + rendering confirmed on the handsets. The "
+             "two in-window link-reply buttons (Chat / Open-in-Odoo on the "
+             "escalation message) are read-only conveniences, optional to "
+             "tap."},
     {"key": "WA-6", "title": "Crew + OD equipment face", "pct": 100,
      "state": "live",
      "body": "DONE & VERIFIED end-to-end on real phones (neon_crew_comms "
