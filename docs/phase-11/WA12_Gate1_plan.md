@@ -65,7 +65,8 @@ audit trail attribute to the real MD/OD.
 |---|---|---|
 | `neon_channels` parse + dispatch | tight `Quote:` command parser (equals/startswith, false-positive test); the approval-ping + View-PDF + requester-return legs; session steps (`q_*`); intents `wa12_approve` / `wa12_reject` / **`wa12_view_pdf`** / `wa12_send` → `wa_payload.INTENTS` | new |
 | `neon_channels` first-tap-wins | advisory lock (fresh namespace, e.g. `5593900`) + WA-10 dedupe shape for the approver pair | new |
-| `neon_finance` quote build | helper to create quote + lines from the parsed payload + price-list lookup + the **LED-wall dimensional rule** (parse `3×2m` → m² × per-m² rate, OR panel-count × per-panel rate) | new helper |
+| `neon_finance` quote build | helper to create quote + lines from the parsed payload + per-product rate lookup + duration mapping ("for N days" → `duration_days`); **LED = named size-variant match only** (ruling 3 — "3×2m" → the named product, else list sizes + ask; NO per-m²) | new helper |
+| `neon_crew_comms` "Price:" face | read-only `Price: <item>` → rate + currency + per-day note; **WA-8 entitlement rail, NO approval, NO quote record** (ruling 4) | **new** |
 | **QWeb quote PDF report** | a report on `neon.finance.quote` (none exists today; the invoice report does) — renders **state-stamped** (DRAFT at submit, final on approval); used by both legs | **new** |
 | `send_document` outbound | new send type on `neon.whatsapp.message` (inbound already recognises `document`); **Meta `/media` upload → media_id → send by id**. Used at **TWO points**: the approver's [View PDF] tap (draft PDF) AND on approval (final PDF → requester) | **new** |
 | email-to-client | `action_send` already mails; **SMTP sender fix scope confirmed INSIDE this Gate-1** (outgoing-mail server / from-address / deliverability must be prod-ready) | confirm |
@@ -162,3 +163,36 @@ Robin's sign-off; flagging explicitly.
 status post-submission (Pending → Active). 4-var body is settled (no lean
 fallback). Meta's review then runs in the background starting today; the cold-
 window approval ping can't deliver until it's Active.
+
+---
+
+## 7. Robin's binding pricing rulings (2026-06-11)
+
+1. **DAYS + RECALC — NO new field, NO new engine.** `quote.line` already has
+   `duration_days` + `day_breakdown_json`; `action_recalculate_pricing` exists.
+   CSV `Rate` = the **per-day** hire price → line total = `qty × rate ×
+   duration_days` via the EXISTING compute. The parse lane maps "for N days" /
+   a date-range → `duration_days` (default 1, echoed in the draft summary).
+   ⚠️ build-time reconciliation: "no new field" ⇒ the per-product rate lives in
+   the existing per-product price field and is set onto `line.unit_rate`
+   directly (pricing_status `manual`), NOT via the category `pricing.rule` path
+   — document the exact source when wiring (bend spec→reality per CLAUDE.md).
+   **DURATION-CHANGE POLICY (binding):** draft → `action_recalculate_pricing`
+   in place; **after approval → DUPLICATE with the new duration → recalculate →
+   fresh MD/OD approval → NEW quote.** Approved quotes are NEVER mutated.
+2. **The 3 × $1 receivers (SHURE / INNOPOW / CineEye)** = ADD-ONS, never quoted
+   alone. No pricing rule; excluded from standalone quoting; requested solo →
+   the bot says they're included with their parent kit. (Placeholder guard does
+   NOT trip on them in a kit context.)
+3. **LED = named size-variant matching ONLY.** "3×2m LED" → the exact named
+   product if it exists (e.g. "3M X 2M LED SCREEN" $300), else list available
+   sizes + rates and ask. **No per-m² formula.**
+4. **SCOPE = everything quotable from the phone** — packages (Corporate /
+   Wedding / DJ / School), Generator, Camera Setup, Logistics all quotable.
+   **Quotable Zoho items missing from Odoo get CREATED** as products/services
+   during the load (⛔ money-gated, after Robin's sign-off + the dedup pass —
+   see the catalogue review).
+   **NEW FACE — "Price:" enquiry.** Sales-capable mapped staff text `Price: <item>`
+   → the bot replies rate + currency + per-day note. **Read-only, WA-8
+   entitlement rail, NO approval, NO quote record.** Added to the footprint +
+   `pwa12` (incl. a denial test for a non-entitled sender).
