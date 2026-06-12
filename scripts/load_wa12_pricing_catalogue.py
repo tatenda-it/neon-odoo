@@ -234,8 +234,9 @@ out("product-scoped rules now in DB=%d" % prod_rules)
 if n_unpriced:
     out("note: %d row(s) carry NO rate -> created WITHOUT a rule (resolve "
         "no_rule -> the guard blocks quoting them until a real rate is set; "
-        "this is expected for LED size-variants priced by the m² rule)."
-        % n_unpriced)
+        "named LED size-variants + services awaiting a per-name rate from "
+        "Robin -- ruling 3a: there is NO m2 rule, size-variants are priced "
+        "by name)." % n_unpriced)
 
 # HARD GATE (review WA12LOAD-2): unresolved MAP rows mean the worksheet peers
 # don't match live product names -> a half-applied, partially-deactivated
