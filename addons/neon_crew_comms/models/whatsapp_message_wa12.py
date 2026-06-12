@@ -249,16 +249,18 @@ class WhatsAppMessageWA12(models.Model):
 
     @api.model
     def _wa12_pending_for_approver(self, user):
-        """The quote awaiting THIS approver's decision (state
-        pending_approval), most-recent first; empty recordset if the sender
-        isn't a designated approver / OD-superuser. Resolves the payload-less
-        template-QR tap to its quote."""
+        """Quote(s) awaiting THIS approver's decision (state pending_approval).
+        Empty if the sender isn't an approver. Returns the FULL set (NO limit):
+        a payload-less template-QR tap carries no quote_id, so the caller must
+        REFUSE when >1 is pending rather than guess 'most recent' -- guessing
+        could approve the WRONG quote at the WRONG total (a real money-surface
+        bug with two reps' quotes pending at once). The in-window HMAC tap is
+        unambiguous (it carries the id) and never routes through here."""
         empty = self.env["neon.finance.quote"].sudo().browse()
         if not self._wa12_is_approver(user):
             return empty
         return self.env["neon.finance.quote"].sudo().search(
-            [("state", "=", "pending_approval")],
-            order="write_date desc", limit=1)
+            [("state", "=", "pending_approval")], order="write_date desc")
 
     def _wa12_session_stale(self, sess):
         if not sess.last_inbound:
@@ -407,6 +409,14 @@ class WhatsAppMessageWA12(models.Model):
         if not quote or not quote.exists():
             return self._wa6_reply(raw_from, from_e164, _(
                 "That quote is no longer available."))
+        if len(quote) > 1:
+            # a payload-less template-QR tap with several quotes pending at once
+            # -- we can't tell which the button was for. REFUSE rather than act
+            # on the wrong quote (money surface); the in-window HMAC buttons or
+            # Odoo resolve it unambiguously.
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Several quotes are awaiting approval — I can't tell which this "
+                "is for. Please action it in Odoo."))
         if intent == "wa12_view_pdf":
             # the HMAC payload binds only to quote_id; gate the document send
             # on the tapper's role (approver / the salesperson / an initiator)
@@ -671,12 +681,23 @@ class WhatsAppMessageWA12(models.Model):
                 continue
             body_params = [requester.name, quote.partner_id.name, summary, total]
             if self._wa5_window_open(phone):
-                self.sudo().send_buttons(
+                res = self.sudo().send_buttons(
                     phone, self._wa12_ping_body(body_params),
                     self._wa12_inwindow_buttons(quote))
             else:
-                self.sudo().send_template(
+                res = self.sudo().send_template(
                     phone, _WA12_TEMPLATE, body_params=body_params)
+            # only count a ping Meta actually ACCEPTED. A rejected cold template
+            # (opt-out / no_config / 4xx-5xx) must NOT read as 'pinged', else the
+            # requester is told "approval on its way" while the quote is silently
+            # stranded in pending_approval. send_buttons -> bool; send_template
+            # -> {'ok': bool}.
+            ok = res.get("ok") if isinstance(res, dict) else bool(res)
+            if not ok:
+                _logger.warning(
+                    "WA-12 approval ping to %s NOT accepted (%s) for %s",
+                    phone, res, quote.name)
+                continue
             self._wa6_audit_out(phone, "wa12 approval ping %s" % quote.name)
             sent += 1
         return sent
