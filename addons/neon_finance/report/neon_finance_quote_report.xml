@@ -122,12 +122,25 @@
                             </thead>
                             <tbody>
                                 <tr t-foreach="o.line_ids" t-as="l">
-                                    <td><span t-field="l.name"/></td>
+                                    <td>
+                                        <span t-if="l.line_type == 'custom'"
+                                              style="color:#7165AC;font-weight:bold;">CUSTOM </span>
+                                        <span t-field="l.name"/>
+                                    </td>
                                     <td class="text-end"><span t-field="l.quantity"/></td>
                                     <td class="text-end"><span t-field="l.duration_days"/></td>
                                     <td class="text-end">
-                                        <span t-field="l.unit_rate"
-                                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                        <!-- discounted: struck base + effective + (disc. X) -->
+                                        <t t-if="l.discount_amount or l.discount_pct">
+                                            <t t-set="eff" t-value="(l.unit_rate - l.discount_amount) if l.discount_amount else (l.unit_rate * (1 - l.discount_pct/100.0))"/>
+                                            <span style="text-decoration:line-through;color:#999;font-size:0.85em;"><span t-out="o.currency_id.name"/> <span t-out="'%.2f' % l.unit_rate"/></span><br/>
+                                            <span t-out="o.currency_id.name"/> <span t-out="'%.2f' % (eff if eff &gt; 0 else 0.0)"/>
+                                            <span style="font-size:0.8em;color:#7165AC;"> (disc. <t t-if="l.discount_pct"><span t-out="'%g' % l.discount_pct"/>%</t><t t-else=""><span t-out="o.currency_id.name"/> <span t-out="'%.2f' % l.discount_amount"/></t>)</span>
+                                        </t>
+                                        <t t-else="">
+                                            <span t-field="l.unit_rate"
+                                                  t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                        </t>
                                     </td>
                                     <td><span t-out="l.tax_id.name or ''"/></td>
                                     <td class="text-end">
@@ -148,7 +161,9 @@
                                                   t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                                         </td>
                                     </tr>
-                                    <tr>
+                                    <!-- VAT row only when tax applies ('no tax'
+                                         clears the line taxes -> amount_tax 0). -->
+                                    <tr t-if="o.amount_tax">
                                         <td>VAT 15.5%</td>
                                         <td class="text-end">
                                             <span t-field="o.amount_tax"
@@ -235,7 +250,8 @@
                         </div>
 
                         <p class="mt-3 text-muted" style="font-size:11px;">
-                            VAT at the ZIMRA standard rate (15.5%). E&amp;OE.
+                            <t t-if="o.amount_tax">VAT at the ZIMRA standard rate
+                                (15.5%). </t>E&amp;OE.
                         </p>
                     </div>
                 </t>

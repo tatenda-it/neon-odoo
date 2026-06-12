@@ -15,7 +15,7 @@
     # an engine-priced reservation-less line re-prices instead of flipping to
     # manual, while a hand-set 'manual' line is preserved. Reservation-backed
     # lines are byte-unchanged (equipment_line_id short-circuit).
-    'version': '17.0.7.10.5',
+    'version': '17.0.7.10.6',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
