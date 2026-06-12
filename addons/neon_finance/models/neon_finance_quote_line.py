@@ -41,6 +41,7 @@ _LINE_TYPES = [
     ("crew", "Crew"),
     ("sub_rental", "Sub-rental"),
     ("consumable", "Consumable"),
+    ("custom", "Custom"),
     ("other", "Other"),
 ]
 
@@ -98,6 +99,24 @@ class NeonFinanceQuoteLine(models.Model):
         "subsequent duration_days edits from drifting the rate.",
     )
     duration_days = fields.Integer(required=True, default=1)
+    # WA-12 flexibility: a PER-UNIT-DAY discount, parallel to unit_rate (so it
+    # scales under qty/days edits). The engine unit_rate is NEVER overwritten;
+    # the discount folds into line_subtotal as (unit_rate - discount). pct and
+    # amount are mutually exclusive (constraint + onchange clear the sibling).
+    discount_pct = fields.Float(
+        string="Discount %",
+        default=0.0,
+        help="Per-line discount as a percentage of unit_rate (0-100). "
+        "Exclusive with Discount amount. Approval-visible.",
+    )
+    discount_amount = fields.Monetary(
+        string="Discount / unit-day",
+        default=0.0,
+        currency_field="currency_id",
+        help="Per-unit-per-day discount off unit_rate (same units as "
+        "unit_rate). Exclusive with Discount %. Approval-visible. "
+        "'price <item> <amt>' stores unit_rate - amt here.",
+    )
     bracket_multiplier = fields.Float(
         default=1.0,
         readonly=True,
@@ -185,7 +204,38 @@ class NeonFinanceQuoteLine(models.Model):
         ("check_unit_rate_non_negative",
          "CHECK (unit_rate >= 0)",
          "Unit rate cannot be negative."),
+        ("check_discount_amount_non_negative",
+         "CHECK (discount_amount >= 0)",
+         "Discount amount cannot be negative (a markup is not a discount)."),
+        ("check_discount_pct_range",
+         "CHECK (discount_pct >= 0 AND discount_pct <= 100)",
+         "Discount percentage must be between 0 and 100."),
     ]
+
+    @api.constrains("discount_pct", "discount_amount", "unit_rate")
+    def _check_discount(self):
+        """WA-12 flexibility: pct and amount are mutually exclusive, and a
+        discount can't exceed the base rate (no markup-by-discount)."""
+        for rec in self:
+            if rec.discount_pct and rec.discount_amount:
+                raise ValidationError(_(
+                    "Line %s: set EITHER a discount %% OR a discount amount, "
+                    "not both.") % (rec.name or rec.id))
+            if rec.discount_amount and rec.discount_amount > rec.unit_rate:
+                raise ValidationError(_(
+                    "Line %s: the discount (%s) is above the base rate (%s) "
+                    "-- that's a markup, not a discount.") % (
+                        rec.name or rec.id, rec.discount_amount, rec.unit_rate))
+
+    @api.onchange("discount_pct")
+    def _onchange_discount_pct(self):
+        if self.discount_pct:
+            self.discount_amount = 0.0  # last-write-wins exclusivity (UI)
+
+    @api.onchange("discount_amount")
+    def _onchange_discount_amount(self):
+        if self.discount_amount:
+            self.discount_pct = 0.0
 
     # ============================================================
     # === Defaults + computes (M2 logic, unchanged)
@@ -203,11 +253,20 @@ class NeonFinanceQuoteLine(models.Model):
         )
         return tax.id if tax else False
 
-    @api.depends("quantity", "unit_rate", "duration_days")
+    @api.depends("quantity", "unit_rate", "duration_days",
+                 "discount_pct", "discount_amount")
     def _compute_subtotal(self):
         for rec in self:
+            # effective per-unit-day rate after the discount; unit_rate (the
+            # engine/base rate) is left untouched. amount wins if set, else pct.
+            if rec.discount_amount:
+                effective = rec.unit_rate - rec.discount_amount
+            elif rec.discount_pct:
+                effective = rec.unit_rate * (1.0 - rec.discount_pct / 100.0)
+            else:
+                effective = rec.unit_rate
             rec.line_subtotal = (
-                rec.quantity * rec.unit_rate * rec.duration_days)
+                rec.quantity * max(effective, 0.0) * rec.duration_days)
 
     @api.depends("line_subtotal", "tax_id")
     def _compute_total_taxed(self):
