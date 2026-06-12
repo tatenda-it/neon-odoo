@@ -488,6 +488,25 @@ _check("T-WA12-19",
        and set(_dstatuses) <= {"priced", "no_rule", "not_yet"},
        "WA-12 lane fabricates no 'manual' line: statuses=%s" % _dstatuses)
 
+# ---- T-WA12-20 (review-fix) [Send to client] requires a client email: a client
+# with NO email -> the send leg refuses + leaves state 'approved' (never the
+# false "sent" on an undelivered quote that the proof's accidental tap exposed).
+noeml = P.create({"name": "[TEST-WA12] NoEmail Co", "is_company": True})
+neq = Q._wa12_provision_chain(noeml, "2026-11-01", USD, u_sales)
+M.sudo()._wa12_build_lines(neq, [{"product_id": prod_ok.id, "qty": 1}], 1)
+neq.action_recalculate_pricing()
+M.sudo()._wa12_ensure_payment_term(neq, noeml)
+neq.with_user(u_sales.id).action_submit_for_approval()
+neq.with_user(u_appr.id).action_approve()
+M.sudo()._wa12_handle_send_to_client(neq, u_sales, SALES_PH, SALES_PH)
+_ne_out = M.search([("phone_number", "=", SALES_PH), ("direction", "=", "outbound")],
+                   order="id desc", limit=1)
+_check("T-WA12-20",
+       "no email" in (_ne_out.message_body or "").lower()
+       and neq.state == "approved",
+       "no-email client: send refused (reply has 'no email'), state=%s (NOT sent)"
+       % neq.state)
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(

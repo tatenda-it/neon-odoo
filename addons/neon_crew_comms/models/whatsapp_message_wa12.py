@@ -497,6 +497,15 @@ class WhatsAppMessageWA12(models.Model):
         if quote.state != "approved":
             return self._wa6_reply(raw_from, from_e164, _(
                 "%s isn't approved yet.") % quote.name)
+        if not (quote.partner_id.email or "").strip():
+            # action_send marks the quote 'sent', but a client with NO email on
+            # file receives nothing -> a false "sent" on an undelivered quote.
+            # Refuse honestly and leave the state at 'approved' until an email
+            # is set (or the rep forwards the PDF themselves).
+            return self._wa6_reply(raw_from, from_e164, _(
+                "%s has no email on file — add one in Odoo or forward the PDF "
+                "yourself. %s is NOT marked sent.") % (
+                    quote.partner_id.name or _("That client"), quote.name))
         try:
             quote.with_user(tapper.id).sudo().action_send()
         except (UserError, AccessError) as e:
