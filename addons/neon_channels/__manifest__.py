@@ -209,7 +209,12 @@
     # touch: no model / data / schema / RBAC change; send_document (added in
     # 17.0.1.21.0) is reused. The webhook worker reloads INTENTS on the
     # force-recreate (a -u alone never reloads a module-level constant).
-    'version': '17.0.1.22.0',
+    # 17.0.1.22.1 = WA-12.2 M2 identity-aware chat: the Copilot system prompt
+    # now ASSERTS the sender's identity (name + role resolved from the
+    # registered WhatsApp number) -- "do you know me?" gets the name/role,
+    # never "no information about you". Also fixes the stale VAT 15% -> 15.5%
+    # in the same prompt string. Module-level constant -> force-recreate.
+    'version': '17.0.1.22.1',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

@@ -232,7 +232,19 @@
     # (intent=other) then falls to the Copilot = a 2nd call — accepted per the
     # ratified fallback design; a copilot-tool fold / cheap pre-gate is parked.
     # No neon_finance/report change. pwa12 37/37, pwa13 15/15.
-    "version": "17.0.1.11.0",
+    # 17.0.1.12.0 = WA-12.2 M1-M5 (unscripted proof #1 walls) + the approver-as-
+    # requester addendum: M1 CONFIRM-BEFORE-DRAFT (q_items step -- extraction
+    # returns ALL items, ONE confirm message lists every matched line @ the
+    # ENGINE rate, stated prices are hints flagged never drafted, NO provision
+    # until yes; corrections: remove/qty/date/client/re-type, complaint ->
+    # repair); M5 bare intent -> q_client/q_itemreq slot-fill (never the generic
+    # Copilot); M3 intake slot PRE-FILL from the brief (phone/email/contact --
+    # only missing slots asked, entries acknowledged); M4 conversational repair
+    # via deterministic complaint tokens + hook-B REPAIR. Addendum: the approval
+    # ping no longer skips the requester (an MD/OD requester gets their own
+    # Approve button; the ratified self-approval principle -- pairs with the
+    # neon_finance 17.0.7.10.8 SoD scoping). pwa12 44/44, pwa13 15/15.
+    "version": "17.0.1.12.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

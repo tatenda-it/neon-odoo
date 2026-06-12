@@ -443,11 +443,17 @@ class NeonFinanceQuote(models.Model):
         approver-only via group check + ACL.
 
         Separation-of-duties guard (P6.predeploy): the approver
-        cannot be the same user as the quote's salesperson. In the
-        production matrix, Robin / Munashe / superuser hold both
-        sales AND approver groups so the group check alone permits
-        self-approval -- this method-level check enforces SoD.
+        cannot be the same user as the quote's salesperson.
         Approvers may still approve OTHER reps' quotes freely.
+
+        ⚠️ DECISION (WA-12 addendum, user-ratified 12 Jun 2026): the
+        MD/OD tier (neon_core.group_neon_superuser -- Robin /
+        Munashe) MAY self-approve their own quotes. The ratified
+        "MD/OD self-approval principle" (WA-12/WA-13 Gate-1)
+        supersedes the blanket P6.predeploy SoD check for that tier
+        ONLY -- a plain sales rep who gains the approver group is
+        still SoD-blocked. Implementation follows the ratified spec
+        per the house rule.
         """
         if not self.env.user.has_group(
                 "neon_finance.group_neon_finance_approver"):
@@ -460,7 +466,9 @@ class NeonFinanceQuote(models.Model):
                     "Only Pending Approval quotes can be approved "
                     "(%s is %s)."
                 ) % (rec.name, dict(_QUOTE_STATES)[rec.state]))
-            if rec.salesperson_id == self.env.user:
+            if (rec.salesperson_id == self.env.user
+                    and not self.env.user.has_group(
+                        "neon_core.group_neon_superuser")):
                 raise UserError(_(
                     "Separation of duties: you cannot approve "
                     "%(name)s because you are also the quote's "

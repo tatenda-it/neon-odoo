@@ -15,12 +15,18 @@
     # an engine-priced reservation-less line re-prices instead of flipping to
     # manual, while a hand-set 'manual' line is preserved. Reservation-backed
     # lines are byte-unchanged (equipment_line_id short-circuit).
+    # 17.0.7.10.8 = WA-12 addendum (user-ratified 12 Jun 2026): the MD/OD tier
+    # (neon_core.group_neon_superuser) MAY self-approve their own quotes -- the
+    # ratified WA-12/WA-13 "MD/OD self-approval principle" supersedes the
+    # blanket P6.predeploy SoD check for that tier ONLY (a plain approver who is
+    # also the salesperson stays SoD-blocked). ⚠️ DECISION marker inline in
+    # action_approve.
     # 17.0.7.10.7 = WA-13 — make Kudzai's Finance/Approver membership durable
     # across a fresh -i/rebuild (migration 17.0.7.10.7 idempotent (4, id) ORM
     # re-assert of the UI-added grant; no-op on the current prod DB). WA-13 adds
     # no finance model/engine -- it is a WhatsApp face on the existing P6.M7
     # invoice.schedule machinery (lives in neon_crew_comms).
-    'version': '17.0.7.10.7',
+    'version': '17.0.7.10.8',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

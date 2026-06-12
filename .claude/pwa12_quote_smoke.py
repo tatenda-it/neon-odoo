@@ -111,14 +111,14 @@ if _old_p:
     env["neon.finance.payment.term"].sudo().search(
         [("partner_id", "in", _old_p.ids)]).unlink()
     _old_p.unlink()
-PT.with_context(active_test=False).search([("name", "like", "[TEST-WA12]")]).unlink()
-# [TEST-WA12] pricing fixtures: delete AFTER the products (which reference the
-# categories); the rule's unique(category,currency,effective_date) would
-# otherwise collide on a re-run.
+# [TEST-WA12] pricing RULES first: a PRODUCT-scoped rule references its product
+# (ondelete restrict) so rules must drop BEFORE the products (same ordering as
+# the teardown); category rules reference categories, so rules precede those too.
 _orules = env["neon.finance.pricing.rule"].sudo().with_context(
     active_test=False).search([("name", "like", "[TEST-WA12]")])
 _orules.mapped("bracket_ids").unlink()
 _orules.unlink()
+PT.with_context(active_test=False).search([("name", "like", "[TEST-WA12]")]).unlink()
 env["neon.equipment.category"].sudo().with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")]).unlink()
 for lg in ("pwa12_sales", "pwa12_crew", "pwa12_appr"):
@@ -766,23 +766,28 @@ _check("T-WA12-31", pickN and resumedN and wa9_ok,
        % (pickN, resumedN, p29b.phone_sanitized if p29b else "-"))
 
 # ---- T-WA12-32 (WA-12.2 hook A) free-text quote request -> LLM EXTRACTION ->
-# deterministic provision. The LLM is MOCKED (offline + deterministic).
+# M1 confirm gate (q_items) -> yes -> deterministic provision. LLM MOCKED.
 _clear_sess(SALES_PH)
 _ai_q = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
-         '"items":[{"name":"qwertyunit","qty":2}],"date":"2026-09-20"}')
+         '"items":[{"name":"qwertyunit","qty":2,"stated_price":null}],'
+         '"date":"2026-09-20","phone":null,"email":null,'
+         '"contact_person":null}')
 with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _ai_q):
     r32 = D_sales._wa12_llm_intake_maybe(_txt(
         SALES_PH,
         "hi can you price up 2 qwertyunit for Acme Events on the 20th please"))
+conf32 = _step(SALES_PH) == "q_items"          # M1: confirm BEFORE draft
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
 s32 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
 b32 = s32._get_buffer() if s32 else {}
 q32 = (Q.sudo().browse(b32.get("quote_id") or 0)
        if isinstance(b32, dict) else Q.browse())
 _check("T-WA12-32",
-       r32 is True and bool(s32) and s32.step == "q_confirm"
+       r32 is True and conf32 and bool(s32) and s32.step == "q_confirm"
        and q32.exists() and q32.partner_id == client and len(q32.line_ids) >= 1,
-       "free-text -> AI extract -> draft quote for %s (q_confirm=%s, lines=%d)"
-       % (q32.partner_id.name if q32.exists() else "-",
+       "free-text -> AI extract -> confirm(q_items)=%s -> yes -> draft for %s "
+       "(q_confirm=%s, lines=%d)"
+       % (conf32, q32.partner_id.name if q32.exists() else "-",
           s32.step if s32 else "-", len(q32.line_ids) if q32.exists() else 0))
 
 # ---- T-WA12-33 (WA-12.2 hook B) a free-text edit during q_confirm -> LLM
@@ -820,6 +825,221 @@ _check("T-WA12-34", deg_ok and det_ok,
        "LLM down -> hook A falls through (r=%s); deterministic Quote: still "
        "works (%s)" % (r34, det_ok))
 
+# ---- T-WA12-35 (M1, the proof-#1 regression) multi-item brief -> CONFIRM-
+# BEFORE-DRAFT: extraction returns ALL items; ONE confirm message lists every
+# matched line @ the ENGINE rate (stated prices are hints, never the rate);
+# NO quote exists until yes.
+_clear_sess(SALES_PH)
+_q_before = Q.search_count([("partner_id", "=", client.id)])
+_brief = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
+          '"items":[{"name":"qwertyunit","qty":5,"stated_price":10},'
+          '{"name":"prodruled","qty":1,"stated_price":null}],'
+          '"date":"2026-09-20","phone":null,"email":null,'
+          '"contact_person":null}')
+_s35 = _since() if False else M.search([], order="id desc", limit=1).id
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _brief):
+    D_sales._wa12_llm_intake_maybe(_txt(
+        SALES_PH, "brief: Acme Events. qwertyunit x5 they cost 10 each, "
+        "plus a prodruled, for the 20th of Sept"))
+_conf = M.search([("id", ">", _s35), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1)
+_ct = _conf.message_body or ""
+no_draft_yet = Q.search_count([("partner_id", "=", client.id)]) == _q_before
+s35 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+conf_ok = (s35 and s35.step == "q_items"
+           and "50.00" in _ct and "77.00" in _ct       # ENGINE rates
+           and "×5" in _ct and "you said 10.00" in _ct)  # qty + hint flagged
+# yes -> NOW the draft exists with BOTH lines at engine rates
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
+q35 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+drafted = (q35 and len(q35.line_ids) == 2
+           and {round(l.unit_rate) for l in q35.line_ids} == {50, 77}
+           and max(q35.line_ids.mapped("quantity")) == 5)
+_check("T-WA12-35", no_draft_yet and conf_ok and drafted,
+       "confirm-before-draft: no-draft=%s confirm(engine-rates+hint)=%s "
+       "drafted-on-yes(2 lines, 50/77, x5)=%s" % (no_draft_yet, conf_ok, drafted))
+
+# ---- T-WA12-36 (M1 corrections) remove + qty + date at q_items re-shape the
+# list BEFORE drafting.
+_clear_sess(SALES_PH)
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _brief):
+    D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "same brief again"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "remove prodruled"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "qty qwertyunit 2"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "29 Sept 2026"))
+s36 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+b36 = s36._get_buffer() if s36 else {}
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
+q36 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+_cj36 = q36.event_job_id.commercial_job_id if q36 else None
+_check("T-WA12-36",
+       isinstance(b36, dict) and len(b36.get("matched") or []) == 1
+       and q36 and len(q36.line_ids) == 1
+       and q36.line_ids.quantity == 2
+       and _cj36 and _cj36.event_date
+       and (_cj36.event_date.month, _cj36.event_date.day) == (9, 29),
+       "q_items corrections: matched=%s lines=%s qty=%s date=%s"
+       % (len(b36.get("matched") or []), len(q36.line_ids) if q36 else 0,
+          q36.line_ids.quantity if q36 and len(q36.line_ids) == 1 else "-",
+          _cj36.event_date if _cj36 else "-"))
+
+# ---- T-WA12-37 (M5) bare quote intent -> q_client -> q_itemreq -> confirm ->
+# draft (never the generic Copilot).
+_clear_sess(SALES_PH)
+_bare = ('{"intent":"quote","client":null,"items":[],"date":null,'
+         '"phone":null,"email":null,"contact_person":null}')
+_s37 = M.search([], order="id desc", limit=1).id
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _bare):
+    r37 = D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "i want to make a quote"))
+which_client = "which client" in (M.search(
+    [("id", ">", _s37), ("phone_number", "=", SALES_PH),
+     ("direction", "=", "outbound")], order="id desc", limit=1
+).message_body or "").lower()
+st1 = _step(SALES_PH)
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "[TEST-WA12] Acme Events Co"))
+st2 = _step(SALES_PH)
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "qwertyunit x3"))
+st3 = _step(SALES_PH)
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
+q37 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+_check("T-WA12-37",
+       r37 is True and which_client and st1 == "q_client"
+       and st2 == "q_itemreq" and st3 == "q_items"
+       and q37 and len(q37.line_ids) == 1 and q37.line_ids.quantity == 3,
+       "bare intent: ask-client=%s steps=%s/%s/%s drafted(x3)=%s"
+       % (which_client, st1, st2, st3, bool(q37 and q37.line_ids)))
+
+# ---- T-WA12-38 (M3) brief-sourced phone+email PRE-FILL the intake: after the
+# name, NO phone/email asks; partner created with both.
+_clear_sess(SALES_PH)
+_pf = ('{"intent":"quote","client":"[TEST-WA12] Prefill Nova Ltd",'
+       '"items":[{"name":"qwertyunit","qty":1,"stated_price":null}],'
+       '"date":null,"phone":"+263773863012","email":"nova@x.test",'
+       '"contact_person":null}')
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _pf):
+    D_sales._wa12_llm_intake_maybe(_txt(
+        SALES_PH, "quote for Prefill Nova Ltd phone +263773863012 "
+        "email nova@x.test one qwertyunit"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))     # q_items -> intake
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "new"))
+_s38 = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "individual"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "ok"))      # name -> create+resume
+_after38 = M.search([("id", ">", _s38), ("phone_number", "=", SALES_PH),
+                     ("direction", "=", "outbound")])
+asked_38 = " ".join((m.message_body or "") for m in _after38).lower()
+p38 = P.search([("name", "=", "[TEST-WA12] Prefill Nova Ltd")], limit=1)
+_check("T-WA12-38",
+       bool(p38) and "773863012" in (p38.phone_sanitized or p38.phone or "")
+       and p38.email == "nova@x.test"
+       and "phone number for" not in asked_38 and "email?" not in asked_38
+       and _step(SALES_PH) == "q_confirm",
+       "prefill: created(phone/email)=%s no-redundant-asks=%s resumed=%s"
+       % (bool(p38), "phone number for" not in asked_38, _step(SALES_PH)))
+
+# ---- T-WA12-39 (M4) complaint -> REPAIR prompt (never the syntax menu): at
+# q_confirm (deterministic token) AND at q_items.
+_s39 = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(
+    SALES_PH, "this is wrong from the information l gave you"))
+r39a = (M.search([("id", ">", _s39), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+repair_qconfirm = "what should i fix" in r39a.lower()
+_clear_sess(SALES_PH)
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _brief):
+    D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "the same brief once more"))
+_s39b = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "no this is incorrect"))
+r39b = (M.search([("id", ">", _s39b), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+_check("T-WA12-39",
+       repair_qconfirm and "what should i fix" in r39b.lower(),
+       "repair prompt: q_confirm=%s q_items=%s"
+       % (repair_qconfirm, "what should i fix" in r39b.lower()))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-40 (M2) identity-aware chat: the copilot system prompt ASSERTS
+# the sender's name+role (resolved via the WA-9 spine) + VAT 15.5.
+from odoo.addons.neon_channels.models.wa_copilot import WhatsAppCopilotService
+u_sales.partner_id.write({"function": "Sales Executive"})  # exact org title
+_sys40 = WhatsAppCopilotService(env)._build_messages(
+    u_sales, "sales", "so you do not know me?", SALES_PH)[0]["content"]
+_check("T-WA12-40",
+       u_sales.name in _sys40 and "KNOW this user" in _sys40
+       and "15.5" in _sys40 and "Sales Executive" in _sys40,
+       "identity in system prompt: name=%s assert=%s vat15.5=%s exact-title=%s"
+       % (u_sales.name in _sys40, "KNOW this user" in _sys40,
+          "15.5" in _sys40, "Sales Executive" in _sys40))
+
+# ---- T-WA12-41 (addendum) APPROVER-AS-REQUESTER end-to-end: MD/OD-tier user
+# drafts via natural language -> confirm -> submit -> SELF-approves (the
+# ratified principle; SoD stays for a non-superuser approver).
+env["neon.wa.equip.session"].sudo().with_context(active_test=False).search(
+    [("phone_number", "=", APPR_PH)]).write({"active": False})
+_check("T-WA12-41a", D_appr._wa12_can_quote(u_appr) is True,
+       "MD/OD tier CAN initiate quotes (asserted, not assumed)")
+_b41 = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
+        '"items":[{"name":"qwertyunit","qty":1,"stated_price":null}],'
+        '"date":"2026-09-21","phone":null,"email":null,"contact_person":null}')
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _b41):
+    D_appr._wa12_llm_intake_maybe(_txt(
+        APPR_PH, "please make a quotation for Acme, one qwertyunit, 21 Sept"))
+D_appr._wa12_maybe_intercept(_txt(APPR_PH, "yes"))
+q41 = Q.search([("partner_id", "=", client.id),
+                ("salesperson_id", "=", u_appr.id)],
+               order="id desc", limit=1)
+q41.with_user(u_appr.id).action_submit_for_approval()
+pending41 = q41.state == "pending_approval"
+# the SELF [Approve] tap (interactive HMAC) -- must NOT be SoD-blocked.
+hmac41 = wa_payload.encode(SECRET, "wa12_approve", q41.id)
+D_appr._wa12_maybe_intercept({
+    "from": APPR_PH, "type": "interactive", "id": "t41",
+    "interactive": {"button_reply": {"id": hmac41}}})
+self_ok = q41.state == "approved" and q41.approved_by_id == u_appr
+# a NON-superuser approver is still SoD-blocked on their own quote.
+_wipe_login("pwa12_appr2")
+u_appr2 = Users.with_context(no_reset_password=True).create({
+    "name": "PWA12 Approver2", "login": "pwa12_appr2", "password": "test123",
+    "groups_id": [(4, env.ref("base.group_user").id), (4, g_sales.id),
+                  (4, env.ref("neon_finance.group_neon_finance_approver").id)]})
+u_appr2.partner_id.write({"email": "pwa12_appr2@neon.test"})  # message_post
+
+q41b = Q._wa12_provision_chain(client, "2026-09-22", USD, u_appr2)
+M.sudo()._wa12_build_lines(q41b, [{"product_id": prod_ok.id, "qty": 1}], 1)
+q41b.action_recalculate_pricing()
+M.sudo()._wa12_ensure_payment_term(q41b, client)
+q41b.with_user(u_appr2.id).action_submit_for_approval()
+try:
+    q41b.with_user(u_appr2.id).action_approve()
+    sod_holds = False
+except Exception:
+    sod_holds = True
+_check("T-WA12-41",
+       pending41 and self_ok and sod_holds,
+       "approver-as-requester: pending=%s SELF-approve(superuser-tier)=%s "
+       "SoD still blocks a plain approver=%s" % (pending41, self_ok, sod_holds))
+u_appr2.write({"active": False})
+
+# ---- T-WA12-42 (self-review) a 'STOP' mid-session is RELEASED (returns None,
+# session intact) so the WA-2 opt-out handler gets it — never swallowed as a
+# cancel word ("stop" is in the cancel set; the release must win).
+_clear_sess(SALES_PH)
+q42 = Q._wa12_provision_chain(client, "2026-09-24", USD, u_sales)
+M.sudo()._wa12_build_lines(q42, [{"product_id": prod_ok.id, "qty": 1}], 1)
+q42.action_recalculate_pricing()
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_confirm", {"quote_id": q42.id})
+r42 = D_sales._wa12_maybe_intercept(_txt(SALES_PH, "STOP"))
+s42 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+_check("T-WA12-42",
+       r42 is None and bool(s42) and s42.step == "q_confirm"
+       and q42.state == "draft",
+       "STOP released (None), session intact (%s), quote NOT cancelled (%s)"
+       % (s42.step if s42 else "-", q42.state))
+_clear_sess(SALES_PH)
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(
@@ -840,10 +1060,14 @@ _check("T-WA12-10",
 # ---------------------------------------------------------- teardown fixtures
 print("--- teardown ---")
 # delete [TEST-WA12] quotes' chains + the quotes + products + partners + users
-# gather the test chains via the quotes (salesperson is a direct field) + the
-# normally-created control job; cancel their ACT, then delete quotes -> jobs.
+# gather the test chains via the quotes (salesperson is a direct field; T41's
+# approver-as-requester quotes belong to u_appr/u_appr2) + by [TEST-WA12]
+# partner + the normally-created control job; cancel ACT, then quotes -> jobs.
+_tcli0 = P.with_context(active_test=False).search(
+    [("name", "like", "[TEST-WA12]")])
 tquotes = Q.with_context(active_test=False).search(
-    [("salesperson_id", "=", u_sales.id)])
+    ["|", ("salesperson_id", "in", (u_sales.id, u_appr.id, u_appr2.id)),
+     ("partner_id", "in", _tcli0.ids)])
 tjobs = (tquotes.mapped("event_job_id") | ctrl_ej).exists()
 tcjobs = (tjobs.mapped("commercial_job_id") | ctrl_cj).exists()
 mdl = env["ir.model"].sudo().search([("model", "=", "commercial.event.job")], limit=1)

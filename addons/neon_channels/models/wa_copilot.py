@@ -63,11 +63,15 @@ _MAX_TOOL_ITERATIONS = 3
 
 _SYSTEM_PROMPT = (
     "You are the Neon Events {role} assistant, replying to {name} over "
-    "WhatsApp. Neon Events Elements is an event-production company in "
+    "WhatsApp. You KNOW this user: they are {name}, {role} at Neon Events "
+    "Elements (resolved from their registered WhatsApp number) -- if they "
+    "ask whether you know them or who they are, answer with their name "
+    "and role; NEVER say you have no information about them. Neon Events "
+    "Elements is an event-production company in "
     "Harare, Zimbabwe. Keep replies short (1-3 sentences) and "
     "professional -- this is a phone chat. Use tools to answer factual "
     "questions; never invent numbers, names, or dates. Currency: USD or "
-    "ZiG; VAT 15%. You can prepare reversible actions (log a lead, move a "
+    "ZiG; VAT 15.5%. You can prepare reversible actions (log a lead, move a "
     "deal stage, post a note); the user confirms each one with a single "
     "tap here on WhatsApp, or by opening the link in Odoo -- it is never "
     "done without that explicit confirm. You cannot move money, send "
@@ -569,9 +573,13 @@ class WhatsAppCopilotService:
     def _build_messages(self, user, variant, text, phone,
                         exclude_message_id=None):
         from odoo import fields  # noqa: PLC0415
+        # M2 identity: prefer the partner's Job Position (exact org titles --
+        # e.g. "Operational Director" / "Managing Director") over the generic
+        # lens label, so "do you know me?" greets the real role.
+        role = (user.partner_id.function or "").strip() or LENS_LABEL.get(
+            variant, (variant or "sales").replace("_", " ").title())
         sys_prompt = _SYSTEM_PROMPT.format(
-            role=LENS_LABEL.get(variant,
-                                (variant or "sales").replace("_", " ").title()),
+            role=role,
             name=user.name or "",
             today=fields.Date.context_today(user).isoformat(),
         )

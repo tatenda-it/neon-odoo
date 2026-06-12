@@ -77,9 +77,18 @@ _WA12_SUBMIT_WORDS = ("yes", "submit", "y", "ok", "submit for approval",
 _WA12_CAPTURE_STEPS = ("qc_pick", "qc_kind", "qc_name", "qc_dupe",
                        "qc_contact", "qc_phone", "qc_email")
 
+# WA-12.2 conversational steps: q_items (confirm matched items BEFORE any
+# draft exists -- M1 binding), q_client / q_itemreq (bare "I want a quote"
+# slot-filling -- M5).
+_WA12_CONVO_STEPS = ("q_items", "q_client", "q_itemreq")
+
 # Quote session steps live on the shared equip-session. WA-12 claims q_confirm /
-# q_reject + the new-client capture steps.
-_WA12_STEPS = ("q_confirm", "q_reject") + _WA12_CAPTURE_STEPS
+# q_reject + the new-client capture steps + the conversational steps.
+_WA12_STEPS = ("q_confirm", "q_reject") + _WA12_CAPTURE_STEPS + _WA12_CONVO_STEPS
+
+# Complaint/correction language (M4): a repair prompt, never the syntax menu.
+_WA12_COMPLAINT_TOKENS = ("wrong", "incorrect", "mistake", "not what i",
+                          "that is not", "that's not", "fix this")
 
 # Fresh advisory-lock namespace (NOT 5593500/600/700/800) -- first-tap-wins on
 # the approver pair so only ONE of uids 7/21 wins a concurrent Approve/Reject.
@@ -203,6 +212,17 @@ class WhatsAppMessageWA12(models.Model):
         from_e164 = to_e164(raw_from)
         if not from_e164:
             return None
+
+        # 0) RELEASE the WA-2 opt-out keywords BEFORE any session claim so they
+        #    fall through to super() -> _wa_maybe_opt_out_keyword (mirrors
+        #    WA-6/7/8/10/13). Without this a 'STOP' typed mid-q_confirm matches
+        #    the cancel words -> "Quote cancelled." and the opt-out NEVER
+        #    registers (review: the WA13-1 bug class).
+        if message.get("type") == "text":
+            _kw = ((message.get("text") or {}).get("body") or "").strip().upper()
+            if _kw in {"STOP", "START", "UNSUBSCRIBE", "STOPALL", "UNSTOP",
+                       "RESUME"}:
+                return None
 
         # 1) TAP (dual-payload). Template-QR -> type 'button' + button.payload
         #    /.text (plain "Approve"/...); interactive -> button_reply.id (HMAC).
@@ -386,12 +406,16 @@ class WhatsAppMessageWA12(models.Model):
         return P.browse(), hits
 
     def _wa12_start_client_intake(self, sender, client_txt, candidates, matched,
-                                  date_txt, days, from_e164, raw_from):
+                                  date_txt, days, from_e164, raw_from,
+                                  prefills=None):
         """Open the qc_pick session: list any existing matches + offer *new*.
-        Buffers the matched items + date so the quote resumes without re-entry."""
+        Buffers the matched items + date so the quote resumes without re-entry.
+        ``prefills`` (M3): phone/email/contact already present in the rep's
+        brief — pre-fill the capture so only MISSING slots get asked."""
         buf = {"matched": matched, "date_txt": date_txt or "",
                "days": days or 1, "client_txt": client_txt,
-               "candidate_ids": candidates.ids[:8]}
+               "candidate_ids": candidates.ids[:8],
+               "prefills": prefills or {}}
         self.env["neon.wa.equip.session"]._start_quote(
             from_e164, sender, "qc_pick", buf)
         if candidates:
@@ -431,20 +455,51 @@ class WhatsAppMessageWA12(models.Model):
 
         def resume(partner):
             sess.sudo().write({"step": "done", "active": False})
+            if not buf.get("matched"):
+                # M5 bare-intent path: the client is set but no items were
+                # captured yet -> ask for them (same lane, no re-entry).
+                self.env["neon.wa.equip.session"]._start_quote(
+                    from_e164, sender, "q_itemreq",
+                    {"client_txt": partner.name, "partner_id": partner.id,
+                     "date_txt": buf.get("date_txt") or "",
+                     "prefills": buf.get("prefills") or {}})
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "%s — what items? (e.g. `2x RGB LED CAN, smoke machine`)")
+                    % partner.name)
             return self._wa12_quote_from_slots(
                 sender, partner, buf.get("matched") or [],
                 buf.get("date_txt") or "", buf.get("days") or 1,
                 from_e164, raw_from)
 
-        def ask_after_name():
+        def ask_after_name(ack=""):
+            """Advance to the next MISSING slot (M3: brief-sourced phone/
+            email/contact pre-fill -- only missing slots get asked)."""
             nm = buf.get("name") or _("the client")
-            if buf.get("kind") == "company":
-                save("qc_contact")
-                return self._wa6_reply(raw_from, from_e164,
-                                       _("Contact person at %s?") % nm)
-            save("qc_phone")
-            return self._wa6_reply(raw_from, from_e164,
-                                   _("Phone number for %s?") % nm)
+            pf = buf.get("prefills") or {}
+            if (buf.get("kind") == "company" and not buf.get("contact")):
+                if pf.get("contact"):
+                    buf["contact"] = pf["contact"]
+                else:
+                    save("qc_contact")
+                    return self._wa6_reply(raw_from, from_e164, ack
+                                           + _("Contact person at %s?") % nm)
+            if not buf.get("phone"):
+                if pf.get("phone"):
+                    buf["phone"] = pf["phone"]
+                    buf["phone_e164"] = to_e164(pf["phone"]) or ""
+                else:
+                    save("qc_phone")
+                    sess._set_buffer(buf)
+                    return self._wa6_reply(raw_from, from_e164, ack
+                                           + _("Phone number for %s?") % nm)
+            if pf.get("email"):
+                sess._set_buffer(buf)
+                partner = self._wa12_create_client(
+                    sender.id, buf, pf["email"])
+                return resume(partner)
+            save("qc_email")
+            return self._wa6_reply(raw_from, from_e164, ack + _(
+                "Email? (needed to send quotes — or reply *skip*)"))
 
         if step == "qc_pick":
             ids = buf.get("candidate_ids") or []
@@ -520,14 +575,15 @@ class WhatsAppMessageWA12(models.Model):
                 "new one."))
 
         if step == "qc_contact":
-            save("qc_phone", contact=raw)
-            return self._wa6_reply(raw_from, from_e164, _(
-                "Phone number for %s?") % (buf.get("name") or _("the client")))
+            buf["contact"] = raw
+            sess._set_buffer(buf)
+            return ask_after_name()
 
         if step == "qc_phone":
-            save("qc_email", phone=raw, phone_e164=to_e164(raw) or "")
-            return self._wa6_reply(raw_from, from_e164, _(
-                "Email? (needed to send quotes — or reply *skip*)"))
+            buf["phone"], buf["phone_e164"] = raw, to_e164(raw) or ""
+            sess._set_buffer(buf)
+            # acknowledge the correction/entry (M3), then the next missing slot.
+            return ask_after_name(ack=_("Got it — %s. ") % raw)
 
         if step == "qc_email":
             email = "" if norm in ("skip", "none", "no", "-", "n") else raw
@@ -555,6 +611,149 @@ class WhatsAppMessageWA12(models.Model):
                       "type": "contact", "phone": ph or False,
                       "email": email or False})
         return partner
+
+    def _wa12_repair_prompt(self, raw_from, from_e164):
+        """M4: complaint/correction language gets a REPAIR prompt, never the
+        syntax menu."""
+        return self._wa6_reply(raw_from, from_e164, _(
+            "What should I fix — the items, the client, or the date? "
+            "e.g. `remove <item>` · `qty <item> 2` · a new date · "
+            "`client <name>`."))
+
+    def _wa12_handle_convo(self, sess, body, from_e164, raw_from):
+        """WA-12.2 conversational steps. q_items = the M1 confirm-before-draft
+        gate (NO quote exists until yes); q_client / q_itemreq = bare-intent
+        slot fill (M5). Deterministic corrections first; complaint language ->
+        the repair prompt (M4)."""
+        import re
+        sender = sess.user_id
+        if not (sender and sender.active and self._wa12_can_quote(sender)):
+            sess.sudo().write({"active": False})
+            return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
+        raw = (body or "").strip()
+        norm = " ".join(raw.lower().split())
+        buf = sess._get_buffer()
+        buf = buf if isinstance(buf, dict) else {}
+
+        if norm in _WA12_CANCEL_WORDS:
+            sess.sudo().write({"step": "done", "active": False})
+            return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
+
+        if sess.step == "q_client":
+            partner, candidates = self._wa12_client_candidates(raw)
+            if partner:
+                buf.update({"client_txt": partner.name,
+                            "partner_id": partner.id})
+                sess.sudo().write({"step": "q_itemreq"})
+                sess._set_buffer(buf)
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "%s — what items? (e.g. `2x RGB LED CAN, smoke machine`)")
+                    % partner.name)
+            return self._wa12_start_client_intake(
+                sender, raw, candidates, buf.get("matched") or [],
+                buf.get("date_txt") or "", buf.get("days") or 1,
+                from_e164, raw_from, prefills=buf.get("prefills") or {})
+
+        if sess.step == "q_itemreq":
+            hits = self._wa6_match_items(raw)
+            matched = [{"product_id": h["product_id"],
+                        "product_name": h["product_name"],
+                        "qty": max(1, int(h.get("qty") or 1)),
+                        "stated_price": None}
+                       for h in hits if h.get("status") == "matched"]
+            unmatched = [{"name": h.get("raw") or "",
+                          "suggestions": h.get("suggestions") or []}
+                         for h in hits if h.get("status") != "matched"]
+            if not matched:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "I couldn't match those in the catalogue — try item names "
+                    "like on the rate card (e.g. `RGB LED CAN x5`)."))
+            return self._wa12_open_items_confirm(
+                sender, buf.get("client_txt") or "", matched, unmatched,
+                buf.get("date_txt") or "", buf.get("prefills") or {},
+                from_e164, raw_from, partner_id=buf.get("partner_id") or False)
+
+        # ---- q_items: the confirm-before-draft gate (M1). ----
+        matched = buf.get("matched") or []
+
+        def reshow():
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164,
+                                   self._wa12_items_confirm_text(buf))
+
+        if norm in _WA12_SUBMIT_WORDS:
+            if not matched:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Nothing matched to draft yet — re-type the items, or "
+                    "*cancel*."))
+            sess.sudo().write({"step": "done", "active": False})
+            partner = self.env["res.partner"].sudo().browse(
+                buf.get("partner_id") or 0).exists()
+            if not partner:
+                partner, candidates = self._wa12_client_candidates(
+                    buf.get("client_txt") or "")
+            if not partner:
+                return self._wa12_start_client_intake(
+                    sender, buf.get("client_txt") or "", candidates, matched,
+                    buf.get("date_txt") or "", buf.get("days") or 1,
+                    from_e164, raw_from, prefills=buf.get("prefills") or {})
+            return self._wa12_quote_from_slots(
+                sender, partner, matched, buf.get("date_txt") or "",
+                buf.get("days") or 1, from_e164, raw_from)
+
+        # complaint -> repair (M4), before any command parsing.
+        if any(t in norm for t in _WA12_COMPLAINT_TOKENS):
+            return self._wa12_repair_prompt(raw_from, from_e164)
+
+        m = re.match(r"client\s+(.+)$", raw, re.I)
+        if m:
+            name = m.group(1).strip()
+            partner, _cand = self._wa12_client_candidates(name)
+            buf["client_txt"] = partner.name if partner else name
+            buf["partner_id"] = partner.id if partner else False
+            return reshow()
+
+        m = re.match(r"remove\s+(.+)$", raw, re.I)
+        if m:
+            tok = m.group(1).strip().lower()
+            keep = [it for it in matched
+                    if tok not in (it.get("product_name") or "").lower()]
+            if len(keep) == len(matched):
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "No line matches \"%s\".") % m.group(1).strip())
+            buf["matched"] = keep
+            return reshow()
+
+        m = re.match(r"qty\s+(.+?)\s+(\d+)\s*$", raw, re.I)
+        if m:
+            tok, n = m.group(1).strip().lower(), max(1, int(m.group(2)))
+            hit = [it for it in matched
+                   if tok in (it.get("product_name") or "").lower()]
+            if not hit:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "No line matches \"%s\".") % m.group(1).strip())
+            hit[0]["qty"] = n
+            return reshow()
+
+        ev_date, ph = self._wa12_resolve_date(raw)
+        if not ph:
+            buf["date_txt"] = ev_date.isoformat()
+            return reshow()
+
+        # re-typed item(s) -> match + ADD to the list.
+        hits = self._wa6_match_items(raw)
+        adds = [{"product_id": h["product_id"],
+                 "product_name": h["product_name"],
+                 "qty": max(1, int(h.get("qty") or 1)), "stated_price": None}
+                for h in hits if h.get("status") == "matched"]
+        if adds:
+            known = {it["product_id"] for it in matched}
+            buf["matched"] = matched + [a for a in adds
+                                        if a["product_id"] not in known]
+            return reshow()
+        return self._wa6_reply(raw_from, from_e164, _(
+            "Reply *yes* to draft, *cancel*, or correct me — `remove <item>` "
+            "· `qty <item> 2` · a date · `client <name>` · re-type an item."))
 
     # ================================================================
     # WA-12.2 conversational lane — the LLM is a TRANSLATOR at the door:
@@ -612,20 +811,30 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_llm_extract_quote(self, text):
         """Translate a free-text quote request into slots. Returns
-        {client, items:[{name,qty}], date} when intent=quote, else None (not a
-        quote / degraded)."""
+        {client, items:[{name,qty,stated_price}], date, phone, email,
+        contact_person} when intent=quote (client/items may be empty for a
+        BARE intent -- M5), else None (not a quote / degraded). Multi-item
+        briefs (client + phone + several equipment lines) are the NORMAL rep
+        format -- every item must come back in the list (M1)."""
         today = fields.Date.context_today(self).isoformat()
         sys = (
             "You convert a sales rep's WhatsApp message into a QUOTE request "
             "for an events-hire company. Respond with ONLY a JSON object, no "
             "prose. Schema: {\"intent\": \"quote\"|\"other\", \"client\": "
-            "string, \"items\": [{\"name\": string, \"qty\": integer}], "
-            "\"date\": string|null}. Set intent='quote' ONLY if the message is "
-            "clearly asking to price/quote equipment for a named client; else "
-            "'other'. Resolve relative dates (e.g. 'next Friday', 'month end') "
+            "string|null, \"items\": [{\"name\": string, \"qty\": integer, "
+            "\"stated_price\": number|null}], \"date\": string|null, "
+            "\"phone\": string|null, \"email\": string|null, "
+            "\"contact_person\": string|null}. Set intent='quote' if the "
+            "message asks to price/quote/hire equipment OR expresses the wish "
+            "to make a quote (then client/items may be empty -- do NOT invent "
+            "them). Extract EVERY equipment line in a multi-line brief as its "
+            "own item (briefs list client details then several items). A price "
+            "the rep states for an item goes in stated_price (it is a hint, "
+            "not the rate). phone/email/contact_person: only if present in the "
+            "message. Resolve relative dates (e.g. 'next Friday', 'month end') "
             "to an absolute YYYY-MM-DD in Africa/Harare given today is " + today
             + "; if no date or you are unsure, set date null. NEVER invent a "
-            "client or items not in the message. Output JSON only.")
+            "client, items, phone or email not in the message. JSON only.")
         raw = self._wa12_llm_chat([{"role": "system", "content": sys},
                                    {"role": "user", "content": text or ""}])
         data = self._wa12_llm_json(raw)
@@ -647,7 +856,9 @@ class WhatsAppMessageWA12(models.Model):
             "custom <description> at <amount>', 'remove <item>', 'no tax', "
             "'with tax', 'client <name>', 'terms <text>', a date "
             "(YYYY-MM-DD), 'yes' (submit), or 'cancel'. Current line items: "
-            + lines + ". If the message doesn't clearly map to one command, "
+            + lines + ". If the message is a COMPLAINT or says something is "
+            "wrong without naming one specific change, output exactly REPAIR. "
+            "If the message doesn't clearly map to one command, "
             "output exactly UNKNOWN.")
         raw = self._wa12_llm_chat([{"role": "system", "content": sys},
                                    {"role": "user", "content": text or ""}])
@@ -687,34 +898,115 @@ class WhatsAppMessageWA12(models.Model):
     def _wa12_llm_quote_fallback(self, sender, body, from_e164, raw_from,
                                  message):
         """The conversational quote-INITIATION fallback (hook A). Extract slots
-        -> deterministic match + resolve/intake + provision. Returns a reply, or
-        None to fall through (not a quote / LLM down / no catalogue match)."""
+        -> match -> CONFIRM-BEFORE-DRAFT (M1 binding: ONE confirmation message
+        listing every matched line with the ENGINE rate + qty; NO provision
+        until the rep says yes). Bare intent (no client/items) -> the guided
+        q_client lane (M5). Returns a reply, or None to fall through (not a
+        quote / LLM down)."""
         data = self._wa12_llm_extract_quote(body)
         if not data:
             return None
         client = (data.get("client") or "").strip()
-        items = data.get("items") or []
-        if not client or not items:
-            return None
-        self._wa6_audit_in(from_e164, message, "wa12-quote-ai")
-        items_txt = ", ".join(
-            "%dx %s" % (int(it.get("qty") or 1), it.get("name") or "")
-            for it in items if it.get("name"))
-        matched = [it for it in self._wa6_match_items(items_txt)
-                   if it.get("status") == "matched"]
-        if not matched:
-            return self._wa6_reply(raw_from, from_e164, _(
-                "I think you want a quote for %s, but I couldn't match those "
-                "items in the catalogue. Try:  Quote: %s — <items>, <date>")
-                % (client, client))
+        items = [it for it in (data.get("items") or []) if it.get("name")]
+        prefills = {"phone": (data.get("phone") or "").strip(),
+                    "email": (data.get("email") or "").strip(),
+                    "contact": (data.get("contact_person") or "").strip()}
         date_txt = data.get("date") or ""
-        partner, candidates = self._wa12_client_candidates(client)
-        if not partner:
-            return self._wa12_start_client_intake(
-                sender, client, candidates, matched, date_txt, 1,
-                from_e164, raw_from)
-        return self._wa12_quote_from_slots(
-            sender, partner, matched, date_txt, 1, from_e164, raw_from)
+        self._wa6_audit_in(from_e164, message, "wa12-quote-ai")
+        # M5 -- bare intent: enter the quote lane, never the generic Copilot.
+        if not client and not items:
+            self.env["neon.wa.equip.session"]._start_quote(
+                from_e164, sender, "q_client",
+                {"date_txt": date_txt, "prefills": prefills})
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Sure — which client is this quote for?"))
+        if not items:
+            # client known, items missing -> ask for the list (same lane).
+            self.env["neon.wa.equip.session"]._start_quote(
+                from_e164, sender, "q_itemreq",
+                {"client_txt": client, "date_txt": date_txt,
+                 "prefills": prefills})
+            return self._wa6_reply(raw_from, from_e164, _(
+                "A quote for %s — what items? (e.g. `2x RGB LED CAN, smoke "
+                "machine`)") % client)
+        # match EVERY extracted item (stated prices are HINTS, never the rate).
+        matched, unmatched = self._wa12_match_slot_items(items)
+        return self._wa12_open_items_confirm(
+            sender, client, matched, unmatched, date_txt, prefills,
+            from_e164, raw_from)
+
+    @api.model
+    def _wa12_match_slot_items(self, items):
+        """Resolve LLM-extracted items through the EXISTING catalogue matcher,
+        one by one (qty from the slot, not re-parsed). Returns (matched,
+        unmatched) where matched = [{product_id, product_name, qty,
+        stated_price}] and unmatched = [{name, suggestions}]."""
+        matched, unmatched = [], []
+        for it in items:
+            hit = self._wa6_match_one(it.get("name") or "")
+            qty = int(it.get("qty") or hit.get("qty") or 1)
+            if hit.get("status") == "matched":
+                matched.append({
+                    "product_id": hit["product_id"],
+                    "product_name": hit["product_name"], "qty": max(1, qty),
+                    "stated_price": it.get("stated_price")})
+            else:
+                unmatched.append({"name": it.get("name") or "",
+                                  "suggestions": hit.get("suggestions") or []})
+        return matched, unmatched
+
+    def _wa12_open_items_confirm(self, sender, client_txt, matched, unmatched,
+                                 date_txt, prefills, from_e164, raw_from,
+                                 partner_id=False):
+        """Open the q_items session + send the ONE confirmation message (M1).
+        NO quote exists yet -- provision happens only on the rep's yes."""
+        if not matched and not unmatched:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I couldn't read any items from that — what items should I "
+                "quote?"))
+        buf = {"client_txt": client_txt, "partner_id": partner_id,
+               "matched": matched, "unmatched": unmatched,
+               "date_txt": date_txt or "", "days": 1,
+               "prefills": prefills or {}}
+        self.env["neon.wa.equip.session"]._start_quote(
+            from_e164, sender, "q_items", buf)
+        return self._wa6_reply(
+            raw_from, from_e164,
+            self._wa12_items_confirm_text(buf))
+
+    def _wa12_items_confirm_text(self, buf):
+        """The M1 confirmation message: every matched line with the ENGINE
+        rate + qty; unmatched lines listed honestly with suggestions. A
+        rep-stated price that differs from the engine rate is flagged (hint
+        only -- the engine rate is always the drafted rate)."""
+        PT = self.env["product.template"].sudo()
+        rows = []
+        for it in (buf.get("matched") or []):
+            prod = PT.browse(it["product_id"])
+            rate, cur = self._wa12_price_lookup(prod)
+            if rate is None or rate <= _WA12_PLACEHOLDER_RATE:
+                rate_txt = _("no rate set yet")
+            else:
+                rate_txt = "%s %.2f/day" % (cur, rate)
+            note = ""
+            sp = it.get("stated_price")
+            if sp and rate is not None and abs(float(sp) - rate) > 0.005:
+                note = _(" (you said %.2f — the catalogue rate applies)") % sp
+            rows.append("• %s ×%d @ %s%s" % (
+                it["product_name"], it.get("qty") or 1, rate_txt, note))
+        for um in (buf.get("unmatched") or []):
+            sugg = um.get("suggestions") or []
+            rows.append(_("• ⚠️ \"%s\" — no match%s") % (
+                um.get("name"),
+                (_(" (did you mean: %s?)") % " / ".join(sugg[:3]))
+                if sugg else ""))
+        head = _("I matched for *%s*%s:") % (
+            buf.get("client_txt") or _("(client TBC)"),
+            (_(" — %s") % buf["date_txt"]) if buf.get("date_txt") else "")
+        return "%s\n%s\n\n%s" % (head, "\n".join(rows), _(
+            "Reply *yes* to draft the quote, or correct me — e.g. "
+            "`remove <item>` · `qty <item> 2` · a date · `client <name>` · "
+            "re-type an item."))
 
     def _wa12_handle_session(self, sess, message, from_e164, raw_from):
         """A q_confirm / q_reject turn. Re-checks entitlement every turn, with
@@ -747,6 +1039,9 @@ class WhatsAppMessageWA12(models.Model):
         # new-client intake FSM (qc_*).
         if sess.step in _WA12_CAPTURE_STEPS:
             return self._wa12_handle_capture(sess, body, from_e164, raw_from)
+        # WA-12.2 conversational steps (confirm-before-draft / bare intent).
+        if sess.step in _WA12_CONVO_STEPS:
+            return self._wa12_handle_convo(sess, body, from_e164, raw_from)
         buf = sess._get_buffer()
         buf = buf if isinstance(buf, dict) else {}
         quote = self.env["neon.finance.quote"].sudo().browse(
@@ -771,11 +1066,18 @@ class WhatsAppMessageWA12(models.Model):
                 edited = self._wa12_try_edit(quote, body, from_e164, raw_from)
                 if edited is not None:
                     return edited
+                # M4: complaint/correction language -> the repair prompt,
+                # never the syntax menu (deterministic check first -- free).
+                if any(t in norm for t in _WA12_COMPLAINT_TOKENS):
+                    return self._wa12_repair_prompt(raw_from, from_e164)
                 # CONVERSATIONAL EDIT FALLBACK (WA-12.2): the deterministic
                 # parser missed -> translate the free text into ONE edit command
                 # and re-run it through the SAME guarded _wa12_try_edit. The LLM
                 # only TRANSLATES; the command it emits is re-validated here.
+                # 'REPAIR' = the model judged it a complaint -> repair prompt.
                 cmd = self._wa12_llm_translate_edit(body, quote)
+                if cmd and cmd.upper().startswith("REPAIR"):
+                    return self._wa12_repair_prompt(raw_from, from_e164)
                 if cmd:
                     edited = self._wa12_try_edit(
                         quote, cmd, from_e164, raw_from)
@@ -1445,16 +1747,20 @@ class WhatsAppMessageWA12(models.Model):
             cur, quote.amount_total or 0.0, vat)
 
     def _wa12_send_approval_ping(self, quote, requester):
-        """Ping the MD/OD approver audience (uids 7 + 21), skipping the
-        requester, anyone inactive, and anyone who no longer holds the approver
-        group. Cold window -> the Active wa12_quote_approval TEMPLATE (static
-        QR buttons; quote resolved from pending context on tap); in window ->
-        interactive HMAC buttons. Returns the number actually pinged so the
-        caller can surface an empty audience instead of a silent stuck quote."""
+        """Ping the MD/OD approver audience (uids 7 + 21), skipping anyone
+        inactive or no longer holding the approver group. The REQUESTER is NOT
+        skipped (WA-12 addendum, 12 Jun 2026): an MD/OD who submits their own
+        quote receives the ping too -- their own [Approve] tap is valid (the
+        ratified self-approval principle), so the same phone gets both the
+        summary and the ping. Cold window -> the Active wa12_quote_approval
+        TEMPLATE (static QR buttons; quote resolved from pending context on
+        tap); in window -> interactive HMAC buttons. Returns the number
+        actually pinged so the caller can surface an empty audience instead of
+        a silent stuck quote."""
         summary = self._wa12_item_summary(quote)
         total = "%s %.2f" % (quote.currency_id.name, quote.amount_total or 0.0)
         approvers = self.env["res.users"].sudo().browse(
-            [u for u in _WA12_APPROVER_UIDS if u != requester.id])
+            list(_WA12_APPROVER_UIDS))
         sent = 0
         for appr in approvers.exists().filtered(
                 lambda u: u.active and self._wa12_is_approver(u)):
