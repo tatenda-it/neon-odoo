@@ -90,8 +90,8 @@
                  LANDLINE (not Munashe's mobile). street/city populate the header
                  address (previously empty). The external_layout renders these
                  res.company fields directly; nothing is hardcoded in the quote
-                 report. NOTE: address per the agreed template; Robin/admin to
-                 CONFIRM the exact field split before the LIVE deploy. -->
+                 report. Address + landline CONFIRMED by the user 2026-06-12 (per
+                 the approved design: 154 Chapman Avenue, Eastlea, Harare). -->
             <field name="phone">+2638677212181</field>
             <field name="street">154 Chapman Avenue</field>
             <field name="street2">Eastlea</field>

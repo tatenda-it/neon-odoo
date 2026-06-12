@@ -206,3 +206,130 @@ window approval ping can't deliver until it's Active.
    → the bot replies rate + currency + per-day note. **Read-only, WA-8
    entitlement rail, NO approval, NO quote record.** Added to the footprint +
    `pwa12` (incl. a denial test for a non-entitled sender).
+
+---
+
+## §8 — FLEXIBILITY AMENDMENT · Gate-1 ratified 2026-06-12 (build rides the LIVE batch behind Robin's money sign-off; plan adversarially reviewed 2026-06-12, 22 findings folded in)
+
+**Sub-hire ruling:** quotable ≠ warehouse — **no stock check ever gates a quote**
+(confirmed; WA-12 never checks QOH). No code change.
+
+### Ratified decisions
+1. **Discount = PER-UNIT-DAY** (parallel to `unit_rate`, scale-safe under qty/days):
+   `line_subtotal = qty × max(unit_rate − discount_amount, 0) × days`, or
+   `qty × unit_rate × (1 − pct/100) × days`. **`unit_rate` NEVER overwritten** (for
+   equipment lines). Commands: **`price <item> <amt>`** (PRIMARY = new effective
+   unit rate → stores `discount_amount = unit_rate − amt`); **`discount <item>
+   <amt|%>`**. Summary / ping / PDF render **"base → discounted (disc. X)"**.
+2. **Pct vs amount — exclusive per line:** setting one **clears the other**
+   (last-write-wins).
+3. **Custom = a `line_type` value `'custom'`** (not a flag): equipment needs an
+   engine rule (guard intact); custom needs the typed price; rendered **loudly
+   CUSTOM**; auditable.
+4. **`days <n>` = whole-quote**; **`days <item> <n>` = per-line.**
+5. **`client <name>` mid-draft = RE-POINT IN PLACE.** ⚠️ **Write the ROOT writable
+   node `quote.event_job_id.commercial_job_id.partner_id`** — `quote.partner_id`
+   and `event.job.partner_id` are **stored-readonly RELATED** (a direct write is
+   rejected); the stored-related cascade flows partner_id to event.job + quote +
+   the PDF. pwa12 asserts all three reflect it. Rebuild-chain only as a documented
+   fallback.
+
+### Model deltas — `neon.finance.quote.line`
+- `+ discount_pct = Float()` and `+ discount_amount =
+  Monetary(currency_field='currency_id')` (quote.line HAS `currency_id`).
+  **Mutually exclusive** (write/onchange clears the other; last-write-wins).
+  ⚠️ **CHECK** `discount_amount >= 0`, `0 <= discount_pct <= 100`; clamp
+  `discount_amount` to `[0, unit_rate]` so `price <item> <amt>` with `amt > base`
+  is **rejected** ("above base rate"), never a silent negative discount (markup).
+- `+ ('custom', 'Custom')` to `_LINE_TYPES`.
+- `_compute_subtotal` (+ `discount_pct`, `discount_amount` to `@api.depends`):
+  `effective = (unit_rate − discount_amount) if discount_amount else
+  unit_rate × (1 − pct/100)`; `line_subtotal = qty × max(effective, 0) × days`.
+  **Verify the discount also reaches `line_total_taxed`** (the stored field
+  `amount_total` reads) so the approval figure moves.
+- **Engine interaction (verified):** the create()/recalc gate keys on
+  `line_type=='equipment'` (`quote_line.py:300`, `quote.py:748`), so a `'custom'`
+  line skips `_compute_line_pricing` and (typed `unit_rate>0`) lands
+  `pricing_status='manual'` — the explicit labeled rate, as intended. Discounts
+  never touch `unit_rate`.
+
+### `<item>` resolution — a NEW line resolver (review BLOCKER)
+The WA-6 catalogue matcher `_wa6_match_one` matches **product.template
+(is_workshop_item)** and returns a `product_id` — it **cannot** address a quote
+line (esp. a `custom` line with no product) and can't disambiguate two lines
+sharing a category. The edit loop needs **`_wa12_match_line(quote, token)`** scoring
+the token against `quote.line_ids` by `.name` (+ `product_template_id` + a 1-based
+index fallback), covering custom lines; on >1 candidate → **refuse + re-list**.
+Only **`add <item> x<n>`** (a NEW catalogue line) uses `_wa6_match_items` +
+engine-prices it.
+
+### Guard evolution — line_type-aware (review HIGH)
+`_wa12_unpriced_lines` (currently has NO line_type branch) becomes:
+**bad** if `(line_type=='equipment' and pricing_status in
+('not_yet','no_rule','manual'))` **OR** `(unit_rate <= $1 and line_type != 'custom')`.
+A `custom` line (manual, typed `unit_rate > $1`) **passes**; an `equipment` line
+with no rule still **blocks**. The guard reads **base `unit_rate`** (not the
+discounted effective) — a 100% discount is an explicit, approval-visible free item,
+not "unpriced". The lane still **cannot fabricate a hidden manual rate on an
+equipment line** (it builds equipment lines `unit_rate=0` → engine prices).
+⚠️ **`price`/`discount` are REFUSED on a `no_rule`/`not_yet`/placeholder equipment
+line** (honest "no rate set") — valid only on an engine-priced equipment line or a
+custom line (else a typed rate slips past the guard the lane exists to enforce).
+
+### Draft-editing FSM (q_confirm session, pre-submit)
+Each command → mutate → `action_recalculate_pricing` → **guard re-evaluates** →
+re-show summary → await confirm/more edits; "yes"/submit only from the re-shown
+summary; **unrecognised → re-prompt (still claimed)**; bare `cancel`/`no`/`stop`
+still exits (never trap the user). Commands:
+`price <item> <amt>` · `discount <item> <amt|%>` · `qty <item> <n>` · `days <n>` ·
+`days <item> <n>` · `add <item> x<n>` · `add custom <desc> at <price>` ·
+`remove <item>` · `no tax` / `with tax` · `client <name>`.
+- **Custom-line pricing:** on a `custom` line `price <item> <amt>` **overwrites
+  `unit_rate`** (re-type the custom price) and clears `discount_*`; `discount` on a
+  custom line is rejected (the custom rate IS the price). Avoids double-counting.
+- **`remove`** that would empty the quote is **refused** (keep ≥1 line).
+- **`no tax`/`with tax`:** write `tax_id` across `quote.line_ids` via standard
+  write — `tax_id=False` for no-tax, `_default_tax()` (VAT 15.5%) for with-tax.
+
+### Render (review HIGH — the report is NOT already conditional)
+- **VAT row is currently UNCONDITIONAL** (`neon_finance_quote_report.xml:151-157`,
+  no `t-if`) — `no tax` would render "VAT 15.5% 0.00". **Wrap the VAT `<tr>` in
+  `t-if="o.amount_tax"`** AND gate the 15.5% footnote (~:237-239) + the
+  draft-summary "(incl. VAT)" string (emit "(no VAT)" / omit when `amount_tax==0`)
+  + the ping body.
+- **Discount is currently invisible** — `Rate/day` shows base `unit_rate`. Render a
+  discount indicator: `Rate/day` = effective with a struck base + "(disc. X)" (or a
+  dedicated column) so `Qty × shown-rate × Days` reconciles to `Amount`; render
+  **FREE (disc. 100%)** for a full discount.
+- **Custom line:** a **CUSTOM** badge when `line_type=='custom'`.
+- **`_wa12_draft_summary` + the approval ping** ALSO show effective rate +
+  "(disc. X)" + CUSTOM (the approver must see honest line detail, not the base).
+  ⚠️ the cold-window TEMPLATE body var is fixed-shape — if the discount/custom
+  detail can't fit, surface it via the in-window buttons / the PDF (flag at build).
+
+### pwa12 expansions
+- discount math (price/discount → correct `line_subtotal` + `amount_total`,
+  `unit_rate` UNCHANGED, scale-safe under a following qty/days edit); pct↔amount
+  exclusivity; **over-discount/markup rejected or clamped**.
+- custom: `add custom … at <price>` → a `custom` line, priced, **labeled CUSTOM**,
+  passes the guard; an `equipment` no_rule line still **blocks**; `price` on a
+  no_rule equipment line **refused**.
+- edit loop: each command mutates + recalcs + re-shows; submit only from the
+  re-shown summary; **remove-last-line refused**.
+- `days <n>` (all) vs `days <item> <n>` (one).
+- `client <name>`: re-point writes `commercial.job.partner_id` and the stored
+  related reaches **event.job.partner_id + quote.partner_id + the rendered PDF**.
+- tax toggle: `no tax` → **no VAT row in the rendered PDF** + `amount_tax=0` +
+  summary not "(incl. VAT)"; `with tax` → restored to the 15.5% figure.
+
+### Footprint
+- `neon_finance/models/neon_finance_quote_line.py` (2 fields + CHECK/clamp +
+  `'custom'` + `_compute_subtotal` + exclusivity) — minor bump.
+- `neon_crew_comms/models/whatsapp_message_wa12.py` (`_wa12_match_line` + edit-loop
+  commands + `add custom`/`client` handlers + evolved guard + discount/custom
+  render in summary/ping) — minor bump.
+- `neon_finance/report/neon_finance_quote_report.xml` (conditional VAT row +
+  footnote + the discount indicator + CUSTOM badge — **MINOR**, real conditional
+  logic, not a patch) — minor bump.
+- ⛔ **Money-adjacent.** Robin's money sign-off covers **WA-12 pricing + flexibility
+  + WA-13 in one sitting** → the LIVE batch then builds + deploys **as one**.
