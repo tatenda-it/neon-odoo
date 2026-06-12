@@ -188,7 +188,13 @@
     # silent half-applied turn); the same interactive-tap short-circuit in the
     # q_* session. (Latent multi-bracket discount-drift documented ⚠️ DECISION;
     # unreachable under binding-b flat product rules.) pwa12 27/27, pwa13 15/15.
-    "version": "17.0.1.10.1",
+    # 17.0.1.10.2 = WA-12 requester DRAFT preview: a `preview` (alias `pdf`)
+    # edit-loop command, available throughout the q_confirm draft session, renders
+    # the CURRENT draft via the existing DRAFT-stamped report -> send_document to
+    # the REQUESTER. Pure preview -- no state change, no approval interaction,
+    # repeatable after any edit. Reuses _wa12_send_pdf (existing report; no
+    # neon_finance change). pwa12 28/28.
+    "version": "17.0.1.10.2",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

@@ -595,6 +595,27 @@ _check("T-WA12-24",
        "stale WA-13 Cancel tap re-prompted; quote stays draft (state=%s, "
        "sess=%s)" % (t24q.state, _s24.step if _s24 else "-"))
 
+# ---- T-WA12-25 (preview) a mid-session `preview` renders the CURRENT draft
+# (DRAFT-stamped) to the REQUESTER, NO state change, and edits after preview
+# still apply.
+pvq = Q._wa12_provision_chain(client, "2026-12-05", USD, u_sales)
+M.sudo()._wa12_build_lines(pvq, [{"product_id": prod_ok.id, "qty": 1}], 1)
+pvq.action_recalculate_pricing()
+_sp = M.search([], order="id desc", limit=1).id
+M.sudo()._wa12_try_edit(pvq, "preview", SALES_PH, SALES_PH)
+_pv_out = M.search([("id", ">", _sp), ("phone_number", "=", SALES_PH),
+                    ("direction", "=", "outbound")])
+_pv_doc = bool(_pv_out.filtered(lambda m: m.message_type == "document"))
+_state_after = pvq.state
+# an edit AFTER preview still applies (no_tax -> amount_tax 0); also proves the
+# session/draft survived the preview unchanged.
+M.sudo()._wa12_try_edit(pvq, "no tax", SALES_PH, SALES_PH)
+_check("T-WA12-25",
+       _pv_doc and _state_after == "draft" and (pvq.amount_tax or 0.0) == 0.0,
+       "preview -> DRAFT doc to requester (%s), state unchanged (%s), "
+       "post-preview edit applies (tax=%s)"
+       % (_pv_doc, _state_after, pvq.amount_tax))
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(

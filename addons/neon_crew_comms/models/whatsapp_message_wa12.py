@@ -374,8 +374,8 @@ class WhatsAppMessageWA12(models.Model):
                 if edited is not None:
                     return edited
             return self._wa6_reply(raw_from, from_e164, _(
-                "Reply *yes* to submit, *cancel*, or edit — e.g. "
-                "`price <item> <amt>` · `discount <item> 10%` · "
+                "Reply *yes* to submit, *cancel*, *preview* (draft PDF), or "
+                "edit — e.g. `price <item> <amt>` · `discount <item> 10%` · "
                 "`qty <item> 2` · `days 3` · `add <item> x2` · "
                 "`add custom <desc> at <amt>` · `remove <item>` · "
                 "`no tax` / `with tax` · `client <name>`."))
@@ -458,6 +458,13 @@ class WhatsAppMessageWA12(models.Model):
             return line.line_type != "custom" and (
                 line.pricing_status in ("not_yet", "no_rule")
                 or (line.unit_rate or 0.0) <= _WA12_PLACEHOLDER_RATE)
+
+        # PREVIEW: render the CURRENT draft (DRAFT-stamped report) to the
+        # REQUESTER. Pure preview -- no state change, no approval interaction,
+        # repeatable after any edit. The DRAFT QUOTE banner is the not-final
+        # marker; the QUO- number is the working reference.
+        if low in ("preview", "pdf"):
+            return self._wa12_send_pdf(quote, raw_from, from_e164, draft=True)
 
         if low in ("no tax", "notax", "no-tax"):
             quote.line_ids.with_user(actor).sudo().write({"tax_id": False})
