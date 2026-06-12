@@ -168,6 +168,16 @@ prod_ph = PT.create({
     "name": "[TEST-WA12] Placeholder Gizmo", "is_workshop_item": True,
     "list_price": 1.0,
     "equipment_category_id": tcat_norule.id})
+# WA-12.1: a PRODUCT-scoped rule ($77) on a product that ALSO sits in tcat (the
+# $50 category rule) with list_price 999 -> must price $77 (product rule wins).
+prod_pr = PT.create({
+    "name": "[TEST-WA12] Prodruled", "is_workshop_item": True,
+    "list_price": 999.0, "equipment_category_id": tcat.id})
+prule = Rule.create({
+    "name": "[TEST-WA12] ProdRule", "product_template_id": prod_pr.id,
+    "currency_id": USD.id, "base_rate": 77.0, "effective_date": "2020-01-01"})
+Bracket.create({"rule_id": prule.id, "sequence": 1, "day_from": 1,
+                "day_to": -1, "multiplier": 1.0})
 # a partner-scoped payment term so _wa12_ensure_payment_term resolves (the
 # prod DB carries terms; the test DB starts with none).
 PTerm = env["neon.finance.payment.term"].sudo()
@@ -507,6 +517,38 @@ _check("T-WA12-20",
        "no-email client: send refused (reply has 'no email'), state=%s (NOT sent)"
        % neq.state)
 
+# ---- T-WA12-21 (WA-12.1) PRODUCT-rule resolution + flat day math: prod_pr has a
+# $77 product rule, sits in tcat ($50 cat rule), list_price 999 -> prices $77.
+prq = Q._wa12_provision_chain(client, "2026-09-20", USD, u_sales)
+M.sudo()._wa12_build_lines(prq, [{"product_id": prod_pr.id, "qty": 2}], 3)
+prq.action_recalculate_pricing()
+prl = prq.line_ids[0]
+_check("T-WA12-21",
+       prl.pricing_status == "priced" and abs(prl.unit_rate - 77.0) < 0.01
+       and abs(prl.line_subtotal - 462.0) < 0.01,
+       "product rule wins: status=%s rate=%s subtotal=%s (want priced/77/462 "
+       "= 77×2×3 flat; not $50 cat, not $999 list)" % (
+           prl.pricing_status, prl.unit_rate, prl.line_subtotal))
+
+# ---- T-WA12-22 (flex) edit loop on a draft: discount, custom line, no-tax.
+fq = Q._wa12_provision_chain(client, "2026-09-21", USD, u_sales)
+M.sudo()._wa12_build_lines(fq, [{"product_id": prod_ok.id, "qty": 1}], 1)
+fq.action_recalculate_pricing()  # prod_ok -> $50 via tcat
+M.sudo()._wa12_try_edit(fq, "discount qwertyunit 20%", SALES_PH, SALES_PH)
+fl = fq.line_ids.filtered(lambda l: l.product_template_id == prod_ok)[:1]
+disc_ok = abs(fl.unit_rate - 50.0) < 0.01 and abs(fl.line_subtotal - 40.0) < 0.01
+M.sudo()._wa12_try_edit(fq, "add custom Rigging at 120", SALES_PH, SALES_PH)
+custom = fq.line_ids.filtered(lambda l: l.line_type == "custom")[:1]
+custom_ok = bool(custom) and abs(custom.unit_rate - 120.0) < 0.01
+# custom line passes the guard; equipment lines are priced -> not unpriced
+guard_ok = not M.sudo()._wa12_unpriced_lines(fq)
+M.sudo()._wa12_try_edit(fq, "no tax", SALES_PH, SALES_PH)
+notax_ok = (fq.amount_tax or 0.0) == 0.0
+_check("T-WA12-22",
+       disc_ok and custom_ok and guard_ok and notax_ok,
+       "flex edit loop: disc(50→40)=%s custom@120=%s guard-pass=%s no-tax=%s"
+       % (disc_ok, custom_ok, guard_ok, notax_ok))
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(
@@ -554,13 +596,14 @@ _moves.filtered(lambda m: m.state != "draft").button_cancel()
 _moves.with_context(force_delete=True).unlink()
 tquotes.unlink()
 tjobs.unlink(); tcjobs.unlink()
-(prod_ok | prod_ph).unlink()
-# [TEST-WA12] pricing fixtures: rule (+ brackets) then categories, AFTER the
-# products that reference the categories.
+# [TEST-WA12] pricing rules (+ brackets) FIRST: a PRODUCT rule references its
+# product (ondelete restrict) so it must drop before the product; the category
+# rule references its category so rules precede categories too.
 _trules = Rule.with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")])
 _trules.mapped("bracket_ids").unlink()
 _trules.unlink()
+(prod_ok | prod_ph | prod_pr).unlink()
 ECat.with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")]).unlink()
 # payment terms: by NAME (our fixture) AND by PARTNER (_wa12_ensure_payment_term
