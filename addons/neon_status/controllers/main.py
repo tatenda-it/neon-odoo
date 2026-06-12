@@ -195,6 +195,20 @@ WA_MODULES = [
              "separate addon so the dashboard's variants are untouched). The "
              "AI \"how are clients feeling lately\" digest is the follow-on "
              "(WA-11.1)."},
+    {"key": "WA-12", "title": "Quote-by-WhatsApp", "pct": 100,
+     "state": "verifying",
+     "body": "MACHINERY PHONE-PROVEN on prod (12 Jun, Robin first-tap-wins). "
+             "A sales rep texts \"Quote: client - items, date\" -> a draft on "
+             "a provisional booking chain, ENGINE-priced (rule x bracket x "
+             "day-multiplier, never list_price), an MD/OD approval ping (cold "
+             "template), [View PDF] (DRAFT-stamped), [Approve] first-tap-wins "
+             "with honest authorship, then the final agreed-design PDF back to "
+             "the rep. Full adversarial review + the real-phone proof passed, "
+             "torn down to baseline. NOT yet LIVE -- gated behind the ticked "
+             "pricing worksheet + the catalogue load, Robin's money sign-off, "
+             "and the LIVE-batch deploy (pricing leg + catalogue + neon_finance "
+             "17.0.7.10.2 / neon_crew_comms 17.0.1.8.2 = the send-leg email "
+             "guard + the agreed-design quote PDF)."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
@@ -210,7 +224,8 @@ TRACK_MILESTONES = [
                      "data-load mappings (Zoho / FamCal / Workshop) "
                      "documented + R3 governance gates signed 11 Jun; "
                      "awaiting Robin's walkthrough to schedule. Build "
-                     "lane: R3 + polish → WA-12 (pricing-gated) → WA-11.1 "
+                     "lane: WA-12 machinery phone-proven (LIVE-gated) → "
+                     "WA-13 retrieval + invoice-from-quote → WA-11.1 "
                      "digest → Copilot M12.2 / M12.3-A LAST (no hurry).",
     },
     {

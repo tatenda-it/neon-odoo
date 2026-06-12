@@ -106,7 +106,12 @@
     # "WA-9 in final verification" caveat -> "B11 is COMPLETE, every WhatsApp
     # module phone-proven (WA-0 through WA-11)". Text/constants only; scores
     # unchanged (WA-9 already milestone-counted).
-    "version": "17.0.1.0.18",
+    # 17.0.1.0.19 = WA-12 card added (Quote-by-WhatsApp): MACHINERY PHONE-PROVEN
+    # 12 Jun (Robin first-tap), state=verifying since LIVE is gated (pricing
+    # worksheet + catalogue load + Robin money sign-off + the LIVE-batch deploy
+    # = neon_finance 17.0.7.10.2 / neon_crew_comms 17.0.1.8.2). Intro + build-lane
+    # note updated (WA-13 next). Text/constants only.
+    "version": "17.0.1.0.19",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

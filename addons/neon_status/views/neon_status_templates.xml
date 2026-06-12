@@ -231,7 +231,10 @@ section{margin:34px 0;}
                     (crew select → finalize → checkout → check-in) end-to-end on real phones;
                     sales availability (Face 1) live; the client lane CRM-matches contacts
                     (WA-9, cross-session fold proven), the post-event feedback loop closes to
-                    staff (WA-10), and the manager insights layer reads the feedback corpus (WA-11).</p>
+                    staff (WA-10), and the manager insights layer reads the feedback corpus (WA-11).
+                    WA-12 (Quote-by-WhatsApp) machinery is now phone-proven (12 Jun, Robin
+                    first-tap); LIVE is gated behind the pricing worksheet + catalogue load and
+                    Robin's money sign-off.</p>
                 <div class="grid cards">
                     <t t-foreach="wa_modules" t-as="m">
                         <div class="card">
