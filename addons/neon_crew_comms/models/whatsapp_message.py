@@ -67,6 +67,17 @@ class WhatsAppMessage(models.Model):
         handled = self._wa12_maybe_intercept(message)
         if handled is not None:
             return handled
+        # WA-13 quote/invoice retrieval + invoice-from-quote NEXT: a wa13_*
+        # generate-confirm tap, a doc_pick/inv_pick/inv_confirm session turn, or
+        # a tight `Send quote/invoice <client|ref>` command from an entitled
+        # sender. Claims ONLY those; a live inv_*/doc_pick session claims EVERY
+        # text turn (WA-6, next, grabs any live session unconditionally).
+        # Returns None for anything else (incl. other sessions / a mid-sentence
+        # "invoice") so WA-6 / WA-5 / Copilot run unchanged. Face-2 is money-
+        # adjacent -- gated to the approver group behind Robin's sign-off.
+        handled = self._wa13_maybe_intercept(message)
+        if handled is not None:
+            return handled
         # WA-6 equipment face NEXT: a wa6_* tap, or a finalize free-text
         # turn for a phone with a live equip session. Disjoint from the
         # crew/WA-5 intents -- returns None for anything else so the WA-5 /

@@ -67,6 +67,9 @@ class WaEquipSession(models.Model):
          ("fb_notes", "Feedback — awaiting free-text note after a tap (WA-10)"),
          ("q_confirm", "Quote — requester awaiting draft confirm/submit (WA-12)"),
          ("q_reject", "Quote — approver awaiting reject comment (WA-12)"),
+         ("doc_pick", "Send — awaiting quote/invoice doc pick (WA-13)"),
+         ("inv_pick", "Invoice-from-quote — awaiting scheduled-stage pick (WA-13)"),
+         ("inv_confirm", "Invoice-from-quote — awaiting generate confirm (WA-13)"),
          ("done", "Done")],
         string="Step", default="await_items", required=True)
     buffer = fields.Text(
@@ -219,6 +222,28 @@ class WaEquipSession(models.Model):
         DICT buffer {quote_id, ...}) or 'q_reject' (the APPROVER types a
         rejection comment after tapping Reject; DICT buffer {quote_id}).
         Same rebind-the-unique-row reasoning as _start_fb / _start_av."""
+        sess = self.sudo().with_context(active_test=False).search(
+            [("phone_number", "=", phone_e164)], limit=1)
+        vals = {
+            "user_id": user.id if user else False,
+            "event_job_id": False, "step": step,
+            "buffer": json.dumps(buf or {}), "fix_index": -1,
+            "active": True, "last_inbound": fields.Datetime.now()}
+        if sess:
+            sess.write(vals)
+        else:
+            vals["phone_number"] = phone_e164
+            sess = self.sudo().create(vals)
+        return sess
+
+    @api.model
+    def _start_inv(self, phone_e164, user, step, buf):
+        """WA-13 — open (or rebind) the single session into a Send/invoice
+        step: 'doc_pick' (retrieval list-then-pick, NUMBER reply; DICT buffer
+        {kind, ids:[...]}), 'inv_pick' (Face-2 scheduled-stage pick, NUMBER
+        reply; DICT buffer {quote_id, schedule_ids:[...]}) or 'inv_confirm'
+        (Face-2 two-phase generate confirm; DICT buffer {quote_id,
+        schedule_id}). Same rebind-the-unique-row reasoning as _start_quote."""
         sess = self.sudo().with_context(active_test=False).search(
             [("phone_number", "=", phone_e164)], limit=1)
         vals = {

@@ -162,7 +162,20 @@
     # (_wa12_match_line + price/discount/qty/days/add/remove/no-tax/with-tax/
     # client/add-custom), the line_type-aware no_rule guard, and discount/custom
     # rendering in the draft summary. Pairs with neon_finance flex model + report.
-    "version": "17.0.1.9.0",
+    # 17.0.1.10.0 = WA-13 quote/invoice retrieval + invoice-from-quote — a new
+    # whatsapp_message_wa13.py: tight `Send quote/invoice <client|ref>` parsers,
+    # explicit positive entitlement gates (quotes own-scope code domain for
+    # sales / all for approver+OD; invoices approver+OD only), the doc_pick /
+    # inv_pick / inv_confirm FSM (new steps + _start_inv on wa_equip_session),
+    # Face-1 PDF retrieval (quotes via the WA-12 report action, posted invoices
+    # via account.account_invoices), and Face-2 invoice-from-quote (approver-
+    # gated two-phase confirm -> action_trigger_now -> DRAFT move; re-send the
+    # auto-fired on_acceptance draft). Intercept wired after WA-12, before WA-6;
+    # advisory lock ns 5594000. New wa13_inv_* intents in neon_channels
+    # (17.0.1.22.0); reuses the existing P6.M7 invoice machinery (no new finance
+    # engine; neon_finance 17.0.7.10.7 only makes Kudzai's grant durable). Money-
+    # adjacent Face-2 behind Robin's sign-off + the approver group.
+    "version": "17.0.1.10.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

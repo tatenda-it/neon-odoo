@@ -106,6 +106,18 @@ INTENTS = frozenset({
     #   wa12_view_pdf:<quote_id>  -- send the (draft|final) quote PDF in-chat
     #   wa12_send:<quote_id>      -- requester sends the approved quote to client
     "wa12_approve", "wa12_reject", "wa12_view_pdf", "wa12_send",
+    # WA-13: quote/invoice retrieval + invoice-from-quote (routed by the
+    # neon_crew_comms bridge intercept AFTER WA-12, before WA-6). Retrieval and
+    # the schedule-stage pick use NUMBER replies via the doc_pick / inv_pick
+    # sessions (not taps); the Face-2 two-phase generate CONFIRM is HMAC
+    # buttons. Registered unconditionally -- encode() raises on an unknown
+    # intent, so the interactive [Confirm]/[Cancel] buttons need the names here:
+    #   wa13_inv_confirm:<schedule_id>  -- the approver confirms generation ->
+    #                                      schedule.action_trigger_now (DRAFT)
+    #   wa13_inv_cancel:<schedule_id>   -- the approver cancels the generation
+    #   wa13_inv_pick:<schedule_id>     -- (reserved) tap-to-pick a scheduled
+    #     stage; the live build uses NUMBER replies via the inv_pick session
+    "wa13_inv_confirm", "wa13_inv_cancel", "wa13_inv_pick",
 })
 
 

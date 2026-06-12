@@ -202,7 +202,14 @@
     # upload -> document message) for the approved-quote PDF. Engine wiring (new
     # outbound capability + intents); handlers live in the neon_crew_comms WA-12
     # bridge. The webhook worker reloads both on the force-recreate.
-    'version': '17.0.1.21.0',
+    # 17.0.1.22.0 = B11/WA-13 retrieval + invoice-from-quote: +3 wa13_inv_*
+    # intents (wa13_inv_confirm / wa13_inv_cancel / wa13_inv_pick) in
+    # wa_payload.INTENTS for the Face-2 generate [Confirm]/[Cancel] buttons
+    # (retrieval + stage picks use NUMBER replies, no intent). PURE registry
+    # touch: no model / data / schema / RBAC change; send_document (added in
+    # 17.0.1.21.0) is reused. The webhook worker reloads INTENTS on the
+    # force-recreate (a -u alone never reloads a module-level constant).
+    'version': '17.0.1.22.0',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

@@ -25,3 +25,8 @@ from . import whatsapp_message_wa10
 # before WA-6. Provisioning + lifecycle live in neon_finance; this is the
 # parse / entitlement / FSM / approval-dispatch / Price: orchestration.
 from . import whatsapp_message_wa12
+# WA-13 -- quote/invoice retrieval + invoice-from-quote. Extends
+# neon.whatsapp.message; intercept hook wired in whatsapp_message AFTER WA-12,
+# before WA-6. A WhatsApp face on the EXISTING P6.M7 invoice machinery (no new
+# finance engine); reuses the WA-12 rails.
+from . import whatsapp_message_wa13
