@@ -674,6 +674,92 @@ _check("T-WA12-28",
        "triggers=%s strip=%s synonyms=%s bare-date(29 Sep)=%s terms(14d)=%s"
        % (trig_ok, strip_ok, syn_ok, date_ok, terms_ok))
 
+# ---- new-client intake helpers ----------------------------------------------
+def _clear_sess(ph):
+    env["neon.wa.equip.session"].sudo().with_context(active_test=False).search(
+        [("phone_number", "=", ph)]).write({"active": False})
+
+
+def _send(ph, txt):
+    return D_sales._wa12_maybe_intercept(_txt(ph, txt))
+
+
+def _step(ph):
+    s = env["neon.wa.equip.session"].sudo()._active_for_phone(ph)
+    return s.step if s else None
+
+
+# ---- T-WA12-29 (intake) full new-client capture (individual, no dupe) ->
+# partner created (E164 phone joins WA-9 spine, ref source, create_uid=rep) ->
+# quote RESUMES in the same session with no item/date re-entry.
+_clear_sess(SALES_PH)
+N29 = "[TEST-WA12] Zorptronic Events"
+_send(SALES_PH, "Quote: %s — qwertyunit, 25/09/2026" % N29)
+pick29 = _step(SALES_PH) == "qc_pick"
+_send(SALES_PH, "new")
+_send(SALES_PH, "individual")
+_send(SALES_PH, "ok")            # qc_name -> reuse the typed name (confirmed)
+phase29 = _step(SALES_PH)        # individual skips contact -> qc_phone
+_send(SALES_PH, "+263772345678")
+_send(SALES_PH, "zorp@example.com")   # qc_email -> create + resume
+p29 = P.search([("name", "=", N29)], limit=1)
+created29 = (bool(p29) and p29.ref == "whatsapp_quote" and not p29.is_company
+             and p29.create_uid.id == u_sales.id
+             and "772345678" in (p29.phone_sanitized or p29.phone or ""))
+q29 = Q.search([("partner_id", "=", p29.id)], limit=1) if p29 else Q.browse()
+_check("T-WA12-29",
+       pick29 and phase29 == "qc_phone" and created29
+       and _step(SALES_PH) == "q_confirm" and bool(q29) and q29.state == "draft",
+       "intake: pick=%s phase=%s created(ref/uid/phone)=%s resumed=%s quote=%s"
+       % (pick29, phase29, created29, _step(SALES_PH), q29.name if q29 else "-"))
+
+# ---- T-WA12-30 (intake) near-duplicate check, BOTH branches.
+gh = P.create({"name": "[TEST-WA12] Globex Holdings"})
+# Flow A: typed name fuzzy-matches -> qc_dupe -> pick existing (NO new partner).
+_clear_sess(SALES_PH)
+_send(SALES_PH, "Quote: [TEST-WA12] Glubex Co — qwertyunit, 2026-09-20")
+_send(SALES_PH, "new")
+_send(SALES_PH, "company")
+_send(SALES_PH, "[TEST-WA12] Globex")     # -> dupe (Globex Holdings)
+dupeA = _step(SALES_PH) == "qc_dupe"
+_send(SALES_PH, "1")                       # use existing
+qA = Q.search([("partner_id", "=", gh.id)], limit=1)
+flowA = (dupeA and bool(qA) and _step(SALES_PH) == "q_confirm"
+         and not P.search([("name", "=", "[TEST-WA12] Globex")]))
+# Flow B: same dupe -> *new* -> create new (company + child contact, skip email).
+_clear_sess(SALES_PH)
+_send(SALES_PH, "Quote: [TEST-WA12] Glubex2 — qwertyunit, 2026-09-20")
+_send(SALES_PH, "new")
+_send(SALES_PH, "company")
+_send(SALES_PH, "[TEST-WA12] Globex")     # -> dupe again
+_send(SALES_PH, "new")                     # add new anyway
+_send(SALES_PH, "[TEST-WA12] John")        # qc_contact (company)
+_send(SALES_PH, "+263773000111")           # qc_phone
+_send(SALES_PH, "skip")                    # qc_email skipped -> create + resume
+newg = P.search([("name", "=", "[TEST-WA12] Globex")], limit=1)
+child = P.search([("name", "=", "[TEST-WA12] John"),
+                  ("parent_id", "=", newg.id)], limit=1) if newg else P.browse()
+flowB = (bool(newg) and newg.is_company and not newg.email
+         and newg.ref == "whatsapp_quote" and bool(child)
+         and _step(SALES_PH) == "q_confirm")
+_check("T-WA12-30", flowA and flowB,
+       "dupe-check: A(pick existing, no new)=%s  B(new w/ contact, skip-email)=%s"
+       % (flowA, flowB))
+
+# ---- T-WA12-31 (intake) resolver >1 -> list-then-pick (was an error) + the
+# T29 partner is WA-9-recognizable (phone_sanitized holds the E164).
+P.create({"name": "[TEST-WA12] Acme Sound"})   # joins the client fixture "Acme Events Co"
+_clear_sess(SALES_PH)
+_send(SALES_PH, "Quote: [TEST-WA12] Acme — qwertyunit, 2026-09-20")
+pickN = _step(SALES_PH) == "qc_pick"
+_send(SALES_PH, "1")
+resumedN = _step(SALES_PH) == "q_confirm"
+p29b = P.search([("name", "=", N29)], limit=1)
+wa9_ok = bool(p29b) and "772345678" in (p29b.phone_sanitized or p29b.phone or "")
+_check("T-WA12-31", pickN and resumedN and wa9_ok,
+       ">1 list-then-pick=%s resumed=%s ; WA-9 phone_sanitized=%s"
+       % (pickN, resumedN, p29b.phone_sanitized if p29b else "-"))
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(

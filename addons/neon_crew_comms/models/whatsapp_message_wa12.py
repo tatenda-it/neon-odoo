@@ -71,8 +71,15 @@ _WA12_CANCEL_WORDS = ("cancel", "no", "stop", "delete", "scrap",
 _WA12_SUBMIT_WORDS = ("yes", "submit", "y", "ok", "submit for approval",
                       "send for approval")
 
-# Quote session steps live on the shared equip-session (q_confirm / q_reject).
-_WA12_STEPS = ("q_confirm", "q_reject")
+# New-client intake steps (guided capture when the resolver misses / is
+# ambiguous). FSM: qc_pick -> qc_kind -> qc_name -> [qc_dupe] ->
+# [qc_contact] -> qc_phone -> qc_email -> create + resume the quote.
+_WA12_CAPTURE_STEPS = ("qc_pick", "qc_kind", "qc_name", "qc_dupe",
+                       "qc_contact", "qc_phone", "qc_email")
+
+# Quote session steps live on the shared equip-session. WA-12 claims q_confirm /
+# q_reject + the new-client capture steps.
+_WA12_STEPS = ("q_confirm", "q_reject") + _WA12_CAPTURE_STEPS
 
 # Fresh advisory-lock namespace (NOT 5593500/600/700/800) -- first-tap-wins on
 # the approver pair so only ONE of uids 7/21 wins a concurrent Approve/Reject.
@@ -302,14 +309,28 @@ class WhatsAppMessageWA12(models.Model):
         if not client_txt or not items_txt:
             return self._wa6_reply(raw_from, from_e164, _(
                 "To quote, send:  Quote: <client> — <items>, <date>"))
-        partner, err = self._wa12_resolve_client(client_txt)
-        if err:
-            return self._wa6_reply(raw_from, from_e164, err)
         items = self._wa6_match_items(items_txt)
         matched = [it for it in items if it.get("status") == "matched"]
         if not matched:
             return self._wa6_reply(raw_from, from_e164, _(
                 "Couldn't match any catalogue items in \"%s\".") % items_txt)
+        # resolve the client: exactly one -> proceed; 0 or >1 -> the guided
+        # new-client intake / list-then-pick (items + date are buffered so the
+        # quote resumes without re-entry). Fixes the old >1 'be more specific'
+        # dead-end + adds in-session client capture (LIVE-blocking amendment).
+        partner, candidates = self._wa12_client_candidates(client_txt)
+        if not partner:
+            return self._wa12_start_client_intake(
+                sender, client_txt, candidates, matched, date_txt, days,
+                from_e164, raw_from)
+        return self._wa12_quote_from_slots(
+            sender, partner, matched, date_txt, days, from_e164, raw_from)
+
+    def _wa12_quote_from_slots(self, sender, partner, matched, date_txt, days,
+                               from_e164, raw_from):
+        """Provision + price a quote for a RESOLVED partner + matched items,
+        open the q_confirm session, reply the draft summary. Shared by the
+        direct Quote: path and the post-intake resume."""
         event_date, placeholder = self._wa12_resolve_date(date_txt)
         currency = (sender.company_id.currency_id
                     or self.env.ref("base.USD", raise_if_not_found=False))
@@ -317,10 +338,8 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(
                 "Can't quote — no currency is configured. Please set one up "
                 "in Odoo first."))
-        # provision the draft chain + the quote (sudo inside the helper).
         # A provisioning UserError (missing TBC venue, etc.) must reply cleanly,
-        # not propagate to the webhook (which would roll back the audit row +
-        # re-loop via Meta re-delivery).
+        # not propagate to the webhook (rollback + Meta re-delivery loop).
         try:
             quote = self.env["neon.finance.quote"]._wa12_provision_chain(
                 partner, event_date, currency, sender,
@@ -330,19 +349,203 @@ class WhatsAppMessageWA12(models.Model):
         self._wa12_build_lines(quote, matched, days or 1)
         quote.with_user(sender.id).sudo().action_recalculate_pricing()
         unpriced = self._wa12_unpriced_lines(quote)
-        # set a payment term so submit is possible (binding: required to submit).
         self._wa12_ensure_payment_term(quote, partner)
         self.env["neon.wa.equip.session"]._start_quote(
             from_e164, sender, "q_confirm", {"quote_id": quote.id})
         summary = self._wa12_draft_summary(quote, unpriced)
         if unpriced:
-            # GUARD (binding 1): a placeholder/unpriced line blocks submit.
             return self._wa6_reply(raw_from, from_e164, summary + "\n\n" + _(
                 "⚠️ Can't submit yet — these have no rate set: %s. "
-                "Pricing isn't loaded for them."
-            ) % ", ".join(unpriced))
+                "Pricing isn't loaded for them.") % ", ".join(unpriced))
         return self._wa6_reply(raw_from, from_e164, summary + "\n\n" + _(
             "Reply *yes* to submit for approval, or *cancel*."))
+
+    @api.model
+    def _wa12_client_candidates(self, name):
+        """(exact/unique partner or empty, candidates). Mirrors
+        _wa12_resolve_client's search but returns the candidate SET for
+        list-then-pick / new-client intake instead of an ambiguity error."""
+        P = self.env["res.partner"].sudo()
+        hits = P.search([("name", "ilike", name), ("is_venue", "=", False)],
+                        limit=8)
+        exact = hits.filtered(
+            lambda p: (p.name or "").strip().lower() == name.strip().lower())
+        if len(exact) == 1:
+            return exact, exact
+        if len(hits) == 1:
+            return hits, hits
+        return P.browse(), hits
+
+    def _wa12_start_client_intake(self, sender, client_txt, candidates, matched,
+                                  date_txt, days, from_e164, raw_from):
+        """Open the qc_pick session: list any existing matches + offer *new*.
+        Buffers the matched items + date so the quote resumes without re-entry."""
+        buf = {"matched": matched, "date_txt": date_txt or "",
+               "days": days or 1, "client_txt": client_txt,
+               "candidate_ids": candidates.ids[:8]}
+        self.env["neon.wa.equip.session"]._start_quote(
+            from_e164, sender, "qc_pick", buf)
+        if candidates:
+            rows = "\n".join("%d) %s" % (i + 1, p.name)
+                             for i, p in enumerate(candidates))
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Found these for \"%s\":\n%s\n\nReply the number to use one, "
+                "or *new* to add a new client.") % (client_txt, rows))
+        return self._wa6_reply(raw_from, from_e164, _(
+            "No existing client matches \"%s\". Reply *new* to add them, or "
+            "send a different name.") % client_txt)
+
+    def _wa12_handle_capture(self, sess, body, from_e164, raw_from):
+        """New-client intake FSM (qc_*). Sales-capable gate re-checked; a
+        'cancel'/'scrap' aborts. On completion (or an existing-client pick) the
+        quote resumes via _wa12_quote_from_slots with the buffered items+date."""
+        sender = sess.user_id
+        if not (sender and sender.active and self._wa12_can_quote(sender)):
+            sess.sudo().write({"active": False})
+            return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
+        raw = (body or "").strip()
+        norm = " ".join(raw.lower().split())
+        buf = sess._get_buffer()
+        buf = buf if isinstance(buf, dict) else {}
+        P = self.env["res.partner"].sudo()
+        step = sess.step
+
+        if norm in ("cancel", "scrap", "abort", "stop", "scrap this"):
+            sess.sudo().write({"step": "done", "active": False})
+            return self._wa6_reply(raw_from, from_e164, _(
+                "New-client setup cancelled."))
+
+        def save(next_step, **kw):
+            buf.update(kw)
+            sess.sudo().write({"step": next_step})
+            sess._set_buffer(buf)
+
+        def resume(partner):
+            sess.sudo().write({"step": "done", "active": False})
+            return self._wa12_quote_from_slots(
+                sender, partner, buf.get("matched") or [],
+                buf.get("date_txt") or "", buf.get("days") or 1,
+                from_e164, raw_from)
+
+        def ask_after_name():
+            nm = buf.get("name") or _("the client")
+            if buf.get("kind") == "company":
+                save("qc_contact")
+                return self._wa6_reply(raw_from, from_e164,
+                                       _("Contact person at %s?") % nm)
+            save("qc_phone")
+            return self._wa6_reply(raw_from, from_e164,
+                                   _("Phone number for %s?") % nm)
+
+        if step == "qc_pick":
+            ids = buf.get("candidate_ids") or []
+            if norm in ("new", "n", "new client", "add", "add new"):
+                save("qc_kind")
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "New client — is it a *company* or an *individual*?"))
+            if norm.isdigit() and 1 <= int(norm) <= len(ids):
+                p = P.browse(ids[int(norm) - 1]).exists()
+                if p:
+                    return resume(p)
+            # a re-typed name -> re-resolve
+            partner, candidates = self._wa12_client_candidates(raw)
+            if partner:
+                return resume(partner)
+            save("qc_pick", client_txt=raw, candidate_ids=candidates.ids[:8])
+            if candidates:
+                rows = "\n".join("%d) %s" % (i + 1, p.name)
+                                 for i, p in enumerate(candidates))
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Found:\n%s\n\nReply the number, or *new* to add a new "
+                    "client.") % rows)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Still no match for \"%s\". Reply *new* to add them, or send a "
+                "different name.") % raw)
+
+        if step == "qc_kind":
+            if norm in ("company", "c", "business", "org", "organisation",
+                        "organization"):
+                save("qc_name", kind="company")
+            elif norm in ("individual", "i", "person", "private"):
+                save("qc_name", kind="individual")
+            else:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Reply *company* or *individual*."))
+            seed = buf.get("client_txt") or ""
+            return self._wa6_reply(
+                raw_from, from_e164,
+                (_("Client name? (or reply *ok* to use \"%s\")") % seed)
+                if seed else _("What's the client's name?"))
+
+        if step == "qc_name":
+            name = ((buf.get("client_txt") or "") if norm in ("ok", "yes",
+                    "same", "y") else raw)
+            if not name:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Please type the client's name."))
+            # NEAR-DUPLICATE CHECK before any create (protect the partner table).
+            dupes = P.search([("name", "ilike", name),
+                              ("is_venue", "=", False)], limit=3)
+            if dupes:
+                save("qc_dupe", name=name, dupe_ids=dupes.ids)
+                rows = "\n".join("%d) %s" % (i + 1, p.name)
+                                 for i, p in enumerate(dupes))
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Found similar:\n%s\n\nSame client? Reply the number to use "
+                    "it, or *new* to add \"%s\" as a new client.")
+                    % (rows, name))
+            buf["name"] = name
+            sess._set_buffer(buf)
+            return ask_after_name()
+
+        if step == "qc_dupe":
+            ids = buf.get("dupe_ids") or []
+            if norm.isdigit() and 1 <= int(norm) <= len(ids):
+                p = P.browse(ids[int(norm) - 1]).exists()
+                if p:
+                    return resume(p)
+            if norm in ("new", "no", "n", "0", "add new"):
+                return ask_after_name()
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Reply the number to use an existing client, or *new* to add a "
+                "new one."))
+
+        if step == "qc_contact":
+            save("qc_phone", contact=raw)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Phone number for %s?") % (buf.get("name") or _("the client")))
+
+        if step == "qc_phone":
+            save("qc_email", phone=raw, phone_e164=to_e164(raw) or "")
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Email? (needed to send quotes — or reply *skip*)"))
+
+        if step == "qc_email":
+            email = "" if norm in ("skip", "none", "no", "-", "n") else raw
+            partner = self._wa12_create_client(sender.id, buf, email)
+            return resume(partner)
+
+        return None
+
+    def _wa12_create_client(self, actor, buf, email):
+        """Create the new client partner as the REP (create_uid honesty):
+        E164 phone (joins the WA-9 phone_sanitized spine), email, ref source
+        marker. A company also gets its contact person as a child."""
+        P = self.env["res.partner"].with_user(actor).sudo()
+        ph = buf.get("phone_e164") or buf.get("phone") or ""
+        vals = {"name": buf.get("name") or _("(client)"),
+                "is_company": buf.get("kind") == "company",
+                "ref": "whatsapp_quote"}
+        if ph:
+            vals["phone"] = ph
+        if email:
+            vals["email"] = email
+        partner = P.create(vals)
+        if buf.get("kind") == "company" and buf.get("contact"):
+            P.create({"name": buf["contact"], "parent_id": partner.id,
+                      "type": "contact", "phone": ph or False,
+                      "email": email or False})
+        return partner
 
     def _wa12_handle_session(self, sess, message, from_e164, raw_from):
         """A q_confirm / q_reject turn. Re-checks entitlement every turn, with
@@ -366,13 +569,19 @@ class WhatsAppMessageWA12(models.Model):
             if sess.step == "q_reject":
                 return self._wa6_reply(raw_from, from_e164, _(
                     "Send a one-line reason and I'll relay it to the requester."))
+            if sess.step in _WA12_CAPTURE_STEPS:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Please reply with text to continue adding the client."))
             return self._wa6_reply(raw_from, from_e164, _(
                 "Reply *yes* to submit, *cancel*, or edit the draft."))
+        body = self._extract_body(message, message.get("type"))
+        # new-client intake FSM (qc_*).
+        if sess.step in _WA12_CAPTURE_STEPS:
+            return self._wa12_handle_capture(sess, body, from_e164, raw_from)
         buf = sess._get_buffer()
         buf = buf if isinstance(buf, dict) else {}
         quote = self.env["neon.finance.quote"].sudo().browse(
             buf.get("quote_id") or 0)
-        body = self._extract_body(message, message.get("type"))
         norm = " ".join((body or "").strip().lower().split())
         if sess.step == "q_confirm":
             if norm in _WA12_CANCEL_WORDS:

@@ -205,7 +205,17 @@
     # cancel|delete|scrap (this); submit|submit/send for approval; conversational
     # quote triggers "make a quotation for"/"i want a quote for"/"quote for"
     # alongside "Quote:". No neon_finance/report change. pwa12 31/31, pwa13 15/15.
-    "version": "17.0.1.10.3",
+    # 17.0.1.10.4 = WA-12 new-client intake (LIVE-blocking): a client-resolver
+    # miss / ambiguity now opens a guided in-session capture (qc_* FSM on
+    # wa_equip_session) — list-then-pick existing (fixes the old >1 'be more
+    # specific' dead-end) OR *new* -> company/individual -> name (seedable from
+    # the typed name) -> NEAR-DUPLICATE check (fuzzy, both branches) -> [contact]
+    # -> phone -> email (skippable). Creates the partner as the REP (create_uid)
+    # with an E164 phone (joins the WA-9 phone_sanitized spine), email, and
+    # ref='whatsapp_quote'; the quote then RESUMES in the same session with no
+    # item/date re-entry (_wa12_quote_from_slots shared by the direct + resume
+    # paths). No neon_finance/report change. pwa12 34/34, pwa13 15/15.
+    "version": "17.0.1.10.4",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
