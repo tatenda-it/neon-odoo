@@ -199,13 +199,15 @@ for r in rows:
         new = RENAMES.get(prod.name)
         if not new and any(prod.name.startswith(s) for s in SERIAL_DROP):
             new = next(s for s in SERIAL_DROP if prod.name.startswith(s))
+        # show the rate APPLY will write (the dry-run is the money-write gate).
+        rate_txt = " @ $%.2f" % rate if not _no_rate(rate) else " (no rate)"
         if new and new != prod.name:
             n_rename += 1
-            out("MAP+RENAME: %r -> %r" % (prod.name, new))
+            out("MAP+RENAME: %r -> %r%s" % (prod.name, new, rate_txt))
             if APPLY:
                 prod.write({"name": new})
         else:
-            out("MAP: %r" % prod.name)
+            out("MAP: %r%s" % (prod.name, rate_txt))
         if _no_rate(rate):
             n_unpriced += 1
             out("MAP-UNPRICED: %r — NO rule (no rate captured)." % prod.name)
