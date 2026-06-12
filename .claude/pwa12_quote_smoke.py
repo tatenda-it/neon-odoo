@@ -616,6 +616,64 @@ _check("T-WA12-25",
        "post-preview edit applies (tax=%s)"
        % (_pv_doc, _state_after, pvq.amount_tax))
 
+# ---- T-WA12-26 (wall a) payment term: a partner with NO term -> the company
+# 7-day default is auto-applied (submit is never termless, never a "use the
+# Odoo button" reply).
+import odoo.addons.neon_crew_comms.models.whatsapp_message_wa12 as _w12  # noqa
+noterm = P.create({"name": "[TEST-WA12] NoTerm Co"})
+tq26 = Q._wa12_provision_chain(noterm, "2026-09-20", USD, u_sales)
+M.sudo()._wa12_build_lines(tq26, [{"product_id": prod_ok.id, "qty": 1}], 1)
+tq26.action_recalculate_pricing()
+M.sudo()._wa12_ensure_payment_term(tq26, noterm)
+_check("T-WA12-26",
+       bool(tq26.payment_term_id)
+       and tq26.payment_term_id.final_due_days == 7
+       and tq26.payment_term_id.deposit_pct == 0.0,
+       "no-term partner -> 7-day default applied (term=%r final_due=%s)"
+       % (tq26.payment_term_id.name, tq26.payment_term_id.final_due_days))
+
+# ---- T-WA12-27 (wall c) date tolerance, DAY-FIRST: 25/09/26, 25/09/2026,
+# 29 Sept 2026, 15 september 2026 all parse to 2026-09-{25,25,29,15}.
+_d1, _p1 = M._wa12_resolve_date("25/09/26")
+_d2, _p2 = M._wa12_resolve_date("25/09/2026")
+_d3, _p3 = M._wa12_resolve_date("29 Sept 2026")
+_d4, _p4 = M._wa12_resolve_date("15 september 2026")
+_check("T-WA12-27",
+       not any([_p1, _p2, _p3, _p4])
+       and (_d1.year, _d1.month, _d1.day) == (2026, 9, 25)
+       and (_d2.month, _d2.day) == (9, 25)
+       and (_d3.year, _d3.month, _d3.day) == (2026, 9, 29)
+       and (_d4.year, _d4.month, _d4.day) == (2026, 9, 15),
+       "date tolerance: 25/09/26=%s 25/09/2026=%s 29 Sept 2026=%s "
+       "15 september 2026=%s" % (_d1, _d2, _d3, _d4))
+
+# ---- T-WA12-28 (wall b/d) conversational triggers + synonyms + strip +
+# bare-date-sets-date + terms command.
+trig_ok = (M._wa12_is_quote_cmd("quote for Acme")
+           and M._wa12_is_quote_cmd("make a quotation for Acme")
+           and M._wa12_is_quote_cmd("i want a quote for Acme")
+           and not M._wa12_is_quote_cmd("quote me later"))
+strip_ok = M._wa12_strip_cmd(
+    "quote for Acme — widget",
+    _w12._WA12_QUOTE_CMDS + _w12._WA12_QUOTE_TRIGGERS) == "Acme — widget"
+syn_ok = ("scrap this" in _w12._WA12_CANCEL_WORDS
+          and "submit for approval" in _w12._WA12_SUBMIT_WORDS)
+tq28 = Q._wa12_provision_chain(client, "2026-09-21", USD, u_sales)
+M.sudo()._wa12_build_lines(tq28, [{"product_id": prod_ok.id, "qty": 1}], 1)
+tq28.action_recalculate_pricing()
+M.sudo()._wa12_try_edit(tq28, "29 Sept 2026", SALES_PH, SALES_PH)
+_cj28 = tq28.event_job_id.commercial_job_id
+date_ok = (_cj28.event_date and _cj28.event_date.month == 9
+           and _cj28.event_date.day == 29
+           and not _cj28.event_date_is_placeholder)
+M.sudo()._wa12_try_edit(tq28, "terms net 14 days", SALES_PH, SALES_PH)
+terms_ok = (bool(tq28.payment_term_id)
+            and tq28.payment_term_id.final_due_days == 14)
+_check("T-WA12-28",
+       trig_ok and strip_ok and syn_ok and date_ok and terms_ok,
+       "triggers=%s strip=%s synonyms=%s bare-date(29 Sep)=%s terms(14d)=%s"
+       % (trig_ok, strip_ok, syn_ok, date_ok, terms_ok))
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(

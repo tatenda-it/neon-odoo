@@ -194,7 +194,18 @@
     # the REQUESTER. Pure preview -- no state change, no approval interaction,
     # repeatable after any edit. Reuses _wa12_send_pdf (existing report; no
     # neon_finance change). pwa12 28/28.
-    "version": "17.0.1.10.2",
+    # 17.0.1.10.3 = WA-12 phone-native hardening (proof walls; deterministic):
+    # (a) PAYMENT TERMS auto-apply the company 7-day default (get-or-create) at
+    # provision + re-ensure at submit -> the submit gate NEVER tells a phone
+    # user to open an Odoo button; new `terms <text>` edit command (light-parses
+    # 'N days'/'X%'). (b) DATE always shown in the draft summary; a bare-date
+    # message mid-session SETS/confirms the event date (not the help menu).
+    # (c) DATE TOLERANCE day-first: 25/09/26, 25/09/2026, 29 Sept 2026,
+    # 15 september 2026, 15th Sep (ordinals + Sept normalised). (d) SYNONYMS:
+    # cancel|delete|scrap (this); submit|submit/send for approval; conversational
+    # quote triggers "make a quotation for"/"i want a quote for"/"quote for"
+    # alongside "Quote:". No neon_finance/report change. pwa12 31/31, pwa13 15/15.
+    "version": "17.0.1.10.3",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

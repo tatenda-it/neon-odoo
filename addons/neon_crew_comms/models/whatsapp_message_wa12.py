@@ -58,6 +58,19 @@ _logger = logging.getLogger(__name__)
 _WA12_QUOTE_CMDS = ("quote:", "quote")
 _WA12_PRICE_CMDS = ("price:", "price")
 
+# Looser conversational TRIGGERS for the quote-create face (multi-word
+# startswith phrases, no colon). The colon form + bare word stay in
+# _WA12_QUOTE_CMDS. A misfire ("quote for the meeting") just yields an honest
+# "send: Quote: <client> — <items>" reply (the turn is claimed, recoverable).
+_WA12_QUOTE_TRIGGERS = (
+    "make a quotation for", "i want a quote for", "quote for")
+
+# q_confirm draft-session vocabulary (synonym-tolerant, whole-message equals).
+_WA12_CANCEL_WORDS = ("cancel", "no", "stop", "delete", "scrap",
+                      "cancel this", "delete this", "scrap this")
+_WA12_SUBMIT_WORDS = ("yes", "submit", "y", "ok", "submit for approval",
+                      "send for approval")
+
 # Quote session steps live on the shared equip-session (q_confirm / q_reject).
 _WA12_STEPS = ("q_confirm", "q_reject")
 
@@ -135,8 +148,12 @@ class WhatsAppMessageWA12(models.Model):
     def _wa12_is_quote_cmd(self, body):
         norm = " ".join((body or "").strip().lower().split())
         # colon form prefix-matches; bare word only as a whole-message equals.
-        return any(norm == c or (c.endswith(":") and norm.startswith(c))
-                   for c in _WA12_QUOTE_CMDS)
+        if any(norm == c or (c.endswith(":") and norm.startswith(c))
+               for c in _WA12_QUOTE_CMDS):
+            return True
+        # conversational triggers: a multi-word phrase at the START.
+        return any(norm == t or norm.startswith(t + " ")
+                   for t in _WA12_QUOTE_TRIGGERS)
 
     @api.model
     def _wa12_is_price_cmd(self, body):
@@ -154,6 +171,9 @@ class WhatsAppMessageWA12(models.Model):
             if low == c or low == c.rstrip(":"):
                 return ""
             if c.endswith(":") and low.startswith(c):
+                return norm[len(c):].strip()
+            # multi-word conversational trigger (no colon): prefix-strip.
+            if " " in c and low.startswith(c + " "):
                 return norm[len(c):].strip()
         return norm
 
@@ -277,7 +297,7 @@ class WhatsAppMessageWA12(models.Model):
         resolution miss it replies an honest message (still claimed -- the
         sender explicitly typed Quote:)."""
         self._wa6_audit_in(from_e164, message, "wa12-quote")
-        rest = self._wa12_strip_cmd(body, _WA12_QUOTE_CMDS)
+        rest = self._wa12_strip_cmd(body, _WA12_QUOTE_CMDS + _WA12_QUOTE_TRIGGERS)
         client_txt, items_txt, date_txt, days = self._wa12_parse_quote(rest)
         if not client_txt or not items_txt:
             return self._wa6_reply(raw_from, from_e164, _(
@@ -355,10 +375,10 @@ class WhatsAppMessageWA12(models.Model):
         body = self._extract_body(message, message.get("type"))
         norm = " ".join((body or "").strip().lower().split())
         if sess.step == "q_confirm":
-            if norm in ("cancel", "no", "stop"):
+            if norm in _WA12_CANCEL_WORDS:
                 sess.sudo().write({"step": "done", "active": False})
                 return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
-            if norm in ("yes", "submit", "y", "ok"):
+            if norm in _WA12_SUBMIT_WORDS:
                 if not quote.exists() or quote.state != "draft":
                     sess.sudo().write({"active": False})
                     return self._wa6_reply(raw_from, from_e164, _(
@@ -474,6 +494,14 @@ class WhatsAppMessageWA12(models.Model):
                 {"tax_id": QL._default_tax()})
             return self._wa12_after_edit(quote, from_e164, raw_from,
                                          _("VAT 15.5%% applied"))
+
+        # terms <text>: phone-native payment-term override (the rep is NEVER
+        # told to open an Odoo button). Light-parses "N day(s)" -> final_due,
+        # "X%" -> deposit; the text is kept as the term note.
+        m = re.match(r"terms\s+(.+)$", raw, re.I)
+        if m:
+            return self._wa12_set_terms(
+                quote, m.group(1).strip(), from_e164, raw_from)
 
         m = re.match(r"client\s+(.+)$", raw, re.I)
         if m:
@@ -597,7 +625,41 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa12_after_edit(quote, from_e164, raw_from,
                                          _("%s discounted") % line.name)
 
+        # a bare DATE message sets/confirms the event date (NOT the help menu).
+        # Runs LAST so command words always win; resolve_date returns a
+        # placeholder flag for anything that isn't a real date.
+        ev_date, ph = self._wa12_resolve_date(raw)
+        if not ph:
+            cj = quote.event_job_id.commercial_job_id
+            if cj:
+                cj.with_user(actor).sudo().write(
+                    {"event_date": ev_date, "event_date_is_placeholder": False})
+            return self._wa12_after_edit(
+                quote, from_e164, raw_from,
+                _("Event date set to %s") % ev_date.strftime("%d %b %Y"))
+
         return None  # not a recognised edit command
+
+    def _wa12_set_terms(self, quote, text, from_e164, raw_from):
+        """Apply a payment term from a phone-typed `terms <text>`. Light-parses
+        a leading 'N day(s)' -> final_due_days and 'X%' -> deposit_pct; the raw
+        text is preserved as the term note. Append-only (a new term per edit)."""
+        import re
+        actor = quote.salesperson_id.id or self.env.uid
+        vals = {"partner_id": quote.partner_id.id, "deposit_pct": 0.0,
+                "deposit_due_days": 0, "final_due_days": 7,
+                "late_policy": "reminder", "notes": "WA terms: %s" % text}
+        dm = re.search(r"(\d+)\s*day", text, re.I)
+        if dm:
+            vals["final_due_days"] = int(dm.group(1))
+        pm = re.search(r"(\d+)\s*%", text)
+        if pm:
+            vals["deposit_pct"] = float(pm.group(1))
+        term = self.env["neon.finance.payment.term"].with_user(actor).sudo(
+            ).create(vals)
+        quote.with_user(actor).sudo().write({"payment_term_id": term.id})
+        return self._wa12_after_edit(quote, from_e164, raw_from,
+                                     _("Payment terms set: %s") % text)
 
     def _wa12_submit(self, quote, sess, from_e164, raw_from):
         """Submit the draft for approval (as the real requester) + ping the
@@ -611,6 +673,9 @@ class WhatsAppMessageWA12(models.Model):
         the requester is never their own approver here.)"""
         requester = sess.user_id
         sess.sudo().write({"step": "done", "active": False})
+        # defence-in-depth: guarantee a payment term so the submit gate can
+        # never tell a phone user to open an Odoo button (proof wall a).
+        self._wa12_ensure_payment_term(quote, quote.partner_id)
         try:
             quote.with_user(requester.id).sudo().action_submit_for_approval()
         except (UserError, AccessError) as e:
@@ -848,15 +913,23 @@ class WhatsAppMessageWA12(models.Model):
 
     @api.model
     def _wa12_resolve_date(self, date_txt):
-        """(date, is_placeholder). A parseable upcoming date, else today as a
-        flagged placeholder (commercial.job.event_date is required)."""
+        """(date, is_placeholder). DAY-FIRST (Zimbabwe). Tolerant of 25/09/26,
+        25/09/2026, 25-09-2026, 29 Sept 2026, 15 september 2026, 15th Sep 2026.
+        Unparseable -> today, flagged placeholder (event_date is required)."""
         from datetime import datetime
+        import re as _re
         today = fields.Date.context_today(self)
-        if date_txt:
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y", "%d %b %Y",
-                        "%d %B %Y", "%d %b", "%d %B"):
+        s = (date_txt or "").strip()
+        if s:
+            # normalise: strip ordinal suffixes (15th->15), Sept->Sep, collapse ws
+            s = _re.sub(r"(\d)(st|nd|rd|th)\b", r"\1", s, flags=_re.I)
+            s = _re.sub(r"\bsept\b", "Sep", s, flags=_re.I)
+            s = " ".join(s.split())
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y",
+                        "%d-%m-%y", "%d %b %Y", "%d %B %Y", "%d %b %y",
+                        "%d %B %y", "%d %b", "%d %B", "%d/%m", "%d-%m"):
                 try:
-                    d = datetime.strptime(date_txt.strip(), fmt).date()
+                    d = datetime.strptime(s, fmt).date()
                     if d.year == 1900:
                         d = d.replace(year=today.year)
                     return d, False
@@ -912,21 +985,41 @@ class WhatsAppMessageWA12(models.Model):
                 bad.append(l.name or "(item)")
         return bad
 
+    def _wa12_default_payment_term(self):
+        """Get-or-create the company-default phone-quote term: 7-day net (org
+        house rule -- 'Payment terms default to 7 days unless agreed
+        otherwise'). Singleton (no partner), idempotent by its structured key,
+        so a phone quote is NEVER left termless."""
+        PT = self.env["neon.finance.payment.term"].sudo()
+        key = [("partner_id", "=", False), ("deposit_pct", "=", 0.0),
+               ("deposit_due_days", "=", 0), ("final_due_days", "=", 7),
+               ("late_policy", "=", "reminder")]
+        term = PT.search(key, limit=1)
+        if not term:
+            term = PT.create({
+                "deposit_pct": 0.0, "deposit_due_days": 0, "final_due_days": 7,
+                "late_policy": "reminder",
+                "notes": "Company default — 7-day net (WA-12 phone quote; org "
+                         "house rule)."})
+        return term
+
     def _wa12_ensure_payment_term(self, quote, partner):
         """submit_for_approval requires a payment term. Prefer the partner's
-        most-recent; else the first active term. Best-effort (a missing term
-        surfaces at submit)."""
+        most-recent; else AUTO-APPLY the company 7-day default (get-or-create).
+        Never leaves a phone quote termless -- that made submit tell the rep to
+        open an Odoo button, breaking the phone-native flow (proof wall a).
+        Idempotent (a no-op once a term is set)."""
         if quote.payment_term_id:
             return
         PT = self.env["neon.finance.payment.term"].sudo()
-        term = PT.search([("partner_id", "=", partner.id)],
-                         order="create_date desc", limit=1) \
-            if "partner_id" in PT._fields else PT.browse()
+        term = (PT.search([("partner_id", "=", partner.id)],
+                          order="create_date desc", limit=1)
+                if (partner and partner.id and "partner_id" in PT._fields)
+                else PT.browse())
         if not term:
-            term = PT.search([], limit=1)
-        if term:
-            actor = quote.salesperson_id.id or self.env.uid
-            quote.with_user(actor).sudo().write({"payment_term_id": term.id})
+            term = self._wa12_default_payment_term()
+        actor = quote.salesperson_id.id or self.env.uid
+        quote.with_user(actor).sudo().write({"payment_term_id": term.id})
 
     def _wa12_draft_summary(self, quote, unpriced):
         cur = quote.currency_id.name
@@ -951,8 +1044,16 @@ class WhatsAppMessageWA12(models.Model):
                         % (tag, l.name, l.quantity, rate_txt, l.duration_days))
         # the VAT line is conditional: 'no tax' clears the line taxes -> no VAT.
         vat = _(" (incl. VAT)") if (quote.amount_tax or 0.0) else _(" (no VAT)")
-        return _("*Quote %s* for %s\n%s\n*Total: %s %.2f*%s") % (
-            quote.name, quote.partner_id.name, "\n".join(rows),
+        # event date is ALWAYS shown (proof wall b); a placeholder/unset date
+        # nudges the rep to send one (which the bare-date edit then sets).
+        cj = quote.event_job_id.commercial_job_id
+        ev = cj.event_date if cj else False
+        ev_ph = (cj.event_date_is_placeholder if cj else True) or not ev
+        date_line = _("📅 %s%s\n") % (
+            ev.strftime("%d %b %Y") if ev else _("date not set"),
+            _(" — TBC, reply with a date") if ev_ph else "")
+        return _("*Quote %s* for %s\n%s%s\n*Total: %s %.2f*%s") % (
+            quote.name, quote.partner_id.name, date_line, "\n".join(rows),
             cur, quote.amount_total or 0.0, vat)
 
     def _wa12_send_approval_ping(self, quote, requester):
