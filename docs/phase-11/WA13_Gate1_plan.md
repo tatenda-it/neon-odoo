@@ -54,10 +54,12 @@ finance engine*. Reuses the WA-12 rails.
    `[('salesperson_id','=',rep.id)]` for non-approver/non-OD requesters, applied to
    **both client-name AND ref lookups** (a ref must not bypass scope).
 3. **Face-2 gate** — **GROUP-based: `neon_finance.group_neon_finance_approver`**
-   (never numeric uids). ⚠️ **Prod membership (verified) = Administrator(2),
-   Munashe(7), Robin(21), Tatenda(6) — KUDZAI IS MISSING.** Kudzai must be ADDED
-   (§5 migration). *(Tatenda's approver membership → temp-superuser teardown review
-   list; team decision, not a WA-13 action.)*
+   (never numeric uids). **Prod membership (verified 2026-06-12) = exactly {2
+   Administrator, 6 Tatenda, 7 Munashe, 10 Kudzai, 21 Robin}.** ✅ **Kudzai (10)
+   was ADDED via the UI 2026-06-12** — so the §5 migration is now a VERIFY /
+   idempotent `(4, id)` (durable across rebuilds), **NOT a fresh add**.
+   *(Tatenda's approver membership → temp-superuser teardown review list; team
+   decision, not a WA-13 action.)*
 4. **Face-2 flow** — the **generation tap IS the authority gate** (tapper holds the
    group) **+ a two-phase CONFIRM by the same person** showing stage / % / amount
    (**VAT-inclusive**, = `schedule.amount`) / client. **No second approver** (MD/OD
@@ -150,12 +152,16 @@ recompute ex-VAT in the WA layer.
 - **neon_channels — `wa_payload.py`:** add `wa13_inv_confirm` / `wa13_inv_cancel`
   / `wa13_inv_pick` to `INTENTS` **unconditionally** (review — the [Confirm]/
   [Cancel] buttons are interactive HMAC; `encode` raises on an unknown intent).
-- **neon_finance — migration (⛔ NEW ACCESS POWER, gated):** add **Kudzai** to
-  `group_neon_finance_approver`. ⚠️ **Her login is `admin@neonhiring.co.zw`
-  (Kudzaiishe — a real staffer; reads like, but is NOT, the Odoo superuser)**
-  (review HIGH). Resolve by that **exact login**, **assert non-empty** (fail loud,
-  never silent no-op), then ORM `(4, group_id)` write per the group-membership +
-  noupdate gotchas; manifest bump. Executed in the build, **after Robin's sign-off**.
+- **neon_finance — migration = VERIFY / idempotent re-assert (NOT a fresh add):**
+  Kudzai was added to `group_neon_finance_approver` via the UI 2026-06-12 (members
+  now {2,6,7,10,21}). The build ships an **idempotent `(4, id)`** group-membership
+  write so the grant **survives a fresh -i/rebuild** (a UI add lives only in the DB,
+  not in any data file) — a **no-op on the current prod DB**. ⚠️ Resolve Kudzai by
+  her **exact login `admin@neonhiring.co.zw`** (Kudzaiishe — a real staffer; reads
+  like, but is NOT, the Odoo superuser), **assert non-empty** (fail loud), then ORM
+  `(4, group_id)` per the group-membership + noupdate gotchas; manifest bump. *(No
+  longer a NEW ACCESS POWER gate — the grant is already live; the migration only
+  makes it durable.)*
 - **Manifest bumps:** neon_crew_comms (new file + session-model edit), neon_finance
   (migration), neon_channels (intents).
 - **No new model, no new finance compute, no row-touching schema migration.**
@@ -185,9 +191,10 @@ recompute ex-VAT in the WA layer.
 - **send_document failure (review):** PDF rendered but Meta send → False → honest
   "invoice created but the PDF couldn't be sent — retrieve it from Odoo" (the
   invoice EXISTS; never read as "no invoice").
-- **Kudzai migration:** before → refused; after → holds the group + can generate;
-  the migration **asserts the `admin@neonhiring.co.zw` user resolved** before the
-  write.
+- **Kudzai migration (verify/idempotent):** Kudzai (`admin@neonhiring.co.zw`)
+  already holds the group + can generate (UI-added 2026-06-12); the idempotent
+  `(4, id)` re-assert is a no-op now; the migration **asserts the user resolved
+  non-empty** before the write (fail loud, never silent no-op).
 - **[TEST-WA13] teardown:** the created DRAFT move → `sudo().unlink()` directly
   (draft is directly unlinkable; no draft→cancel→unlink needed); append-only rows
   (quote chain + invoice.schedule, `perm_unlink=0`) via `sudo().unlink()` as the
