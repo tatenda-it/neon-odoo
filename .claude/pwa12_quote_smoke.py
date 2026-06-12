@@ -57,6 +57,11 @@ results = {}
 Users = env["res.users"].sudo()
 Bot = env["neon.bot.user"].sudo()
 M = env["neon.whatsapp.message"].sudo()
+# WA-12.2: mute the LLM lane for the whole suite (offline + deterministic) so
+# free-text turns never make a real provider call. The 3 conversational tests
+# (T32-34) override this with their own patch. Stopped in teardown.
+_LLMP = patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: None)
+_LLMP.start()
 P = env["res.partner"].sudo()
 PT = env["product.template"].sudo()
 Q = env["neon.finance.quote"].sudo()
@@ -760,6 +765,61 @@ _check("T-WA12-31", pickN and resumedN and wa9_ok,
        ">1 list-then-pick=%s resumed=%s ; WA-9 phone_sanitized=%s"
        % (pickN, resumedN, p29b.phone_sanitized if p29b else "-"))
 
+# ---- T-WA12-32 (WA-12.2 hook A) free-text quote request -> LLM EXTRACTION ->
+# deterministic provision. The LLM is MOCKED (offline + deterministic).
+_clear_sess(SALES_PH)
+_ai_q = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
+         '"items":[{"name":"qwertyunit","qty":2}],"date":"2026-09-20"}')
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _ai_q):
+    r32 = D_sales._wa12_llm_intake_maybe(_txt(
+        SALES_PH,
+        "hi can you price up 2 qwertyunit for Acme Events on the 20th please"))
+s32 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+b32 = s32._get_buffer() if s32 else {}
+q32 = (Q.sudo().browse(b32.get("quote_id") or 0)
+       if isinstance(b32, dict) else Q.browse())
+_check("T-WA12-32",
+       r32 is True and bool(s32) and s32.step == "q_confirm"
+       and q32.exists() and q32.partner_id == client and len(q32.line_ids) >= 1,
+       "free-text -> AI extract -> draft quote for %s (q_confirm=%s, lines=%d)"
+       % (q32.partner_id.name if q32.exists() else "-",
+          s32.step if s32 else "-", len(q32.line_ids) if q32.exists() else 0))
+
+# ---- T-WA12-33 (WA-12.2 hook B) a free-text edit during q_confirm -> LLM
+# translates to ONE command -> applied through the guarded _wa12_try_edit.
+_clear_sess(SALES_PH)
+eq = Q._wa12_provision_chain(client, "2026-09-22", USD, u_sales)
+M.sudo()._wa12_build_lines(eq, [{"product_id": prod_ok.id, "qty": 1}], 1)
+eq.action_recalculate_pricing()
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_confirm", {"quote_id": eq.id})
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: "discount qwertyunit 20%"):
+    D_sales._wa12_maybe_intercept(_txt(
+        SALES_PH, "actually knock twenty percent off that qwerty thing"))
+el = eq.line_ids.filtered(lambda l: l.product_template_id == prod_ok)[:1]
+_check("T-WA12-33",
+       bool(el) and abs(el.discount_pct - 20.0) < 0.01
+       and abs(el.line_subtotal - 40.0) < 0.01,
+       "free-text edit -> translated to 'discount 20%%' -> applied "
+       "(disc_pct=%s sub=%s)"
+       % (el.discount_pct if el else "-", el.line_subtotal if el else "-"))
+
+# ---- T-WA12-34 (WA-12.2 degradation) LLM down (None) -> hook A does NOT claim
+# (falls through); the deterministic Quote: command is unaffected.
+_clear_sess(SALES_PH)
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: None):
+    r34 = D_sales._wa12_llm_intake_maybe(_txt(
+        SALES_PH, "could you put together a quote for somebody sometime"))
+deg_ok = r34 is None
+det = D_sales._wa12_maybe_intercept(_txt(
+    SALES_PH, "Quote: [TEST-WA12] Acme Events Co — qwertyunit, 2026-09-23"))
+_sdet = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+det_ok = det is True and bool(_sdet) and _sdet.step == "q_confirm"
+_check("T-WA12-34", deg_ok and det_ok,
+       "LLM down -> hook A falls through (r=%s); deterministic Quote: still "
+       "works (%s)" % (r34, det_ok))
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(
@@ -831,6 +891,7 @@ env["neon.wa.equip.session"].sudo().with_context(active_test=False).search(
     [("phone_number", "in", (SALES_PH, CREW_PH, APPR_PH))]).unlink()
 env.cr.commit()
 _MAILP.stop()
+_LLMP.stop()
 
 print()
 print("=" * 72)

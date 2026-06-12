@@ -92,6 +92,11 @@ _WA12_TTL_HOURS = 2
 # A $1 (or lower) line rate is the catalogue PLACEHOLDER, never a real price.
 _WA12_PLACEHOLDER_RATE = 1.0
 
+# WA-12.2 conversational fallback: only invoke the LLM translator when the tight
+# parsers missed AND the message is multi-word (a quote names a client + items;
+# a 1-2 word message is never a quote -> skip the call, fall to the Copilot).
+_WA12_LLM_MIN_WORDS = 3
+
 # ⚠️ DECISION (WA-12): the proactive approval-ping AUDIENCE = the two MD/OD
 # approver uids (Tatenda binding) -- who we cold-window TEMPLATE-ping. Resolved
 # to live res.users at send time; an inactive / non-approver uid is skipped.
@@ -222,7 +227,11 @@ class WhatsAppMessageWA12(models.Model):
             # next intercept) will handle the turn.
             return None
 
-        # 3) A tight Quote:/Price: command.
+        # 3) A tight Quote:/Price: command (deterministic-first; zero cost/risk
+        #    on exact commands). The WA-12.2 CONVERSATIONAL fallback is NOT here
+        #    -- it runs from handle_inbound AFTER every deterministic interceptor
+        #    misses (_wa12_llm_intake_maybe), so a WA-13 "send quote" / WA-6
+        #    turn is never pre-empted by an LLM call.
         body = self._extract_body(message, message.get("type"))
         is_q, is_p = self._wa12_is_quote_cmd(body), self._wa12_is_price_cmd(body)
         if not (is_q or is_p):
@@ -547,6 +556,166 @@ class WhatsAppMessageWA12(models.Model):
                       "email": email or False})
         return partner
 
+    # ================================================================
+    # WA-12.2 conversational lane — the LLM is a TRANSLATOR at the door:
+    # extraction only, never prices / approves / bypasses a guard. Every
+    # failure degrades to the deterministic forms (quoting is never blocked
+    # by an LLM outage).
+    # ================================================================
+    def _wa12_llm_chat(self, messages):
+        """One-shot LLM completion for EXTRACTION ONLY. Rides the WA provider
+        (config neon_channels.whatsapp_provider_key) with a Groq fallback.
+        Returns the assistant text, or None on ANY failure/timeout/absence
+        (graceful degradation)."""
+        try:
+            from odoo.addons.neon_ai_core.models.ai.chat_adapter_factory \
+                import get_chat_adapter
+        except Exception:  # noqa: BLE001 -- ai_core absent -> degrade
+            return None
+        Prov = self.env["neon.dashboard.ai.provider"].sudo()
+        key = self.env["ir.config_parameter"].sudo().get_param(
+            "neon_channels.whatsapp_provider_key", "google")
+        keys = [key, "groq"] if key != "groq" else ["groq"]
+        for k in keys:
+            prov = Prov.search([("provider_key", "=", k),
+                                ("is_enabled", "=", True)], limit=1)
+            adapter = get_chat_adapter(prov) if prov else None
+            if not adapter:
+                continue
+            try:
+                res = adapter.chat(messages)
+            except Exception as e:  # noqa: BLE001 -- never crash a turn
+                _logger.warning("WA-12.2 LLM chat failed (%s): %s", k, e)
+                continue
+            if res is not None and getattr(res, "success", False) \
+                    and res.assistant_message:
+                return res.assistant_message
+        return None
+
+    @api.model
+    def _wa12_llm_json(self, raw):
+        """Parse an LLM reply into a dict, tolerating ```json fences / prose
+        around the object. None on any failure."""
+        import json
+        import re
+        if not raw:
+            return None
+        s = raw.strip()
+        m = re.search(r"\{.*\}", s, re.S)
+        if m:
+            s = m.group(0)
+        try:
+            data = json.loads(s)
+            return data if isinstance(data, dict) else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _wa12_llm_extract_quote(self, text):
+        """Translate a free-text quote request into slots. Returns
+        {client, items:[{name,qty}], date} when intent=quote, else None (not a
+        quote / degraded)."""
+        today = fields.Date.context_today(self).isoformat()
+        sys = (
+            "You convert a sales rep's WhatsApp message into a QUOTE request "
+            "for an events-hire company. Respond with ONLY a JSON object, no "
+            "prose. Schema: {\"intent\": \"quote\"|\"other\", \"client\": "
+            "string, \"items\": [{\"name\": string, \"qty\": integer}], "
+            "\"date\": string|null}. Set intent='quote' ONLY if the message is "
+            "clearly asking to price/quote equipment for a named client; else "
+            "'other'. Resolve relative dates (e.g. 'next Friday', 'month end') "
+            "to an absolute YYYY-MM-DD in Africa/Harare given today is " + today
+            + "; if no date or you are unsure, set date null. NEVER invent a "
+            "client or items not in the message. Output JSON only.")
+        raw = self._wa12_llm_chat([{"role": "system", "content": sys},
+                                   {"role": "user", "content": text or ""}])
+        data = self._wa12_llm_json(raw)
+        if not data or (data.get("intent") or "").lower() != "quote":
+            return None
+        return data
+
+    def _wa12_llm_translate_edit(self, text, quote):
+        """Translate a free-text in-session message into ONE deterministic edit
+        command the q_confirm loop understands, or None (unclear / degraded).
+        Extraction only -- the returned command is re-run through the SAME
+        deterministic _wa12_try_edit (which re-enforces every guard)."""
+        lines = " · ".join("%s" % l.name for l in quote.line_ids) or "(none)"
+        sys = (
+            "You map a sales rep's WhatsApp message to EXACTLY ONE quote-edit "
+            "command, output as plain text on one line, no quotes, no prose. "
+            "Allowed commands: 'price <item> <amount>', 'discount <item> "
+            "<n>%', 'qty <item> <n>', 'days <n>', 'add <item> x<n>', 'add "
+            "custom <description> at <amount>', 'remove <item>', 'no tax', "
+            "'with tax', 'client <name>', 'terms <text>', a date "
+            "(YYYY-MM-DD), 'yes' (submit), or 'cancel'. Current line items: "
+            + lines + ". If the message doesn't clearly map to one command, "
+            "output exactly UNKNOWN.")
+        raw = self._wa12_llm_chat([{"role": "system", "content": sys},
+                                   {"role": "user", "content": text or ""}])
+        if not raw:
+            return None
+        cmd = raw.strip().strip('"`').splitlines()[0].strip()
+        if not cmd or cmd.upper() == "UNKNOWN":
+            return None
+        return cmd
+
+    @api.model
+    def _wa12_llm_intake_maybe(self, message):
+        """WA-12.2 conversational quote-INITIATION fallback. Called from
+        handle_inbound AFTER every deterministic interceptor misses + BEFORE the
+        Copilot. Sales-capable sender + multi-word free TEXT -> LLM translate to
+        a quote (extraction only). Not a quote / LLM down / live session ->
+        None, so the Copilot runs unchanged."""
+        if message.get("type") != "text":
+            return None
+        raw_from = message.get("from")
+        from_e164 = to_e164(raw_from)
+        if not from_e164:
+            return None
+        body = self._extract_body(message, "text")
+        if len((body or "").split()) < _WA12_LLM_MIN_WORDS:
+            return None
+        sender = self._wa6_resolve_user(from_e164)
+        if not (sender and self._wa12_can_quote(sender)):
+            return None
+        # a live session means an earlier interceptor owns this phone -- defensive
+        # (it would have claimed the turn already); never start a parallel quote.
+        if self.env["neon.wa.equip.session"]._active_for_phone(from_e164):
+            return None
+        return self._wa12_llm_quote_fallback(
+            sender, body, from_e164, raw_from, message)
+
+    def _wa12_llm_quote_fallback(self, sender, body, from_e164, raw_from,
+                                 message):
+        """The conversational quote-INITIATION fallback (hook A). Extract slots
+        -> deterministic match + resolve/intake + provision. Returns a reply, or
+        None to fall through (not a quote / LLM down / no catalogue match)."""
+        data = self._wa12_llm_extract_quote(body)
+        if not data:
+            return None
+        client = (data.get("client") or "").strip()
+        items = data.get("items") or []
+        if not client or not items:
+            return None
+        self._wa6_audit_in(from_e164, message, "wa12-quote-ai")
+        items_txt = ", ".join(
+            "%dx %s" % (int(it.get("qty") or 1), it.get("name") or "")
+            for it in items if it.get("name"))
+        matched = [it for it in self._wa6_match_items(items_txt)
+                   if it.get("status") == "matched"]
+        if not matched:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I think you want a quote for %s, but I couldn't match those "
+                "items in the catalogue. Try:  Quote: %s — <items>, <date>")
+                % (client, client))
+        date_txt = data.get("date") or ""
+        partner, candidates = self._wa12_client_candidates(client)
+        if not partner:
+            return self._wa12_start_client_intake(
+                sender, client, candidates, matched, date_txt, 1,
+                from_e164, raw_from)
+        return self._wa12_quote_from_slots(
+            sender, partner, matched, date_txt, 1, from_e164, raw_from)
+
     def _wa12_handle_session(self, sess, message, from_e164, raw_from):
         """A q_confirm / q_reject turn. Re-checks entitlement every turn, with
         the gate that matches the STEP's actor: q_confirm is the requester
@@ -602,6 +771,16 @@ class WhatsAppMessageWA12(models.Model):
                 edited = self._wa12_try_edit(quote, body, from_e164, raw_from)
                 if edited is not None:
                     return edited
+                # CONVERSATIONAL EDIT FALLBACK (WA-12.2): the deterministic
+                # parser missed -> translate the free text into ONE edit command
+                # and re-run it through the SAME guarded _wa12_try_edit. The LLM
+                # only TRANSLATES; the command it emits is re-validated here.
+                cmd = self._wa12_llm_translate_edit(body, quote)
+                if cmd:
+                    edited = self._wa12_try_edit(
+                        quote, cmd, from_e164, raw_from)
+                    if edited is not None:
+                        return edited
             return self._wa6_reply(raw_from, from_e164, _(
                 "Reply *yes* to submit, *cancel*, *preview* (draft PDF), or "
                 "edit — e.g. `price <item> <amt>` · `discount <item> 10%` · "

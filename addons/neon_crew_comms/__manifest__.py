@@ -215,7 +215,24 @@
     # ref='whatsapp_quote'; the quote then RESUMES in the same session with no
     # item/date re-entry (_wa12_quote_from_slots shared by the direct + resume
     # paths). No neon_finance/report change. pwa12 34/34, pwa13 15/15.
-    "version": "17.0.1.10.4",
+    # 17.0.1.11.0 = WA-12.2 conversational lane (Gate-1 ratified) — the LLM is a
+    # TRANSLATOR at the door, extraction ONLY (never prices/approves/bypasses a
+    # guard). DETERMINISTIC-FIRST: the tight parsers keep first claim; the LLM
+    # runs only as a FALLBACK. Hook A (initiation) = _wa12_llm_intake_maybe,
+    # invoked from handle_inbound AFTER every deterministic interceptor misses +
+    # before the Copilot (sales-capable + multi-word free text -> extract
+    # {client,items,date} -> deterministic match + resolve/intake + provision).
+    # Hook B (in-session edit) = when q_confirm's deterministic parser misses,
+    # translate the free text to ONE edit command + re-run the SAME guarded
+    # _wa12_try_edit. Rides the WA provider (neon_channels.whatsapp_provider_key)
+    # with a Groq fallback; relative dates resolved in Africa/Harare + echoed in
+    # the (now always-visible) summary; GRACEFUL DEGRADATION — any LLM failure
+    # returns None so the deterministic forms still quote. ⚠️ DECISION: hook A
+    # runs one extraction per sales-user multi-word free-text turn; a non-quote
+    # (intent=other) then falls to the Copilot = a 2nd call — accepted per the
+    # ratified fallback design; a copilot-tool fold / cheap pre-gate is parked.
+    # No neon_finance/report change. pwa12 37/37, pwa13 15/15.
+    "version": "17.0.1.11.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

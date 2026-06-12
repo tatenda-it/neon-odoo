@@ -85,6 +85,14 @@ class WhatsAppMessage(models.Model):
         handled = self._wa6_maybe_intercept(message)
         if handled is not None:
             return handled
+        # WA-12.2 conversational quote fallback LAST (after every deterministic
+        # interceptor misses, before the Copilot): a sales-capable sender's
+        # multi-word free-text quote request -> LLM translate to slots ->
+        # deterministic provision. Not a quote / LLM down -> None, so the
+        # Copilot (super) runs unchanged. Extraction only; never prices/approves.
+        handled = self._wa12_llm_intake_maybe(message)
+        if handled is not None:
+            return handled
         return super().handle_inbound(message, metadata)
 
     @api.model
