@@ -20,3 +20,8 @@ from . import whatsapp_message_wa8
 # intercept hook wired in whatsapp_message AFTER WA-8, before WA-6. Extends
 # the P3.M7 commercial.event.feedback model (neon_jobs) with staff voices.
 from . import whatsapp_message_wa10
+# WA-12 -- quote-by-WhatsApp (first money-adjacent face). Extends
+# neon.whatsapp.message; intercept hook wired in whatsapp_message AFTER WA-10,
+# before WA-6. Provisioning + lifecycle live in neon_finance; this is the
+# parse / entitlement / FSM / approval-dispatch / Price: orchestration.
+from . import whatsapp_message_wa12

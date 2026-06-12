@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Neon Finance',
-    'version': '17.0.7.9.2',
+    # 17.0.7.10.0 = B11/WA-12 quote-by-WhatsApp finance layer: a new
+    # neon_finance_quote_wa12 model layer (_wa12_provision_chain draft booking
+    # chain + lifecycle hooks: graduate-on-accept / archive-on-dead-quote), the
+    # DRAFT-stamped quote QWeb report (action_report_neon_quote), and the TBC
+    # placeholder-venue data record. New layer (not a fix round) -> minor bump.
+    'version': '17.0.7.10.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -44,6 +49,10 @@ and cost-line behaviour downstream.
         'data/res_currency_data.xml',
         'data/account_tax_data.xml',
         'data/res_company_profile.xml',
+        # WA-12 -- the single TBC placeholder venue for phone-quote
+        # provisional booking chains (binding a; functional default, not seed
+        # corpus). res.partner is_venue=True; needs neon_jobs (the field).
+        'data/wa12_tbc_venue.xml',
         'data/res_company_logo.xml',
         'data/res_company_banks.xml',
         'data/account_journal_data.xml',
@@ -67,6 +76,8 @@ and cost-line behaviour downstream.
         'views/neon_finance_payment_term_views.xml',
         'views/neon_finance_quote_line_views.xml',
         'views/neon_finance_quote_views.xml',
+        # WA-12 — quote PDF report (DRAFT-stamped) for the WhatsApp loop.
+        'report/neon_finance_quote_report.xml',
         # P6.M4 — approval views + Finance Approval settings section.
         'views/neon_finance_approval_views.xml',
         'views/res_config_settings_views.xml',

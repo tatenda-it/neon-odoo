@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        WA-12: Quote PDF report on neon.finance.quote.
+
+        No quote report existed (only the invoice override
+        report_invoice_document_neon_finance + the Phase-1 sale.order
+        quote in neon_sales). WA-12 needs a PDF of the FINANCE quote so
+        the WhatsApp loop can deliver it (draft on [View PDF] to the
+        approver; final to the requester on approval).
+
+        STATE-STAMPED (Robin's WhatsApp-native ruling): a prominent
+        "DRAFT QUOTE" banner renders while the quote is draft /
+        pending_approval; once approved / sent the banner is suppressed
+        and it reads as the final document. Same report, two faces.
+
+        Self-contained external-layout report (company letterhead via
+        web.external_layout). VAT shown at the ZIMRA 15.5% standard
+        (the line taxes drive amount_tax; the label states the rate).
+    -->
+
+    <record id="action_report_neon_quote" model="ir.actions.report">
+        <field name="name">Quote (Neon)</field>
+        <field name="model">neon.finance.quote</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">neon_finance.report_neon_quote_document</field>
+        <field name="report_file">neon_finance.report_neon_quote_document</field>
+        <field name="print_report_name">'Quote - %s' % (object.name or 'draft')</field>
+    </record>
+
+    <template id="report_neon_quote_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+
+                        <!-- DRAFT stamp: draft + pending_approval only -->
+                        <div t-if="o.state in ('draft', 'pending_approval')"
+                             class="alert alert-warning text-center"
+                             style="font-size:18px;font-weight:bold;letter-spacing:2px;">
+                            DRAFT QUOTE &#8212; NOT YET APPROVED
+                        </div>
+
+                        <h2 class="mt-2">
+                            Quotation <span t-field="o.name"/>
+                        </h2>
+
+                        <div class="row mt-3 mb-3">
+                            <div class="col-6">
+                                <strong>Client</strong><br/>
+                                <span t-field="o.partner_id"
+                                      t-options='{"widget": "contact", "fields": ["name", "address", "phone", "email"], "no_marker": true}'/>
+                            </div>
+                            <div class="col-6 text-end">
+                                <div>Date: <span t-field="o.create_date"
+                                                 t-options='{"widget": "date"}'/></div>
+                                <div t-if="o.expires_at">Valid until:
+                                    <span t-field="o.expires_at"/></div>
+                                <div>Currency: <span t-field="o.currency_id.name"/></div>
+                            </div>
+                        </div>
+
+                        <table class="table table-sm o_main_table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-end">Qty</th>
+                                    <th class="text-end">Day rate</th>
+                                    <th class="text-end">Days</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="o.line_ids" t-as="l">
+                                    <td><span t-field="l.name"/></td>
+                                    <td class="text-end"><span t-field="l.quantity"/></td>
+                                    <td class="text-end">
+                                        <span t-field="l.unit_rate"
+                                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                    </td>
+                                    <td class="text-end"><span t-field="l.duration_days"/></td>
+                                    <td class="text-end">
+                                        <span t-field="l.line_subtotal"
+                                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="row">
+                            <div class="col-6 offset-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td>Subtotal (ex-VAT)</td>
+                                        <td class="text-end">
+                                            <span t-field="o.amount_untaxed"
+                                                  t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>VAT 15.5%</td>
+                                        <td class="text-end">
+                                            <span t-field="o.amount_tax"
+                                                  t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                        </td>
+                                    </tr>
+                                    <tr style="font-weight:bold;border-top:2px solid #000;">
+                                        <td>Total</td>
+                                        <td class="text-end">
+                                            <span t-field="o.amount_total"
+                                                  t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div t-if="o.payment_term_id" class="mt-2">
+                            <strong>Payment terms:</strong>
+                            <span t-field="o.payment_term_id.display_name"/>
+                        </div>
+
+                        <p class="mt-4 text-muted" style="font-size:11px;">
+                            Neon Events Elements &#183; quotation subject to
+                            equipment availability on the requested dates. VAT at
+                            the ZIMRA standard rate (15.5%). E&amp;OE.
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

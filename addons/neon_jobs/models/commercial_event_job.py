@@ -121,6 +121,19 @@ class CommercialEventJob(models.Model):
         "auto-created event job after the commercial job is activated.",
     )
     active = fields.Boolean(default=True)
+    is_quote_provisional = fields.Boolean(
+        default=False, index=True,
+        string="Provisional (WA-12 quote)",
+        help="WA-12: True while this is a DRAFT chain spun up purely to carry "
+        "a phone quote (commercial.job -> event.job -> quote). While True the "
+        "three create-time side-effects are SUPPRESSED (the 9 checklists, the "
+        "'Set Lead Tech' event_created activity, readiness alerting) -- a quote "
+        "shell is not an operational event. On quote ACCEPTANCE the chain "
+        "GRADUATES via _graduate_from_quote_provisional: this flips False AND "
+        "REPLAYS those effects, so a graduated job is operationally identical "
+        "to a normally-created one. Default False -> every existing/normal job "
+        "is untouched. Distinct from has_operational_scope (a user-set "
+        "quote-only flag with no create-time suppression).")
 
     # === Related from commercial.job (denormalised for filtering) ===
     partner_id = fields.Many2one(
@@ -1051,24 +1064,16 @@ class CommercialEventJob(models.Model):
                     or _("New")
                 )
         records = super().create(vals_list)
-        # P3.M5 — eagerly create one checklist instance per type
-        # (snapshotting from each template's items) so the event_job
-        # opens with its 9 checklists already populated.
+        # P3.M5 + P4.M5 — the create-time operational effects (the 9
+        # checklists + the 'Set Lead Tech' event_created activity), now
+        # in one helper so create() and WA-12 graduation apply the EXACT
+        # same set (no drift). WA-12: a PROVISIONAL quote shell
+        # (is_quote_provisional) SUPPRESSES them -- a quote is not an
+        # operational event yet; they are REPLAYED verbatim on graduation
+        # (_graduate_from_quote_provisional) when the quote is accepted.
         for rec in records:
-            rec._create_event_job_checklists()
-        # P4.M5 — fire the event_created Action Centre trigger on
-        # each new event_job. Wrapped defensively: an Action Centre
-        # failure must never block event_job creation. Idempotency
-        # in the mixin handles double-fires (e.g. if Odoo replays
-        # the create() inside a savepoint).
-        for rec in records:
-            try:
-                rec._action_centre_create_item("event_created")
-            except Exception as e:
-                _logger.warning(
-                    "Action Centre event_created trigger failed "
-                    "for %s: %s", rec.name, e,
-                )
+            if not rec.is_quote_provisional:
+                rec._apply_event_job_creation_effects()
         # P5.M5 — auto-spawn soft_hold reservations for any equipment
         # lines that landed in the same create() (typically via
         # default values or copy()). Existing event_jobs are NOT
@@ -1087,6 +1092,45 @@ class CommercialEventJob(models.Model):
                     "%s: %s", rec.name, e,
                 )
         return records
+
+    def _apply_event_job_creation_effects(self):
+        """The create-time operational effects of a REAL event job: snapshot
+        the 9 checklists (P3.M5) + fire the event_created 'Set Lead Tech'
+        Action Centre activity (P4.M5). Called from create() for normal jobs
+        AND from _graduate_from_quote_provisional on quote acceptance -- so a
+        graduated WA-12 chain gets EXACTLY what a normal create gets (single
+        source, no operational drift). Checklist seeding is unwrapped (as the
+        original create -- a genuine failure should surface); the Action
+        Centre fire stays defensively wrapped + is idempotent (duplicate-safe
+        on replay)."""
+        self.ensure_one()
+        self._create_event_job_checklists()
+        try:
+            self._action_centre_create_item("event_created")
+        except Exception as e:  # noqa: BLE001
+            _logger.warning(
+                "Action Centre event_created trigger failed for %s: %s",
+                self.name, e)
+
+    def _graduate_from_quote_provisional(self):
+        """WA-12 graduation (binding d): the quote on this provisional chain
+        was ACCEPTED, so the chain BECOMES the real booking. Flip the marker
+        False AND REPLAY the create-time effects the provisional create
+        deferred (checklists + 'Set Lead Tech'), then re-evaluate readiness
+        (now ungated). Without the replay a graduated job would enter planning
+        with no checklists / no lead-tech activity / dormant readiness -- the
+        silent gap binding-d closes. No-op on a non-provisional job."""
+        for rec in self:
+            if not rec.is_quote_provisional:
+                continue
+            rec.is_quote_provisional = False
+            rec._apply_event_job_creation_effects()
+            try:
+                rec._evaluate_readiness_triggers()
+            except Exception as e:  # noqa: BLE001
+                _logger.warning(
+                    "Readiness eval on graduation failed for %s: %s",
+                    rec.name, e)
 
     def _autocreate_reservations_for_lines(self, lines):
         """For each line in `lines`, spawn quantity_planned soft_hold
@@ -2490,6 +2534,12 @@ class CommercialEventJob(models.Model):
         and explicitly does NOT auto-close (manual closure per Q3).
         """
         self.ensure_one()
+        # WA-12: a provisional quote shell never raises readiness alerts -- no
+        # crew/equipment/venue yet, so a low score is meaningless. Graduation
+        # flips is_quote_provisional False, after which readiness resumes on
+        # the next evaluation (graduation nudges it explicitly).
+        if self.is_quote_provisional:
+            return
         if self.state in ("completed", "closed", "cancelled", "released"):
             return
         score = self.readiness_score or 0.0

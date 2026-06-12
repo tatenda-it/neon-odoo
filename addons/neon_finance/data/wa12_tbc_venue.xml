@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        WA-12 binding (a): ONE functional placeholder venue for the
+        phone-quote provisional booking chain. This is a CONFIG-CLASS
+        default (like a fallback record), NOT corpus/test data; it ships
+        legitimately (explicitly distinct from the WA-11 no-seed rule).
+        forcecreate so it exists on install; the comment field warns against
+        deletion since the provisioner references it by xmlid.
+
+        The quote-build attaches every provisional commercial.job to this
+        venue (commercial.job.venue_id is required, domain is_venue=True);
+        the quote PDF renders "Venue: TBC"; on graduation the team replaces
+        it with the real venue when they activate the booking.
+    -->
+    <record id="wa12_tbc_venue" model="res.partner" forcecreate="True">
+        <field name="name">TBC — Phone Enquiry (placeholder)</field>
+        <field name="is_venue" eval="True"/>
+        <field name="is_company" eval="True"/>
+        <field name="comment">WA-12 placeholder venue for phone-quote provisional bookings. Replace with the real venue when the quote is accepted and the booking is activated. Do not delete — it is the standing fallback the quote provisioner references by xmlid.</field>
+    </record>
+</odoo>

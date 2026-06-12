@@ -42,3 +42,7 @@ from . import res_partner
 from . import neon_finance_dashboard
 # P6.M11 -- workshop write-off integration via incident extension.
 from . import neon_equipment_incident
+# WA-12 -- quote-by-WhatsApp provisioning + lifecycle layer (loads last:
+# _inherits neon.finance.quote + references commercial.event.job /
+# commercial.job, all registered above).
+from . import neon_finance_quote_wa12

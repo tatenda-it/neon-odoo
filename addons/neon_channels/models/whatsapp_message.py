@@ -155,6 +155,67 @@ class WhatsAppMessage(models.Model):
             _logger.error('Error sending WhatsApp message: %s', str(e))
             return False
 
+    def send_document(self, to_number, pdf_bytes, filename, caption=None):
+        """WA-12 -- send a PDF as a WhatsApp DOCUMENT message.
+
+        Two-step per the Cloud API: (1) multipart upload the bytes to
+        ``/{phone_number_id}/media`` -> ``media_id``; (2) post a
+        ``type=document`` message referencing the id. Best-effort: returns
+        True only on a 200 send, else False (logs, never raises) -- the
+        SAME discipline as ``send_message``. The inbound side already
+        recognises ``msg_type == 'document'`` (handle_inbound); this is the
+        missing OUTBOUND half.
+        """
+        config = self.env['neon.whatsapp.config'].search(
+            [('active', '=', True)], limit=1)
+        if not config:
+            _logger.error('WA-12 send_document: no active WhatsApp config.')
+            return False
+        base = f"https://graph.facebook.com/v25.0/{config.phone_number_id}"
+        auth = {"Authorization": f"Bearer {config.access_token}"}
+        # (1) upload the bytes -> media_id (multipart form, NOT json).
+        try:
+            up = requests.post(
+                f"{base}/media", headers=auth,
+                data={"messaging_product": "whatsapp",
+                      "type": "application/pdf"},
+                files={"file": (filename, pdf_bytes, "application/pdf")},
+            )
+        except Exception as e:  # noqa: BLE001
+            _logger.error('WA-12 send_document upload error: %s', str(e))
+            return False
+        if up.status_code != 200 or not (up.json() or {}).get("id"):
+            _logger.error(
+                'WA-12 send_document upload failed (%s): %s',
+                up.status_code, up.text)
+            return False
+        media_id = up.json()["id"]
+        # (2) send the document message referencing the uploaded media id.
+        document = {"id": media_id, "filename": filename}
+        if caption:
+            document["caption"] = caption
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to_number,
+            "type": "document",
+            "document": document,
+        }
+        try:
+            resp = requests.post(
+                f"{base}/messages", json=payload,
+                headers={**auth, "Content-Type": "application/json"})
+            if resp.status_code == 200:
+                _logger.info(
+                    'WA-12 document sent to %s (%s)', to_number, filename)
+                return True
+            _logger.error(
+                'WA-12 send_document send failed (%s): %s',
+                resp.status_code, resp.text)
+            return False
+        except Exception as e:  # noqa: BLE001
+            _logger.error('WA-12 send_document send error: %s', str(e))
+            return False
+
     # ==================================================================
     # WA-0 -- inbound router + cta_url outbound
     # ==================================================================

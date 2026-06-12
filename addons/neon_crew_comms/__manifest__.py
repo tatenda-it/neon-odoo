@@ -139,7 +139,16 @@
     # push with an Odoo-activity fallback; the create sends NOTHING (mail
     # suppressed). New wa10_* intents in neon_channels (17.0.1.20.0); the model
     # extension + check-in hook live in neon_jobs (17.0.8.4.0).
-    "version": "17.0.1.7.0",
+    # 17.0.1.8.0 = B11/WA-12 quote-by-WhatsApp orchestration (the first
+    # money-adjacent face). New whatsapp_message_wa12.py method bank: tight
+    # Quote:/Price: parsers + sales-capable entitlement, the q_confirm/q_reject
+    # FSM (new steps + _start_quote on wa_equip_session), provision->line-build
+    # ->no_rule guard->submit, and the dual-payload approval dispatch (HMAC
+    # in-window + template-QR; first-tap-wins advisory lock ns 5593900; gate +
+    # audience resolved from the approver GROUP). Intercept wired after WA-10,
+    # before WA-6. Provisioning + lifecycle live in neon_finance (17.0.7.10.0);
+    # intents in neon_channels (17.0.1.21.0). LIVE behind Robin's money sign-off.
+    "version": "17.0.1.8.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

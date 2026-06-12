@@ -57,6 +57,16 @@ class WhatsAppMessage(models.Model):
         handled = self._wa10_maybe_intercept(message)
         if handled is not None:
             return handled
+        # WA-12 quote-by-WhatsApp NEXT (sales-capable mapped staff): a wa12_*
+        # tap (interactive HMAC) OR an Approve/Reject/View-PDF template-QR tap,
+        # a q_* (quote) session turn, or a tight Quote:/Price: command. Claims
+        # ONLY those; returns None for anything else (incl. other sessions /
+        # crew taps / a mid-sentence "quote") so WA-6 / WA-5 / Copilot run
+        # unchanged. First MONEY-adjacent face -- gated to LIVE behind Robin's
+        # sign-off + the pricing load + the staged proof (test rates only).
+        handled = self._wa12_maybe_intercept(message)
+        if handled is not None:
+            return handled
         # WA-6 equipment face NEXT: a wa6_* tap, or a finalize free-text
         # turn for a phone with a live equip session. Disjoint from the
         # crew/WA-5 intents -- returns None for anything else so the WA-5 /

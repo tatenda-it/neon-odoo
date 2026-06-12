@@ -95,6 +95,17 @@ INTENTS = frozenset({
     #   wa10_pull (reserved; the "feedback" PULL pick uses NUMBER replies
     #     via the fb_pull session, not a tap)
     "wa10_fb", "wa10_notes", "wa10_pull",
+    # WA-12: quote-by-WhatsApp (MAPPED sales-capable staff; routed by the
+    # neon_crew_comms bridge intercept AFTER WA-10, before WA-6). The MD/OD
+    # approval ping's cold-window TEMPLATE quick-reply buttons route by their
+    # button TEXT ("Approve"/"Reject"/"View PDF" -- Meta strips emoji), the
+    # SAME mechanism as WA-2's crew_confirm; the IN-WINDOW interactive buttons
+    # carry these HMAC payloads (each = the quote id):
+    #   wa12_approve:<quote_id>   -- MD/OD approves -> action_approve
+    #   wa12_reject:<quote_id>    -- MD/OD rejects  -> prompt for a comment
+    #   wa12_view_pdf:<quote_id>  -- send the (draft|final) quote PDF in-chat
+    #   wa12_send:<quote_id>      -- requester sends the approved quote to client
+    "wa12_approve", "wa12_reject", "wa12_view_pdf", "wa12_send",
 })
 
 

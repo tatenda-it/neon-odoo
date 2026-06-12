@@ -106,7 +106,15 @@
     # sent-marker. The check-in wizard's action_confirm fires the WA-10 push
     # (guarded soft cross-module call -> neon_crew_comms; neon_jobs stays
     # standalone-installable). New nullable columns only -> no row migration.
-    "version": "17.0.8.4.0",
+    # 17.0.8.5.0 = B11/WA-12 support on commercial.event.job: an
+    # is_quote_provisional marker (new nullable bool) that suppresses the three
+    # create-time side-effects (checklists / event_created ACT / readiness_50)
+    # for a quote-provisioned draft chain, plus _apply_event_job_creation_effects
+    # (shared by create() and graduation) and _graduate_from_quote_provisional
+    # (flips the marker + replays those effects on quote-accept so a graduated
+    # job is operationally identical to a normal one). New nullable column only
+    # -> no row migration. The WA-12 finance/orchestration live elsewhere.
+    "version": "17.0.8.5.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema

@@ -71,7 +71,7 @@ audit trail attribute to the real MD/OD.
 | `send_document` outbound | new send type on `neon.whatsapp.message` (inbound already recognises `document`); **Meta `/media` upload → media_id → send by id**. Used at **TWO points**: the approver's [View PDF] tap (draft PDF) AND on approval (final PDF → requester) | **new** |
 | email-to-client | `action_send` already mails; **SMTP sender fix scope confirmed INSIDE this Gate-1** (outgoing-mail server / from-address / deliverability must be prod-ready) | confirm |
 | Meta template | the **MD/OD approval-ping template** (cold-window) — drafted + submitted EARLY (separate track, see the template draft) | **new (in flight)** |
-| tests | `pwa12` real-path (command→parse→draft→submit→approve-tap→PDF→send-tap), false-positive, reject+comment, self-approval, first-tap-wins, dimensional parse, **placeholder-rate BLOCKS submit (add 1)**, **entitlement denial — non-sales-mapped (add 2)**, **one-currency-per-quote / mixed-asks (add 3)**; + a staged `[TEST-WA12]` handset proof | new |
+| tests | `pwa12` real-path (command→parse→draft→submit→approve-tap→PDF→send-tap), false-positive, reject+comment, self-approval, first-tap-wins, dimensional parse, **placeholder-rate BLOCKS submit (add 1)**, **entitlement denial — mapped non-sales crew refused on BOTH faces, refusal leaks no capability (add 2)**, **one-currency-per-quote / mixed-asks (add 3)**, **dual-payload dispatch — [Approve]/[Reject]/[View PDF] matched as BOTH template-QR button text AND interactive HMAC payload (the live-proof seam)**; + a staged `[TEST-WA12]` handset proof | new |
 
 ## 4. ⛔ Gates / guardrails (binding)
 
@@ -97,9 +97,19 @@ audit trail attribute to the real MD/OD.
    the pricing load, so this guarantees **no $6 / placeholder quote ever reaches
    an approver**. **`pwa12` test REQUIRED** (placeholder line → submit blocked +
    honest message).
-2. **ENTITLEMENT GATE.** The `Quote:` command answers **sales-capable mapped
-   staff ONLY** (reuse the WA-8 entitlement rail). A non-entitled / unmapped
-   sender falls through (no quote lane). **Denial test REQUIRED.**
+2. **ENTITLEMENT GATE (APPROVED 2026-06-11).** `_wa12_can_quote` =
+   **OD/superuser + `neon_sales_rep` + `jobs_manager`** (narrower than WA-8's
+   any-mapped rail), **shared by `Quote:` AND `Price:`**. (Org-map verified:
+   Evrill covered — her groups are a superset of Lisa's.)
+   - **Non-sales MAPPED** sender → **polite, terse refusal that NEVER names the
+     capability** (no "quoting is for sales", no command syntax — e.g. "Sorry,
+     that isn't available on your account."). Don't teach excluded users what
+     the commands do.
+   - **UNMAPPED** sender → silent **fall-through** (client lane / Copilot, as
+     WA-6/7/8) — no acknowledgement at all.
+   - **Denial test (sharpened):** a **mapped NON-sales user (crew fixture)** is
+     refused on **BOTH** faces, AND the refusal text is asserted terse +
+     **leaks no command/capability detail**.
 3. **ONE CURRENCY PER QUOTE (v1).** A quote carries a single currency; a mixed
    request → **the bot asks** which. **ZiG only where a rate is configured;
    unset → exclude** (per the house rule / the manual ZiG↔USD rate). Test:
