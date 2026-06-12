@@ -6,7 +6,16 @@
     # chain + lifecycle hooks: graduate-on-accept / archive-on-dead-quote), the
     # DRAFT-stamped quote QWeb report (action_report_neon_quote), and the TBC
     # placeholder-venue data record. New layer (not a fix round) -> minor bump.
-    'version': '17.0.7.10.0',
+    # 17.0.7.10.1 = WA-12 pricing-engine fix (review): the pricing engine now
+    # resolves a reservation-less line's category via
+    # product_template_id.equipment_category_id (the documented hook) and prices
+    # it through the rule/bracket/day-multiplier -- so a WA-12 line is engine-
+    # priced (or 'no_rule'), never list_price-driven. create() keys engine-vs-
+    # manual on `not unit_rate`; recalc keys on `pricing_status != 'manual'` so
+    # an engine-priced reservation-less line re-prices instead of flipping to
+    # manual, while a hand-set 'manual' line is preserved. Reservation-backed
+    # lines are byte-unchanged (equipment_line_id short-circuit).
+    'version': '17.0.7.10.1',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

@@ -608,22 +608,22 @@ class WhatsAppMessageWA12(models.Model):
         QL = self.env["neon.finance.quote.line"].with_user(actor).sudo()
         for it in matched:
             prod = self.env["product.template"].sudo().browse(it["product_id"])
-            rate = prod.list_price or 0.0
-            # list_price is in the product's currency; never silently print it
-            # under a different quote currency. If they differ, zero the rate so
-            # the no_rule guard flags the line as unpriced rather than ship a
-            # mislabelled money figure on the ping/PDF.
-            if (prod.currency_id and quote.currency_id
-                    and prod.currency_id != quote.currency_id):
-                rate = 0.0
+            # unit_rate is left UNSET -> the pricing ENGINE resolves it from the
+            # product's equipment_category_id x the quote currency (rule +
+            # bracket + day-multiplier). A category with no rule -> 'no_rule' ->
+            # the no_rule guard blocks submit. The WA-12 lane NEVER reads
+            # list_price, so it can never fabricate a 'manual'-priced line (the
+            # guard-bypass we closed; pinned by the pwa12 guard-bypass test).
             QL.create({
                 "quote_id": quote.id,
                 "line_type": "equipment",
                 "product_template_id": prod.id,
                 "name": prod.name,
                 "quantity": float(it.get("qty") or 1),
-                "unit_rate": rate,
                 "duration_days": int(days or 1),
+                # explicit 0.0 (the column is NOT NULL); falsy -> the create()
+                # gate fires the engine instead of stamping 'manual'.
+                "unit_rate": 0.0,
             })
 
     def _wa12_unpriced_lines(self, quote):

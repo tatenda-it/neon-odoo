@@ -148,7 +148,13 @@
     # audience resolved from the approver GROUP). Intercept wired after WA-10,
     # before WA-6. Provisioning + lifecycle live in neon_finance (17.0.7.10.0);
     # intents in neon_channels (17.0.1.21.0). LIVE behind Robin's money sign-off.
-    "version": "17.0.1.8.0",
+    # 17.0.1.8.1 = WA-12 pricing-engine fix (review): _wa12_build_lines no longer
+    # reads product.list_price -- it creates the line with unit_rate=0.0 so the
+    # finance pricing ENGINE resolves the rate (rule x bracket x day-multiplier)
+    # via the product's equipment_category_id; an unruled category -> 'no_rule'
+    # -> the guard blocks submit. The WA-12 lane can no longer fabricate a
+    # 'manual'-priced line. Pairs with neon_finance 17.0.7.10.1.
+    "version": "17.0.1.8.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

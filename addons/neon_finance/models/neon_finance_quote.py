@@ -745,7 +745,16 @@ class NeonFinanceQuote(models.Model):
                 # (no equipment_line_id and no rule) flip to pricing_
                 # status='manual' if unit_rate > 0, else 'not_yet'.
                 line.snapshot_taken = False
-                if line.line_type == "equipment" and line.equipment_line_id:
+                # Re-price via the engine for a reservation-backed line, OR a
+                # reservation-less categorised line that is NOT a hand-set
+                # ('manual') line. Keying on pricing_status (not unit_rate) is
+                # what lets an engine-priced reservation-less line (unit_rate now
+                # >0 from the rule) RE-price on recalc instead of flipping to
+                # 'manual', while a genuinely hand-set 'manual' line is preserved.
+                if line.line_type == "equipment" and (
+                        line.equipment_line_id
+                        or (line.product_template_id.equipment_category_id
+                            and line.pricing_status != "manual")):
                     line._compute_line_pricing()
                 elif line.unit_rate > 0:
                     line.pricing_status = "manual"

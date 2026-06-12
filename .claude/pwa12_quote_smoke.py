@@ -107,6 +107,15 @@ if _old_p:
         [("partner_id", "in", _old_p.ids)]).unlink()
     _old_p.unlink()
 PT.with_context(active_test=False).search([("name", "like", "[TEST-WA12]")]).unlink()
+# [TEST-WA12] pricing fixtures: delete AFTER the products (which reference the
+# categories); the rule's unique(category,currency,effective_date) would
+# otherwise collide on a re-run.
+_orules = env["neon.finance.pricing.rule"].sudo().with_context(
+    active_test=False).search([("name", "like", "[TEST-WA12]")])
+_orules.mapped("bracket_ids").unlink()
+_orules.unlink()
+env["neon.equipment.category"].sudo().with_context(active_test=False).search(
+    [("name", "like", "[TEST-WA12]")]).unlink()
 for lg in ("pwa12_sales", "pwa12_crew", "pwa12_appr"):
     _wipe_login(lg)
 g_sales = env.ref("neon_core.group_neon_sales_rep")
@@ -132,17 +141,33 @@ for _u in (u_sales, u_crew, u_appr):
     _u.partner_id.write({"email": "%s@neon.test" % _u.login})
 
 client = P.create({"name": "[TEST-WA12] Acme Events Co"})
-cat = env["neon.equipment.category"].sudo().search([], limit=1)
+USD = env.ref("base.USD")
+# WA-12 prices through the ENGINE (rule x bracket x day-mult), NEVER list_price.
+# A dedicated [TEST-WA12] rule (base $50, bracket 1..* x1.0) gives a
+# deterministic $50/day -- NOT a Sound rule, so no ambiguity with PRC-0001. A
+# SECOND category with NO rule exercises the no_rule path.
+ECat = env["neon.equipment.category"].sudo()
+Rule = env["neon.finance.pricing.rule"].sudo()
+Bracket = env["neon.finance.pricing.bracket"].sudo()
+tcat = ECat.create({"name": "[TEST-WA12] Cat", "code": "TWA12CAT"})
+tcat_norule = ECat.create({"name": "[TEST-WA12] NoRuleCat", "code": "TWA12NR"})
+trule = Rule.create({
+    "name": "[TEST-WA12] Rule", "category_id": tcat.id, "currency_id": USD.id,
+    "base_rate": 50.0, "effective_date": "2020-01-01", "active": True})
+Bracket.create({"rule_id": trule.id, "sequence": 1, "day_from": 1,
+                "day_to": -1, "multiplier": 1.0})
 prod_ok = PT.create({
-    # a UNIQUE made-up token so _wa6_match_one widens to all workshop items
-    # (no category-synonym collision) and token-matches THIS product only.
+    # unique token so _wa6_match_one token-matches THIS product only; the
+    # list_price is DELIBERATELY 999 (!= the $50 rule) to PROVE the engine
+    # ignores list_price -- the line must price at $50 via tcat -> trule.
     "name": "[TEST-WA12] Qwertyunit", "is_workshop_item": True,
-    "list_price": 50.0,
-    "equipment_category_id": cat.id if cat else False})
+    "list_price": 999.0,
+    "equipment_category_id": tcat.id})
 prod_ph = PT.create({
+    # a category with NO rule -> the engine stamps 'no_rule' -> guard blocks.
     "name": "[TEST-WA12] Placeholder Gizmo", "is_workshop_item": True,
     "list_price": 1.0,
-    "equipment_category_id": cat.id if cat else False})
+    "equipment_category_id": tcat_norule.id})
 # a partner-scoped payment term so _wa12_ensure_payment_term resolves (the
 # prod DB carries terms; the test DB starts with none).
 PTerm = env["neon.finance.payment.term"].sudo()
@@ -234,6 +259,19 @@ _check("T-WA12-05",
            quote.name if quote else "-", cjob.id if cjob else "-",
            len(quote.line_ids) if quote else 0))
 
+# ---- T-WA12-05a (review-fix: ENGINE pricing, NOT list_price) — prod_ok x2 x1d
+# prices $50/day via tcat->trule (its list_price is 999, which MUST be ignored):
+# 50 x 2 x 1 = $100.00 ex-VAT, $115.50 incl 15.5% VAT.
+okl = quote.line_ids.filtered(lambda l: l.product_template_id == prod_ok)[:1]
+_check("T-WA12-05a",
+       okl.pricing_status == "priced" and abs(okl.unit_rate - 50.0) < 0.01
+       and abs(quote.amount_untaxed - 100.0) < 0.01
+       and abs(quote.amount_total - 115.50) < 0.01,
+       "engine-priced via rule: line=%s rate=%s (list_price 999 IGNORED); "
+       "untaxed=%s total=%s (want priced/50/100.00/115.50)" % (
+           okl.pricing_status, okl.unit_rate,
+           quote.amount_untaxed, quote.amount_total))
+
 # ---------------------------------------------------------- T-WA12-06 binding-b
 n_checklists = len(ejob.checklist_ids) if "checklist_ids" in ejob._fields else 0
 _check("T-WA12-06",
@@ -258,6 +296,7 @@ ph_quote = quote
 M.sudo()._wa12_build_lines(ph_quote, [{"product_id": prod_ph.id, "qty": 1}], 1)
 ph_quote.action_recalculate_pricing()
 unpriced = M.sudo()._wa12_unpriced_lines(ph_quote)
+phl = ph_quote.line_ids.filtered(lambda l: l.product_template_id == prod_ph)[:1]
 blocked = False
 try:
     if not unpriced:
@@ -266,8 +305,10 @@ try:
         blocked = True
 except Exception:
     blocked = True
-_check("T-WA12-07", bool(unpriced) and blocked,
-       "placeholder line -> unpriced=%s, submit blocked" % unpriced)
+# (review-fix b) an UNRULED category resolves the engine's no_rule path -> guard
+_check("T-WA12-07", bool(unpriced) and blocked and phl.pricing_status == "no_rule",
+       "unruled-category line status=%s -> unpriced=%s, submit blocked"
+       % (phl.pricing_status, unpriced))
 
 # ---------------------------------------------------------- T-WA12-08 graduation
 # build a clean (priced-only) quote, submit, approve, check graduation
@@ -415,6 +456,38 @@ _check("T-WA12-17",
        "2 pending -> template-QR Approve refused, neither approved (dp=%s dp2=%s)"
        % (dp.state, dp2.state))
 
+# ---- T-WA12-18 (review-fix c) REGRESSION: a hand-set rate on a categorized
+# product with NO equipment_line_id stays 'manual' -- the engine widening
+# (scoped to unit_rate==0) must NOT re-price it to the rule's $50.
+mq = Q._wa12_provision_chain(client, "2026-10-01", USD, u_sales)
+mline = env["neon.finance.quote.line"].sudo().create({
+    "quote_id": mq.id, "line_type": "equipment", "product_template_id": prod_ok.id,
+    "name": "[TEST-WA12] manual", "quantity": 1, "unit_rate": 80.0,
+    "duration_days": 1})
+m_create = mline.pricing_status
+mq.action_recalculate_pricing()
+_check("T-WA12-18",
+       m_create == "manual" and mline.pricing_status == "manual"
+       and abs(mline.unit_rate - 80.0) < 0.01,
+       "manual line preserved (create=%s recalc=%s rate=%s; NOT repriced to 50)"
+       % (m_create, mline.pricing_status, mline.unit_rate))
+# reservation-backed lines are byte-unchanged by construction: the gate is
+# `equipment_line_id OR (new clause)` -> when equipment_line_id is set the new
+# clause is never evaluated (short-circuit). Covered structurally + by pwa6.
+
+# ---- T-WA12-19 (review-fix d) GUARD-BYPASS pinned: the WA-12 lane never sets
+# unit_rate, so it can NEVER fabricate a 'manual'-priced line for ANY input --
+# the engine prices ('priced') or stamps 'no_rule'. (The defeat we found.)
+dq = Q._wa12_provision_chain(client, "2026-10-02", USD, u_sales)
+M.sudo()._wa12_build_lines(dq, [{"product_id": prod_ok.id, "qty": 1},
+                                {"product_id": prod_ph.id, "qty": 1}], 1)
+dq.action_recalculate_pricing()
+_dstatuses = dq.line_ids.mapped("pricing_status")
+_check("T-WA12-19",
+       "manual" not in _dstatuses
+       and set(_dstatuses) <= {"priced", "no_rule", "not_yet"},
+       "WA-12 lane fabricates no 'manual' line: statuses=%s" % _dstatuses)
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(
@@ -463,6 +536,14 @@ _moves.with_context(force_delete=True).unlink()
 tquotes.unlink()
 tjobs.unlink(); tcjobs.unlink()
 (prod_ok | prod_ph).unlink()
+# [TEST-WA12] pricing fixtures: rule (+ brackets) then categories, AFTER the
+# products that reference the categories.
+_trules = Rule.with_context(active_test=False).search(
+    [("name", "like", "[TEST-WA12]")])
+_trules.mapped("bracket_ids").unlink()
+_trules.unlink()
+ECat.with_context(active_test=False).search(
+    [("name", "like", "[TEST-WA12]")]).unlink()
 # payment terms: by NAME (our fixture) AND by PARTNER (_wa12_ensure_payment_term
 # may have auto-created a default-named term for the client).
 (PTerm.search([("name", "like", "[TEST-WA12]")])

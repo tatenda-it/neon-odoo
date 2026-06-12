@@ -297,11 +297,16 @@ class NeonFinanceQuoteLine(models.Model):
                 # Created with an explicit snapshot (e.g. by the
                 # Recalculate action) -- don't re-snapshot.
                 continue
-            if line.line_type == "equipment" and line.equipment_line_id:
+            if line.line_type == "equipment" and (
+                    line.equipment_line_id
+                    or (line.product_template_id.equipment_category_id
+                        and not line.unit_rate)):
+                # reservation-backed line, OR a reservation-less line that has a
+                # resolvable category and NO hand-set rate (WA-12) -> engine.
                 line._compute_line_pricing()
             elif line.unit_rate > 0:
                 # Salesperson typed in a rate without an equipment link
-                # -- treat as manual.
+                # -- treat as manual (unchanged).
                 line.pricing_status = "manual"
         return lines
 
@@ -319,9 +324,16 @@ class NeonFinanceQuoteLine(models.Model):
         read-only ACL on pricing.rule still resolves the lookup
         (P6.M1 CSV grants Sales read-only)."""
         self.ensure_one()
-        if not self.equipment_line_id:
-            return self.env["neon.finance.pricing.rule"]
-        category = self.equipment_line_id.category_id
+        # Category source: the equipment reservation's category when present
+        # (the P6.M3 path); else fall back to the line product's
+        # equipment_category_id (the documented hook above), so a
+        # reservation-less line -- e.g. a WA-12 WhatsApp quote, which books no
+        # stock and carries no equipment_line_id -- still prices through the
+        # engine instead of silently keeping a hand-set rate.
+        if self.equipment_line_id:
+            category = self.equipment_line_id.category_id
+        else:
+            category = self.product_template_id.equipment_category_id
         currency = self.quote_id.currency_id
         if not category or not currency:
             return self.env["neon.finance.pricing.rule"]
@@ -394,7 +406,9 @@ class NeonFinanceQuoteLine(models.Model):
                     "line %s (category=%s, currency=%s); leaving unit_rate "
                     "at %s for manual entry.",
                     line.name,
-                    line.equipment_line_id.category_id.display_name or "(none)",
+                    (line.equipment_line_id.category_id.display_name
+                     or line.product_template_id.equipment_category_id.display_name
+                     or "(none)"),
                     line.currency_id.name or "(none)",
                     line.unit_rate,
                 )
