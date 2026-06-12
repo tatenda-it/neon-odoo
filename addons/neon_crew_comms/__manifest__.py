@@ -154,7 +154,11 @@
     # via the product's equipment_category_id; an unruled category -> 'no_rule'
     # -> the guard blocks submit. The WA-12 lane can no longer fabricate a
     # 'manual'-priced line. Pairs with neon_finance 17.0.7.10.1.
-    "version": "17.0.1.8.1",
+    # 17.0.1.8.2 = WA-12 send-leg guard: _wa12_handle_send_to_client checks the
+    # client has an email before action_send; absent -> honest refusal + state
+    # stays 'approved' (no false "sent" on an undelivered quote). Rides the LIVE
+    # batch with the quote-PDF design alignment (neon_finance 17.0.7.10.2).
+    "version": "17.0.1.8.2",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

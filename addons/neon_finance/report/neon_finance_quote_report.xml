@@ -32,8 +32,27 @@
     <template id="report_neon_quote_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
+                <!-- single-company: quote has no company_id; the rendering env
+                     company == the main company. Header/logo/landline/address
+                     come from web.external_layout (the company Document Layout +
+                     res.company fields). -->
+                <t t-set="company" t-value="o.env.company"/>
+                <t t-set="rep" t-value="o.salesperson_id"/>
+                <t t-set="rep_mobile" t-value="rep.mobile or rep.partner_id.mobile"/>
                 <t t-call="web.external_layout">
                     <div class="page">
+
+                        <!-- Quotation # title: TOP-RIGHT, opposite the top-left
+                             company logo in the header (change 8). The
+                             Date / Expiration / Salesperson row stays below. -->
+                        <div class="row">
+                            <div class="col-12 text-end mb-2">
+                                <h2 class="mb-0" style="color:#7165AC;">Quotation</h2>
+                                <div style="font-size:1.15em;font-weight:bold;">
+                                    <span t-field="o.name"/>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- DRAFT stamp: draft + pending_approval only -->
                         <div t-if="o.state in ('draft', 'pending_approval')"
@@ -42,44 +61,75 @@
                             DRAFT QUOTE &#8212; NOT YET APPROVED
                         </div>
 
-                        <h2 class="mt-2">
-                            Quotation <span t-field="o.name"/>
-                        </h2>
-
-                        <div class="row mt-3 mb-3">
+                        <!-- Client + Date / Expiration / Salesperson -->
+                        <div class="row mt-2 mb-2">
                             <div class="col-6">
-                                <strong>Client</strong><br/>
+                                <strong>To:</strong><br/>
                                 <span t-field="o.partner_id"
                                       t-options='{"widget": "contact", "fields": ["name", "address", "phone", "email"], "no_marker": true}'/>
                             </div>
                             <div class="col-6 text-end">
-                                <div>Date: <span t-field="o.create_date"
-                                                 t-options='{"widget": "date"}'/></div>
-                                <div t-if="o.expires_at">Valid until:
+                                <div><strong>Quotation Date:</strong>
+                                    <span t-field="o.create_date"
+                                          t-options='{"widget": "date"}'/></div>
+                                <div t-if="o.expires_at"><strong>Expiration:</strong>
                                     <span t-field="o.expires_at"/></div>
-                                <div>Currency: <span t-field="o.currency_id.name"/></div>
+                                <div><strong>Salesperson:</strong>
+                                    <span t-out="rep.name or '[not set]'"/></div>
+                                <div><strong>Currency:</strong>
+                                    <span t-field="o.currency_id.name"/></div>
                             </div>
                         </div>
 
+                        <!-- Tax Information bar (TIN / Vendor # / VAT) -->
+                        <div class="row mb-3" name="neon_tax_bar"
+                             t-if="company.x_zimra_tin or company.x_zimra_bpn or company.partner_id.vat">
+                            <div class="col-12">
+                                <div class="p-2"
+                                     style="background-color:#F4F2F8;border-left:3px solid #7165AC;font-size:0.85em;">
+                                    <strong>Tax Information:</strong>
+                                    <span t-if="company.x_zimra_tin">TIN
+                                        <t t-out="company.x_zimra_tin"/></span>
+                                    <span t-if="company.x_zimra_bpn" class="ms-3">Vendor #
+                                        <t t-out="company.x_zimra_bpn"/></span>
+                                    <span t-if="company.partner_id.vat" class="ms-3">VAT
+                                        <t t-out="company.partner_id.vat"/></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cover-letter greeting -->
+                        <div class="mb-3" name="neon_cover_letter">
+                            <p>Dear <span t-out="o.partner_id.name"/>,</p>
+                            <p>Thank you for your enquiry. We are pleased to provide the
+                               quotation set out below for your event. All rates are
+                               subject to equipment availability on the requested dates.</p>
+                        </div>
+
+                        <!-- Lines: Description | Qty | Days | Rate/day | Taxes |
+                             Amount. Amount = qty x rate/day x days (= the line's
+                             line_subtotal), matching the engine math exactly. -->
                         <table class="table table-sm o_main_table">
                             <thead>
                                 <tr>
-                                    <th>Item</th>
+                                    <th>Description</th>
                                     <th class="text-end">Qty</th>
-                                    <th class="text-end">Day rate</th>
                                     <th class="text-end">Days</th>
-                                    <th class="text-end">Subtotal</th>
+                                    <th class="text-end">Rate/day</th>
+                                    <th>Taxes</th>
+                                    <th class="text-end">Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr t-foreach="o.line_ids" t-as="l">
                                     <td><span t-field="l.name"/></td>
                                     <td class="text-end"><span t-field="l.quantity"/></td>
+                                    <td class="text-end"><span t-field="l.duration_days"/></td>
                                     <td class="text-end">
                                         <span t-field="l.unit_rate"
                                               t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                                     </td>
-                                    <td class="text-end"><span t-field="l.duration_days"/></td>
+                                    <td><span t-out="l.tax_id.name or ''"/></td>
                                     <td class="text-end">
                                         <span t-field="l.line_subtotal"
                                               t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
@@ -88,7 +138,7 @@
                             </tbody>
                         </table>
 
-                        <div class="row">
+                        <div class="row" name="so_total_summary">
                             <div class="col-6 offset-6">
                                 <table class="table table-sm">
                                     <tr>
@@ -121,10 +171,71 @@
                             <span t-field="o.payment_term_id.display_name"/>
                         </div>
 
-                        <p class="mt-4 text-muted" style="font-size:11px;">
-                            Neon Events Elements &#183; quotation subject to
-                            equipment availability on the requested dates. VAT at
-                            the ZIMRA standard rate (15.5%). E&amp;OE.
+                        <!-- Banking Details: USD + ZWG CABS, star on the account
+                             matching this quote's currency -->
+                        <div class="mt-4 mb-3" name="neon_banking"
+                             t-if="company.bank_ids">
+                            <h5 style="color:#7165AC;border-bottom:1px solid #7165AC;padding-bottom:4px;">
+                                Banking Details
+                            </h5>
+                            <p class="text-muted" style="font-size:0.85em;">
+                                Please pay into the account matching this
+                                quotation's currency.
+                            </p>
+                            <div class="row">
+                                <t t-foreach="company.bank_ids" t-as="bank">
+                                    <t t-set="is_match"
+                                       t-value="bank.currency_id and bank.currency_id == o.currency_id"/>
+                                    <div class="col-6 mb-2">
+                                        <div class="p-2"
+                                             t-attf-style="border:1px solid {{ '#7165AC' if is_match else '#DDDDDD' }};background-color:{{ '#F4F2F8' if is_match else 'transparent' }};border-radius:4px;">
+                                            <div t-if="is_match"
+                                                 style="font-size:0.75em;color:#7165AC;font-weight:bold;">
+                                                &#9733; PAY IN THIS CURRENCY
+                                            </div>
+                                            <strong>
+                                                <t t-out="bank.currency_id.name or 'Account'"/>
+                                            </strong><br/>
+                                            <span style="font-size:0.9em;">
+                                                Bank: <t t-out="bank.bank_id.name or ''"/><br/>
+                                                Branch: <t t-out="bank.x_branch_name or ''"/><br/>
+                                                Account Name:
+                                                <t t-out="bank.acc_holder_name or company.name"/><br/>
+                                                Account Number: <t t-out="bank.acc_number"/>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+
+                        <!-- Terms and Conditions: a LINK to the published terms
+                             (not an attachment). The old "available on request"
+                             line is removed per the design alignment. -->
+                        <div class="mt-3" name="neon_tcs"
+                             style="font-size:0.85em;border-top:1px solid #7165AC;padding-top:6px;">
+                            Standard Neon Events Elements Pvt Ltd terms apply
+                            &#8212; read the full
+                            <a href="https://neonhiring.com/terms-and-conditions/">Terms &amp; Conditions</a>
+                            at
+                            <a href="https://neonhiring.com/terms-and-conditions/">https://neonhiring.com/terms-and-conditions/</a>.
+                        </div>
+
+                        <!-- Footer: the requesting rep's contact, so the client
+                             knows exactly who to call. Flags missing email/mobile
+                             rather than printing blanks. -->
+                        <div class="mt-4" name="neon_rep_footer"
+                             style="font-size:0.85em;border-top:1px dashed #CCCCCC;padding-top:6px;">
+                            <strong>Your Neon contact:</strong>
+                            <span t-out="rep.name or '[salesperson not set]'"/>
+                            <t t-if="rep.email"> &#183; <t t-out="rep.email"/></t>
+                            <t t-else=""> &#183; <span style="color:#CC0000;">[work email missing &#8212; update profile]</span></t>
+                            <t t-if="rep_mobile"> &#183; <t t-out="rep_mobile"/></t>
+                            <t t-else=""> &#183; <span style="color:#CC0000;">[mobile missing &#8212; update profile]</span></t>
+                        </div>
+
+                        <p class="mt-3 text-muted" style="font-size:11px;">
+                            VAT at the ZIMRA standard rate (15.5%). E&amp;OE.
                         </p>
                     </div>
                 </t>

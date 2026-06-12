@@ -86,10 +86,19 @@
     <data noupdate="0">
         <record id="base.main_company" model="res.company">
             <field name="email">admin@neonhiring.co.zw</field>
-            <field name="phone">+263775672250</field>
+            <!-- WA-12 design alignment: the letterhead now shows the company
+                 LANDLINE (not Munashe's mobile). street/city populate the header
+                 address (previously empty). The external_layout renders these
+                 res.company fields directly; nothing is hardcoded in the quote
+                 report. NOTE: address per the agreed template; Robin/admin to
+                 CONFIRM the exact field split before the LIVE deploy. -->
+            <field name="phone">+2638677212181</field>
+            <field name="street">154 Chapman Avenue</field>
+            <field name="street2">Eastlea</field>
+            <field name="city">Harare</field>
             <field name="website">https://neonhiring.com</field>
             <field name="report_footer" type="html">
-                <p>admin@neonhiring.co.zw • https://neonhiring.com • +263775672250</p>
+                <p>admin@neonhiring.co.zw • https://neonhiring.com • +2638677212181</p>
             </field>
         </record>
     </data>
