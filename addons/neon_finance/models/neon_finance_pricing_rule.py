@@ -32,9 +32,23 @@ class NeonFinancePricingRule(models.Model):
     category_id = fields.Many2one(
         "neon.equipment.category",
         string="Category",
-        required=True,
+        required=False,
         ondelete="restrict",
         index=True,
+        help="Category-scoped rule (the fallback tier). A rule is EITHER "
+        "product-scoped (product_template_id set) OR category-scoped "
+        "(category_id set) -- exactly one.",
+    )
+    # WA-12.1 per-product PRIMARY pricing: a product-scoped rule wins over the
+    # category rule. nullable; the resolver tries product first, then category.
+    product_template_id = fields.Many2one(
+        "product.template",
+        string="Product",
+        required=False,
+        ondelete="restrict",
+        index=True,
+        help="Product-scoped rule (the PRIMARY tier, WA-12.1). When set, this "
+        "rate applies to exactly this product, ahead of any category rule.",
     )
     currency_id = fields.Many2one(
         "res.currency",
@@ -71,9 +85,17 @@ class NeonFinancePricingRule(models.Model):
     notes = fields.Text()
 
     _sql_constraints = [
+        # Each only bites for its non-NULL key (Postgres treats NULLs as
+        # distinct), so category rules (product NULL) and product rules
+        # (category NULL) are each uniquely keyed without colliding.
         ("unique_category_currency_effective",
          "UNIQUE (category_id, currency_id, effective_date)",
          "A pricing rule already exists for this category, currency, "
+         "and effective date. Adjust the existing record or pick a "
+         "new effective date."),
+        ("unique_product_currency_effective",
+         "UNIQUE (product_template_id, currency_id, effective_date)",
+         "A pricing rule already exists for this product, currency, "
          "and effective date. Adjust the existing record or pick a "
          "new effective date."),
     ]
@@ -85,3 +107,14 @@ class NeonFinancePricingRule(models.Model):
                 raise ValidationError(_(
                     "Base rate must be zero or positive (got %s) "
                     "on rule %s.") % (rec.base_rate, rec.display_name))
+
+    @api.constrains("product_template_id", "category_id")
+    def _check_exactly_one_scope(self):
+        """A rule is EITHER product-scoped OR category-scoped, never both,
+        never neither (WA-12.1 per-product PRIMARY + the category fallback)."""
+        for rec in self:
+            if bool(rec.product_template_id) == bool(rec.category_id):
+                raise ValidationError(_(
+                    "Pricing rule %s must set EXACTLY ONE of Product "
+                    "(per-product rate) or Category (fallback rate) -- "
+                    "not both, not neither.") % rec.display_name)

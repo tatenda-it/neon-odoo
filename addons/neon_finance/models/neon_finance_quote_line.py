@@ -311,42 +311,57 @@ class NeonFinanceQuoteLine(models.Model):
         return lines
 
     def _find_pricing_rule(self):
-        """Return the most-recent active pricing rule for this line's
-        category x currency, or an empty recordset if none exists.
+        """Return the most-recent active pricing rule for this line, or an
+        empty recordset (-> no_rule) if none exists.
 
-        Lookup chain:
-          equipment_line_id -> category_id
-          quote_id -> currency_id
-          neon.finance.pricing.rule(category, currency, effective_date<=today)
-            ordered by effective_date desc, take first.
+        Resolution tiers (WA-12.1 per-product PRIMARY):
+          1) PRODUCT rule: the line's product x currency (the per-product rate).
+          2) CATEGORY rule: the line's equipment category x currency (fallback;
+             architecture for future real category rates -- the P6 placeholder
+             category rules are deactivated at the catalogue load, so a product
+             with no product rule resolves no_rule, NOT placeholder money).
+          3) empty -> no_rule -> the guard blocks submit.
 
-        Returns the rule's sudo recordset so the salesperson's
-        read-only ACL on pricing.rule still resolves the lookup
+        Product source: the line's product_template_id, else the equipment
+        reservation's product. Category source: equipment_line_id.category_id
+        (the reservation path) else product_template_id.equipment_category_id
+        (the reservation-less WA-12 path).
+
+        sudo so the salesperson's read-only ACL on pricing.rule still resolves
         (P6.M1 CSV grants Sales read-only)."""
         self.ensure_one()
-        # Category source: the equipment reservation's category when present
-        # (the P6.M3 path); else fall back to the line product's
-        # equipment_category_id (the documented hook above), so a
-        # reservation-less line -- e.g. a WA-12 WhatsApp quote, which books no
-        # stock and carries no equipment_line_id -- still prices through the
-        # engine instead of silently keeping a hand-set rate.
+        currency = self.quote_id.currency_id
+        if not currency:
+            return self.env["neon.finance.pricing.rule"]
+        Rule = self.env["neon.finance.pricing.rule"].sudo()
+        today = fields.Date.context_today(self)
+        prod = self.product_template_id or (
+            self.equipment_line_id.product_template_id
+            if self.equipment_line_id else self.env["product.template"])
+        # 1) per-product rule (PRIMARY)
+        if prod:
+            pr = Rule.search([
+                ("product_template_id", "=", prod.id),
+                ("currency_id", "=", currency.id),
+                ("active", "=", True),
+                ("effective_date", "<=", today),
+            ], order="effective_date desc, id desc", limit=1)
+            if pr:
+                return pr
+        # 2) category rule (fallback tier)
         if self.equipment_line_id:
             category = self.equipment_line_id.category_id
         else:
             category = self.product_template_id.equipment_category_id
-        currency = self.quote_id.currency_id
-        if not category or not currency:
+        if not category:
             return self.env["neon.finance.pricing.rule"]
-        return self.env["neon.finance.pricing.rule"].sudo().search(
-            [
-                ("category_id", "=", category.id),
-                ("currency_id", "=", currency.id),
-                ("active", "=", True),
-                ("effective_date", "<=", fields.Date.context_today(self)),
-            ],
-            order="effective_date desc, id desc",
-            limit=1,
-        )
+        return Rule.search([
+            ("product_template_id", "=", False),
+            ("category_id", "=", category.id),
+            ("currency_id", "=", currency.id),
+            ("active", "=", True),
+            ("effective_date", "<=", today),
+        ], order="effective_date desc, id desc", limit=1)
 
     @staticmethod
     def _find_bracket(rule, total_days):

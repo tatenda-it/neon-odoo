@@ -333,3 +333,47 @@ still exits (never trap the user). Commands:
   logic, not a patch) — minor bump.
 - ⛔ **Money-adjacent.** Robin's money sign-off covers **WA-12 pricing + flexibility
   + WA-13 in one sitting** → the LIVE batch then builds + deploys **as one**.
+
+---
+
+## §9 — PRICING MODEL: per-product PRIMARY (reconciled to WA-12.1, not a new decision)
+
+Per the granularity reversal already ratified as **WA-12.1 (per-product PRIMARY)**,
+the pricing engine is **product-keyed** (Option 1, ratified 2026-06-12):
+
+- **Model (BUILT, chunk 1):** `neon.finance.pricing.rule` gains a nullable
+  `product_template_id`; `category_id` made optional; a CHECK that a rule sets
+  **exactly one** of product/category; a 2nd unique on
+  `(product_template_id, currency_id, effective_date)`. neon_finance 17.0.7.10.4.
+- **Resolver (BUILT, chunk 1):** `_find_pricing_rule` = **product rule -> category
+  rule -> empty(no_rule)**. The Option-B WA-12 path is unchanged (it just resolves
+  product-first now). Verified: a product rule beats the category rule and
+  list_price; category-only falls back; neither -> blocked.
+- **Binding (a) NO PLACEHOLDER FALLBACK:** the catalogue load **deactivates** the
+  18 P6 placeholder category rules, so a product with no product rule resolves
+  **no_rule -> the guard blocks**, never placeholder money. The category tier
+  stays as architecture for FUTURE real category rates only.
+- **Binding (b) FLAT DAY CURVE:** every per-product rule is seeded with a single
+  bracket `day_from=1, day_to=-1, multiplier=1.0` (Robin's list is flat per-day;
+  multi-day discount curves are a logged FUTURE Robin question, not assumed;
+  extensions are new quotes per the standing ruling).
+
+### Catalogue load (chunk 2, unblocked by chunk 1)
+From `WA12_pricing_decision_worksheet.csv` (314 rows, final ticked):
+- **271 creates** -> new `product.template` (workshop/service) + a per-product
+  rule (flat 1.0).
+- **41 maps** -> set/confirm the per-product rule on the existing Odoo product;
+  apply the **renames** (ZETHUS typo, RGB LED CAN, ALLEN & HEATH SQ6, drop the
+  AVOLITES serial, 360 BOOTH).
+- **2 skips** (SHURE/INNOPOW receivers -> no rule; add-ons).
+- **3 user rate-corrections (12-Jun):** LOW FOGGER $150, POWERWORKS MONITOR
+  $45/unit (the Zoho $180 group-of-4 -> per-unit), POWERWORKS INEAR MONITOR
+  $20/unit (new; never in Zoho).
+- **Deactivate the 18 placeholder category rules** (binding a).
+- Money-adjacent prod write -> runs at the DEPLOY gate (Tatenda's clicks), with
+  the dry-run row list + count verification per the data-load ritual.
+
+### pwa additions
+product-rule resolution ($X per the worksheet); no-product-rule -> no_rule
+**blocked** (NOT placeholder-priced); LOW FOGGER $150 + POWERWORKS MONITOR
+$45/unit spot-checks; day math `qty x rate x days` flat (bracket 1.0).
