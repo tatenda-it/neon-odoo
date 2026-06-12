@@ -444,6 +444,47 @@ _check("T-WA13-12", res is True and _sent_doc(s, SALES_PH),
        "handle_inbound routes a `Send quote` to WA-13 (after WA-12, before "
        "WA-6): res=%s" % res)
 
+# ------------------------------------------------------- T-WA13-13 STOP release
+# (review WA13-1) a live WA-13 session must RELEASE an opt-out keyword (return
+# None -> super() -> the WA-2 opt-out handler), never swallow it.
+Sess._start_inv(APPR_PH, u_appr, "inv_confirm",
+                {"quote_id": q_c.id, "schedule_id": sched_c.id})
+r_stop = D_appr._wa13_maybe_intercept(_txt(APPR_PH, "STOP"))
+still_live = bool(Sess._active_for_phone(APPR_PH))  # WA-13 didn't cancel it
+_check("T-WA13-13", r_stop is None and still_live,
+       "STOP during a live inv_confirm session -> released (None), session not "
+       "swallowed (live=%s)" % still_live)
+Sess.with_context(active_test=False).search(
+    [("phone_number", "=", APPR_PH)]).write({"active": False})
+
+# ------------------------------------------------------- T-WA13-14 VAT label
+# (review WA13-F2-VATLABEL) the confirm text tracks ACTUAL tax: a tax-free line
+# -> amount_tax 0 -> '(no VAT)', never a hardcoded '(incl. VAT)'.
+qv = _new_quote(cC, u_sales)
+qv.line_ids.write({"tax_id": False})
+qv.invalidate_recordset()
+schv = Sched.create({"name": "[TEST-WA13] VAT", "quote_id": qv.id,
+                     "stage": "final", "trigger": "manual", "percentage": 100.0})
+vtxt = D_appr._wa13_confirm_text(schv)
+_check("T-WA13-14",
+       (qv.amount_tax or 0.0) == 0.0 and "(no VAT)" in vtxt,
+       "tax-free quote -> confirm says (no VAT) (amount_tax=%s, text=%r)"
+       % (qv.amount_tax, vtxt[:90]))
+
+# ------------------------------------------------------- T-WA13-15 doc_pick gate
+# (review WA13-SEC-01 / WA13-2) doc_pick re-gates the CURRENT phone owner EVERY
+# turn: a deactivated owner mid-session -> pick refused + session closed.
+Sess._start_inv(APPR_PH, u_appr, "doc_pick",
+                {"kind": "quote", "ids": [q_sales.id, q_c.id]})
+u_appr.write({"active": False})
+s = _since()
+M._wa13_maybe_intercept(_txt(APPR_PH, "1"))
+regated = (REFUSAL in _last_body(s, APPR_PH)
+           and not Sess._active_for_phone(APPR_PH))
+u_appr.write({"active": True})  # restore for teardown
+_check("T-WA13-15", regated,
+       "doc_pick re-gates a deactivated owner mid-session (refused + closed)")
+
 # ---------------------------------------------------------------- teardown
 print("--- teardown ---")
 _tcli = P.with_context(active_test=False).search([("name", "like", "[TEST-WA13]")])

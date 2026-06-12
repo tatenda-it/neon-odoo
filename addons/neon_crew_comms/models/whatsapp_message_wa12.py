@@ -338,6 +338,16 @@ class WhatsAppMessageWA12(models.Model):
         if not (sender and sender.active and ok):
             sess.sudo().write({"active": False})
             return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
+        # a stray INTERACTIVE tap (e.g. a stale WA-13 button titled 'Cancel')
+        # reaching a q_* TEXT session must NOT have its TITLE parsed as a
+        # 'cancel'/'yes'/edit command (that would cancel a live quote draft) --
+        # claim the turn + re-prompt, never act on it. q_* turns are text-only.
+        if message.get("type") == "interactive":
+            if sess.step == "q_reject":
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Send a one-line reason and I'll relay it to the requester."))
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Reply *yes* to submit, *cancel*, or edit the draft."))
         buf = sess._get_buffer()
         buf = buf if isinstance(buf, dict) else {}
         quote = self.env["neon.finance.quote"].sudo().browse(
@@ -406,7 +416,22 @@ class WhatsAppMessageWA12(models.Model):
     def _wa12_after_edit(self, quote, from_e164, raw_from, note):
         """Recalc + re-show the draft summary with the edit note + the prompt."""
         actor = quote.salesperson_id.id or self.env.uid
-        quote.with_user(actor).sudo().action_recalculate_pricing()
+        # ⚠️ DECISION (review WA12-FLEX-2): a `days N` recalc re-prices an
+        # engine line through the day-bracket. With binding (b) every per-
+        # product rule is FLAT (1..* x1.0) and binding (a) deactivates the
+        # category placeholders, so unit_rate does NOT change on a day edit ->
+        # a set discount neither drifts nor exceeds the base. The reviewer's
+        # 'mark the line manual' fix is rejected: _wa12_unpriced_lines blocks a
+        # 'manual' equipment line (anti-fabrication guard), so it would break
+        # submit. The residual silent-drift / _check_discount edge is reachable
+        # ONLY if a future REAL multi-bracket day-taper CATEGORY rule is added
+        # (polish backlog, LOW). Until then we GUARD the recalc: a
+        # ValidationError (<: UserError) becomes a clean reply, never a silent
+        # half-applied turn or a 500.
+        try:
+            quote.with_user(actor).sudo().action_recalculate_pricing()
+        except (UserError, AccessError) as e:
+            return self._wa6_reply(raw_from, from_e164, str(e))
         unpriced = self._wa12_unpriced_lines(quote)
         summary = self._wa12_draft_summary(quote, unpriced)
         tail = (_("\n\n⚠️ Can't submit yet — no rate set: %s.")
@@ -718,6 +743,29 @@ class WhatsAppMessageWA12(models.Model):
     # ================================================================
     # Price: face — read-only.
     # ================================================================
+    @api.model
+    def _wa12_price_lookup(self, product):
+        """The per-product day rate via the SAME engine resolver the quote line
+        uses (mirrors neon.finance.quote.line._find_pricing_rule: per-product
+        rule PRIMARY -> category rule fallback -> none). Returns
+        (rate_or_None, currency_name). Per binding (b) every per-product rule
+        carries a flat 1.0 bracket, so base_rate IS the per-day rate. USD v1
+        (Q3). This is why Price: never reads product.list_price."""
+        currency = self.env.ref("base.USD")
+        Rule = self.env["neon.finance.pricing.rule"].sudo()
+        today = fields.Date.context_today(self)
+        base = [("currency_id", "=", currency.id), ("active", "=", True),
+                ("effective_date", "<=", today)]
+        rule = Rule.search(
+            [("product_template_id", "=", product.id)] + base,
+            order="effective_date desc, id desc", limit=1)
+        if not rule and product.equipment_category_id:
+            rule = Rule.search(
+                [("product_template_id", "=", False),
+                 ("category_id", "=", product.equipment_category_id.id)] + base,
+                order="effective_date desc, id desc", limit=1)
+        return (rule.base_rate if rule else None), currency.name
+
     def _wa12_run_price(self, sender, body, from_e164, raw_from, message):
         self._wa6_audit_in(from_e164, message, "wa12-price")
         rest = self._wa12_strip_cmd(body, _WA12_PRICE_CMDS)
@@ -729,9 +777,11 @@ class WhatsAppMessageWA12(models.Model):
         lines = []
         for it in matched:
             prod = self.env["product.template"].sudo().browse(it["product_id"])
-            rate = prod.list_price or 0.0
-            cur = prod.currency_id.name or "USD"
-            if rate <= _WA12_PLACEHOLDER_RATE:
+            # the ENGINE rate (rule x bracket), NOT product.list_price -- so the
+            # Price: read-out matches what Quote: actually charges (review
+            # WA12-FLEX-3). no_rule / placeholder -> 'no rate set yet'.
+            rate, cur = self._wa12_price_lookup(prod)
+            if rate is None or rate <= _WA12_PLACEHOLDER_RATE:
                 lines.append(_("%s — no rate set yet") % prod.name)
             else:
                 lines.append(_("%s — %s %.2f / day") % (prod.name, cur, rate))

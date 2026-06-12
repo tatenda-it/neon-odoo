@@ -58,11 +58,18 @@ def out(msg):
 
 
 def parse_rate(s):
+    """Return the float rate, or None for blank/unparseable input. None is a
+    'no rate captured' signal (NOT 0.0) -- the caller then creates the product
+    WITHOUT a rule (resolves no_rule -> the guard blocks) instead of minting a
+    free $0 rule (review WA12LOAD-4). An explicit '0.00' parses to 0.0 and is
+    treated the same as None by the caller (a $0 rule is never created)."""
     s = (s or "").upper().replace("USD", "").replace(",", "").strip()
+    if not s:
+        return None
     try:
         return float(s)
     except ValueError:
-        return 0.0
+        return None
 
 
 def clean_name(full, category):
@@ -89,14 +96,21 @@ def find_product(name):
 
 
 def upsert_rule(product, rate):
-    """One active USD product-rule per product, flat 1.0 bracket. Idempotent."""
+    """One active USD product-rule per product, flat 1.0 bracket. Idempotent,
+    and HEALS a deactivated same-key row: the SQL unique key is
+    UNIQUE(product, currency, effective_date) and does NOT include `active`, so
+    a blind create would collide with a previously-deactivated rule (review
+    WA12LOAD-5). We therefore match across inactive rows and reactivate +
+    refresh rather than create. Never called with a None/<=0 rate (the caller
+    skips the rule so the product resolves no_rule)."""
     if not APPLY:
         return
-    rule = Rule.search([("product_template_id", "=", product.id),
-                        ("currency_id", "=", USD.id), ("active", "=", True)],
-                       limit=1)
+    rule = Rule.with_context(active_test=False).search(
+        [("product_template_id", "=", product.id),
+         ("currency_id", "=", USD.id)],
+        order="effective_date desc, id desc", limit=1)
     if rule:
-        rule.write({"base_rate": rate})
+        rule.write({"base_rate": rate, "active": True})
     else:
         rule = Rule.create({
             "product_template_id": product.id, "currency_id": USD.id,
@@ -121,7 +135,13 @@ def ensure_product(name, ctype):
 
 # ---------------------------------------------------------------- load
 rows = list(csv.DictReader(open(CSV_PATH, encoding="utf-8")))
-n_create = n_map = n_skip = n_rename = n_unresolved = 0
+n_create = n_map = n_skip = n_rename = n_unresolved = n_unpriced = 0
+
+
+def _no_rate(rate):
+    """A missing (None) or non-positive rate -> create the product but NO rule
+    (resolves no_rule -> guard blocks), never a free $0 rule (WA12LOAD-4)."""
+    return rate is None or rate <= 0
 
 for r in rows:
     disp = r["disposition"].strip()
@@ -151,52 +171,81 @@ for r in rows:
 
     if disp == "create":
         p, created = ensure_product(name, r.get("create_type") or "equipment")
-        upsert_rule(p, rate)
         n_create += 1
-        out("CREATE: %r @ $%.2f (%s)" % (name, rate, r.get("create_type") or "equipment"))
+        if _no_rate(rate):
+            n_unpriced += 1
+            out("CREATE-UNPRICED: %r — product %s, NO rule (no rate captured; "
+                "resolves no_rule -> guard blocks). FIX the worksheet rate." % (
+                    name, "created" if created else "exists"))
+        else:
+            upsert_rule(p, rate)
+            out("CREATE: %r @ $%.2f (%s)" % (
+                name, rate, r.get("create_type") or "equipment"))
         continue
 
     if disp == "map":
-        prod = find_product(peer)
+        # rename-aware lookup so a RE-RUN re-finds the ALREADY-renamed product
+        # (the worksheet peer is the PRE-rename name; review WA12LOAD-3).
+        target = RENAMES.get(peer)
+        if not target and any(peer.startswith(s) for s in SERIAL_DROP):
+            target = next(s for s in SERIAL_DROP if peer.startswith(s))
+        prod = find_product(peer) or (find_product(target) if target else None)
         if not prod:
             n_unresolved += 1
-            out("MAP-UNRESOLVED: peer %r not found (zoho %r @ $%.2f)" % (peer, name, rate))
+            out("MAP-UNRESOLVED: peer %r (target %r) not found (zoho %r)" % (
+                peer, target, name))
             continue
-        # rename?
+        # rename only if the CURRENT name still differs from the target.
         new = RENAMES.get(prod.name)
         if not new and any(prod.name.startswith(s) for s in SERIAL_DROP):
             new = next(s for s in SERIAL_DROP if prod.name.startswith(s))
         if new and new != prod.name:
             n_rename += 1
-            out("MAP+RENAME: %r -> %r @ $%.2f" % (prod.name, new, rate))
+            out("MAP+RENAME: %r -> %r" % (prod.name, new))
             if APPLY:
                 prod.write({"name": new})
         else:
-            out("MAP: %r @ $%.2f" % (prod.name, rate))
-        upsert_rule(prod, rate)
+            out("MAP: %r" % prod.name)
+        if _no_rate(rate):
+            n_unpriced += 1
+            out("MAP-UNPRICED: %r — NO rule (no rate captured)." % prod.name)
+        else:
+            upsert_rule(prod, rate)
         n_map += 1
         continue
 
-# binding (a): deactivate the placeholder CATEGORY rules
+# binding (a): the placeholder CATEGORY rules -- deactivated ONLY on a CLEAN
+# apply (so a product with no product rule resolves no_rule, never placeholder
+# money). Reported always; written only inside the clean-apply branch below.
 placeholders = Rule.search([("product_template_id", "=", False),
                             ("active", "=", True)])
-out("\nDEACTIVATE %d placeholder CATEGORY rule(s): %s" % (
+out("\nDEACTIVATE (on clean apply) %d placeholder CATEGORY rule(s): %s" % (
     len(placeholders), placeholders.mapped("name")))
-if APPLY:
-    placeholders.write({"active": False})
 
-# count verification
+# count verification (always printed)
 out("\n=== PLAN (%s) ===" % ("APPLY" if APPLY else "DRY-RUN"))
-out("create=%d  map=%d  rename=%d  skip=%d  unresolved-maps=%d  rows=%d" % (
-    n_create, n_map, n_rename, n_skip, n_unresolved, len(rows)))
-out("placeholder category rules deactivated=%d" % len(placeholders))
+out("create=%d (of which UNPRICED/no-rule=%d)  map=%d  rename=%d  skip=%d  "
+    "unresolved-maps=%d  rows=%d" % (
+        n_create, n_unpriced, n_map, n_rename, n_skip, n_unresolved, len(rows)))
 prod_rules = Rule.search_count([("product_template_id", "!=", False)])
-out("product-scoped rules now in DB=%d (expect ~312 after a clean apply)" % prod_rules)
-if n_unresolved:
-    out("!! %d MAP rows unresolved -- resolve before APPLY (names differ from "
-        "the worksheet peers on this DB)." % n_unresolved)
+out("product-scoped rules now in DB=%d" % prod_rules)
+if n_unpriced:
+    out("note: %d row(s) carry NO rate -> created WITHOUT a rule (resolve "
+        "no_rule -> the guard blocks quoting them until a real rate is set; "
+        "this is expected for LED size-variants priced by the m² rule)."
+        % n_unpriced)
 
-if APPLY:
+# HARD GATE (review WA12LOAD-2): unresolved MAP rows mean the worksheet peers
+# don't match live product names -> a half-applied, partially-deactivated
+# catalogue. ABORT the APPLY (rollback) rather than commit a broken load.
+if APPLY and n_unresolved:
+    env.cr.rollback()
+    out("\n!! ABORTED: %d unresolved MAP row(s) -- NOTHING committed (no rules "
+        "written, no category rules deactivated). Fix the peer names / RENAMES "
+        "on this DB and re-run." % n_unresolved)
+elif APPLY:
+    placeholders.write({"active": False})
+    out("DEACTIVATED %d placeholder CATEGORY rule(s)." % len(placeholders))
     env.cr.commit()
     out("\nAPPLIED + committed.")
 else:

@@ -59,6 +59,12 @@ _WA13_LOCK_NS = 5594000
 # WA-13 session steps live on the shared equip-session.
 _WA13_STEPS = ("doc_pick", "inv_pick", "inv_confirm")
 
+# WA-2 opt-out keywords: a live WA-13 session must RELEASE these so they fall
+# through to super() -> _wa_maybe_opt_out_keyword (mirrors WA-6/7/8/10). Without
+# this a 'STOP' typed mid-session is swallowed and the user never opts out.
+_WA13_OPT_OUT_KEYWORDS = {
+    "STOP", "START", "UNSUBSCRIBE", "STOPALL", "UNSTOP", "RESUME"}
+
 # Terse, NON-advertising refusal (same shape as WA-12) -- never name the
 # capability or teach the command.
 _WA13_REFUSAL = (
@@ -146,6 +152,15 @@ class WhatsAppMessageWA13(models.Model):
         from_e164 = to_e164(raw_from)
         if not from_e164:
             return None
+
+        # 0) RELEASE the WA-2 opt-out keywords BEFORE the live-session claim so
+        #    they fall through to super() -> _wa_maybe_opt_out_keyword (mirrors
+        #    WA-6/7/8/10). A live doc_pick/inv_* session must never swallow a
+        #    'STOP'. Text-only; a tap is never an opt-out keyword.
+        if message.get("type") == "text":
+            _kw = ((message.get("text") or {}).get("body") or "").strip().upper()
+            if _kw in _WA13_OPT_OUT_KEYWORDS:
+                return None
 
         # 1) a wa13_* HMAC tap (Face-2 [Confirm]/[Cancel]).
         tap = self._wa13_extract_tap(message)
@@ -439,15 +454,27 @@ class WhatsAppMessageWA13(models.Model):
         quote = sched.quote_id
         stage = dict(sched._fields["stage"].selection).get(
             sched.stage, sched.stage)
+        # the VAT label tracks the quote's actual tax: a rep may clear tax_id on
+        # a line (zero-rated/exempt supply) -> amount_tax==0, so the prorated
+        # stage carries NO VAT. Asserting '(incl. VAT)' there would mislabel a
+        # money-surface figure (ZIMRA 15.5% house rule). sched.amount is strictly
+        # proportional to amount_total, so the stage's VAT is zero iff
+        # amount_tax is zero; 'partial' when some lines are tax-free.
+        if not (quote.amount_tax or 0.0):
+            vat = _("(no VAT)")
+        elif quote.line_ids.filtered(lambda l: not l.tax_id):
+            vat = _("(incl. partial VAT)")
+        else:
+            vat = _("(incl. VAT)")
         return _(
             "Generate the %(stage)s invoice for %(client)s?\n"
-            "Quote %(q)s · %(pct).0f%% · %(cur)s %(amt).2f (incl. VAT)\n"
+            "Quote %(q)s · %(pct).0f%% · %(cur)s %(amt).2f %(vat)s\n"
             "Tap *Confirm* to create the DRAFT invoice (Kudzai posts it in "
             "Odoo), or *Cancel*.") % {
             "stage": stage, "client": quote.partner_id.name or "",
             "q": quote.name, "pct": sched.percentage,
             "cur": sched.currency_id.name or quote.currency_id.name or "",
-            "amt": sched.amount}
+            "amt": sched.amount, "vat": vat}
 
     def _wa13_handle_tap(self, intent, sched, from_e164, raw_from, message):
         self._wa6_audit_in(from_e164, message, "wa13-tap")
@@ -512,21 +539,33 @@ class WhatsAppMessageWA13(models.Model):
     def _wa13_handle_session(self, sess, message, from_e164, raw_from):
         self._wa6_audit_in(from_e164, message, "wa13-sess")
         sess.sudo().write({"last_inbound": fields.Datetime.now()})
-        sender = sess.user_id
+        # the CURRENT phone owner (NOT a possibly-stale sess.user_id) -- re-gate
+        # EVERY turn so a deactivated / deprivileged / phone-remapped sender
+        # can't keep pulling docs within the session TTL (matches the WA-12
+        # 'recheck entitlement every turn' discipline).
+        owner = self._wa6_resolve_user(from_e164)
+        if not (owner and owner.active):
+            sess.sudo().write({"active": False})
+            return self._wa6_reply(raw_from, from_e164, _(_WA13_REFUSAL))
+        # a stray INTERACTIVE tap (e.g. a stale cross-feature button whose title
+        # is 'Cancel') must NOT have its TITLE parsed as a session command --
+        # claim the turn + re-prompt, never act on it.
+        if message.get("type") == "interactive":
+            return self._wa13_session_reprompt(sess, from_e164, raw_from)
         body = self._extract_body(message, message.get("type"))
         norm = " ".join((body or "").strip().lower().split())
         buf = sess._get_buffer()
         buf = buf if isinstance(buf, dict) else {}
         if sess.step == "doc_pick":
             return self._wa13_session_doc_pick(
-                sess, buf, norm, from_e164, raw_from)
+                sess, owner, buf, norm, from_e164, raw_from)
         # inv_pick / inv_confirm are Face-2 -> re-gate generation EVERY turn.
-        if not (sender and sender.active and self._wa13_can_generate(sender)):
+        if not self._wa13_can_generate(owner):
             sess.sudo().write({"active": False})
             return self._wa6_reply(raw_from, from_e164, _(_WA13_REFUSAL))
         if sess.step == "inv_pick":
             return self._wa13_session_inv_pick(
-                sess, sender, buf, norm, from_e164, raw_from)
+                sess, owner, buf, norm, from_e164, raw_from)
         if sess.step == "inv_confirm":
             if norm in ("cancel", "no", "stop"):
                 sess.sudo().write({"step": "done", "active": False})
@@ -536,12 +575,23 @@ class WhatsAppMessageWA13(models.Model):
                 sched = self.env["neon.finance.invoice.schedule"].sudo().browse(
                     buf.get("schedule_id") or 0)
                 return self._wa13_do_generate(
-                    sched, sender, sess, from_e164, raw_from)
+                    sched, owner, sess, from_e164, raw_from)
             return self._wa6_reply(raw_from, from_e164, _(
                 "Reply *yes* to create the draft invoice, or *cancel*."))
         return None
 
-    def _wa13_session_doc_pick(self, sess, buf, norm, from_e164, raw_from):
+    def _wa13_session_reprompt(self, sess, from_e164, raw_from):
+        """Claim the turn with a step-appropriate re-prompt (used when a stray
+        interactive tap reaches a live WA-13 text session -- never act on it)."""
+        if sess.step == "inv_confirm":
+            msg = _("Reply *yes* to create the draft invoice, or *cancel*.")
+        else:
+            msg = _("Reply with the number from the list, or send a new "
+                    "command.")
+        return self._wa6_reply(raw_from, from_e164, msg)
+
+    def _wa13_session_doc_pick(self, sess, owner, buf, norm, from_e164,
+                               raw_from):
         ids = buf.get("ids") or []
         if not (norm.isdigit() and 1 <= int(norm) <= len(ids)):
             return self._wa6_reply(raw_from, from_e164, _(
@@ -554,11 +604,21 @@ class WhatsAppMessageWA13(models.Model):
             if not quote:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "That quote is no longer available."))
+            # re-gate on the CURRENT owner: retrieve-quote capability + own-scope
+            # (a sales user demoted mid-session can't pull another rep's quote
+            # from the stale buffer).
+            if not self._wa13_can_retrieve_quote(owner) or (
+                    not self._wa13_quote_all_scope(owner)
+                    and quote.salesperson_id != owner):
+                return self._wa6_reply(raw_from, from_e164, _(_WA13_REFUSAL))
             return self._wa13_send_quote_pdf(quote, raw_from, from_e164)
         move = self.env["account.move"].sudo().browse(rec_id).exists()
         if not move:
             return self._wa6_reply(raw_from, from_e164, _(
                 "That invoice is no longer available."))
+        # re-gate invoices on the current owner (approver/OD only).
+        if not self._wa13_can_retrieve_invoice(owner):
+            return self._wa6_reply(raw_from, from_e164, _(_WA13_REFUSAL))
         return self._wa13_send_invoice_pdf(
             move, raw_from, from_e164, draft=(move.state == "draft"))
 

@@ -549,6 +549,52 @@ _check("T-WA12-22",
        "flex edit loop: disc(50→40)=%s custom@120=%s guard-pass=%s no-tax=%s"
        % (disc_ok, custom_ok, guard_ok, notax_ok))
 
+# ---- T-WA12-23 (review WA12-FLEX-3) Price: face uses the ENGINE, not
+# list_price. qwertyunit (list 999, $50 cat rule) -> $50; prodruled ($77 product
+# rule) -> $77; placeholder (no rule) -> 'no rate set yet'. Clear any live
+# SALES_PH session first: a live q_* session legitimately OWNS the turn (the
+# command branch runs after the session branch), so the standalone Price: face
+# is tested on a clean slate.
+env["neon.wa.equip.session"].sudo().with_context(active_test=False).search(
+    [("phone_number", "=", SALES_PH)]).write({"active": False})
+
+
+def _price_reply(token):
+    _s = M.search([], order="id desc", limit=1).id
+    D_sales._wa12_maybe_intercept(_txt(SALES_PH, "Price: %s" % token))
+    o = M.search([("id", ">", _s), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1)
+    return o.message_body or ""
+
+pr_ok = _price_reply("qwertyunit")
+pr_pr = _price_reply("prodruled")
+pr_ph = _price_reply("placeholder gizmo")
+_check("T-WA12-23",
+       ("50.00" in pr_ok and "999" not in pr_ok)
+       and "77.00" in pr_pr
+       and "no rate set yet" in pr_ph.lower(),
+       "Price: engine rate — qwertyunit=%r prodruled=%r placeholder=%r"
+       % (pr_ok[:40], pr_pr[:40], pr_ph[:40]))
+
+# ---- T-WA12-24 (review WA13-3) a stale WA-13 'Cancel' INTERACTIVE tap reaching
+# a live q_confirm session must NOT be parsed as a cancel command (it would
+# cancel a live quote draft) — WA-12 re-prompts, the quote stays draft.
+t24q = Q._wa12_provision_chain(client, "2026-12-01", USD, u_sales)
+M.sudo()._wa12_build_lines(t24q, [{"product_id": prod_ok.id, "qty": 1}], 1)
+t24q.action_recalculate_pricing()
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_confirm", {"quote_id": t24q.id})
+_stale = {"from": SALES_PH, "type": "interactive", "id": "stale-wa13",
+          "interactive": {"button_reply": {
+              "id": "wa13_inv_cancel:999:deadbeef", "title": "Cancel"}}}
+_r24 = D_sales._wa12_maybe_intercept(_stale)
+_s24 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+_check("T-WA12-24",
+       _r24 is True and t24q.state == "draft"
+       and bool(_s24) and _s24.step == "q_confirm",
+       "stale WA-13 Cancel tap re-prompted; quote stays draft (state=%s, "
+       "sess=%s)" % (t24q.state, _s24.step if _s24 else "-"))
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(

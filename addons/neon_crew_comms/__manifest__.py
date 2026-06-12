@@ -175,7 +175,20 @@
     # (17.0.1.22.0); reuses the existing P6.M7 invoice machinery (no new finance
     # engine; neon_finance 17.0.7.10.7 only makes Kudzai's grant durable). Money-
     # adjacent Face-2 behind Robin's sign-off + the approver group.
-    "version": "17.0.1.10.0",
+    # 17.0.1.10.1 = WA-12/WA-13 adversarial-review fixes (11 confirmed findings):
+    # WA-13 -- release the WA-2 opt-out keywords before a live session claims
+    # the turn (STOP no longer swallowed); re-gate the doc_pick / inv_* session
+    # on the CURRENT phone owner EVERY turn (deactivated/deprivileged/remapped
+    # can't keep pulling docs); a stray cross-feature interactive tap's TITLE is
+    # never parsed as a session command (claim + re-prompt); the Face-2 confirm
+    # VAT label tracks actual amount_tax (no/partial/incl). WA-12 -- the Price:
+    # face prices through the ENGINE (rule x bracket), never product.list_price,
+    # so Price: and Quote: agree; _wa12_after_edit guards action_recalculate_
+    # pricing (a discount/_check_discount ValidationError -> clean reply, not a
+    # silent half-applied turn); the same interactive-tap short-circuit in the
+    # q_* session. (Latent multi-bracket discount-drift documented ⚠️ DECISION;
+    # unreachable under binding-b flat product rules.) pwa12 27/27, pwa13 15/15.
+    "version": "17.0.1.10.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
