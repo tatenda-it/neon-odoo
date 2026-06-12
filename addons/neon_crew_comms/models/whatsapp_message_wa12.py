@@ -357,13 +357,215 @@ class WhatsAppMessageWA12(models.Model):
                     return self._wa6_reply(raw_from, from_e164, _(
                         "Still can't submit — some lines have no rate set."))
                 return self._wa12_submit(quote, sess, from_e164, raw_from)
+            # draft-editing commands (price/discount/qty/days/add/remove/no tax/
+            # with tax/client). Each mutates -> recalc -> re-show the summary.
+            if quote.exists() and quote.state == "draft":
+                edited = self._wa12_try_edit(quote, body, from_e164, raw_from)
+                if edited is not None:
+                    return edited
             return self._wa6_reply(raw_from, from_e164, _(
-                "Reply *yes* to submit, or *cancel*."))
+                "Reply *yes* to submit, *cancel*, or edit — e.g. "
+                "`price <item> <amt>` · `discount <item> 10%` · "
+                "`qty <item> 2` · `days 3` · `add <item> x2` · "
+                "`add custom <desc> at <amt>` · `remove <item>` · "
+                "`no tax` / `with tax` · `client <name>`."))
         if sess.step == "q_reject":
             # the APPROVER typed a rejection comment -> relay to the requester.
             return self._wa12_apply_reject_comment(
                 quote, body, sess, from_e164, raw_from)
         return None
+
+    # ================================================================
+    # Draft editing (q_confirm, pre-submit) -- WA-12 flexibility.
+    # ================================================================
+    def _wa12_match_line(self, quote, token):
+        """Resolve a typed token to ONE quote.line, by 1-based index, then a
+        contains-match on the line name / product name (covers custom lines,
+        which carry only a name). (line, error_or_None); >1 -> ambiguous list."""
+        token = (token or "").strip()
+        lines = quote.line_ids
+        if not lines:
+            return lines, _("This quote has no lines.")
+        if token.isdigit():
+            i = int(token)
+            if 1 <= i <= len(lines):
+                return lines[i - 1], None
+        low = token.lower()
+        hits = lines.filtered(
+            lambda l: low in (l.name or "").lower()
+            or low in (l.product_template_id.name or "").lower())
+        if len(hits) == 1:
+            return hits, None
+        if len(hits) > 1:
+            menu = " · ".join("%d) %s" % (i + 1, l.name)
+                              for i, l in enumerate(lines))
+            return lines.browse(), _(
+                "Several lines match \"%s\" — say the number: %s") % (token, menu)
+        return lines.browse(), _("No line matches \"%s\".") % token
+
+    def _wa12_after_edit(self, quote, from_e164, raw_from, note):
+        """Recalc + re-show the draft summary with the edit note + the prompt."""
+        actor = quote.salesperson_id.id or self.env.uid
+        quote.with_user(actor).sudo().action_recalculate_pricing()
+        unpriced = self._wa12_unpriced_lines(quote)
+        summary = self._wa12_draft_summary(quote, unpriced)
+        tail = (_("\n\n⚠️ Can't submit yet — no rate set: %s.")
+                % ", ".join(unpriced)) if unpriced else _(
+                "\n\nReply *yes* to submit, *cancel*, or keep editing.")
+        return self._wa6_reply(raw_from, from_e164,
+                               "%s — done.\n\n%s%s" % (note, summary, tail))
+
+    def _wa12_try_edit(self, quote, body, from_e164, raw_from):
+        """Parse + apply ONE draft-edit command; return the re-shown summary,
+        or None if the text isn't a recognised edit command. All writes run as
+        the rep (with_user) under sudo for the cross-tier ACL."""
+        import re
+        actor = quote.salesperson_id.id or self.env.uid
+        QL = self.env["neon.finance.quote.line"].with_user(actor).sudo()
+        raw = (body or "").strip()
+        low = raw.lower()
+        cur = quote.currency_id.name
+
+        def err(msg):
+            return self._wa6_reply(raw_from, from_e164, msg)
+
+        def priced_equipment_blocked(line):
+            return line.line_type != "custom" and (
+                line.pricing_status in ("not_yet", "no_rule")
+                or (line.unit_rate or 0.0) <= _WA12_PLACEHOLDER_RATE)
+
+        if low in ("no tax", "notax", "no-tax"):
+            quote.line_ids.with_user(actor).sudo().write({"tax_id": False})
+            return self._wa12_after_edit(quote, from_e164, raw_from, _("Tax removed"))
+        if low in ("with tax", "withtax", "add tax"):
+            quote.line_ids.with_user(actor).sudo().write(
+                {"tax_id": QL._default_tax()})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("VAT 15.5%% applied"))
+
+        m = re.match(r"client\s+(.+)$", raw, re.I)
+        if m:
+            partner, e = self._wa12_resolve_client(m.group(1).strip())
+            if e:
+                return err(e)
+            quote.event_job_id.commercial_job_id.with_user(actor).sudo().write(
+                {"partner_id": partner.id})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("Client set to %s") % partner.name)
+
+        m = re.match(r"add\s+custom\s+(.+?)\s+at\s+([0-9]+(?:\.[0-9]+)?)\s*$",
+                     raw, re.I)
+        if m:
+            desc, price = m.group(1).strip(), float(m.group(2))
+            days = max(quote.line_ids.mapped("duration_days") or [1])
+            QL.create({"quote_id": quote.id, "line_type": "custom",
+                       "name": "[CUSTOM] %s" % desc, "quantity": 1.0,
+                       "unit_rate": price, "duration_days": int(days)})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("Added custom \"%s\" @ %s %.2f")
+                                         % (desc, cur, price))
+
+        if low.startswith("add ") and not low.startswith("add custom"):
+            text = raw[4:].strip()
+            items = self._wa6_match_items(text)
+            matched = [it for it in items if it.get("status") == "matched"]
+            if not matched:
+                return err(_("Couldn't match any catalogue item in \"%s\".")
+                           % text)
+            days = max(quote.line_ids.mapped("duration_days") or [1])
+            self._wa12_build_lines(quote, matched, int(days))
+            return self._wa12_after_edit(
+                quote, from_e164, raw_from,
+                _("Added %s") % ", ".join(it["product_name"] for it in matched))
+
+        m = re.match(r"remove\s+(.+)$", raw, re.I)
+        if m:
+            line, e = self._wa12_match_line(quote, m.group(1).strip())
+            if e:
+                return err(e)
+            if len(quote.line_ids) <= 1:
+                return err(_("Can't remove the last line — a quote needs at "
+                             "least one item."))
+            nm = line.name
+            line.with_user(actor).sudo().unlink()
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("Removed %s") % nm)
+
+        m = re.match(r"days\s+([0-9]+)\s*$", raw, re.I)
+        if m:
+            n = max(1, int(m.group(1)))
+            quote.line_ids.with_user(actor).sudo().write({"duration_days": n})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("All lines -> %d day(s)") % n)
+
+        m = re.match(r"days\s+(.+?)\s+([0-9]+)\s*$", raw, re.I)
+        if m:
+            line, e = self._wa12_match_line(quote, m.group(1).strip())
+            if e:
+                return err(e)
+            line.with_user(actor).sudo().write(
+                {"duration_days": max(1, int(m.group(2)))})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("%s -> %s day(s)") % (line.name, m.group(2)))
+
+        m = re.match(r"qty\s+(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*$", raw, re.I)
+        if m:
+            line, e = self._wa12_match_line(quote, m.group(1).strip())
+            if e:
+                return err(e)
+            line.with_user(actor).sudo().write({"quantity": float(m.group(2))})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("%s -> qty %s") % (line.name, m.group(2)))
+
+        m = re.match(r"price\s+(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*$", raw, re.I)
+        if m:
+            line, e = self._wa12_match_line(quote, m.group(1).strip())
+            if e:
+                return err(e)
+            amt = float(m.group(2))
+            if line.line_type == "custom":
+                line.with_user(actor).sudo().write(
+                    {"unit_rate": amt, "discount_amount": 0.0, "discount_pct": 0.0})
+                return self._wa12_after_edit(quote, from_e164, raw_from,
+                                             _("%s price -> %s %.2f")
+                                             % (line.name, cur, amt))
+            if priced_equipment_blocked(line):
+                return err(_("%s has no rate set yet — can't set a price on it.")
+                           % line.name)
+            if amt > line.unit_rate:
+                return err(_("%s %.2f is above the base rate (%s %.2f) — that's "
+                             "a markup, not a discount.")
+                           % (cur, amt, cur, line.unit_rate))
+            line.with_user(actor).sudo().write(
+                {"discount_amount": line.unit_rate - amt, "discount_pct": 0.0})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("%s -> %s %.2f/day") % (line.name, cur, amt))
+
+        m = re.match(r"discount\s+(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*(%?)\s*$",
+                     raw, re.I)
+        if m:
+            line, e = self._wa12_match_line(quote, m.group(1).strip())
+            if e:
+                return err(e)
+            val, is_pct = float(m.group(2)), bool(m.group(3))
+            if priced_equipment_blocked(line):
+                return err(_("%s has no rate set yet — can't discount it.")
+                           % line.name)
+            if is_pct:
+                if val > 100:
+                    return err(_("Discount %% can't exceed 100."))
+                line.with_user(actor).sudo().write(
+                    {"discount_pct": val, "discount_amount": 0.0})
+            else:
+                if val > line.unit_rate:
+                    return err(_("Discount %s is above the base rate — that's "
+                                 "a markup.") % val)
+                line.with_user(actor).sudo().write(
+                    {"discount_amount": val, "discount_pct": 0.0})
+            return self._wa12_after_edit(quote, from_e164, raw_from,
+                                         _("%s discounted") % line.name)
+
+        return None  # not a recognised edit command
 
     def _wa12_submit(self, quote, sess, from_e164, raw_from):
         """Submit the draft for approval (as the real requester) + ping the
@@ -636,11 +838,19 @@ class WhatsAppMessageWA12(models.Model):
             })
 
     def _wa12_unpriced_lines(self, quote):
-        """Names of lines with NO real rate (binding 1 guard): pricing_status
-        'not_yet'/'no_rule', or unit_rate at/below the $1 placeholder."""
+        """Names of lines with NO real rate (binding-1 guard, line_type-aware).
+        EQUIPMENT line blocks if pricing_status not_yet/no_rule/MANUAL (the lane
+        can't fabricate a hidden manual rate on an engine item) or base
+        unit_rate<=$1. A CUSTOM line (explicit typed rate) passes once its
+        unit_rate>$1. Reads the BASE unit_rate, not the discounted effective —
+        a discount (even 100%) is an explicit, approval-visible choice."""
         bad = []
         for l in quote.line_ids:
-            if l.pricing_status in ("not_yet", "no_rule") \
+            if l.line_type == "custom":
+                if (l.unit_rate or 0.0) <= _WA12_PLACEHOLDER_RATE:
+                    bad.append(l.name or "(item)")
+                continue
+            if l.pricing_status in ("not_yet", "no_rule", "manual") \
                     or (l.unit_rate or 0.0) <= _WA12_PLACEHOLDER_RATE:
                 bad.append(l.name or "(item)")
         return bad
@@ -662,14 +872,31 @@ class WhatsAppMessageWA12(models.Model):
             quote.with_user(actor).sudo().write({"payment_term_id": term.id})
 
     def _wa12_draft_summary(self, quote, unpriced):
-        lines = "\n".join(
-            "• %s ×%g — %s %.2f/day × %dd"
-            % (l.name, l.quantity, quote.currency_id.name, l.unit_rate or 0,
-               l.duration_days)
-            for l in quote.line_ids)
-        return _("*Quote %s* for %s\n%s\n*Total: %s %.2f* (incl. VAT)") % (
-            quote.name, quote.partner_id.name, lines,
-            quote.currency_id.name, quote.amount_total or 0.0)
+        cur = quote.currency_id.name
+        rows = []
+        for l in quote.line_ids:
+            base = l.unit_rate or 0.0
+            if l.discount_amount:
+                eff, disc = base - l.discount_amount, "%s %.2f" % (
+                    cur, l.discount_amount)
+            elif l.discount_pct:
+                eff, disc = base * (1 - l.discount_pct / 100.0), "%g%%" % (
+                    l.discount_pct)
+            else:
+                eff, disc = base, None
+            tag = "[CUSTOM] " if l.line_type == "custom" else ""
+            if disc:
+                rate_txt = "%s %.2f → %.2f/day (disc. %s)" % (
+                    cur, base, max(eff, 0.0), disc)
+            else:
+                rate_txt = "%s %.2f/day" % (cur, base)
+            rows.append("• %s%s ×%g — %s × %dd"
+                        % (tag, l.name, l.quantity, rate_txt, l.duration_days))
+        # the VAT line is conditional: 'no tax' clears the line taxes -> no VAT.
+        vat = _(" (incl. VAT)") if (quote.amount_tax or 0.0) else _(" (no VAT)")
+        return _("*Quote %s* for %s\n%s\n*Total: %s %.2f*%s") % (
+            quote.name, quote.partner_id.name, "\n".join(rows),
+            cur, quote.amount_total or 0.0, vat)
 
     def _wa12_send_approval_ping(self, quote, requester):
         """Ping the MD/OD approver audience (uids 7 + 21), skipping the

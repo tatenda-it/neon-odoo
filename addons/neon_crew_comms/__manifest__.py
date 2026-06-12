@@ -158,7 +158,11 @@
     # client has an email before action_send; absent -> honest refusal + state
     # stays 'approved' (no false "sent" on an undelivered quote). Rides the LIVE
     # batch with the quote-PDF design alignment (neon_finance 17.0.7.10.2).
-    "version": "17.0.1.8.2",
+    # 17.0.1.9.0 = WA-12 flexibility orchestration: the q_confirm draft-edit loop
+    # (_wa12_match_line + price/discount/qty/days/add/remove/no-tax/with-tax/
+    # client/add-custom), the line_type-aware no_rule guard, and discount/custom
+    # rendering in the draft summary. Pairs with neon_finance flex model + report.
+    "version": "17.0.1.9.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
