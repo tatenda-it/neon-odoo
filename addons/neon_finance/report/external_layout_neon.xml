@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        WA-12 design alignment, change 1: a BIGGER company logo on the shared
+        letterhead. The logo IMAGE is unchanged (800x228 file); only the rendered
+        size in web.external_layout_standard (the company's report layout) is
+        bumped from the stock max-height:45px to 80px (~1.8x; 800x228 -> ~280px
+        wide, well within the page). Applies to every report on the standard
+        external layout (the agreed quotation design shares it). The exact size is
+        eyeballed against the QT-001977 "Bigger" annotation on the side-by-side
+        PDF check and tuned there if needed.
+    -->
+    <template id="external_layout_standard_neon_logo"
+              inherit_id="web.external_layout_standard">
+        <!-- the logo img is the sole img, the direct child of the header's
+             col-3 box; select via hasclass (Odoo forbids @alt as a selector). -->
+        <xpath expr="//div[hasclass('col-3')]/img" position="attributes">
+            <attribute name="style">max-height: 80px;</attribute>
+        </xpath>
+    </template>
+</odoo>

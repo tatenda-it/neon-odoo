@@ -15,7 +15,7 @@
     # an engine-priced reservation-less line re-prices instead of flipping to
     # manual, while a hand-set 'manual' line is preserved. Reservation-backed
     # lines are byte-unchanged (equipment_line_id short-circuit).
-    'version': '17.0.7.10.2',
+    'version': '17.0.7.10.3',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -87,6 +87,8 @@ and cost-line behaviour downstream.
         'views/neon_finance_quote_views.xml',
         # WA-12 — quote PDF report (DRAFT-stamped) for the WhatsApp loop.
         'report/neon_finance_quote_report.xml',
+        # WA-12 design alignment — bigger company logo on the shared letterhead.
+        'report/external_layout_neon.xml',
         # P6.M4 — approval views + Finance Approval settings section.
         'views/neon_finance_approval_views.xml',
         'views/res_config_settings_views.xml',
