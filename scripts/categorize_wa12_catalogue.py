@@ -147,9 +147,9 @@ for code in sorted(by_code):
     out("  %-14s%s <- %d  e.g. %s" % (
         code, tag, len(by_code[code]), [p.name for p in by_code[code][:3]]))
 out("DEPOSITS -> NO category, FLAG FOR REMOVAL (%d): %s" % (
-    len(deposits), deposits.mapped("name") if deposits else []))
+    len(deposits), [p.name for p in deposits]))
 if unclassified:
-    out("!! UNCLASSIFIED (must be 0): %s" % unclassified.mapped("name"))
+    out("!! UNCLASSIFIED (must be 0): %s" % [p.name for p in unclassified])
 
 if not APPLY:
     out("\nDRY-RUN only -- set WA12_CATEGORIZE_APPLY=1 after Robin's gate.")
