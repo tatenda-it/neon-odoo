@@ -214,7 +214,10 @@
     # registered WhatsApp number) -- "do you know me?" gets the name/role,
     # never "no information about you". Also fixes the stale VAT 15% -> 15.5%
     # in the same prompt string. Module-level constant -> force-recreate.
-    'version': '17.0.1.22.1',
+    # 17.0.1.22.2: M-E -- when the partner has no Job Position, the greeting role
+    # is resolved from the user's GROUPS (functional role first, superuser last)
+    # so a sales user greets "Sales", never the lens-default "Director".
+    'version': '17.0.1.22.2',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

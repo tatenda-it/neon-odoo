@@ -71,6 +71,13 @@ _WA6_STOP = {
     "the", "a", "an", "of", "and", "for", "with", "unit", "units", "pcs",
     "pc", "pce", "pieces", "piece", "set", "sets", "x", "plus", "off"}
 
+# Generic equipment nouns that add NO product-distinguishing meaning -- used by
+# the confirmed-alias product short-circuit so "smoke machine"/"smoke machines"
+# still resolves to the confirmed 'smoke' product (the noun is noise, the slang
+# is the signal). NOT in _WA6_STOP because they ARE meaningful tokens elsewhere
+# (e.g. token-scoring a real "machine"-named product).
+_WA6_GENERIC_NOUN = {"machine", "machines"}
+
 # keyword -> category CODE. Phrase synonyms (with a space) match as a
 # substring; single tokens match on a word boundary. Resolved to the live
 # neon.equipment.category by code at match time (the 9 seeded codes).
@@ -975,12 +982,16 @@ class WhatsAppMessageWA6(models.Model):
             if kind == "category":
                 return ("category", value, desc)
             # product: short-circuit ONLY when the alias phrase dominates the
-            # desc (the desc is essentially just the slang, modulo stopwords) --
-            # so "totem" -> the product, but "totem clamp adapter" keeps matching
-            # normally rather than being hijacked by a bare 'totem' alias.
+            # desc (the desc is essentially just the slang, modulo stopwords +
+            # generic equipment nouns) -- so "totem" / "smoke machine" -> the
+            # product, but "totem clamp adapter" keeps matching normally rather
+            # than being hijacked by a bare 'totem' alias. The generic-noun set
+            # lets "smoke" fire for "smoke machine" (live-wire finding): "smoke"
+            # confirmed -> VERTICAL SMOKE MACHINES, and "machine(s)" carries no
+            # product-distinguishing meaning.
             residue = re.sub(pat, " ", low)
             residue_toks = [t for t in re.findall(r"[a-z0-9.]+", residue)
-                            if t not in _WA6_STOP]
+                            if t not in _WA6_STOP and t not in _WA6_GENERIC_NOUN]
             if not residue_toks:
                 return ("product", value, desc)
         return (None, None, desc)
@@ -1124,7 +1135,18 @@ class WhatsAppMessageWA6(models.Model):
                     "suggestions": sugg, "confidence": conf, "family": fam}
 
         Product = self.env["product.template"].sudo()
-        allp = Product.search([("is_workshop_item", "=", True)])
+        # Single-item matching EXCLUDES the Packages family: a rep naming a piece
+        # of gear ("smoke machine") never means a bundled DJ/wedding PACKAGE that
+        # merely lists that item in its name -- packages are reached only when a
+        # rep explicitly asks for a package (a separate, future path). Without
+        # this, "smoke machine" leaked to 3 PACKAGE products (live-wire finding
+        # 614-617). Code resolved once; absent on a fresh DB -> no exclusion.
+        pkg = self.env["neon.equipment.category"].sudo().search(
+            [("code", "=", "packages")], limit=1)
+        pdomain = [("is_workshop_item", "=", True)]
+        if pkg:
+            pdomain.append(("equipment_category_id", "!=", pkg.id))
+        allp = Product.search(pdomain)
 
         # S2 -- CONFIRMED alias expansion (before family derivation). A product
         # alias is terminal; a category alias forces the family; a term alias

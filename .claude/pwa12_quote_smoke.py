@@ -262,6 +262,11 @@ g_smoke = _gp("[TEST-WA12G] VERTICAL SMOKE MACHINES", cat_eff)
 g_fog = _gp("[TEST-WA12G] LOW FOGGER", cat_eff)
 g_stage = _gp("[TEST-WA12G] 9.9M X 9.9M STAGE DECK", cat_stg)
 g_mon = _gp("[TEST-WA12G] POWERWORKS MONITOR", cat_snd)
+# Packages: a DJ bundle that NAMES 'SMOKE MACHINE' inside it -- the leak the
+# package-exclusion fix prevents (a bare "smoke machine" must NOT hit this).
+cat_pkg = _ecat("packages", "Packages")
+g_pkg = _gp("[TEST-WA12G] BASIC DJ PACKAGE - PA, 12 CANS, SMOKE MACHINE",
+            cat_pkg)
 # CONFIRMED [TEST-WA12] aliases mirroring Robin's rulings.
 Alias.create([
     {"phrase": "[test-wa12]-screen", "category_id": cat_vis.id, "state": "confirmed"},
@@ -1662,6 +1667,21 @@ g["wedge_product"] = (h["product_id"] == g_mon.id and h["confidence"] == "exact"
 # confirmed PRODUCT alias: smoke -> VERTICAL SMOKE MACHINES.
 h = _m("[test-wa12]-smoke")
 g["smoke_product"] = (h["product_id"] == g_smoke.id)
+# live-wire finding 1: a confirmed product alias fires for a 2-word phrase
+# where the residue is only a GENERIC noun ("machine") -> the smoke MACHINE,
+# NOT a package that merely names it.  Seed a [test-wa12] 'smoke' product alias
+# whose phrase is the bare slang, then ask for "smoke machine".
+Alias.create({"phrase": "[test-wa12]-smk",
+              "product_template_id": g_smoke.id, "state": "confirmed"})
+h = _m("[test-wa12]-smk machine")
+g["smoke_machine_alias"] = (h["product_id"] == g_smoke.id)
+# package EXCLUSION: a bare "smoke machine" (no alias) routes to Effects and
+# NEVER to the DJ PACKAGE that names 'SMOKE MACHINE'. The golden smoke product
+# is in Effects; the package is excluded from single-item matching entirely.
+h = _m("smoke machine")
+g["package_excluded"] = (h["product_id"] != g_pkg.id
+                         and (h["status"] != "matched"
+                              or h["family"] != "packages"))
 # zoom can -> the GOLDEN lighting zoom can specifically (unique 99x99 dims so it
 # out-scores the T-57 18x18 zoom on the "99x99" tokens -> exercises S6b cleanly).
 h = _m("rgbwauv 99x99 zoom led can")

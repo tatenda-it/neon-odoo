@@ -298,7 +298,11 @@
     # pg_trgm category-scoped rank → grounded LLM shortlist → discovery). New
     # _r2_* helpers; bare-leading-count qty guard; alias cache-bust on write.
     # Byte-compat return dict. Money gate: _wa12_run_price now confidence-gated.
-    "version": "17.0.1.16.0",
+    # 17.0.1.16.1: live-wire fixes — single-item matching EXCLUDES the Packages
+    # family (a bare "smoke machine" no longer leaks to a DJ package); confirmed
+    # product-alias short-circuit tolerates a generic-noun residue ("smoke
+    # machine" -> the confirmed smoke product).
+    "version": "17.0.1.16.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

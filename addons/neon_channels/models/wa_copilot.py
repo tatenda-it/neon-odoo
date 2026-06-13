@@ -570,14 +570,46 @@ class WhatsAppCopilotService:
                 f"&model=neon.finance.ai.chat.write.log"
                 f"&view_type=form{suffix}")
 
+    def _wa_role_from_groups(self, user):
+        """A human role label for the greeting when the partner has no Job
+        Position. Resolved from the user's GROUPS by XML id (never numeric ids
+        -- install-order drift), most-senior first; the first held group wins.
+        Returns '' if none match (caller then falls to the lens label). NEVER
+        returns 'Director' for a plain sales user (the M-E finding)."""
+        # (xmlid, label) ordered by JOB role, NOT technical privilege: a user
+        # whose function is blank but who works in sales must greet as "Sales",
+        # even though they ALSO hold superuser (Tatenda, the dev). So the
+        # functional roles lead and group_neon_superuser is the LAST resort
+        # (only a pure-superuser with no job group lands on "Director"). XML ids
+        # verified live; has_group raises ValueError on an absent ref -> skip.
+        ladder = [
+            ("neon_finance.group_neon_finance_sales", "Sales"),
+            ("neon_finance.group_neon_finance_bookkeeper", "Bookkeeper"),
+            ("neon_finance.group_neon_finance_approver", "Finance"),
+            ("neon_jobs.group_neon_jobs_crew_leader", "Lead Tech"),
+            ("neon_jobs.group_neon_jobs_manager", "Operations Manager"),
+            ("neon_core.group_neon_superuser", "Director"),
+        ]
+        for xmlid, label in ladder:
+            try:
+                if user.has_group(xmlid):
+                    return label
+            except ValueError:
+                continue  # group ref absent in this install -> skip
+        return ""
+
     def _build_messages(self, user, variant, text, phone,
                         exclude_message_id=None):
         from odoo import fields  # noqa: PLC0415
-        # M2 identity: prefer the partner's Job Position (exact org titles --
-        # e.g. "Operational Director" / "Managing Director") over the generic
-        # lens label, so "do you know me?" greets the real role.
-        role = (user.partner_id.function or "").strip() or LENS_LABEL.get(
-            variant, (variant or "sales").replace("_", " ").title())
+        # M2/M-E identity: prefer the partner's Job Position (exact org titles --
+        # e.g. "Operational Director" / "Managing Director"); when it's EMPTY,
+        # resolve the role from the user's groups (so Tatenda, function blank +
+        # in Sales, greets as "Sales", NOT the lens-default "Director" -- the
+        # live-wire M-E finding). The lens label is the last resort.
+        role = ((user.partner_id.function or "").strip()
+                or self._wa_role_from_groups(user)
+                or LENS_LABEL.get(
+                    variant, (variant or "sales").replace("_", " ").title()))
         sys_prompt = _SYSTEM_PROMPT.format(
             role=role,
             name=user.name or "",
