@@ -326,7 +326,17 @@
     # / ✓✗ card / custom line) -> q_confirm review. A dump resets to step 1 (no
     # bulk-parse); client locked. pwa12_6 wire harness 7/7. NOT a complete cutover
     # yet (old pwa12 flow suite + review-step wire-test pending). NOT deployed.
-    "version": "17.0.1.19.0",
+    # 17.0.1.19.1: WA-12.6 CUTOVER complete + refinements. (a) DURATION: a date
+    # RANGE never auto-assumes the day count -> bot ASKS "how many chargeable
+    # days?" (Robin's billing convention; await_days FSM); _wa12_parse_event_dates
+    # now returns is_range. (b) STRUCTURED new-client intake (qc_*) resumes INTO
+    # qs_event (not the old item path). (c) no-command-syntax: dropped the
+    # "(e.g. `2x RGB LED CAN`)" template from the bare-intent reply. (d) old
+    # pwa12 flow suite reworked/retired to the structured spine (T-48/T-58 = dead
+    # convo lane; T-43r/T-45r re-prove the no-cat-rule $ + rep-priced surfaces);
+    # review-step MONEY wire-test hardened (VAT 15% exact + discount math exact)
+    # + no-command-syntax sweep. pwa12 61/61, pwa12_6 11/11.
+    "version": "17.0.1.19.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

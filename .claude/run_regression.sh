@@ -79,6 +79,8 @@ SMOKES=(
   pwa9_crm_matching
   pwa10_feedback
   pwa11_insights
+  pwa12_quote
+  pwa12_6_structured
   pneon_library
 )
 SCRIPT_DIR="$(dirname "$0")"

@@ -1,5 +1,13 @@
 """P-WA-12.5 WIRE smoke — assert the BOT'S ACTUAL MESSAGES, not internal state.
 
+⚠️ SUPERSEDED (WA-12.6 cutover) by .claude/pwa12_6_structured_smoke.py. W1/W3/
+W5/W8 here exercised the OLD combined-extract -> q_items stepper flow, which the
+structured spine REPLACED (client -> qs_event -> qs_item, one item at a time).
+Those legs now fail by design; only the matcher-scope legs (W6/W7) still hold.
+NOT in the regression runner. The wire-level guarantee (incl. the no-command-
+syntax sweep, W4) is re-proven by pwa12_6 S1-S11. Kept for history only; safe
+to delete once WA-12.6 is fully bedded in on prod.
+
 The lesson from WA-12.4: pwa12 was 68/68 green while the live conversation was
 broken (a 5-item brief produced "confirm 1 item"; a question removed a line).
 Internal-state tests prove the units; they do NOT prove the conversation. This

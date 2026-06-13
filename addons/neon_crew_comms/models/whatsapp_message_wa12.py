@@ -472,15 +472,18 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_start_client_intake(self, sender, client_txt, candidates, matched,
                                   date_txt, days, from_e164, raw_from,
-                                  prefills=None):
+                                  prefills=None, structured=False):
         """Open the qc_pick session: list any existing matches + offer *new*.
         Buffers the matched items + date so the quote resumes without re-entry.
         ``prefills`` (M3): phone/email/contact already present in the rep's
-        brief — pre-fill the capture so only MISSING slots get asked."""
+        brief — pre-fill the capture so only MISSING slots get asked.
+        WA-12.6: ``structured`` -> on intake completion resume into the EVENT
+        step (qs_event), not the old item path (Robin's briefs are often new
+        clients; the exact-client path alone would dead-end them)."""
         buf = {"matched": matched, "date_txt": date_txt or "",
                "days": days or 1, "client_txt": client_txt,
                "candidate_ids": candidates.ids[:8],
-               "prefills": prefills or {}}
+               "prefills": prefills or {}, "structured": structured}
         self.env["neon.wa.equip.session"]._start_quote(
             from_e164, sender, "qc_pick", buf)
         if candidates:
@@ -527,6 +530,18 @@ class WhatsAppMessageWA12(models.Model):
 
         def resume(partner):
             sess.sudo().write({"step": "done", "active": False})
+            # WA-12.6: a STRUCTURED intake resumes into the EVENT step (the
+            # new spine: client -> event -> items), reusing the same session row.
+            if buf.get("structured"):
+                sbuf = {"v": 5, "structured": True, "client_txt": partner.name,
+                        "partner_id": partner.id, "date_txt": "", "venue": "",
+                        "note": "", "prefills": buf.get("prefills") or {},
+                        "items": [], "pending_item": None, "qty_for": False,
+                        "await_days": False}
+                ns = self.env["neon.wa.equip.session"]._start_quote(
+                    from_e164, sender, "q_client", sbuf)
+                return self._wa12_struct_after_client(
+                    ns, sbuf, partner, from_e164, raw_from)
             if not buf.get("matched"):
                 # M5 bare-intent path: the client is set but no items were
                 # captured yet -> ask for them (same lane, no re-entry).
@@ -536,8 +551,7 @@ class WhatsAppMessageWA12(models.Model):
                      "date_txt": buf.get("date_txt") or "",
                      "prefills": buf.get("prefills") or {}})
                 return self._wa6_reply(raw_from, from_e164, _(
-                    "%s — what items? (e.g. `2x RGB LED CAN, smoke machine`)")
-                    % partner.name)
+                    "%s — what items?") % partner.name)
             # WA-12.4: client now resolved -> open the item STEPPER (not a direct
             # draft) so each buffered item is confirmed one at a time. The
             # buffered `matched` were extracted upstream; re-split into matched/
@@ -791,35 +805,58 @@ class WhatsAppMessageWA12(models.Model):
             sess._set_buffer(buf)
             return self._wa6_reply(raw_from, from_e164, _(
                 "Note saved. What's the event date?"))
-        # Parse a single date OR a range OR a 'for N days' span in ONE pass --
-        # a range string ("7 to 11 August") must NOT be fed whole to the single-
-        # date parser (it fails). MONEY: the resulting day count becomes every
-        # line's default duration_days (the duration-not-applied fix).
-        ev_date, days, end_date = self._wa12_parse_event_dates(raw)
+        # AWAIT-DAYS: if we asked "how many chargeable days?" for a range, this
+        # turn is the rep's number (Robin's convention: NEVER auto-assume a range
+        # day-count -- always ask).
+        if buf.get("await_days"):
+            m = re.match(r"^\s*(\d+)\s*(?:days?|nights?)?\s*$", norm)
+            if not m:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "How many chargeable days for this hire? (just a number)"))
+            buf["days"] = max(1, int(m.group(1)))
+            buf["await_days"] = False
+            sess.sudo().write({"step": "qs_item"})
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "%d-day hire — got it.\n\nNow the equipment, one at a time. "
+                "What's the first item?") % buf["days"])
+        # Parse a single date / range / 'for N days'. A range must NOT be fed
+        # whole to the single-date parser (it fails).
+        ev_date, days, end_date, is_range = self._wa12_parse_event_dates(raw)
         if not ev_date:
             return self._wa6_reply(raw_from, from_e164, _(
                 "I didn't catch a date there — send the event date "
                 "(e.g. 25/09/2026, 25 Sept 2026, or 7–11 Aug)."))
         buf["date_txt"] = ev_date.isoformat()
+        # MONEY (Robin's convention): a RANGE never auto-sets the day count --
+        # ASK the rep (the inclusive count is offered only as a hint). A single
+        # date -> 1; an explicit "for N days" -> N (the rep stated it). The
+        # review 'days' edit can still override.
+        if is_range:
+            buf["await_days"] = True
+            sess._set_buffer(buf)
+            hint = (_(" (looks like %d if you count both days)") % days
+                    if days > 1 else "")
+            return self._wa6_reply(raw_from, from_e164, _(
+                "📅 %s%s — got it. How many chargeable days for this hire?%s") % (
+                ev_date.strftime("%d %b"),
+                (_("–%s") % end_date.strftime("%d %b")) if end_date else "",
+                hint))
         buf["days"] = days
         sess.sudo().write({"step": "qs_item"})
         sess._set_buffer(buf)
-        span = ""
-        if days > 1:
-            span = (_("  (%d-day hire") % days
-                    + ((_(", %s–%s)") % (ev_date.strftime("%d"),
-                                         end_date.strftime("%d %b")))
-                       if end_date else _(")")))
+        span = (_("  (%d-day hire)") % days) if days > 1 else ""
         return self._wa6_reply(raw_from, from_e164, _(
             "📅 %s%s — got it.\n\nNow the equipment, one at a time. What's the "
             "first item?") % (ev_date.strftime("%d %b %Y"), span))
 
     def _wa12_parse_event_dates(self, raw):
-        """(start_date|None, days, end_date|None). Handles: a date RANGE
-        ('7th-11th August', '25/09-29/09') -> INCLUSIVE day count (Robin's money
-        convention -- 7..11 = 5 days); a single date + 'for N days'; a bare
-        single date -> 1 day. ⚠️ inclusive-vs-billable is Robin's call; inclusive
-        is the default + the review 'days' edit overrides."""
+        """(start_date|None, days, end_date|None, is_range). A date RANGE
+        ('7th-11th August', '25/09-29/09') -> the inclusive count is returned as
+        a HINT with is_range=True, so the caller ASKS the rep (Robin's
+        convention: never auto-assume a range day-count). A single date + 'for N
+        days' -> N (the rep stated it, is_range=False). A bare single date -> 1
+        day. The review 'days' edit can still override."""
         import re
         from datetime import timedelta
         low = " ".join((raw or "").lower().split())
@@ -841,16 +878,21 @@ class WhatsAppMessageWA12(models.Model):
                     except ValueError:
                         l_ph = True
             if not l_ph and not r_ph and r_date >= l_date:
-                return l_date, (r_date - l_date).days + 1, r_date  # INCLUSIVE
-        # 2) a single date (+ optional 'for N days').
-        s_date, s_ph = self._wa12_resolve_date(low)
-        if s_ph:
-            return None, 1, None
+                # inclusive count = HINT only; is_range=True -> caller asks.
+                return l_date, (r_date - l_date).days + 1, r_date, True
+        # 2) a single date (+ optional 'for N days' -> the rep stated it). Strip
+        # the 'for N days' clause BEFORE resolving the date ("25 Sept 2026 for 3
+        # days" must parse the date from "25 Sept 2026", not the whole string).
         m = re.search(r"\bfor\s+(\d+)\s*(?:day|days|nights?)\b", low)
-        if m:
-            n = max(1, int(m.group(1)))
-            return s_date, n, (s_date + timedelta(days=n - 1))
-        return s_date, 1, None
+        stated_n = max(1, int(m.group(1))) if m else None
+        date_part = re.sub(r"\bfor\s+\d+\s*(?:day|days|nights?)\b", "", low
+                           ).strip(" ,") if m else low
+        s_date, s_ph = self._wa12_resolve_date(date_part)
+        if s_ph:
+            return None, 1, None, False
+        if stated_n:
+            return s_date, stated_n, (s_date + timedelta(days=stated_n - 1)), False
+        return s_date, 1, None, False
 
     def _wa12_handle_struct_item(self, sess, buf, body, from_e164, raw_from):
         """qs_item: the one-at-a-time item loop. Holds ONE item in flight. The
@@ -1041,7 +1083,8 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa12_start_client_intake(
                 sender, raw, candidates, buf.get("matched") or [],
                 buf.get("date_txt") or "", buf.get("days") or 1,
-                from_e164, raw_from, prefills=buf.get("prefills") or {})
+                from_e164, raw_from, prefills=buf.get("prefills") or {},
+                structured=bool(buf.get("structured")))
 
         # M-B: a catalogue-discovery question at either item step lists the
         # family by its EXACT catalogue names (the pick-list the rep chooses

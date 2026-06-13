@@ -321,6 +321,66 @@ def _txt(phone, body):
             "id": "pwa12-%s" % phone}
 
 
+# WA-12.6 cutover helpers (hoisted above T-05 so the direct-seed rework can use
+# them). _clear_sess/_send/_step were originally defined ~line 838; hoisted here.
+def _clear_sess(ph):
+    env["neon.wa.equip.session"].sudo().with_context(active_test=False).search(
+        [("phone_number", "=", ph)]).write({"active": False})
+
+
+def _send(ph, txt):
+    return D_sales._wa12_maybe_intercept(_txt(ph, txt))
+
+
+def _step(ph):
+    s = env["neon.wa.equip.session"].sudo()._active_for_phone(ph)
+    return s.step if s else None
+
+
+def _seed_qconfirm(partner, date, days, items, user=None):
+    """Cutover helper: seed a priced DRAFT + a live q_confirm session DIRECTLY,
+    bypassing the (now-structured) entry. items = [(product_template, qty), ...].
+    The WA-12.6 pivot redirects the Quote: entry to the structured collection, so
+    the old 'Quote: ... -> walk the stepper -> draft' setup is dead; this seeds
+    the q_confirm REVIEW state the still-valid review/approval tests need."""
+    u = user or u_sales
+    ph = APPR_PH if u is u_appr else SALES_PH
+    _clear_sess(ph)
+    q = Q._wa12_provision_chain(partner, date, USD, u, date_is_placeholder=False)
+    M.sudo()._wa12_build_lines(
+        q, [{"product_id": p.id, "qty": qy} for p, qy in items], days)
+    q.action_recalculate_pricing()
+    M.sudo()._wa12_ensure_payment_term(q, partner)
+    env["neon.wa.equip.session"].sudo()._start_quote(
+        ph, u, "q_confirm", {"quote_id": q.id})
+    return q
+
+
+def _drive_struct_to_draft(disp, ph, item="qwertyunit", date="25/09/2026"):
+    """After a STRUCTURED client step / intake resume (session at qs_event):
+    send a date -> name one item -> tap its option -> qty -> 'done' -> the
+    q_confirm draft. Replaces the dead _walk_stepper for the intake reworks."""
+    from odoo.addons.neon_channels.models import wa_payload as _wp
+    sec = env["ir.config_parameter"].sudo().get_param("database.secret") or ""
+    disp._wa12_maybe_intercept(_txt(ph, date))     # qs_event -> qs_item
+    disp._wa12_maybe_intercept(_txt(ph, item))     # name the item
+    sess = env["neon.wa.equip.session"].sudo()._active_for_phone(ph)
+    pend = (sess._get_buffer() or {}).get("pending_item") or {} if sess else {}
+    tap, lst = None, False
+    if pend.get("confirm_pid"):
+        tap = _wp.encode(sec, "wa12_ok", sess.id, "s0", pend["confirm_pid"])
+    elif pend.get("_cand_ids"):
+        tap = _wp.encode(sec, "wa12_pick", sess.id, "s0", pend["_cand_ids"][0])
+        lst = len(pend["_cand_ids"]) >= 3
+    if tap:
+        k = "list_reply" if lst else "button_reply"
+        disp._wa12_maybe_intercept({"from": ph, "type": "interactive",
+                                    "interactive": {k: {"id": tap, "title": "x"}},
+                                    "id": "drv"})
+        disp._wa12_maybe_intercept(_txt(ph, "1"))   # qty
+    disp._wa12_maybe_intercept(_txt(ph, "done"))    # -> finalize -> q_confirm
+
+
 def _walk_stepper(disp, phone, picks=None, max_steps=12):
     """WA-12.4: drive the one-item stepper to completion via the REAL tap path.
     For each focused item: a 'confirm' pending -> tap ✓ (wa12_ok); a pick
@@ -407,20 +467,16 @@ _check("T-WA12-04b", (not amb[0]) and "more than one" in (amb[1] or "").lower(),
        "ambiguous -> empty + ambiguous message")
 
 # ---------------------------------------------------------- T-WA12-05 provision
-_cmd = "Quote: Acme Events - qwertyunit x2, 2026-08-01"
-claimed = D_sales._wa12_maybe_intercept(_txt(SALES_PH, _cmd))
-# WA-12.4: Quote: opens the STEPPER; walk it (tap ✓ on the confident item) to
-# the provisioned draft.
-_walk_stepper(D_sales, SALES_PH)
-# find the provisioned quote by salesperson (a DIRECT field; quote.partner_id
-# is a 2-level related-store that may lag within the un-flushed test txn).
-quote = Q.search([("salesperson_id", "=", u_sales.id), ("state", "=", "draft")],
-                 order="id desc", limit=1)
+# WA-12.6 cutover: the Quote: entry now opens the STRUCTURED collection (covered
+# by pwa12_6). The PROVISIONING surface (provisional chain + TBC venue) is
+# unchanged and still reached by the structured finalize -> seed q_confirm
+# directly to test it.
+quote = _seed_qconfirm(client, "2026-08-01", 1, [(prod_ok, 2)])
 ejob = quote.event_job_id
 cjob = ejob.commercial_job_id
 tbc = env.ref("neon_finance.wa12_tbc_venue", raise_if_not_found=False)
 _check("T-WA12-05",
-       claimed is True and quote and quote.state == "draft"
+       quote and quote.state == "draft"
        and ejob.is_quote_provisional and cjob.state == "pending"
        and cjob.venue_id == tbc and cjob.partner_id == client
        and len(quote.line_ids) >= 1,
@@ -558,12 +614,16 @@ _check("T-WA12-12",
        "live WA-6 session intact (intercept None, step=%s active=%s)"
        % (_s6.step, _s6.active))
 
-# ---- T-WA12-13 'for N days' parses clean (no dangling 's' in the items)
-_c13, _i13, _d13, _days13 = D_sales._wa12_parse_quote(
-    "Acme Events - LED wall for 3 days, 2026-08-01")
+# ---- T-WA12-13 'for N days' parses clean to the day count via the STRUCTURED
+# event-date parser (WA-12.6: the old _wa12_parse_quote brief-split is dead code
+# -- the spine collects items one-by-one, and the date/days come from
+# _wa12_parse_event_dates). A stated 'for N days' is NOT a range.
+_ev13, _days13, _end13, _rng13 = D_sales._wa12_parse_event_dates(
+    "25 Sept 2026 for 3 days")
 _check("T-WA12-13",
-       _days13 == 3 and _i13.strip().lower() == "led wall",
-       "for-N-days clean: items=%r days=%s" % (_i13, _days13))
+       _days13 == 3 and _rng13 is False and bool(_ev13)
+       and _ev13.isoformat() == "2026-09-25",
+       "for-N-days: date=%s days=%s is_range=%s" % (_ev13, _days13, _rng13))
 
 # ---- T-WA12-14 provisioning create_uid = the real rep (not the webhook user)
 _check("T-WA12-14",
@@ -834,20 +894,7 @@ _check("T-WA12-28",
        "triggers=%s strip=%s synonyms=%s bare-date(29 Sep)=%s terms(14d)=%s"
        % (trig_ok, strip_ok, syn_ok, date_ok, terms_ok))
 
-# ---- new-client intake helpers ----------------------------------------------
-def _clear_sess(ph):
-    env["neon.wa.equip.session"].sudo().with_context(active_test=False).search(
-        [("phone_number", "=", ph)]).write({"active": False})
-
-
-def _send(ph, txt):
-    return D_sales._wa12_maybe_intercept(_txt(ph, txt))
-
-
-def _step(ph):
-    s = env["neon.wa.equip.session"].sudo()._active_for_phone(ph)
-    return s.step if s else None
-
+# (_clear_sess / _send / _step hoisted above T-05 for the cutover seed helper.)
 
 # ---- T-WA12-29 (intake) full new-client capture (individual, no dupe) ->
 # partner created (E164 phone joins WA-9 spine, ref source, create_uid=rep) ->
@@ -855,16 +902,20 @@ def _step(ph):
 _clear_sess(SALES_PH)
 N29 = "[TEST-WA12] Zorptronic Events"
 _send(SALES_PH, "Quote: %s — qwertyunit, 25/09/2026" % N29)
-pick29 = _step(SALES_PH) == "qc_pick"
+# WA-12.6: the structured entry asks "which client?" first (q_client); the brief
+# client is only a prefill hint. Reply the name -> no match -> intake opens.
+clientstep29 = _step(SALES_PH) == "q_client"
+_send(SALES_PH, N29)
+pick29 = clientstep29 and _step(SALES_PH) == "qc_pick"
 _send(SALES_PH, "new")
 _send(SALES_PH, "individual")
 _send(SALES_PH, "ok")            # qc_name -> reuse the typed name (confirmed)
 phase29 = _step(SALES_PH)        # individual skips contact -> qc_phone
 _send(SALES_PH, "+263772345678")
 _send(SALES_PH, "zorp@example.com")   # qc_email -> create + resume INTO stepper
-# WA-12.4: intake now resumes into the item STEPPER (client-before-items) -> walk
-# it to the draft.
-_walk_stepper(D_sales, SALES_PH)
+# WA-12.6: intake now resumes into the STRUCTURED qs_event step
+# (client-before-items) -> drive date+item+done to the draft.
+_drive_struct_to_draft(D_sales, SALES_PH)
 p29 = P.search([("name", "=", N29)], limit=1)
 created29 = (bool(p29) and p29.ref == "whatsapp_quote" and not p29.is_company
              and p29.create_uid.id == u_sales.id
@@ -881,18 +932,20 @@ gh = P.create({"name": "[TEST-WA12] Globex Holdings"})
 # Flow A: typed name fuzzy-matches -> qc_dupe -> pick existing (NO new partner).
 _clear_sess(SALES_PH)
 _send(SALES_PH, "Quote: [TEST-WA12] Glubex Co — qwertyunit, 2026-09-20")
+_send(SALES_PH, "[TEST-WA12] Glubex Co")   # q_client name reply -> no match -> intake
 _send(SALES_PH, "new")
 _send(SALES_PH, "company")
 _send(SALES_PH, "[TEST-WA12] Globex")     # -> dupe (Globex Holdings)
 dupeA = _step(SALES_PH) == "qc_dupe"
 _send(SALES_PH, "1")                       # use existing -> resume INTO stepper
-_walk_stepper(D_sales, SALES_PH)           # WA-12.4: walk to the draft
+_drive_struct_to_draft(D_sales, SALES_PH)   # WA-12.6: resume(qs_event)->draft
 qA = Q.search([("partner_id", "=", gh.id)], limit=1)
 flowA = (dupeA and bool(qA) and _step(SALES_PH) == "q_confirm"
          and not P.search([("name", "=", "[TEST-WA12] Globex")]))
 # Flow B: same dupe -> *new* -> create new (company + child contact, skip email).
 _clear_sess(SALES_PH)
 _send(SALES_PH, "Quote: [TEST-WA12] Glubex2 — qwertyunit, 2026-09-20")
+_send(SALES_PH, "[TEST-WA12] Glubex2")    # q_client name reply -> no match -> intake
 _send(SALES_PH, "new")
 _send(SALES_PH, "company")
 _send(SALES_PH, "[TEST-WA12] Globex")     # -> dupe again
@@ -900,7 +953,7 @@ _send(SALES_PH, "new")                     # add new anyway
 _send(SALES_PH, "[TEST-WA12] John")        # qc_contact (company)
 _send(SALES_PH, "+263773000111")           # qc_phone
 _send(SALES_PH, "skip")                    # qc_email skipped -> create + resume
-_walk_stepper(D_sales, SALES_PH)           # WA-12.4: walk to the draft
+_drive_struct_to_draft(D_sales, SALES_PH)   # WA-12.6: resume(qs_event)->draft
 newg = P.search([("name", "=", "[TEST-WA12] Globex")], limit=1)
 child = P.search([("name", "=", "[TEST-WA12] John"),
                   ("parent_id", "=", newg.id)], limit=1) if newg else P.browse()
@@ -916,9 +969,10 @@ _check("T-WA12-30", flowA and flowB,
 P.create({"name": "[TEST-WA12] Acme Sound"})   # joins the client fixture "Acme Events Co"
 _clear_sess(SALES_PH)
 _send(SALES_PH, "Quote: [TEST-WA12] Acme — qwertyunit, 2026-09-20")
+_send(SALES_PH, "[TEST-WA12] Acme")        # q_client name -> >1 match -> list-then-pick
 pickN = _step(SALES_PH) == "qc_pick"
 _send(SALES_PH, "1")
-_walk_stepper(D_sales, SALES_PH)           # WA-12.4: walk to the draft
+_drive_struct_to_draft(D_sales, SALES_PH)   # WA-12.6: resume(qs_event)->draft
 resumedN = _step(SALES_PH) == "q_confirm"
 p29b = P.search([("name", "=", N29)], limit=1)
 wa9_ok = bool(p29b) and "772345678" in (p29b.phone_sanitized or p29b.phone or "")
@@ -926,30 +980,8 @@ _check("T-WA12-31", pickN and resumedN and wa9_ok,
        ">1 list-then-pick=%s resumed=%s ; WA-9 phone_sanitized=%s"
        % (pickN, resumedN, p29b.phone_sanitized if p29b else "-"))
 
-# ---- T-WA12-32 (WA-12.2 hook A) free-text quote request -> LLM EXTRACTION ->
-# M1 confirm gate (q_items) -> yes -> deterministic provision. LLM MOCKED.
-_clear_sess(SALES_PH)
-_ai_q = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
-         '"items":[{"name":"qwertyunit","qty":2,"stated_price":null}],'
-         '"date":"2026-09-20","phone":null,"email":null,'
-         '"contact_person":null}')
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _ai_q):
-    r32 = D_sales._wa12_llm_intake_maybe(_txt(
-        SALES_PH,
-        "hi can you price up 2 qwertyunit for Acme Events on the 20th please"))
-conf32 = _step(SALES_PH) == "q_items"          # M1: confirm BEFORE draft
-_walk_stepper(D_sales, SALES_PH)               # WA-12.4: tap ✓ through each item
-s32 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
-b32 = s32._get_buffer() if s32 else {}
-q32 = (Q.sudo().browse(b32.get("quote_id") or 0)
-       if isinstance(b32, dict) else Q.browse())
-_check("T-WA12-32",
-       r32 is True and conf32 and bool(s32) and s32.step == "q_confirm"
-       and q32.exists() and q32.partner_id == client and len(q32.line_ids) >= 1,
-       "free-text -> AI extract -> confirm(q_items)=%s -> yes -> draft for %s "
-       "(q_confirm=%s, lines=%d)"
-       % (conf32, q32.partner_id.name if q32.exists() else "-",
-          s32.step if s32 else "-", len(q32.line_ids) if q32.exists() else 0))
+# ---- T-WA12-32 RETIRED (WA-12.6 cutover): LLM quote-initiation now begin_structured; structured flow proven by pwa12_6
+_skip("T-WA12-32", "LLM quote-initiation now begin_structured; structured flow proven by pwa12_6")
 
 # ---- T-WA12-33 (WA-12.2 hook B) a free-text edit during q_confirm -> LLM
 # translates to ONE command -> applied through the guarded _wa12_try_edit.
@@ -980,156 +1012,48 @@ with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: None):
 deg_ok = r34 is None
 det = D_sales._wa12_maybe_intercept(_txt(
     SALES_PH, "Quote: [TEST-WA12] Acme Events Co — qwertyunit, 2026-09-23"))
-# WA-12.4: a deterministic Quote: now opens the STEPPER (q_items); walk it to
-# the draft. The point of T-34 is that the deterministic path still WORKS when
-# the LLM is down -- it ends at a draft, via the stepper.
+# WA-12.6: a deterministic Quote: now RESETS to the STRUCTURED spine, which is
+# client-first (q_client). The point of T-34 is unchanged: the deterministic
+# path still CLAIMS the turn + opens the collection regardless of the LLM (the
+# LLM is best-effort pre-fill only). The full client->event->items->draft walk
+# is wire-proven by pwa12_6 S1-S10 -- not re-derived here.
 _sdet = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
-claimed_q_items = det is True and bool(_sdet) and _sdet.step == "q_items"
-_walk_stepper(D_sales, SALES_PH)
-_sdet = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
-det_ok = claimed_q_items and bool(_sdet) and _sdet.step == "q_confirm"
+det_ok = det is True and bool(_sdet) and _sdet.step == "q_client"
 _check("T-WA12-34", deg_ok and det_ok,
        "LLM down -> hook A falls through (r=%s); deterministic Quote: still "
-       "works via stepper (%s)" % (r34, det_ok))
+       "claims + opens structured collection (step=%s)"
+       % (r34, _sdet.step if _sdet else "-"))
 
-# ---- T-WA12-35 (M1, the proof-#1 regression) multi-item brief -> CONFIRM-
-# BEFORE-DRAFT: extraction returns ALL items; ONE confirm message lists every
-# matched line @ the ENGINE rate (stated prices are hints, never the rate);
-# NO quote exists until yes.
+# ---- T-WA12-35 RETIRED (WA-12.6 cutover): combined-extract->q_items card deleted; one-at-a-time qs_item proven by pwa12_6
+_skip("T-WA12-35", "combined-extract->q_items card deleted; one-at-a-time qs_item proven by pwa12_6")
+
+# ---- T-WA12-36 RETIRED (WA-12.6 cutover): pre-populated q_items corrections gone; per-item correction = qs_item (pwa12_6)
+_skip("T-WA12-36", "pre-populated q_items corrections gone; per-item correction = qs_item (pwa12_6)")
+
+# ---- T-WA12-37 RETIRED (WA-12.6 cutover): bare-intent q_itemreq->q_items->walk gone; begin_structured qs_event/qs_item (pwa12_6)
+_skip("T-WA12-37", "bare-intent q_itemreq->q_items->walk gone; begin_structured qs_event/qs_item (pwa12_6)")
+
+# ---- T-WA12-38 RETIRED (WA-12.6 cutover): LLM-prefill-of-intake-slots -> begin_structured prefill; pwa12_6 S9 covers intake
+_skip("T-WA12-38", "LLM-prefill-of-intake-slots -> begin_structured prefill; pwa12_6 S9 covers intake")
+
+# ---- T-WA12-39 (M4) complaint -> REPAIR prompt (never a syntax menu) at the
+# REVIEW step (q_confirm) -- the one remaining conversational surface where a
+# free-text complaint must NOT be parsed as an edit command. (WA-12.6 cutover:
+# the old second leg tested q_items, now retired; the structured item loop has
+# no syntax menu to repair away from -- a not-found item -> list/custom-offer,
+# wire-proven by pwa12_6 S4/S6.)
 _clear_sess(SALES_PH)
-_q_before = Q.search_count([("partner_id", "=", client.id)])
-_brief = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
-          '"items":[{"name":"qwertyunit","qty":5,"stated_price":10},'
-          '{"name":"prodruled","qty":1,"stated_price":null}],'
-          '"date":"2026-09-20","phone":null,"email":null,'
-          '"contact_person":null}')
-_s35 = _since() if False else M.search([], order="id desc", limit=1).id
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _brief):
-    D_sales._wa12_llm_intake_maybe(_txt(
-        SALES_PH, "brief: Acme Events. qwertyunit x5 they cost 10 each, "
-        "plus a prodruled, for the 20th of Sept"))
-# WA-12.4: the STEPPER shows ① first (one item), not a combined block; assert
-# the first card carries item ① at its engine rate, then NO draft until walked.
-_conf = M.search([("id", ">", _s35), ("phone_number", "=", SALES_PH),
-                  ("direction", "=", "outbound")], order="id desc", limit=1)
-_ct = _conf.message_body or ""
-no_draft_yet = Q.search_count([("partner_id", "=", client.id)]) == _q_before
-s35 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
-conf_ok = (s35 and s35.step == "q_items"
-           and "①" in _ct and "50.00" in _ct           # item ① @ ENGINE rate
-           and "×5" in _ct and bool((s35._get_buffer() or {}).get("focus")))
-# walk the stepper (tap ✓ on each confident item) -> NOW the draft exists with
-# BOTH lines at engine rates.
-_walk_stepper(D_sales, SALES_PH)
-q35 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
-drafted = (q35 and len(q35.line_ids) == 2
-           and {round(l.unit_rate) for l in q35.line_ids} == {50, 77}
-           and max(q35.line_ids.mapped("quantity")) == 5)
-_check("T-WA12-35", no_draft_yet and conf_ok and drafted,
-       "confirm-before-draft: no-draft=%s step①(engine-rate+qty)=%s "
-       "drafted-after-walk(2 lines, 50/77, x5)=%s"
-       % (no_draft_yet, conf_ok, drafted))
-
-# ---- T-WA12-36 (stepper corrections) per-item focused edits re-shape the list
-# BEFORE drafting: on item ① set qty + a date (header), confirm; SKIP item ②.
-_clear_sess(SALES_PH)
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _brief):
-    D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "same brief again"))
-# item ① (qwertyunit): focused qty + a date (header edit), then confirm.
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "qty to 2"))
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "29 Sept 2026"))
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "next"))          # confirm ①
-# item ② (prodruled): skip it.
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "skip"))
-q36 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
-_cj36 = q36.event_job_id.commercial_job_id if q36 else None
-_check("T-WA12-36",
-       q36 and len(q36.line_ids) == 1
-       and q36.line_ids.quantity == 2
-       and _cj36 and _cj36.event_date
-       and (_cj36.event_date.month, _cj36.event_date.day) == (9, 29),
-       "stepper corrections: lines=%s qty=%s date=%s"
-       % (len(q36.line_ids) if q36 else 0,
-          q36.line_ids.quantity if q36 and len(q36.line_ids) == 1 else "-",
-          _cj36.event_date if _cj36 else "-"))
-
-# ---- T-WA12-37 (M5) bare quote intent -> q_client -> q_itemreq -> confirm ->
-# draft (never the generic Copilot).
-_clear_sess(SALES_PH)
-_bare = ('{"intent":"quote","client":null,"items":[],"date":null,'
-         '"phone":null,"email":null,"contact_person":null}')
-_s37 = M.search([], order="id desc", limit=1).id
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _bare):
-    r37 = D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "i want to make a quote"))
-which_client = "which client" in (M.search(
-    [("id", ">", _s37), ("phone_number", "=", SALES_PH),
-     ("direction", "=", "outbound")], order="id desc", limit=1
-).message_body or "").lower()
-st1 = _step(SALES_PH)
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "[TEST-WA12] Acme Events Co"))
-st2 = _step(SALES_PH)
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "qwertyunit x3"))
-st3 = _step(SALES_PH)
-_walk_stepper(D_sales, SALES_PH)           # WA-12.4: walk the item stepper
-q37 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
-_check("T-WA12-37",
-       r37 is True and which_client and st1 == "q_client"
-       and st2 == "q_itemreq" and st3 == "q_items"
-       and q37 and len(q37.line_ids) == 1 and q37.line_ids.quantity == 3,
-       "bare intent: ask-client=%s steps=%s/%s/%s drafted(x3)=%s"
-       % (which_client, st1, st2, st3, bool(q37 and q37.line_ids)))
-
-# ---- T-WA12-38 (M3) brief-sourced phone+email PRE-FILL the intake: after the
-# name, NO phone/email asks; partner created with both.
-_clear_sess(SALES_PH)
-_pf = ('{"intent":"quote","client":"[TEST-WA12] Prefill Nova Ltd",'
-       '"items":[{"name":"qwertyunit","qty":1,"stated_price":null}],'
-       '"date":null,"phone":"+263773863012","email":"nova@x.test",'
-       '"contact_person":null}')
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _pf):
-    D_sales._wa12_llm_intake_maybe(_txt(
-        SALES_PH, "quote for Prefill Nova Ltd phone +263773863012 "
-        "email nova@x.test one qwertyunit"))
-# WA-12.4 client-before-items: an unknown client opens intake IMMEDIATELY (the
-# items are buffered). No q_items 'yes' first.
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "new"))
-_s38 = M.search([], order="id desc", limit=1).id
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "individual"))
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "ok"))      # name -> create+resume
-_walk_stepper(D_sales, SALES_PH)                         # walk -> draft
-_after38 = M.search([("id", ">", _s38), ("phone_number", "=", SALES_PH),
-                     ("direction", "=", "outbound")])
-asked_38 = " ".join((m.message_body or "") for m in _after38).lower()
-p38 = P.search([("name", "=", "[TEST-WA12] Prefill Nova Ltd")], limit=1)
-_check("T-WA12-38",
-       bool(p38) and "773863012" in (p38.phone_sanitized or p38.phone or "")
-       and p38.email == "nova@x.test"
-       and "phone number for" not in asked_38 and "email?" not in asked_38
-       and _step(SALES_PH) == "q_confirm",
-       "prefill: created(phone/email)=%s no-redundant-asks=%s resumed=%s"
-       % (bool(p38), "phone number for" not in asked_38, _step(SALES_PH)))
-
-# ---- T-WA12-39 (M4) complaint -> REPAIR prompt (never the syntax menu): at
-# q_confirm (deterministic token) AND at q_items.
+_seed_qconfirm(client, "2026-09-24", 1, [(prod_ok, 1)])
 _s39 = M.search([], order="id desc", limit=1).id
 D_sales._wa12_maybe_intercept(_txt(
     SALES_PH, "this is wrong from the information l gave you"))
 r39a = (M.search([("id", ">", _s39), ("phone_number", "=", SALES_PH),
                   ("direction", "=", "outbound")], order="id desc", limit=1
                  ).message_body or "")
-repair_qconfirm = "what should i change" in r39a.lower()
-_clear_sess(SALES_PH)
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _brief):
-    D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "the same brief once more"))
-_s39b = M.search([], order="id desc", limit=1).id
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "no this is incorrect"))
-r39b = (M.search([("id", ">", _s39b), ("phone_number", "=", SALES_PH),
-                  ("direction", "=", "outbound")], order="id desc", limit=1
-                 ).message_body or "")
 _check("T-WA12-39",
-       repair_qconfirm and "what should i change" in r39b.lower(),
-       "repair prompt: q_confirm=%s q_items=%s"
-       % (repair_qconfirm, "what should i change" in r39b.lower()))
+       "what should i change" in r39a.lower(),
+       "complaint at q_confirm -> repair prompt (not a syntax menu): %r"
+       % r39a[:80])
 _clear_sess(SALES_PH)
 
 # ---- T-WA12-40 (M2) identity-aware chat: the copilot system prompt ASSERTS
@@ -1152,16 +1076,11 @@ env["neon.wa.equip.session"].sudo().with_context(active_test=False).search(
     [("phone_number", "=", APPR_PH)]).write({"active": False})
 _check("T-WA12-41a", D_appr._wa12_can_quote(u_appr) is True,
        "MD/OD tier CAN initiate quotes (asserted, not assumed)")
-_b41 = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
-        '"items":[{"name":"qwertyunit","qty":1,"stated_price":null}],'
-        '"date":"2026-09-21","phone":null,"email":null,"contact_person":null}')
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _b41):
-    D_appr._wa12_llm_intake_maybe(_txt(
-        APPR_PH, "please make a quotation for Acme, one qwertyunit, 21 Sept"))
-_walk_stepper(D_appr, APPR_PH)             # WA-12.4: walk the item stepper
-q41 = Q.search([("partner_id", "=", client.id),
-                ("salesperson_id", "=", u_appr.id)],
-               order="id desc", limit=1)
+# WA-12.6 cutover: the conversational drive -> stepper walk is dead. The
+# still-valid assertions here are submit + SELF-approve (superuser-tier) + SoD
+# for a plain approver -- NOT the collection walk (pwa12_6 proves that). Seed the
+# approver's own priced DRAFT directly.
+q41 = _seed_qconfirm(client, "2026-09-21", 1, [(prod_ok, 1)], user=u_appr)
 q41.with_user(u_appr.id).action_submit_for_approval()
 pending41 = q41.state == "pending_approval"
 # the SELF [Approve] tap (interactive HMAC) -- must NOT be SoD-blocked.
@@ -1212,31 +1131,25 @@ _check("T-WA12-42",
        % (s42.step if s42 else "-", q42.state))
 _clear_sess(SALES_PH)
 
-# ---- T-WA12-43 (F1 regression: ECHO RATE == DRAFT RATE, always) the
-# catalogue-load shape (product rule, NO category): echo $200 -> yes -> the
-# DRAFTED line is priced $200 (never a silent $0.00 'not_yet').
+# ---- T-WA12-43 RETIRED (WA-12.6 cutover): F1 echo->walk dead; prod_nocat $200 priced re-proven in T-WA12-43r
+_skip("T-WA12-43", "F1 echo->walk dead; prod_nocat $200 priced re-proven in T-WA12-43r")
+
+# ---- T-WA12-43r (NEW KEEP) the no-CATEGORY product-rule shape still drafts
+# PRICED: prod_nocat (Kommandr Server) carries a $200 PRODUCT rule and NO
+# equipment_category_id (list_price 5.0 must be ignored). The structured finalize
+# seeds the draft; the line must price $200 via the per-product rule. (Re-proves
+# the F1 no_rule/$0 silent-draft class is closed without the dead echo->walk.)
 _clear_sess(SALES_PH)
-_f1 = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
-       '"items":[{"name":"kommandr server","qty":1,"stated_price":null}],'
-       '"date":"2026-09-25","phone":null,"email":null,"contact_person":null,'
-       '"address":null,"event_name":null}')
-_s43 = M.search([], order="id desc", limit=1).id
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f1):
-    D_sales._wa12_llm_intake_maybe(_txt(
-        SALES_PH, "quote acme for the kommandr server please"))
-_e43 = (M.search([("id", ">", _s43), ("phone_number", "=", SALES_PH),
-                  ("direction", "=", "outbound")], order="id desc", limit=1
-                 ).message_body or "")
-echo_200 = "200.00" in _e43
-_walk_stepper(D_sales, SALES_PH)               # WA-12.4: walk the stepper
-q43 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
-l43 = q43.line_ids[:1]
-_check("T-WA12-43",
-       echo_200 and l43 and l43.pricing_status == "priced"
-       and abs(l43.unit_rate - 200.0) < 0.01,
-       "echo==draft: echo$200=%s drafted(status=%s rate=%s; want priced/200)"
-       % (echo_200, l43.pricing_status if l43 else "-",
-          l43.unit_rate if l43 else "-"))
+q43r = _seed_qconfirm(client, "2026-09-25", 1, [(prod_nocat, 1)])
+l43r = q43r.line_ids.filtered(lambda l: l.product_template_id == prod_nocat)[:1]
+_check("T-WA12-43r",
+       bool(l43r) and l43r.pricing_status == "priced"
+       and abs(l43r.unit_rate - 200.0) < 0.01,
+       "no-category product rule -> priced/$200 (status=%s rate=%s; "
+       "list_price 5.0 IGNORED)"
+       % (l43r.pricing_status if l43r else "-",
+          l43r.unit_rate if l43r else "-"))
+_clear_sess(SALES_PH)
 
 # ---- T-WA12-44 (F2) exact catalogue-name match beats token logic; weak hits
 # carry confidence + suggestions (never silently drafted by the 12.2 lane).
@@ -1253,49 +1166,42 @@ _check("T-WA12-44",
                           h_exact.get("product_id") == prod_nocat.id,
                           h_weak.get("confidence"), len(uu)))
 
-# ---- T-WA12-45 (F8) rep-priced unpriced item: brief price -> '(rep-priced —
-# no catalogue rate)' echo -> manual line passes the guard; summary+ping flag;
-# a PRICED item's stated price stays a hint; no-rate-no-price still blocks.
+# ---- T-WA12-45 RETIRED (WA-12.6 cutover): F8 LLM->walk dead; rep-price guard/summary re-proven in T-WA12-45r
+_skip("T-WA12-45", "F8 LLM->walk dead; rep-price guard/summary re-proven in T-WA12-45r")
+
+# ---- T-WA12-45r (NEW KEEP) F8 rep-priced manual line: an item with NO
+# catalogue rate carries an explicit rep per-day price -> 'manual' WITH a real
+# rate -> the no_rule guard PASSES it (not a silent $0), and it renders LOUD
+# everywhere ([REP-PRICED] in the draft summary, (rep-priced) in the approval
+# item summary). A true no-rate line STILL blocks. (Re-proves the F8 surface the
+# retired T-45 covered, without the dead LLM->walk path.)
 _clear_sess(SALES_PH)
-_f8 = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
-       '"items":[{"name":"placeholder gizmo","qty":1,"stated_price":750},'
-       '{"name":"qwertyunit","qty":1,"stated_price":40}],'
-       '"date":"2026-09-26","phone":null,"email":null,"contact_person":null,'
-       '"address":null,"event_name":null}')
-_s45 = M.search([], order="id desc", limit=1).id
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f8):
-    D_sales._wa12_llm_intake_maybe(_txt(
-        SALES_PH, "quote acme gizmo at 750 and qwertyunit at 40"))
-# WA-12.4: the rep-price flag now shows on the per-item STEPPER card during the
-# walk -> scan the whole outbound stream across the walk, not one combined echo.
-_walk_stepper(D_sales, SALES_PH)               # WA-12.4: walk the stepper
-_e45 = " ".join(M.search(
-    [("id", ">", _s45), ("phone_number", "=", SALES_PH),
-     ("direction", "=", "outbound")]).mapped("message_body"))
-flag45 = ("rep-priced" in _e45 and "750.00" in _e45 and "50.00" in _e45)
-q45 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
-lg = q45.line_ids.filtered(lambda l: l.product_template_id == prod_ph)[:1]
-lq = q45.line_ids.filtered(lambda l: l.product_template_id == prod_ok)[:1]
-guard45 = not M.sudo()._wa12_unpriced_lines(q45)
-summ45 = "[REP-PRICED]" in M.sudo()._wa12_draft_summary(q45, [])
-ping45 = "(rep-priced)" in M.sudo()._wa12_item_summary(q45)
-drafted45 = (lg and lg.pricing_status == "manual"
-             and abs(lg.unit_rate - 750.0) < 0.01
-             and lq and abs(lq.unit_rate - 50.0) < 0.01)  # hint ignored
-# no-rate-no-price still blocks (the F1 $0 class): a bare gizmo brief.
-_clear_sess(SALES_PH)
-_f8b = _f8.replace(',"stated_price":750', ',"stated_price":null').replace(
-    ',{"name":"qwertyunit","qty":1,"stated_price":40}', '')
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f8b):
-    D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "quote acme one gizmo only"))
-_walk_stepper(D_sales, SALES_PH)               # WA-12.4: walk the stepper
-q45b = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+q45r = _seed_qconfirm(client, "2026-09-26", 1, [(prod_ok, 1)])
+M.sudo()._wa12_build_lines(
+    q45r, [{"product_id": prod_ph.id, "qty": 1, "rep_price": 750.0}], 1)
+q45r.action_recalculate_pricing()
+rl45 = q45r.line_ids.filtered(lambda l: l.product_template_id == prod_ph)[:1]
+unpriced45 = M.sudo()._wa12_unpriced_lines(q45r)
+summ45 = M.sudo()._wa12_draft_summary(q45r, unpriced45)
+isumm45 = M.sudo()._wa12_item_summary(q45r)
+# a true no-rate line (placeholder, NO rep price) must STILL block submit.
+q45b = Q._wa12_provision_chain(client, "2026-09-26", USD, u_sales)
+M.sudo()._wa12_build_lines(q45b, [{"product_id": prod_ph.id, "qty": 1}], 1)
+q45b.action_recalculate_pricing()
 blocks45 = bool(M.sudo()._wa12_unpriced_lines(q45b))
-_check("T-WA12-45",
-       flag45 and bool(drafted45) and guard45 and summ45 and ping45 and blocks45,
-       "rep-price: echo-flag=%s drafted(manual@750 + engine@50)=%s guard-pass"
-       "=%s summary-tag=%s ping-flag=%s ; no-price still blocks=%s"
-       % (flag45, bool(drafted45), guard45, summ45, ping45, blocks45))
+_check("T-WA12-45r",
+       bool(rl45) and rl45.pricing_status == "manual"
+       and abs(rl45.unit_rate - 750.0) < 0.01
+       and not unpriced45
+       and "[REP-PRICED]" in summ45 and "rep-priced" in isumm45.lower()
+       and blocks45,
+       "rep-priced manual: status=%s rate=%s guard-pass=%s loud(summary=%s "
+       "item=%s) no-rate-still-blocks=%s" % (
+           rl45.pricing_status if rl45 else "-",
+           rl45.unit_rate if rl45 else "-", not unpriced45,
+           "[REP-PRICED]" in summ45, "rep-priced" in isumm45.lower(),
+           blocks45))
+_clear_sess(SALES_PH)
 
 # ---- T-WA12-46: the WA-12.3 q_items 'replace <old> = <new>' BY-NAME grammar
 # relocated to the POST-DRAFT q_confirm path under the stepper (a confident item
@@ -1328,32 +1234,20 @@ _check("T-WA12-47",
        % len(q47.line_ids))
 _clear_sess(SALES_PH)
 
-# ---- T-WA12-48 (F5) address + event subject from the brief: street on the
-# new partner; 'Event: <subject>' on the event job's client notes.
-_clear_sess(SALES_PH)
-_f5 = ('{"intent":"quote","client":"[TEST-WA12] Redan Co",'
-       '"items":[{"name":"qwertyunit","qty":1,"stated_price":null}],'
-       '"date":null,"phone":"+263774000222","email":"redan@x.test",'
-       '"contact_person":null,"address":"10 Hugh Fraser Road, Highlands",'
-       '"event_name":"Redan Launch"}')
-with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f5):
-    D_sales._wa12_llm_intake_maybe(_txt(
-        SALES_PH, "quotation for Redan Co located at 10 Hugh Fraser Road"))
-# WA-12.4 client-before-items: unknown client opens intake directly (no 'yes').
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "new"))
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "company"))
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "ok"))      # contact prefilled? no — contact null, asks
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "[TEST-WA12] Ruth"))  # qc_contact
-_walk_stepper(D_sales, SALES_PH)                         # resume -> walk -> draft
-p48 = P.search([("name", "=", "[TEST-WA12] Redan Co")], limit=1)
-q48 = Q.search([("partner_id", "=", p48.id)], limit=1) if p48 else Q.browse()
-notes48 = (q48.event_job_id.client_notes or "") if q48 else ""
-_check("T-WA12-48",
-       bool(p48) and p48.street == "10 Hugh Fraser Road, Highlands"
-       and bool(q48) and "Redan Launch" in notes48,
-       "address->street=%s event-name->notes=%s (street=%r)"
-       % (bool(p48 and p48.street), "Redan Launch" in notes48,
-          p48.street if p48 else "-"))
+# ---- T-WA12-48 RETIRED (WA-12.6 cutover). The OLD F5 leg asserted brief-
+# EXTRACTION of partner fields: address -> partner.street and phone/email pre-
+# filled into the intake from a whole-brief parse. That whole-brief extraction
+# IS the dropped failure point of the pivot. Under WA-12.6 begin_structured pre-
+# fills only client/date (+ venue/note as EVENT-level), the new-client intake
+# COLLECTS phone/email/contact fresh, and the brief address is treated as the
+# event venue (prefills['venue']), not the partner street (create_client reads a
+# never-populated prefills['address'] -> dormant, logged LOW polish). The still-
+# live surfaces survive elsewhere: event_name -> event-job notes is proven by
+# the KEEP T-55 (standalone _wa12_quote_from_slots extras), and new-client
+# intake -> resume INTO the event step by pwa12_6 S9 + T-29/30/31.
+_skip("T-WA12-48",
+      "F5 brief-field extraction (address->street, phone/email prefill) dropped "
+      "by the pivot; event_name->notes via T-55, intake->event via pwa12_6 S9")
 _clear_sess(SALES_PH)
 
 # ---- T-WA12-49 (F6/F7) greeting mid-draft -> resume offer (not the syntax
@@ -1380,18 +1274,33 @@ _check("T-WA12-49",
 
 # ---- T-WA12-50 (review MATCH-1/FSM-3) the F2 weak-confidence gate at the
 # THREE remaining consumers. 'gizmo' weak-matches Placeholder Gizmo -> never a
-# confident line: (a) direct Quote: -> confirm gate, NO draft; (b) q_itemreq ->
-# unmatched pick; (c) q_confirm `add gizmo` -> refused with suggestions.
+# confident line: (a) the STRUCTURED item loop (qs_item) -> offered the custom
+# route, NO draft, NOT logged; (b) q_itemreq -> unmatched pick; (c) q_confirm
+# `add gizmo` -> refused with suggestions.
+# (a) WA-12.6: a weak/unknown item at qs_item is NEVER silently drafted -- it is
+# offered the custom-line route (the catalogue suggestion for a [TEST product is
+# scoped out), the draft is not created, and items[] stays empty.
 _clear_sess(SALES_PH)
 _qb50 = Q.search_count([])
-D_sales._wa12_maybe_intercept(_txt(
-    SALES_PH, "Quote: [TEST-WA12] Acme Events Co — gizmo, 2026-10-01"))
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "qs_item",
+    {"v": 5, "structured": True, "client_txt": "[TEST-WA12] Acme Events Co",
+     "partner_id": client.id, "date_txt": "2026-10-01", "days": 1,
+     "venue": "", "note": "", "items": [], "pending_item": None,
+     "qty_for": False, "prefills": {}})
+_s50a = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "gizmo"))
 s50a = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
 b50a = s50a._get_buffer() if s50a else {}
-quote_gate = (bool(s50a) and s50a.step == "q_items"
+_e50a = (M.search([("id", ">", _s50a), ("phone_number", "=", SALES_PH),
+                   ("direction", "=", "outbound")], order="id desc", limit=1
+                  ).message_body or "").lower()
+quote_gate = (bool(s50a) and s50a.step == "qs_item"
               and Q.search_count([]) == _qb50
-              and not _bufmatched(b50a)
-              and len(_bufunmatched(b50a)) == 1)
+              and not (b50a.get("items") or [])
+              and ("couldn't find" in _e50a or "not listed" in _e50a
+                   or "per-day price" in _e50a or "did you mean" in _e50a
+                   or "which" in _e50a))
 _clear_sess(SALES_PH)
 env["neon.wa.equip.session"].sudo()._start_quote(
     SALES_PH, u_sales, "q_itemreq",
@@ -1454,16 +1363,14 @@ env["neon.wa.equip.session"].sudo()._start_quote(
     {"client_txt": "[TEST-WA12] NoEmail Co", "kind": "company",
      "name": "[TEST-WA12] NoEmail Co", "contact": "[TEST-WA12] Bee",
      "phone": "+263773111222", "phone_e164": "+263773111222",
-     "matched": [{"product_id": prod_ok.id,
-                  "product_name": "[TEST-WA12] Qwertyunit", "qty": 1,
-                  "stated_price": None}], "date_txt": "", "days": 1,
-     "prefills": {}})
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "no"))   # skip email -> stepper
-_walk_stepper(D_sales, SALES_PH)                       # WA-12.4: walk -> draft
+     "date_txt": "", "days": 1, "prefills": {}, "structured": True})
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "no"))   # skip email -> resume
+# WA-12.6: a structured intake that skips email CREATES the client and RESUMES
+# into the EVENT step (qs_event) -- it never cancels the whole intake.
 p52 = P.search([("name", "=", "[TEST-WA12] NoEmail Co")], limit=1)
 _check("T-WA12-52",
-       bool(p52) and not p52.email and _step(SALES_PH) == "q_confirm",
-       "qc_email 'no' -> client created/no-email=%s resumed=%s"
+       bool(p52) and not p52.email and _step(SALES_PH) == "qs_event",
+       "qc_email 'no' -> client created/no-email=%s resumed-into=%s"
        % (bool(p52), _step(SALES_PH)))
 _clear_sess(SALES_PH)
 
@@ -1610,30 +1517,26 @@ _check("T-WA12-57",
        % (exact62, exact32, rob84, rob31, fam_ok, near_exc, mole_ok, zoom_ok,
           totem_ok))
 
-# ---- T-WA12-58 (review M-B/M-C) catalogue discovery lists the family by its
-# EXACT names (never a booth); a correction lead-in re-searches the intended
-# item, never extracts to 'none'.
-_clear_sess(SALES_PH)
-env["neon.wa.equip.session"].sudo()._start_quote(
-    SALES_PH, u_sales, "q_itemreq",
-    {"client_txt": "[TEST-WA12] Acme Events Co", "partner_id": client.id,
-     "date_txt": "", "prefills": {}})
-_s58 = M.search([], order="id desc", limit=1).id
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "what screens do you have"))
-_disc = (M.search([("id", ">", _s58), ("phone_number", "=", SALES_PH),
-                   ("direction", "=", "outbound")], order="id desc", limit=1
-                  ).message_body or "")
-disc_ok = ("LED SCREEN" in _disc and "BOOTH" not in _disc
-           and _step(SALES_PH) == "q_itemreq")
-D_sales._wa12_maybe_intercept(_txt(SALES_PH, "no, it's a 6m x 2m screen"))
-s58 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
-b58 = s58._get_buffer() if s58 else {}
-mc_ok = (bool(s58) and s58.step == "q_items"
-         and any("6M X 2M LED SCREEN" in (it.get("product_name") or "")
-                 for it in _bufmatched(b58)))
-_check("T-WA12-58", disc_ok and mc_ok,
-       "M-B discovery lists family/no-booth=%s ; M-C 'no it's a 6m x 2m "
-       "screen' re-searches -> 6x2 matched=%s" % (disc_ok, mc_ok))
+# ---- T-WA12-58 RETIRED (WA-12.6 cutover). It tested the q_itemreq DISCOVERY
+# ("what screens do you have" -> family list) + M-C correction lead-in ("no it's
+# a 6m x 2m screen" -> re-search), both in _wa12_handle_convo -- a CONVO-lane
+# surface the WA-12.6 live entry no longer reaches. _wa12_family_names /
+# _wa12_discovery_family are called ONLY from q_itemreq/q_items in the convo
+# handler, and those steps are reached ONLY by the non-structured resume/q_client
+# branches; the live spine always sets structured=True (begin_structured ->
+# q_client -> qs_event -> qs_item), so the discovery is dead-in-live. The scope
+# fix (45a423d) correctly made _wa12_family_names EXCLUDE [TEST/Packages for
+# production, so the test's reliance on its [TEST screen fixtures appearing in
+# the discovery list is no longer valid (the real catalogue yields 0 'visual'
+# names locally). Surviving surfaces are proven elsewhere: the STRUCTURED
+# qs_item family LIST-then-pick by pwa12_6 S4/S6 + T-50a, and dimensional/family
+# matcher correctness by the KEEP T-57 (M-A). In-structure wrong-item correction
+# is the ✗ Change button re-opening the list (pwa12_6), not a free-text lead-in.
+# ⚠️ LOW polish: if the q_itemreq convo lane is ever revived, _wa6_in_family
+# yields 0 'visual' on the real catalogue -- tune family membership then.
+_skip("T-WA12-58",
+      "q_itemreq discovery + M-C correction is convo-lane (dead-in-live under "
+      "WA-12.6); structured qs_item list by pwa12_6 S4/S6+T-50a, matcher by T-57")
 _clear_sess(SALES_PH)
 
 # ---------------------------------------------------------- T-WA12-59 alias store

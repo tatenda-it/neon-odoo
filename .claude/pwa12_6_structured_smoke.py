@@ -40,6 +40,7 @@ print("P-WA-12.6 — STRUCTURED collection WIRE smoke")
 print("=" * 72)
 PHONE = "+263779126001"
 _WIRE = []
+_ALLWIRE = []   # never cleared: every bot message across S1-S10 for the S11 sweep
 
 
 def _cap_reply(self, raw_from, from_e164, text):
@@ -69,6 +70,7 @@ for p in _PS:
 
 
 def _clear():
+    _ALLWIRE.extend(_WIRE)   # archive for the cumulative no-syntax sweep (S11)
     _WIRE.clear()
 
 
@@ -100,6 +102,18 @@ def _tap(pid_id, lst=False):
             "interactive": {k: {"id": pid_id, "title": "x"}}, "id": "w126t"}
 
 # ---- fixtures
+def _purge_rules():
+    """neon.finance.pricing.rule + bracket are APPEND-ONLY (perm_unlink=0) -> raw
+    SQL for [TEST-WA126] fixtures (brackets FK the rule -> brackets first)."""
+    env.cr.execute(
+        "DELETE FROM neon_finance_pricing_bracket WHERE rule_id IN "
+        "(SELECT id FROM neon_finance_pricing_rule WHERE name LIKE %s)",
+        ("%[TEST-WA126]%",))
+    env.cr.execute(
+        "DELETE FROM neon_finance_pricing_rule WHERE name LIKE %s",
+        ("%[TEST-WA126]%",))
+
+
 def _purge():
     parts = P.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")])
     env.cr.execute("DELETE FROM neon_finance_payment_term WHERE name LIKE %s "
@@ -109,13 +123,13 @@ def _purge():
     env["neon.finance.invoice.schedule"].sudo().search([("quote_id", "in", _tq.ids)]).unlink()
     _ej = _tq.mapped("event_job_id"); _cj = _ej.mapped("commercial_job_id")
     _tq.unlink(); _ej.exists().unlink(); _cj.exists().unlink()
+    _purge_rules()  # product-scoped rules FK the products -> drop before them
     parts.exists().unlink()
 
 
 _clear_sess()
+_purge_rules()
 PT.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")]).unlink()
-Rule.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")]).mapped("bracket_ids").unlink()
-Rule.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")]).unlink()
 ECat.with_context(active_test=False).search([("code", "=", "TW126")]).unlink()
 _purge()
 
@@ -210,14 +224,22 @@ s2ok = {"at_event_step": bool(s2) and s2.step == "qs_event",
         "asks_date": "date" in _alltext().lower()}
 _check("S2-client-to-event", all(s2ok.values()), "%s" % s2ok)
 
-# ============================================================ S3: range -> 5 days
+# ============================================================ S3: range -> ASK days
+# Robin's convention: a RANGE never auto-assumes -> the bot ASKS "how many
+# chargeable days?" (offers the inclusive count as a hint); the rep types it.
 _clear()
 D._wa12_maybe_intercept(_txt("7 to 11 August 2026"))
+s3a = _sess(); b3a = s3a._get_buffer() if s3a else {}
+asked = "how many" in _alltext().lower()
+hinted = "5" in _alltext()           # inclusive hint shown
+await_set = bool(b3a.get("await_days")) and s3a.step == "qs_event"
+_clear()
+D._wa12_maybe_intercept(_txt("5"))   # the rep states 5 chargeable days
 s3 = _sess(); b3 = s3._get_buffer() if s3 else {}
-s3ok = {"at_item_step": bool(s3) and s3.step == "qs_item",
-        "days_5": b3.get("days") == 5,
-        "echoed_5day": "5-day" in _alltext().lower() or "5 day" in _alltext().lower()}
-_check("S3-range-5-days-inclusive", all(s3ok.values()),
+s3ok = {"asked_days": asked, "offered_hint": hinted, "await_flag": await_set,
+        "at_item_step": bool(s3) and s3.step == "qs_item",
+        "days_5_from_rep": b3.get("days") == 5}
+_check("S3-range-asks-rep-for-days", all(s3ok.values()),
        "%s (days=%s)" % (s3ok, b3.get("days")))
 
 # ============================================================ S4+S5: 5 items one-by-one
@@ -248,6 +270,46 @@ _check("S4-five-items-one-by-one", n_items == 5 and q and len(q.line_ids) == 5,
 _check("S5-MONEY-duration-5-on-every-line", bool(q) and durs == {5},
        "line durations=%s (want {5})" % durs)
 
+# ============================================================ S8: REVIEW money surface
+# At the q_confirm draft (from S4 'done'), the review MUST apply discount + VAT
+# toggle correctly. This is the money surface that must not deploy unvalidated.
+# The session s5 is now q_confirm; commands route via _wa12_try_edit (typed
+# fallback -- the rep normally taps, but the underlying math is what we assert).
+s8 = _sess()
+review_ok = {}
+if s8 and s8.step == "q_confirm" and q:
+    tax_before = q.amount_tax or 0.0
+    total_before = q.amount_total or 0.0
+    # VAT off -> tax row clears.
+    _clear(); D._wa12_maybe_intercept(_txt("no tax"))
+    q.invalidate_recordset()
+    review_ok["vat_off_zeroes_tax"] = (q.amount_tax or 0.0) == 0.0
+    # VAT back on -> tax returns at ~15% of the untaxed base (the real rate, not
+    # just "non-zero" -- this is the money surface).
+    _clear(); D._wa12_maybe_intercept(_txt("with tax"))
+    q.invalidate_recordset()
+    review_ok["vat_on_restores_tax"] = (q.amount_tax or 0.0) > 0.0
+    review_ok["vat_rate_is_15pct"] = bool(q.amount_untaxed) and abs(
+        (q.amount_tax / q.amount_untaxed) - 0.15) < 0.01
+    # a 10% discount on line 1 -> its subtotal is EXACTLY rate×qty×days×0.9 (the
+    # actual edit math, not merely "it dropped").
+    l1 = q.line_ids[:1]
+    sub_before = l1.line_subtotal if l1 else 0.0
+    _clear(); D._wa12_maybe_intercept(_txt("discount 1 10%"))
+    q.invalidate_recordset()
+    l1 = q.line_ids[:1]
+    want = round((l1.unit_rate or 0) * (l1.quantity or 0)
+                 * (l1.duration_days or 0) * 0.9, 2) if l1 else -1
+    review_ok["discount_drops_subtotal"] = bool(l1) and (
+        l1.line_subtotal < sub_before)
+    review_ok["discount_math_exact"] = bool(l1) and abs(
+        (l1.line_subtotal or 0) - want) < 0.02
+    review_ok["still_q_confirm"] = _sess() and _sess().step == "q_confirm"
+else:
+    review_ok["reached_review"] = False
+_check("S8-REVIEW-money-discount-vat", bool(review_ok) and all(review_ok.values()),
+       "%s" % review_ok)
+
 # ============================================================ S6: smoke -> only smoke
 _clear(); _clear_sess()
 # jump a session straight to the item step to test the item search in isolation.
@@ -271,12 +333,86 @@ s7 = _sess(); b7 = s7._get_buffer() if s7 else {}
 _check("S7-client-locked", b7.get("partner_id") == client.id,
        "client still=%s (not Beta=%s)" % (b7.get("partner_id"), other.id))
 
+# ============================================================ S9: NEW-client intake -> event
+# A client the bot doesn't know -> guided intake -> on completion RESUME into the
+# EVENT step (not a dead-end). Robin's briefs are often new clients.
+_clear(); _clear_sess()
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: '{"intent":"quote","client":"[TEST-WA126] '
+                  'Zêta New Co","items":[],"date":null,"phone":null,'
+                  '"email":null,"contact_person":null,"address":null,'
+                  '"event_name":null}'):
+    D._wa12_llm_intake_maybe(_txt("quote for Zeta New Co"))
+D._wa12_maybe_intercept(_txt("[TEST-WA126] Zêta New Co"))   # unknown -> intake
+D._wa12_maybe_intercept(_txt("new"))
+D._wa12_maybe_intercept(_txt("individual"))
+D._wa12_maybe_intercept(_txt("ok"))            # qc_name -> reuse typed name
+D._wa12_maybe_intercept(_txt("+263779126777"))  # qc_phone
+_clear()
+D._wa12_maybe_intercept(_txt("skip"))          # qc_email -> create + resume
+s9 = _sess()
+newp = P.search([("name", "=", "[TEST-WA126] Zêta New Co")], limit=1)
+_check("S9-newclient-intake-to-event",
+       bool(newp) and bool(s9) and s9.step == "qs_event"
+       and "date" in _alltext().lower(),
+       "created=%s resumed=%s" % (bool(newp), s9.step if s9 else None))
+
+# ============================================================ S10: 3-day brief -> dur 3
+# the user's money must-pass: a "for 3 days" brief -> every line duration_days=3.
+_clear(); _clear_sess()
+_q10_before = Q.search([("partner_id", "=", client.id)], order="id desc",
+                       limit=1).id
+env["neon.wa.equip.session"].sudo()._start_quote(
+    PHONE, u_sales, "qs_event",
+    {"v": 5, "structured": True, "client_txt": client.name,
+     "partner_id": client.id, "date_txt": "", "venue": "", "note": "",
+     "prefills": {}, "items": [], "pending_item": None, "qty_for": False,
+     "await_days": False})
+D._wa12_maybe_intercept(_txt("25 September 2026 for 3 days"))
+s10 = _sess(); b10 = s10._get_buffer() if s10 else {}
+# add one confident item then done.
+_clear(); D._wa12_maybe_intercept(_txt("6m x 2m screen"))
+last10 = _WIRE[-1] if _WIRE else {}
+oid = (last10.get("ids") or [None])[0]
+if oid:
+    D._wa12_maybe_intercept(_tap(oid, lst=(last10.get("kind") == "list")))
+    D._wa12_maybe_intercept(_txt("2"))   # qty 2
+D._wa12_maybe_intercept(_txt("done"))
+q10 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+l10 = q10.line_ids[:1] if q10 else None
+dur_ok = bool(q10) and set(q10.line_ids.mapped("duration_days")) == {3}
+sub_ok = bool(l10) and abs(
+    (l10.unit_rate or 0) * (l10.quantity or 0) * (l10.duration_days or 0)
+    - (l10.line_subtotal or 0)) < 0.5
+_check("S10-MONEY-3day-brief", b10.get("days") == 3 and dur_ok and sub_ok,
+       "days=%s durs=%s subtotal=rate×qty×3=%s" % (
+           b10.get("days"),
+           set(q10.line_ids.mapped("duration_days")) if q10 else set(), sub_ok))
+
+# ============================================================ S11: NO COMMAND SYNTAX
+# User directive: every user-facing message is PLAIN language -- no internal
+# command grammar (angle-bracket placeholders like "price <item>", backtick
+# command templates like "e.g. `add screen`"). Sweep EVERY bot message captured
+# across S1-S10 (text bodies + button/list titles + row descriptions). A plain-
+# language example like "(e.g. *bespoke arch 250*)" or a date "(e.g. 25/09/2026)"
+# is allowed; only command-shaped syntax is forbidden.
+_allmsgs = _ALLWIRE + _WIRE
+_sweep_parts = []
+for e in _allmsgs:
+    _sweep_parts.append(e.get("body") or "")
+    _sweep_parts += e.get("opts") or []
+    _sweep_parts += e.get("descs") or []
+_sweep = "\n".join(_sweep_parts)
+_FORBIDDEN = ["<", "`", "price <", "add <", "replace <", "qty <", "e.g. `"]
+_offenders = sorted({tok for tok in _FORBIDDEN if tok in _sweep})
+_check("S11-no-command-syntax",
+       len(_allmsgs) >= 10 and not _offenders,
+       "swept %d messages; offending tokens=%s" % (len(_allmsgs), _offenders))
+
 # ---- teardown
 _clear_sess()
 _purge()
 PT.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")]).unlink()
-Rule.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")]).mapped("bracket_ids").unlink()
-Rule.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")]).unlink()
 ECat.with_context(active_test=False).search([("name", "like", "[TEST-WA126]")]).unlink()
 Bot.with_context(active_test=False).search([("phone_number", "=", PHONE)]).unlink()
 u_sales.write({"active": False})
@@ -286,6 +422,8 @@ for p in _PS:
 print("=" * 72)
 _passed = sum(1 for v in results.values() if v)
 print("STRUCTURED WIRE Total: %d/%d passed" % (_passed, len(results)))
+# plain summary line so run_regression.sh (greps ^Total:) picks this suite up.
+print("Total: %d/%d passed" % (_passed, len(results)))
 for k in results:
     print("  %s: %s" % (k, "PASS" if results[k] else "FAIL"))
 print("=" * 72)
