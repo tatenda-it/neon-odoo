@@ -172,6 +172,15 @@ _MENU_PHRASES = {
 _MENU_TRIGGERS = {"menu", "help", "/menu", "/help", "what can you do",
                   "what can i do", "options", "commands",
                   "what can you help with"}
+# A bare GREETING is basic navigation -- it must NOT depend on the LLM (a
+# quoting bot can't go dark on an AI blip). Tight EQUALS on a small set (after
+# strip/lower/trailing-punctuation): "hello can you quote X" is a real request,
+# not a greeting, and still routes to the Copilot / WA-12. Mirrors the
+# wants_menu discipline.
+_GREETINGS = {"hi", "hii", "hie", "hey", "yo", "hello", "helo", "hallo",
+              "hi there", "hello there", "hey there", "greetings",
+              "good morning", "good afternoon", "good evening", "good day",
+              "morning", "afternoon", "evening", "start", "/start"}
 
 # ======================================================================
 # WA-4 -- dual-role lens routing constants
@@ -404,15 +413,18 @@ class WhatsAppCopilotService:
             result, served_by = self._provider_chat(messages, schemas)
             last = result
             if result is None or not result.success:
+                err = (result.error_message if result is not None
+                       else "no_provider")
                 _logger.warning(
-                    "WA: all providers failed for %s; err=%s", user.login,
-                    (result.error_message if result is not None else "n/a"))
-                return {"text": "Sorry -- I can't reach the assistant right "
-                                "now. Please try again shortly.",
-                        "cta_url": None, "provider_key": served_by,
-                        "variant": variant,
-                        "error": (result.error_message
-                                  if result is not None else "no_provider")}
+                    "WA: all providers failed for %s; err=%s", user.login, err)
+                # DON'T dead-end (a quoting bot can't go dark on an LLM blip).
+                # Degrade to the DETERMINISTIC capability menu -- the Quote /
+                # crew / availability commands are deterministic interceptors
+                # that work without the LLM; only the free-form AI chat is
+                # down. Basic navigation stays alive. Thread the routed lens so
+                # a multi-role user keeps that lens's tools + marker.
+                return self._degraded_menu(
+                    bot_user, variant, err, lens_routed=lens_routed)
 
             # Final natural-language turn (text, no tool calls).
             if not result.tool_calls:
@@ -789,17 +801,33 @@ class WhatsAppCopilotService:
         t = (text or "").strip().lower().rstrip(" ?!.")
         return t in {x.rstrip(" ?!.") for x in _MENU_TRIGGERS}
 
-    def build_menu_result(self, bot_user):
+    def is_greeting(self, text):
+        """A bare greeting (deterministic, LLM-independent). Tight EQUALS on
+        _GREETINGS after strip/lower/trailing-punctuation -- a greeting glued to
+        a real request ('hello can you quote X') is NOT a greeting and routes on
+        to the Copilot / WA-12 as before."""
+        t = (text or "").strip().lower().rstrip(" ?!.,")
+        return t in {x.rstrip(" ?!.,") for x in _GREETINGS}
+
+    def build_menu_result(self, bot_user, prefix="", variant=None):
+        """``prefix`` (optional) is prepended to the body + text fallback: a
+        warm greeting for the greeting fast-path, or the 'AI briefly
+        unavailable' note for the LLM-down degrade. ``variant`` (optional) keeps
+        the lens the turn was running under (the degrade path threads the ROUTED
+        lens so a multi-role user sees that lens's tools, not the default);
+        greeting callers pass nothing and keep variant_for. The menu itself is
+        DETERMINISTIC (tool registry, no LLM)."""
         user = bot_user.user_id
-        variant = self.variant_for(user)
+        variant = variant or self.variant_for(user)
         tools = self.whatsapp_tools(user, variant)
         opts = [(t.name, _MENU_LABELS.get(
             t.name, t.name.replace("get_", "").replace("_", " ").title()))
             for t in tools]
         if not opts:
             return self._safe(
+                (prefix or "") +
                 "You can ask me about your work and I'll help where I can.")
-        body = ("Here's what I can help with, %s. Tap an option:"
+        body = (prefix + "Here's what I can help with, %s. Tap an option:"
                 % (user.name or "there"))
         if len(opts) <= 3:
             buttons = [{"id": self._payload("menu", k), "title": lbl[:20]}
@@ -821,6 +849,28 @@ class WhatsAppCopilotService:
         return {"text": body, "cta_url": None, "interactive": interactive,
                 "text_fallback": fallback, "error": None,
                 "provider_key": None}
+
+    def _degraded_menu(self, bot_user, variant, error_msg=None,
+                       lens_routed=False):
+        """LLM (Groq) unreachable -> DON'T dead-end. The AI is OPTIONAL: degrade
+        to the DETERMINISTIC capability menu so the bot stays useful. The Quote /
+        crew / availability / feedback faces are all deterministic interceptors
+        that run WITHOUT the LLM; only the free-form AI chat is down. Threads the
+        turn's ROUTED ``variant`` so a multi-role user keeps that lens's tools
+        (not the default), re-surfaces the lens marker, and carries the provider
+        error for the outbound audit row. NOTE: no trailing 'Tap an option:' in
+        the prefix -- build_menu_result adds it when there ARE options, and the
+        no-tools branch then reads cleanly (no 'tap' with nothing to tap)."""
+        marker = (("🔖 as %s\n" % LENS_LABEL.get(variant, variant))
+                  if lens_routed else "")
+        res = self.build_menu_result(
+            bot_user, variant=variant,
+            prefix=marker + "⚠️ My AI assistant is briefly unavailable — but I "
+                   "can still help you directly.\n\n")
+        res["error"] = error_msg or "llm_unavailable"
+        res["provider_key"] = None
+        res["variant"] = variant
+        return res
 
     # ==================================================================
     # WA-1 -- tap-back inbound router (Piece B, THE real risk)

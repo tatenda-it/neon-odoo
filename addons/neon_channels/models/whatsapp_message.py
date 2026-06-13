@@ -321,7 +321,22 @@ class WhatsAppMessage(models.Model):
                 # multi-role -> a 2-button ask instead of run_turn.
                 lr = svc.resolve_lens(bot_user, body, inbound.id)
                 if lr.get("ask"):
+                    # a multi-role greeting/ambiguous turn -> the DETERMINISTIC
+                    # 2-button lens ask (already LLM-independent; a greeting
+                    # here stays the ask, not a menu -- WA-4 behaviour intact).
                     result = lr["ask"]
+                elif svc.is_greeting(body):
+                    # Robustness: a bare GREETING (single-role / resolved-lens)
+                    # is basic navigation -> the DETERMINISTIC capability menu,
+                    # never the LLM. A quoting bot must greet even when Groq is
+                    # down (the AI is OPTIONAL). A greeting glued to a real
+                    # request is NOT caught (tight equals) and routes to
+                    # run_turn / WA-12 as before. (A greeting at an ACTIVE
+                    # WA-* session is already claimed deterministically by the
+                    # neon_crew_comms intercepts upstream.)
+                    who = (bot_user.user_id.name or "").split(" ")[0] or "there"
+                    result = svc.build_menu_result(
+                        bot_user, prefix="Hi %s! 👋\n\n" % who)
                 else:
                     result = svc.run_turn(
                         bot_user, lr.get("text") or body,

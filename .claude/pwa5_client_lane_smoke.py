@@ -349,12 +349,28 @@ try:
         check("A8: 'what is the price' DOES trip handoff",
               WM._wa5_is_handoff("what is the price") is True)
 
-        # A9: MAPPED number -> staff assistant path (regression guard)
+        # A9: MAPPED number -> staff assistant path (regression guard). NB the
+        # probe is a NON-greeting 1-word turn ("thanks"): a bare greeting now
+        # routes to the DETERMINISTIC menu (the LLM-optional fix), proven in
+        # A9b + pwa_copilot_resilience. "thanks" is <3 words so it also bypasses
+        # the WA-12 sales-quote LLM and reaches the Copilot run_turn.
         _sent.clear(); _reset_spies()
-        WM.handle_inbound(text_msg("hello", A_FROM), {})
-        check("A9: mapped sender -> Copilot path (run_turn + variant_for)",
+        WM.handle_inbound(text_msg("thanks", A_FROM), {})
+        check("A9: mapped sender (non-greeting) -> Copilot path (run_turn)",
               counters["run_turn"] >= 1 and counters["variant_for"] >= 1,
               dict(counters))
+        # A9b: a bare GREETING -> DETERMINISTIC menu, the LLM is NOT called
+        # (robustness: the bot greets even when Groq is down).
+        _sent.clear(); _reset_spies()
+        WM.handle_inbound(text_msg("hello", A_FROM), {})
+        # the greeting reply is deterministic (no LLM); its kind (buttons/list/
+        # text) depends on the user's tool count, so assert the greeting TEXT in
+        # whatever was sent, not a specific structured kind.
+        _g9 = _sent[-1] if _sent else None
+        _g9body = (_g9[2] if _g9 and len(_g9) > 2 else "")
+        check("A9b: mapped greeting -> deterministic greeting reply (NO run_turn)",
+              counters["run_turn"] == 0 and "Hi " in _g9body,
+              "run_turn=%s reply=%r" % (counters["run_turn"], _g9body[:60]))
 
         # =========================================================
         # B -- LEAD-CREATE CONTRACT

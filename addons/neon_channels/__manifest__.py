@@ -221,7 +221,14 @@
     # for the tappable candidate/variant pick.
     # 17.0.1.22.4: WA-12.4 stepper -- 2 new INTENTS (wa12_ok/wa12_change) for the
     # confident-item ✓/✗ card.
-    'version': '17.0.1.22.4',
+    # 17.0.1.22.5: RESILIENCE -- the LLM (Groq) is OPTIONAL; the bot must not go
+    # dark on an AI blip. (a) a bare GREETING (is_greeting, tight equals) routes
+    # to the DETERMINISTIC capability menu, never the LLM; (b) run_turn on
+    # all-providers-failed DEGRADES to that menu ("AI briefly unavailable") with
+    # the provider error kept for audit, instead of the dead-end "can't reach the
+    # assistant". WA-4 multi-role greeting still gets the deterministic lens ask.
+    # build_menu_result gains an optional prefix. pwa_copilot_resilience 10/10.
+    'version': '17.0.1.22.5',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',
