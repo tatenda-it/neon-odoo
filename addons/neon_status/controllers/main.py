@@ -222,7 +222,14 @@ WA_MODULES = [
              "confirms every matched line + rate BEFORE drafting. New-client "
              "intake (company/individual, near-duplicate check, phone/email) "
              "runs in-chat; reps can price genuinely-unpriced items by hand "
-             "(loudly flagged). Goes live with WA-12."},
+             "(loudly flagged). RESOLVER v2 (the matcher) is now live: a "
+             "category-keystone (every catalogue product carries its family) + "
+             "a UI-reviewed team-slang alias store + a funnel "
+             "(normalise -> confirmed-alias -> dimensional -> exact -> pg_trgm "
+             "rank -> grounded LLM shortlist -> discovery) that never crosses "
+             "category and never invents a product; \"3 x 2 screen\" hits the "
+             "exact LED screen, \"4 blinders\" = qty 4 molefays. Goes live "
+             "with WA-12."},
     {"key": "WA-13", "title": "Quote / invoice retrieval", "pct": 100,
      "state": "verifying",
      "body": "BUILT & DEPLOYED, gated. Face 1 (retrieval): \"Send quote / "

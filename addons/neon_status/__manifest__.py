@@ -119,7 +119,9 @@
     # value confirmation, not "R3"); WA-12 card = LIVE batch deployed (real
     # catalogue loaded), still in-verification; new WA-12.2 + WA-13 cards
     # (built & deployed, gated). Text/constants only.
-    "version": "17.0.1.0.20",
+    # 17.0.1.0.21: Resolver v2 (matcher funnel + alias store) live -> WA-12.2
+    # card line. Text only.
+    "version": "17.0.1.0.21",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
