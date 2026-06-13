@@ -290,7 +290,10 @@
     # group lens). pwa12 62/62; pwa6 58/58, pwa8 33/33, pwa13 15/15.
     # ⚠️ BASELINE: a superseding Resolver v2 (re-map equipment_category_id from
     # Robin's CSV `category` column, not keyword-guessing) is incoming.
-    "version": "17.0.1.14.0",
+    # 17.0.1.15.0: Resolver v2 SUPPORT (a) — neon.equipment.alias store (UI-
+    # reviewable team-slang map; only CONFIRMED rows applied). No matcher wiring
+    # yet — the funnel + golden set follow once Robin confirms the seeded rows.
+    "version": "17.0.1.15.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
@@ -315,6 +318,7 @@
         "wizards/crew_notify_wizard_views.xml",
         "views/commercial_job_views.xml",
         "views/commercial_event_job_views.xml",
+        "views/neon_equipment_alias_views.xml",
         "views/readiness_templates.xml",
         "data/ir_cron.xml",
         "data/readiness_cron.xml",

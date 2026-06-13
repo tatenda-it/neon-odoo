@@ -30,3 +30,5 @@ from . import whatsapp_message_wa12
 # before WA-6. A WhatsApp face on the EXISTING P6.M7 invoice machinery (no new
 # finance engine); reuses the WA-12 rails.
 from . import whatsapp_message_wa13
+# Resolver v2 -- team-slang alias store (matcher normalise step).
+from . import neon_equipment_alias

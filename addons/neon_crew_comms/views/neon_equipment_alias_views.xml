@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Resolver v2 alias store: a UI list Robin reviews/confirms. Only
+         CONFIRMED rows are applied by the WA-12 matcher. -->
+    <record id="view_neon_equipment_alias_list" model="ir.ui.view">
+        <field name="name">neon.equipment.alias.list</field>
+        <field name="model">neon.equipment.alias</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom"
+                  decoration-muted="state == 'open'"
+                  decoration-success="state == 'confirmed'">
+                <field name="phrase"/>
+                <field name="product_template_id"/>
+                <field name="category_id"/>
+                <field name="term"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'confirmed'"
+                       decoration-warning="state == 'proposed'"/>
+                <field name="note"/>
+                <button name="action_confirm" type="object" string="Confirm"
+                        icon="fa-check" invisible="state == 'confirmed'"/>
+                <button name="action_mark_open" type="object" string="Open"
+                        icon="fa-question" invisible="state == 'open'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_neon_equipment_alias" model="ir.actions.act_window">
+        <field name="name">Equipment Slang Aliases</field>
+        <field name="res_model">neon.equipment.alias</field>
+        <field name="view_mode">tree</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Review team slang aliases.</p>
+            <p>Each row maps slang the team types on WhatsApp to a product,
+               category, or search term. Only <b>Confirmed</b> rows are applied
+               by the quote matcher.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_neon_equipment_alias"
+              name="Slang Aliases"
+              action="action_neon_equipment_alias"
+              parent="neon_jobs.menu_operations_root"
+              sequence="90"
+              groups="neon_jobs.group_neon_jobs_manager,neon_core.group_neon_superuser"/>
+</odoo>

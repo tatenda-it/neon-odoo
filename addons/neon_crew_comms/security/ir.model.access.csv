@@ -2,3 +2,6 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_crew_notify_wizard_mgr,crew.notify.wizard/manager,model_commercial_job_crew_notify_wizard,neon_jobs.group_neon_jobs_manager,1,1,1,1
 access_crew_notify_wizard_leader,crew.notify.wizard/crew_leader,model_commercial_job_crew_notify_wizard,neon_jobs.group_neon_jobs_crew_leader,1,1,1,1
 access_wa_equip_session_system,wa.equip.session.system,model_neon_wa_equip_session,base.group_system,1,1,1,0
+access_neon_equipment_alias_user,neon.equipment.alias/user,model_neon_equipment_alias,base.group_user,1,0,0,0
+access_neon_equipment_alias_mgr,neon.equipment.alias/manager,model_neon_equipment_alias,neon_jobs.group_neon_jobs_manager,1,1,1,1
+access_neon_equipment_alias_su,neon.equipment.alias/superuser,model_neon_equipment_alias,neon_core.group_neon_superuser,1,1,1,1

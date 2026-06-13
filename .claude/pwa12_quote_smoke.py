@@ -27,7 +27,7 @@ T-WA12-10  teardown: dead (rejected) quote -> provisional chain archived;
 """
 from unittest.mock import patch
 
-from odoo.exceptions import AccessError  # noqa: F401 (parity)
+from odoo.exceptions import AccessError, ValidationError  # noqa: F401 (parity)
 from odoo.addons.neon_channels.models import wa_payload
 
 # Mute SMTP for the whole run: action_accept fires the P6.M7 on-acceptance
@@ -1505,6 +1505,46 @@ _check("T-WA12-58", disc_ok and mc_ok,
        "M-B discovery lists family/no-booth=%s ; M-C 'no it's a 6m x 2m "
        "screen' re-searches -> 6x2 matched=%s" % (disc_ok, mc_ok))
 _clear_sess(SALES_PH)
+
+# ---------------------------------------------------------- T-WA12-59 alias store
+# Resolver v2 SUPPORT (a): the neon.equipment.alias model loads, the EXACTLY-
+# ONE-target constraint holds, phrase is unique, and state defaults to
+# 'proposed' (nothing auto-applies until Robin confirms). No matcher wiring is
+# asserted here — that ships with the funnel after Robin confirms the seed.
+ALIAS = env["neon.equipment.alias"].sudo()
+_a_vis = env["neon.equipment.category"].sudo().search(
+    [("code", "=", "visual")], limit=1)
+alias_results = {}
+# 59a: a valid category-target row is creatable + defaults to proposed.
+_ar = ALIAS.create({"phrase": "[test-wa12]-screen", "category_id": _a_vis.id})
+alias_results["default_proposed"] = (_ar.state == "proposed")
+alias_results["confirm_action"] = (
+    _ar.action_confirm() or _ar.state == "confirmed")
+# 59b: ZERO targets -> ValidationError.
+try:
+    ALIAS.create({"phrase": "[test-wa12]-notarget"})
+    alias_results["zero_target_blocked"] = False
+except ValidationError:
+    alias_results["zero_target_blocked"] = True
+# 59c: TWO targets (category + term) -> ValidationError.
+try:
+    ALIAS.create({"phrase": "[test-wa12]-twotarget",
+                  "category_id": _a_vis.id, "term": "led can"})
+    alias_results["two_target_blocked"] = False
+except ValidationError:
+    alias_results["two_target_blocked"] = True
+# 59d: duplicate phrase -> unique constraint.
+try:
+    ALIAS.create({"phrase": "[test-wa12]-screen", "term": "led screen"})
+    env.cr.flush()
+    alias_results["phrase_unique"] = False
+except Exception:
+    env.cr.rollback()  # SQL constraint poisons the cursor; clear it
+    alias_results["phrase_unique"] = True
+_ar = ALIAS.search([("phrase", "=", "[test-wa12]-screen")])  # re-acquire post-rollback
+_ar.unlink()  # test-only alias row; not under the append-only finance rule
+_check("T-WA12-59", all(alias_results.values()),
+       "alias store: %s" % alias_results)
 
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
