@@ -293,7 +293,12 @@
     # 17.0.1.15.0: Resolver v2 SUPPORT (a) — neon.equipment.alias store (UI-
     # reviewable team-slang map; only CONFIRMED rows applied). No matcher wiring
     # yet — the funnel + golden set follow once Robin confirms the seeded rows.
-    "version": "17.0.1.15.0",
+    # 17.0.1.16.0: Resolver v2 FUNNEL — _wa6_match_one rewritten S0-S8 (normalise
+    # → CONFIRMED-alias expand → family → dimensional/casing-dup → exact →
+    # pg_trgm category-scoped rank → grounded LLM shortlist → discovery). New
+    # _r2_* helpers; bare-leading-count qty guard; alias cache-bust on write.
+    # Byte-compat return dict. Money gate: _wa12_run_price now confidence-gated.
+    "version": "17.0.1.16.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

@@ -2041,7 +2041,15 @@ class WhatsAppMessageWA12(models.Model):
         self._wa6_audit_in(from_e164, message, "wa12-price")
         rest = self._wa12_strip_cmd(body, _WA12_PRICE_CMDS)
         items = self._wa6_match_items(rest)
-        matched = [it for it in items if it.get("status") == "matched"]
+        # MONEY GATE (Robin/Tatenda 2026-06-13): Price: quotes a rate ONLY for an
+        # exact/strong hit -- PARITY with the quote-build gate (_wa12_match_slot_
+        # items:1328 / _wa12_match_text_items:1386). Resolver v2 widens the
+        # matched set with trgm-weak + LLM-grounded picks; a weak/LLM hit must
+        # NOT surface a guessed rate over WhatsApp -> it reads as "couldn't find
+        # a price", exactly as the quote path would refuse to auto-add it.
+        matched = [it for it in items
+                   if it.get("status") == "matched"
+                   and it.get("confidence") in ("exact", "strong")]
         if not matched:
             return self._wa6_reply(raw_from, from_e164, _(
                 "Couldn't find a price for \"%s\".") % rest)

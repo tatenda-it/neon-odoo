@@ -119,6 +119,12 @@ _orules = env["neon.finance.pricing.rule"].sudo().with_context(
 _orules.mapped("bracket_ids").unlink()
 _orules.unlink()
 PT.with_context(active_test=False).search([("name", "like", "[TEST-WA12]")]).unlink()
+# Resolver v2 golden residue (products [TEST-WA12G] + [test-wa12] alias rows)
+# from a crashed prior run -- drop so the re-run seeds clean.
+PT.with_context(active_test=False).search(
+    [("name", "like", "[TEST-WA12G]")]).unlink()
+env["neon.equipment.alias"].sudo().with_context(active_test=False).search(
+    [("phrase", "like", "[test-wa12]")]).unlink()
 env["neon.equipment.category"].sudo().with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")]).unlink()
 for lg in ("pwa12_sales", "pwa12_crew", "pwa12_appr"):
@@ -211,6 +217,61 @@ if not env["ir.mail_server"].sudo().search([], limit=1):
     env["ir.mail_server"].sudo().create({
         "name": "[TEST-WA12] dummy", "smtp_host": "localhost",
         "smtp_port": 25, "smtp_encryption": "none"})
+
+# ------------------------------------------------------------------ Resolver v2
+# GOLDEN fixtures. The local test DB has none of the real catalogue, so we seed
+# real-SHAPED products in the SEEDED categories (so _wa6_in_family scopes by
+# equipment_category_id.code, the keystone's effect) + [TEST-WA12] CONFIRMED
+# alias rows mirroring Robin's rulings -- the funnel + golden set are then
+# self-contained, independent of prod's live alias rows.
+Alias = env["neon.equipment.alias"].sudo()
+Alias.with_context(active_test=False).search(
+    [("phrase", "like", "[test-wa12]")]).unlink()
+# the real seeded categories (the keystone created/populated these on prod;
+# get-or-create here so the local DB has them with the right CODES).
+def _ecat(code, name):
+    c = ECat.search([("code", "=", code)], limit=1)
+    return c or ECat.create({"code": code, "name": name})
+cat_vis = _ecat("visual", "Visual")
+cat_lig = _ecat("lighting", "Lighting")
+cat_tru = _ecat("trussing", "Trussing")
+cat_eff = _ecat("effects", "Effects")
+cat_stg = _ecat("staging", "Staging")
+cat_snd = _ecat("sound", "Sound")
+def _gp(name, cat, wsname=None):
+    return PT.create({"name": name, "workshop_name": wsname or name.lower(),
+                      "is_workshop_item": True, "list_price": 10.0,
+                      "equipment_category_id": cat.id})
+# Golden fixtures use CATEGORIZED products with UNIQUE dims/names so they never
+# collide with the T-57 uncategorised proof fixtures (which reuse 3x2/6x2 etc.).
+# These exercise the post-keystone categorized path (equipment_category_id set).
+# Visual: two LED screen sizes + a casing DUP of one + a decoy non-screen.
+g_scr32 = _gp("[TEST-WA12G] 13M X 12M LED SCREEN", cat_vis)
+g_scr62 = _gp("[TEST-WA12G] 16M X 12M LED SCREEN", cat_vis)
+g_scr53 = _gp("[TEST-WA12G] 15M X 13M LED SCREEN", cat_vis)
+g_scr10a = _gp("[TEST-WA12G] 19M X 12M LED SCREEN", cat_vis)
+g_scr10b = _gp("[TEST-WA12G] 19m x 12m led screen", cat_vis)  # pure casing dup
+g_booth = _gp("[TEST-WA12G] 360 PHOTO BOOTH", cat_vis)  # decoy non-screen
+# Lighting: molefays (blinder) + an rgbwauv zoom can.
+g_mole = _gp("[TEST-WA12G] 4x100W INDOOR MOLEFAYS", cat_lig)
+g_mole2 = _gp("[TEST-WA12G] 2X100W INDOOR MOLEFAYS", cat_lig)
+g_can = _gp("[TEST-WA12G] RGBWAUV 99X99 ZOOM INDOOR LED CAN", cat_lig)
+# Trussing: totem. Effects: smoke + fogger. Staging: stage. Sound: monitor.
+g_totem = _gp("[TEST-WA12G] 9M PIN TRUSS TOTEM WITH BASE", cat_tru)
+g_smoke = _gp("[TEST-WA12G] VERTICAL SMOKE MACHINES", cat_eff)
+g_fog = _gp("[TEST-WA12G] LOW FOGGER", cat_eff)
+g_stage = _gp("[TEST-WA12G] 9.9M X 9.9M STAGE DECK", cat_stg)
+g_mon = _gp("[TEST-WA12G] POWERWORKS MONITOR", cat_snd)
+# CONFIRMED [TEST-WA12] aliases mirroring Robin's rulings.
+Alias.create([
+    {"phrase": "[test-wa12]-screen", "category_id": cat_vis.id, "state": "confirmed"},
+    {"phrase": "[test-wa12]-blinder", "term": "molefay", "state": "confirmed"},
+    {"phrase": "[test-wa12]-cans", "term": "led can", "state": "confirmed"},
+    {"phrase": "[test-wa12]-smoke", "product_template_id": g_smoke.id, "state": "confirmed"},
+    {"phrase": "[test-wa12]-wedge", "product_template_id": g_mon.id, "state": "confirmed"},
+    # an OPEN row that must be IGNORED by the matcher (gate proof).
+    {"phrase": "[test-wa12]-ignoreme", "category_id": cat_eff.id, "state": "open"},
+])
 env.cr.commit()
 
 D_sales = M.with_user(u_sales)
@@ -1516,7 +1577,8 @@ _a_vis = env["neon.equipment.category"].sudo().search(
     [("code", "=", "visual")], limit=1)
 alias_results = {}
 # 59a: a valid category-target row is creatable + defaults to proposed.
-_ar = ALIAS.create({"phrase": "[test-wa12]-screen", "category_id": _a_vis.id})
+# (distinct phrase -- never collides with the golden [test-wa12]-screen fixture)
+_ar = ALIAS.create({"phrase": "[test-wa12]-c59a", "category_id": _a_vis.id})
 alias_results["default_proposed"] = (_ar.state == "proposed")
 alias_results["confirm_action"] = (
     _ar.action_confirm() or _ar.state == "confirmed")
@@ -1533,18 +1595,135 @@ try:
     alias_results["two_target_blocked"] = False
 except ValidationError:
     alias_results["two_target_blocked"] = True
-# 59d: duplicate phrase -> unique constraint.
+# 59d: duplicate phrase -> unique constraint. Use a SAVEPOINT so the SQL error
+# doesn't poison the whole transaction (a bare rollback would drop the golden
+# fixtures' uncommitted follow-on work).
 try:
-    ALIAS.create({"phrase": "[test-wa12]-screen", "term": "led screen"})
-    env.cr.flush()
+    with env.cr.savepoint():
+        ALIAS.create({"phrase": "[test-wa12]-c59a", "term": "led screen"})
     alias_results["phrase_unique"] = False
 except Exception:
-    env.cr.rollback()  # SQL constraint poisons the cursor; clear it
     alias_results["phrase_unique"] = True
-_ar = ALIAS.search([("phrase", "=", "[test-wa12]-screen")])  # re-acquire post-rollback
-_ar.unlink()  # test-only alias row; not under the append-only finance rule
+ALIAS.search([("phrase", "=", "[test-wa12]-c59a")]).unlink()  # throwaway only
 _check("T-WA12-59", all(alias_results.values()),
        "alias store: %s" % alias_results)
+
+# ---------------------------------------------------------- T-WA12-60 Resolver v2
+# The funnel golden set: assert (resolved product, qty, confidence) for the
+# director-wire phrases that the proof-#3 matcher failed, the confirmed-alias
+# slang, dimensional exact + casing-dup, the qty guard, and the never-invent /
+# never-cross-category / confirmed-only-alias / LLM-firewall guarantees. The
+# LLM is muted globally (_LLMP) so S6/S7 exercise the DETERMINISTIC path; a
+# dedicated sub-case un-mutes to prove the grounded-pick firewall.
+MM = M  # the model (sudo) for direct _wa6_match_one calls
+def _m(phrase, hint=None):
+    return MM._wa6_match_one(phrase, category_hint=hint)
+g = {}
+# (a) dimensional EXACT -- the size EXISTS (the proof-#3 catastrophe fixed).
+# Unique golden dims (13x12 etc.) so we assert the CATEGORIZED path cleanly.
+h = _m("13 x 12 screen")
+g["13x12_exact"] = (h["product_id"] == g_scr32.id and h["confidence"] == "exact"
+                    and h["qty"] == 1)
+h = _m("16m x 12m screen")
+g["16x12_exact"] = (h["product_id"] == g_scr62.id and h["confidence"] == "exact")
+h = _m("15m x 13m LED screen")
+g["15x13_exact"] = (h["product_id"] == g_scr53.id and h["confidence"] == "exact")
+# casing DUP at one size -> canonical UPPER rep, EXACT (NOT a false weak).
+h = _m("19m x 12m screen")
+g["casing_dup_exact"] = (h["product_id"] == g_scr10a.id
+                         and h["confidence"] == "exact")
+# bare "screen" -> a Visual product (NEVER the photo booth); never cross-cat.
+h = _m("screen")
+g["bare_screen_visual"] = (h["status"] == "matched"
+                           and h["product_id"] != g_booth.id
+                           and h["family"] == "visual")
+# qty guard with REALISTIC input: "4 molefays" -> qty 4 (bare-leading-count),
+# resolves within lighting to a MOLEFAY product. (Both the golden and the T-57
+# uncategorised molefay fixtures legitimately match -- assert the FAMILY + that
+# it's a molefay by name, not a specific fixture id, so the two test blocks'
+# lighting fixtures don't make this brittle.)
+h = _m("4 molefays")
+g["bare_count_qty4"] = (h["qty"] == 4 and h["status"] == "matched"
+                        and h["family"] == "lighting"
+                        and "MOLEFAY" in (h["product_name"] or "").upper())
+# confirmed TERM alias: blinder -> molefay (lighting). (Alias expansion, not the
+# qty path -- the [test-wa12]- prefix is a test-only namespacing.)
+h = _m("[test-wa12]-blinder")
+g["blinder_alias_lighting"] = (h["status"] == "matched"
+                               and h["family"] == "lighting"
+                               and "MOLEFAY" in (h["product_name"] or "").upper())
+# confirmed term-alias "cans" -> led can (lighting), never cross-category.
+h = _m("[test-wa12]-cans")
+g["cans_lighting"] = (h["status"] == "matched" and h["family"] == "lighting"
+                      and "CAN" in (h["product_name"] or "").upper())
+# confirmed PRODUCT alias: wedge -> POWERWORKS MONITOR exactly.
+h = _m("[test-wa12]-wedge")
+g["wedge_product"] = (h["product_id"] == g_mon.id and h["confidence"] == "exact")
+# confirmed PRODUCT alias: smoke -> VERTICAL SMOKE MACHINES.
+h = _m("[test-wa12]-smoke")
+g["smoke_product"] = (h["product_id"] == g_smoke.id)
+# zoom can -> the GOLDEN lighting zoom can specifically (unique 99x99 dims so it
+# out-scores the T-57 18x18 zoom on the "99x99" tokens -> exercises S6b cleanly).
+h = _m("rgbwauv 99x99 zoom led can")
+g["zoom_can"] = (h["status"] == "matched" and h["family"] == "lighting"
+                 and h["product_id"] == g_can.id)
+# exact full catalogue name (global S5a fast path).
+h = _m("[TEST-WA12G] LOW FOGGER")
+g["exact_name"] = (h["product_id"] == g_fog.id and h["confidence"] == "exact")
+# truss plural-fold safety: "truss"/"trussing" must NOT fold to "trus".
+g["truss_keep"] = (MM._r2_norm("truss") == "truss"
+                   and MM._r2_norm("trussing") == "trussing")
+g["screens_fold"] = (MM._r2_norm("screens") == "screen")
+# genuinely unknown -> none; NEVER invents, NEVER cross-category.
+h = _m("disco ball mirror thing zzzq")
+g["unknown_none"] = (h["status"] == "not_found" and h["confidence"] == "none"
+                     and not h["product_id"])
+# CONFIRMED-only gate: an OPEN alias is IGNORED ([test-wa12]-ignoreme -> effects
+# cat would force effects; but it's OPEN, so the funnel ignores it and the
+# phrase resolves on its own merits / to none).
+h = _m("[test-wa12]-ignoreme")
+g["open_alias_ignored"] = (h["family"] != "effects" or h["status"] == "not_found")
+# byte-compat: the return dict keys + value-domain unchanged.
+h = _m("3 x 2 screen")
+g["bytecompat_keys"] = (set(h.keys()) == {
+    "raw", "qty", "product_id", "product_name", "category", "status",
+    "suggestions", "confidence", "family"} and h["category"] == ""
+    and h["confidence"] in ("exact", "strong", "weak", "none"))
+_check("T-WA12-60", all(g.values()),
+       "Resolver v2 funnel golden: %s" % {k: v for k, v in g.items() if not v}
+       or "Resolver v2 funnel golden: ALL PASS")
+
+# ---------------------------------------------------------- T-WA12-60b firewall
+# Un-mute the LLM for ONE case: a thin in-family phrase that S6 cannot resolve
+# deterministically -> S7 grounded pick. Prove the firewall: (i) an out-of-range
+# LLM index is REJECTED -> none/discovery (never invents); (ii) a valid in-range
+# index resolves to a REAL in-family id at 'weak'. Also prove LLM-down degrades.
+fw = {}
+_vis_names = [g_scr32.name, g_scr62.name, g_scr53.name]
+# (i) LLM returns an out-of-range index -> rejected -> discovery 'none'.
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: '{"index": 99}'):
+    h = MM._wa6_match_one("vaguely a visual thing here", category_hint="visual")
+    fw["oob_index_rejected"] = (h["status"] == "not_found"
+                                or h["confidence"] != "weak")
+# (ii) LLM returns index 0 -> the first shortlisted REAL visual product, weak.
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: '{"index": 0}'):
+    h = MM._wa6_match_one("some visual gear", category_hint="visual")
+    fw["valid_pick_weak"] = (h["status"] in ("matched", "not_found"))
+    if h["status"] == "matched":
+        fw["valid_pick_weak"] = (h["confidence"] == "weak"
+                                 and h["family"] == "visual"
+                                 and MM.env["product.template"].sudo().browse(
+                                     h["product_id"]).equipment_category_id.code
+                                 == "visual")
+# (iii) LLM down (returns None) -> graceful, never invents.
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: None):
+    h = MM._wa6_match_one("another vague visual", category_hint="visual")
+    fw["llm_down_graceful"] = (h["confidence"] != "exact"
+                               and (h["status"] == "not_found"
+                                    or h["confidence"] in ("weak", "strong")))
+_check("T-WA12-60b", all(fw.values()), "grounded-pick firewall: %s" % fw)
 
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
@@ -1604,7 +1783,18 @@ _trules = Rule.with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")])
 _trules.mapped("bracket_ids").unlink()
 _trules.unlink()
-(prod_ok | prod_ph | prod_pr | prod_nocat).unlink()
+# Resolver v2: confirmed/open [test-wa12]-* alias rows + the golden products.
+# Aliases first (they ondelete-cascade off product/category but we drop them
+# explicitly so the registry cache-bust fires cleanly).
+Alias.with_context(active_test=False).search(
+    [("phrase", "like", "[test-wa12]")]).unlink()
+# ALL [TEST-WA12*] workshop products (the originals + the [TEST-WA12G] golden
+# fixtures). 'like' matches the prefix of both tags.
+PT.with_context(active_test=False).search(
+    ["|", ("name", "like", "[TEST-WA12]"),
+     ("name", "like", "[TEST-WA12G]")]).unlink()
+# only the [TEST-WA12]-NAMED categories -- the SEEDED ones (visual/lighting/...)
+# may have been get-or-created above and must SURVIVE (they're real prod cats).
 ECat.with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")]).unlink()
 # payment terms: by NAME (our fixture) AND by PARTNER (_wa12_ensure_payment_term

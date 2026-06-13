@@ -110,6 +110,19 @@ _WA6_CAT_SYNONYMS = {
                 "bubbles", "snow"],
 }
 
+# --- Resolver v2 (the matcher funnel) -------------------------------------
+# pg_trgm category-scoped lexical rank thresholds (Postgres pg_trgm v1.6 live
+# on prod). Tuned against the golden corpus at build; constants so re-tuning is
+# non-structural. STRONG = auto-accept the top hit; FLOOR = below it there is no
+# deterministic winner -> hand the shortlist to the grounded LLM pick.
+_WA6_TRGM_STRONG = 0.55   # top sim >= this AND margin >= MARGIN -> 'strong'
+_WA6_TRGM_MARGIN = 0.12   # winner must beat #2 by this to auto-accept
+_WA6_TRGM_FLOOR = 0.30    # top sim below this -> straight to the shortlist
+_WA6_SHORTLIST_K = 6      # how many real names the grounded pick chooses among
+# Plurals we must NOT fold (a trailing 's' that is part of the stem). The fold
+# also skips '...ss' words, but these are explicit safety pins.
+_WA6_PLURAL_KEEP = {"truss", "trussing", "bass", "press", "class", "glass"}
+
 # WA-6.1 Face-3 dispatch -- crew-initiated checkout / check-in commands.
 # Matched by EQUALS or STARTSWITH-then-space on the normalised (lowered,
 # whitespace-collapsed) body -- NEVER substring -- AND only fired for a
@@ -805,6 +818,13 @@ class WhatsAppMessageWA6(models.Model):
             m = re.search(r"(?:^|\s)(\d+)\s*x(?=\s|$)", masked)
         if not m:
             m = re.search(r"(?:^|\s)qty\.?\s*(\d+)(?=\s|$)", masked)
+        if not m:
+            # Resolver v2: a bare LEADING count -- "4 blinders" -> qty 4. Runs on
+            # the MASKED string, so a dimension/spec ("3 x 2", "4x100") is
+            # already blanked and never read here (its leading int was masked
+            # out). Requires the next char after the count to be a letter, so a
+            # stray trailing/standalone number is not grabbed.
+            m = re.search(r"^\s*(\d+)\s+(?=[a-z])", masked)
         qty = 1
         if m:
             qty = max(1, int(m.group(1)))
@@ -886,107 +906,351 @@ class WhatsAppMessageWA6(models.Model):
                         return cat
         return None
 
+    # ================================================================
+    # Resolver v2 -- the matcher funnel helpers (S1 normalise, S2 alias-
+    # expand CONFIRMED-only, S4 casing-dup canonicalise, S6 pg_trgm rank,
+    # S7 grounded LLM shortlist). Design: docs/phase-11/
+    # WA12_resolver_v2_locked_spec.md. Every stage exits _wa6_match_one
+    # through the existing hit() closure -> byte-compatible return dict.
+    # ================================================================
+    @api.model
+    def _r2_norm(self, s):
+        """S1 normalise: casefold; unify x/separators; join a bare 'NxM' spec
+        into one token; safe plural-fold (NOT 'ss', not the KEEP set) so
+        'screens'=='screen' but 'truss' stays 'truss'. Returns a space-joined
+        token string -- the canonical key for exact-equality + the trgm query."""
+        low = (s or "").lower().replace("×", "x").replace(" ", " ")
+        toks = []
+        for t in re.findall(r"[a-z0-9.]+", low):
+            if t in _WA6_STOP:
+                continue
+            # safe plural fold: alpha, len>3, trailing single 's' (not 'ss'),
+            # not an explicit keep-stem.
+            if (t.isalpha() and len(t) > 3 and t.endswith("s")
+                    and not t.endswith("ss") and t not in _WA6_PLURAL_KEEP):
+                t = t[:-1]
+            toks.append(t)
+        return " ".join(toks)
+
+    @api.model
+    def _r2_alias_map(self):
+        """S2 gate #1: {phrase: ('product', id) | ('category', code) |
+        ('term', text)} for CONFIRMED rows ONLY. proposed/open rows are
+        structurally invisible to the matcher. Single read site -> the only
+        place the alias store is consulted."""
+        out = {}
+        Alias = self.env["neon.equipment.alias"].sudo()
+        for a in Alias.search([("state", "=", "confirmed")]):
+            if a.product_template_id:
+                out[a.phrase] = ("product", a.product_template_id.id)
+            elif a.category_id:
+                out[a.phrase] = ("category", a.category_id.code)
+            elif a.term:
+                out[a.phrase] = ("term", a.term)
+        return out
+
+    @api.model
+    def _r2_alias_expand(self, desc):
+        """S2: apply the CONFIRMED alias map to a description. Whole-word,
+        plural-tolerant ('cans' matches a 'can' alias and vice versa), longest
+        phrase first (so a multi-word alias wins over a contained single word).
+        Returns (kind, value, new_desc):
+          ('product', id, desc)   -> terminal: resolve straight to that product
+          ('category', code, desc)-> forced family scope, keep matching within
+          ('term', text, new_desc)-> desc rewritten (phrase -> term), continue
+          (None, None, desc)      -> no confirmed alias hit."""
+        amap = self._r2_alias_map()
+        if not amap:
+            return (None, None, desc)
+        low = " " + (desc or "").lower() + " "
+        for phrase in sorted(amap, key=len, reverse=True):
+            # plural-tolerant whole-word: optional trailing 's' on the phrase.
+            pat = r"(?<![a-z0-9])%ss?(?![a-z0-9])" % re.escape(phrase)
+            if not re.search(pat, low):
+                continue
+            kind, value = amap[phrase]
+            if kind == "term":
+                new = re.sub(pat, " %s " % value, low).strip()
+                return ("term", value, " ".join(new.split()))
+            if kind == "category":
+                return ("category", value, desc)
+            # product: short-circuit ONLY when the alias phrase dominates the
+            # desc (the desc is essentially just the slang, modulo stopwords) --
+            # so "totem" -> the product, but "totem clamp adapter" keeps matching
+            # normally rather than being hijacked by a bare 'totem' alias.
+            residue = re.sub(pat, " ", low)
+            residue_toks = [t for t in re.findall(r"[a-z0-9.]+", residue)
+                            if t not in _WA6_STOP]
+            if not residue_toks:
+                return ("product", value, desc)
+        return (None, None, desc)
+
+    @api.model
+    def _r2_pick_canonical(self, prods):
+        """S4/S5 casing-dup collapse. Given products that are EXACT logical
+        matches, return (representative, distinct_others). Pure casing/space
+        dups (same _r2_norm) collapse to ONE representative -- the most-
+        UPPERCASE spelling, ties broken by lowest id -- so a pure-case dup is
+        NOT a false 'weak'. Genuinely-distinct names (different _r2_norm) are
+        returned as `distinct_others` for the caller to surface as suggestions."""
+        if not prods:
+            return (prods, prods.browse())
+        by_norm = {}
+        for p in prods:
+            by_norm.setdefault(self._r2_norm(p.name), p)  # first seen per norm
+        # representative of the FIRST norm group: prefer most uppercase, low id.
+        first_norm = self._r2_norm(prods[0].name)
+        group = prods.filtered(lambda p: self._r2_norm(p.name) == first_norm)
+        rep = sorted(
+            group, key=lambda p: (-sum(1 for c in (p.name or "") if c.isupper()),
+                                  p.id))[0]
+        distinct = prods.browse(
+            [v.id for k, v in by_norm.items() if k != first_norm])
+        return (rep, distinct)
+
+    @api.model
+    def _r2_trgm_rank(self, query_norm, cand_ids, k=None):
+        """S6: pg_trgm category-scoped lexical rank. Returns [(id, sim)] desc,
+        deterministic tie-break by id, capped at k. Family-scoped by cand_ids
+        (cross-category structurally impossible). Degrades to [] on ANY SQL
+        surprise -> never 500s mid-quote."""
+        if not query_norm or not cand_ids:
+            return []
+        k = k or _WA6_SHORTLIST_K
+        # product_template.name is a TRANSLATABLE field -> stored as jsonb
+        # ({"en_US": "..."}) in Odoo 17, NOT plain text; workshop_name is a
+        # plain Char (character varying). So name must be extracted via ->> ; a
+        # raw lower(name) fails with "invalid input syntax for type json". Pull
+        # the company language value, fall back to the first json value.
+        lang = (self.env.lang or self.env.company.partner_id.lang
+                or "en_US")
+        # Run inside a SAVEPOINT: a failed cr.execute (e.g. pg_trgm missing)
+        # aborts the cursor, and WITHOUT a savepoint every subsequent query in
+        # the request raises InFailedSqlTransaction. The savepoint contains the
+        # failure so we degrade to [] cleanly and the outer txn survives.
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute(
+                    """
+                    SELECT pt.id,
+                           GREATEST(
+                             similarity(lower(coalesce(
+                               pt.name ->> %(lang)s,
+                               (SELECT je.value FROM jsonb_each_text(pt.name) je
+                                LIMIT 1),
+                               '')), %(q)s),
+                             similarity(lower(coalesce(pt.workshop_name, '')),
+                                        %(q)s)
+                           ) AS sim
+                    FROM   product_template pt
+                    WHERE  pt.id IN %(ids)s
+                    ORDER  BY sim DESC, pt.id ASC
+                    LIMIT  %(k)s
+                    """,
+                    {"q": query_norm, "ids": tuple(cand_ids), "k": k,
+                     "lang": lang})
+                rows = self.env.cr.fetchall()
+            return [(r[0], float(r[1])) for r in rows]
+        except Exception:  # noqa: BLE001 -- any SQL issue -> graceful empty
+            _logger.exception("r2 trgm rank failed; degrading to []")
+            return []
+
+    @api.model
+    def _r2_grounded_pick(self, desc, fam, ranked):
+        """S7: the grounded LLM shortlist -- the firewall. Hand the LLM a FIXED
+        numbered list of REAL product names (the S6 top-K within `fam`) and ask
+        for an INDEX. The reply is validated in-range AND re-checked in-family
+        before it can become a product_id; any non-index / out-of-range / out-
+        of-family / LLM-down reply -> None (caller falls to discovery). NEVER
+        invents, NEVER crosses category. Returns {product_id, product_name} or
+        None."""
+        ids = [pid for pid, _sim in ranked][:_WA6_SHORTLIST_K]
+        if not ids:
+            return None
+        Product = self.env["product.template"].sudo()
+        prods = [Product.browse(i) for i in ids]
+        prods = [p for p in prods if p.exists()]
+        if not prods:
+            return None
+        opts = "\n".join("  %d. %s" % (i, p.name) for i, p in enumerate(prods))
+        messages = [
+            {"role": "system", "content": (
+                "You match a sales rep's equipment phrase to ONE item from a "
+                "FIXED numbered list of real products this company stocks, or "
+                "none. Reply with ONLY JSON: {\"index\": <integer or null>}. "
+                "index MUST be one of the shown numbers. Do NOT invent a "
+                "product, do NOT return a name. If none of the listed options "
+                "is what the phrase means, return {\"index\": null}. Every "
+                "listed product is in the '%s' family -- never pick across "
+                "families." % fam)},
+            {"role": "user", "content": (
+                "Phrase: \"%s\"\nOptions:\n%s" % (desc, opts))},
+        ]
+        try:
+            data = self._wa12_llm_json(self._wa12_llm_chat(messages)) or {}
+        except Exception:  # noqa: BLE001 -- LLM down -> discovery
+            return None
+        idx = data.get("index")
+        if not isinstance(idx, int) or not (0 <= idx < len(prods)):
+            return None
+        p = prods[idx]
+        if not p.exists() or not self._wa6_in_family(p, fam):
+            return None  # defence in depth
+        return {"product_id": p.id, "product_name": p.name}
+
     @api.model
     def _wa6_match_one(self, raw, category_hint=None):
         """Resolve one free-text item to {product_id, qty, status,
-        suggestions, confidence}. NEVER auto-invents: a no-token-overlap item
-        is 'not_found' with closest-in-category suggestions.
+        suggestions, confidence, family}. Resolver v2 funnel (S0-S8; design
+        docs/phase-11/WA12_resolver_v2_locked_spec.md). NEVER auto-invents and
+        NEVER crosses category. ``confidence``: 'exact' (typed name /
+        dimensional-exact / confirmed product-alias), 'strong' (a clear trgm
+        winner), 'weak' (thin/tied/nearest/LLM-grounded -- human-confirming
+        consumers list alternatives), 'none'. Return dict is byte-compatible
+        with the prior matcher (same keys + value-domain).
 
-        F2 (WA-12 proof #2): an EXACT / near-exact catalogue-NAME match wins
-        BEFORE any fuzzy/token logic ("5m x 3m LED screen" must hit "5M X 3M
-        LED SCREEN", never a token-overlap TV). ``confidence`` grades the hit:
-        'exact' (normalised name equality), 'strong' (>=2 tokens + a clear
-        margin), 'weak' (thin/tied overlap -- human-confirming consumers, e.g.
-        the WA-12.2 echo, list alternatives instead of trusting it). Consumers
-        that only read ``status`` are byte-compatible (extra key ignored)."""
+        S0 parse  -> S1 normalise -> S2 alias-expand (CONFIRMED only) ->
+        S3 family-derive -> S4 dimensional -> S5 exact-name ->
+        S6 pg_trgm category-scoped rank -> S7 grounded LLM shortlist ->
+        S8 discovery/custom."""
+        # S0 -- parse qty/desc (dims masked; bare-leading-count -> qty).
         qty, desc = self._wa6_parse_qty(raw)
+        fam = ""  # bound up-front (the hit() closure reads it on every exit).
 
-        def _norm(s):
-            return " ".join(re.findall(r"[a-z0-9.]+", (s or "").lower()))
+        def hit(pid, pname, conf, sugg):
+            return {"raw": raw, "qty": qty, "product_id": pid,
+                    "product_name": pname, "category": "",
+                    "status": "matched" if pid else "not_found",
+                    "suggestions": sugg, "confidence": conf, "family": fam}
 
         Product = self.env["product.template"].sudo()
         allp = Product.search([("is_workshop_item", "=", True)])
+
+        # S2 -- CONFIRMED alias expansion (before family derivation). A product
+        # alias is terminal; a category alias forces the family; a term alias
+        # rewrites desc and we continue. proposed/open rows are invisible.
+        forced_fam = ""
+        kind, value, desc = self._r2_alias_expand(desc)
+        if kind == "product":
+            p = Product.browse(value)
+            if p.exists():
+                fam = self._wa6_family_code(p.name) or ""
+                return hit(p.id, p.name, "exact", [])
+        elif kind == "category":
+            forced_fam = value
+
+        # S1 -- normalise (after any term rewrite). want = canonical key.
+        want = self._r2_norm(desc)
         tokens = [t for t in re.findall(r"[a-z0-9.]+", desc.lower())
                   if t and t not in _WA6_STOP]
 
-        def hit(raw_, pid, pname, cat_, conf, sugg):
-            return {"raw": raw, "qty": qty, "product_id": pid,
-                    "product_name": pname, "category": cat_,
-                    "status": "matched" if pid else "not_found",
-                    "suggestions": sugg, "confidence": conf,
-                    "family": fam}
-
-        # 1) EXACT name equality across ALL families (the typed name IS the id).
-        want = _norm(desc)
+        # S5a -- EXACT name equality across ALL families (the typed name IS the
+        # id), preserved as a global fast path (F2): a fully-typed catalogue name
+        # wins even when no family synonym fires. Casing/space dups collapse to a
+        # canonical rep, so a pure-case dup is still 'exact' (not a false weak).
         if want:
-            exact = [p for p in allp
-                     if _norm(p.name) == want
-                     or (p.workshop_name and _norm(p.workshop_name) == want)]
-            if len(exact) == 1:
+            exact = allp.filtered(
+                lambda p: self._r2_norm(p.name) == want
+                or (p.workshop_name and self._r2_norm(p.workshop_name) == want))
+            if exact:
                 fam = self._wa6_family_code(desc) or ""
-                return hit(raw, exact[0].id, exact[0].name, "", "exact", [])
+                rep, distinct = self._r2_pick_canonical(exact)
+                return hit(rep.id, rep.name, "exact",
+                           [p.name for p in distinct[:3]])
 
-        # 2) FAMILY scope (M-A): the LLM category_hint (Robin's
-        #    visual/lighting/staging label), else the synonym-derived family. A
-        #    matched family is NEVER widened to all items -> no cross-category
-        #    (a 'screen' resolves only within visual, never a BOOTH).
-        fam = self._wa6_norm_family(category_hint) or self._wa6_family_code(desc)
+        # S3 -- derive the family. forced_fam (confirmed cat alias) wins, then
+        # the LLM hint, then the synonym-derived family. Never widened to all.
+        fam = (forced_fam or self._wa6_norm_family(category_hint)
+               or self._wa6_family_code(desc) or "")
+
         if fam:
             cands = allp.filtered(lambda p: self._wa6_in_family(p, fam))
             if not cands:
-                return hit(raw, False, "", fam, "none", [])  # M-B: family empty
+                return hit(False, "", "none", [])  # family empty (M-B)
+
+            # S4 -- dimensional (only with a size). Exact stocked size is the
+            # rule; pure casing/space dups collapse to one canonical rep (NOT a
+            # false 'weak'); no stocked size -> nearest-by-area (weak, the
+            # exception -> confirm / custom-price path).
             dims = self._wa6_parse_dims(desc)
             if dims:
                 target = dims[0] * dims[1]
                 sized = [(p, self._wa6_parse_dims(p.name)) for p in cands]
                 sized = [(p, d) for p, d in sized if d]
-                # the requested size IS stocked -> an EXACT dimensional hit (the
-                # rule, per the verified 47-product list); parse_dims already
-                # normalised case / "x" / spacing / "m", so "6m x 2m" == the
-                # "6M X 2M LED SCREEN" product. Only a NON-stocked size falls to
-                # nearest + the F8 custom path (the exception).
-                exactd = [p for p, d in sized if d == dims]
-                if len(exactd) == 1:
-                    return hit(raw, exactd[0].id, exactd[0].name, fam,
-                               "exact", [])
-                if len(exactd) > 1:
-                    # exact size but a catalogue DUP (casing/space variants) ->
-                    # surface them as a pick (data-cleanup flagged separately).
-                    return hit(raw, exactd[0].id, exactd[0].name, fam, "weak",
-                               [p.name for p in exactd[:3]])
+                exactd = cands.browse([p.id for p, d in sized if d == dims])
+                if exactd:
+                    rep, distinct = self._r2_pick_canonical(exactd)
+                    return hit(rep.id, rep.name, "exact",
+                               [p.name for p in distinct[:3]])
                 if sized:
-                    # M-D EXCEPTION: no stocked size -> nearest by area, weak ->
-                    # the confirm offers it / the F8 custom-price path.
                     sized.sort(key=lambda pd: abs(pd[1][0] * pd[1][1] - target))
-                    return hit(raw, sized[0][0].id, sized[0][0].name, fam,
-                               "weak", [p.name for p, _ in sized[:3]])
-            # token tier WITHIN the family.
-            def score(p):
+                    return hit(sized[0][0].id, sized[0][0].name, "weak",
+                               [p.name for p, _ in sized[:3]])
+
+            # S5 -- exact normalised-name equality within the family.
+            if want:
+                exact = cands.filtered(
+                    lambda p: self._r2_norm(p.name) == want
+                    or (p.workshop_name
+                        and self._r2_norm(p.workshop_name) == want))
+                if exact:
+                    rep, distinct = self._r2_pick_canonical(exact)
+                    return hit(rep.id, rep.name, "exact",
+                               [p.name for p in distinct[:3]])
+
+            # S6 -- pg_trgm category-scoped lexical rank. A clear winner is
+            # 'strong'; otherwise the rank still informs the shortlist (S7).
+            ranked = self._r2_trgm_rank(want, cands.ids)
+            if ranked:
+                top_id, top_sim = ranked[0]
+                second = ranked[1][1] if len(ranked) > 1 else 0.0
+                if top_sim >= _WA6_TRGM_STRONG \
+                        and (top_sim - second) >= _WA6_TRGM_MARGIN:
+                    p = Product.browse(top_id)
+                    return hit(p.id, p.name, "strong", [])
+
+            # S6b -- DETERMINISTic within-family token tier (the baseline
+            # scorer, restored). A bare family word ("screen") or a thin trgm
+            # hit still resolves by token overlap, so the matcher is not
+            # LLM-dependent for the common case (and tests with the LLM muted
+            # still resolve). Strong = >=2 distinct word hits + a clear margin;
+            # else weak with alternatives. Runs BEFORE the LLM pick.
+            def tscore(p):
                 hay = ((p.name or "") + " " + (p.workshop_name or "")).lower()
                 return sum(1 for t in tokens if t in hay)
-            ranked = cands.sorted(
-                key=lambda p: (-score(p), (p.name or "").lower()))
-            best = ranked[:1]
-            if best and score(best) > 0:
+            tranked = cands.sorted(
+                key=lambda p: (-tscore(p), (p.name or "").lower()))
+            tbest = tranked[:1]
+            if tbest and tscore(tbest) > 0:
                 def wscore(p):
                     hw = re.findall(r"[a-z0-9.]+",
                                     ((p.name or "") + " "
                                      + (p.workshop_name or "")).lower())
                     return sum(1 for t in tokens if len(t) >= 3
                                and any(w == t or w.startswith(t) for w in hw))
-                s1 = wscore(best)
-                s2 = wscore(ranked[1]) if len(ranked) > 1 else 0
+                s1 = wscore(tbest)
+                s2 = wscore(tranked[1]) if len(tranked) > 1 else 0
                 conf = "strong" if (s1 >= 2 and s1 > s2) else "weak"
-                return hit(raw, best.id, best.name, fam, conf,
-                           [p.name for p in ranked[:3]] if conf == "weak"
+                return hit(tbest.id, tbest.name, conf,
+                           [p.name for p in tranked[:3]] if conf == "weak"
                            else [])
-            # family known, no token hit -> suggest the family (M-B recovery).
-            return hit(raw, False, "", fam, "none",
-                       [p.name for p in cands[:3]])
 
-        # 3) NO family identified -> conservative all-items token scorer.
-        fam = ""
+            # S7 -- grounded LLM shortlist (only when fam known + trgm gave a
+            # ranking but token overlap found nothing). Validated back to a real
+            # in-family id; else falls through to discovery. NEVER invents.
+            if ranked:
+                picked = self._r2_grounded_pick(desc, fam, ranked)
+                if picked:
+                    return hit(picked["product_id"], picked["product_name"],
+                               "weak", [Product.browse(i).name
+                                        for i, _s in ranked[:3]])
 
+            # S8 (family-known) -- nothing scored: discovery suggestions.
+            return hit(False, "", "none", [p.name for p in cands[:3]])
+
+        # S8 (no family) -- conservative all-items token scorer (baseline
+        # behaviour; lone winner capped at weak/strong by wscore3). No LLM here,
+        # no cross-category risk (no family was ever asserted). Never invents.
         def score3(p):
             hay = ((p.name or "") + " " + (p.workshop_name or "")).lower()
             return sum(1 for t in tokens if t in hay)
@@ -1002,9 +1266,9 @@ class WhatsAppMessageWA6(models.Model):
             s1 = wscore3(best)
             s2 = wscore3(ranked[1]) if len(ranked) > 1 else 0
             conf = "strong" if (s1 >= 2 and s1 > s2) else "weak"
-            return hit(raw, best.id, best.name, "", conf,
+            return hit(best.id, best.name, conf,
                        [p.name for p in ranked[:3]] if conf == "weak" else [])
-        return hit(raw, False, "", "", "none", [])
+        return hit(False, "", "none", [])
 
     # ================================================================
     # WA-6.1 -- Face-3 crew-initiated dispatch (command -> list -> pick ->

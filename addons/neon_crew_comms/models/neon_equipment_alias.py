@@ -66,3 +66,23 @@ class NeonEquipmentAlias(models.Model):
 
     def action_mark_open(self):
         self.write({"state": "open"})
+
+    # The WA-12 matcher reads the CONFIRMED alias set (_r2_alias_map). Bust the
+    # registry cache cross-worker on any change so a freshly-confirmed alias is
+    # live without a restart (the per-method clear_cache would only clear this
+    # worker, leaving a confirm dead on the others).
+    @api.model_create_multi
+    def create(self, vals_list):
+        recs = super().create(vals_list)
+        self.env.registry.clear_cache()
+        return recs
+
+    def write(self, vals):
+        res = super().write(vals)
+        self.env.registry.clear_cache()
+        return res
+
+    def unlink(self):
+        res = super().unlink()
+        self.env.registry.clear_cache()
+        return res
