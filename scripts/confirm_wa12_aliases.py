@@ -117,17 +117,26 @@ for phrase, action in PLAN:
     elif act == "open":
         vals = {"state": "open"}
 
+    # Compute the EFFECTIVE post-write state for an honest before/after, whether
+    # or not we APPLY. `clear_targets` writes explicit False keys, so a key
+    # PRESENT in vals is authoritative; a key ABSENT means "unchanged from row".
+    def eff(key, current):
+        return vals[key] if key in vals else current
+    e_pid = eff("product_template_id", row.product_template_id.id)
+    e_cid = eff("category_id", row.category_id.id)
+    e_term = eff("term", row.term)
+    e_state = eff("state", row.state)
+    after = "%s/%s/%s [%s]" % (
+        (PT.browse(e_pid).name if e_pid else "-"),
+        (Cat.browse(e_cid).code if e_cid else "-"),
+        (e_term or "-"), e_state)
+    # invariant guard: exactly one target on a CONFIRMED row.
+    ntargets = bool(e_pid) + bool(e_cid) + bool(e_term)
+    if e_state == "confirmed" and ntargets != 1:
+        out("!! CONSTRAINT RISK %s: %d targets on a confirmed row -> %s"
+            % (phrase, ntargets, after))
     if APPLY:
         row.write(vals)
-        row = Alias.search([("phrase", "=", phrase)], limit=1)
-    after = "%s/%s/%s [%s]" % (
-        ((PT.browse(vals["product_template_id"]).name
-          if vals.get("product_template_id") else
-          (row.product_template_id.name if not APPLY else "-")) or "-"),
-        (Cat.browse(vals["category_id"]).code if vals.get("category_id")
-         else (row.category_id.code if not APPLY else "-")) or "-",
-        (vals.get("term") or (row.term if not APPLY else "-")) or "-",
-        vals.get("state", row.state))
     changes.append("  %-13s %s  ->  %s" % (phrase, before, after))
 
 out("=== ALIAS CONFIRM (%s) — Robin's 6 rulings ===" % (
