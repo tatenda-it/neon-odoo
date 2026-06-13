@@ -54,7 +54,8 @@ def find_product(*needles):
            # exclude bundled PACKAGES/WEDDING/DJ kits -- a needle like 'smoke'
            # otherwise hits a DJ package whose name lists 'SMOKE MACHINE'.
            ("name", "not ilike", "PACKAGE"),
-           ("name", "not ilike", "WEDDING")]
+           ("name", "not ilike", "WEDDING"),
+           ("name", "not ilike", "REMOTES")]  # accessory line, never the unit
     for n in needles:
         dom.append(("name", "ilike", n))
     return PT.search(dom, order="name", limit=1)
