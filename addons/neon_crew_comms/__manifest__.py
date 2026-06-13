@@ -315,7 +315,11 @@
     # item words exclude Packages; "package"/a package name scopes within (one
     # per-day line, parity unchanged). Buffer v4 (per-line state + cursor + focus
     # + seq). intents wa12_ok/wa12_change. C/D edits relocated POST-DRAFT.
-    "version": "17.0.1.18.0",
+    # 17.0.1.18.1: WA-12.5 Stage A live-wire fixes — item-drop deterministic net
+    # (_wa12_match_slot_items re-splits each LLM item name); post-draft QUESTION
+    # guard -> plain HELP (never an edit); plain-language repair/help (no command
+    # syntax). Wire-level golden harness pwa12_5 5/5.
+    "version": "17.0.1.18.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
