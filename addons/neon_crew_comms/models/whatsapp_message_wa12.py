@@ -734,10 +734,25 @@ class WhatsAppMessageWA12(models.Model):
                 buf.get("date_txt") or "", buf.get("days") or 1,
                 from_e164, raw_from, prefills=buf.get("prefills") or {})
 
+        # M-B: a catalogue-discovery question at either item step lists the
+        # family by its EXACT catalogue names (the pick-list the rep chooses
+        # from), instead of trying to match the question as an item.
+        if sess.step in ("q_itemreq", "q_items"):
+            disc = self._wa12_discovery_family(raw)
+            if disc:
+                names = self._wa12_family_names(disc)
+                if names:
+                    return self._wa6_reply(raw_from, from_e164, _(
+                        "Our %s options:\n%s\n\nReply with one (name or size).")
+                        % (disc, "\n".join("• %s" % n for n in names[:12])))
+
         if sess.step == "q_itemreq":
+            # M-C: strip a correction lead-in ('no, it's an LED screen') so it
+            # re-searches as the item, never 'none'.
+            search = self._wa12_strip_correction(raw) or raw
             # F2 (review FSM-3): the confidence gate — weak hits become
             # unmatched picks in the confirm echo, never confident rows.
-            matched, unmatched = self._wa12_match_text_items(raw)
+            matched, unmatched = self._wa12_match_text_items(search)
             if not matched and not unmatched:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "I couldn't match those in the catalogue — try item names "
@@ -1134,7 +1149,9 @@ class WhatsAppMessageWA12(models.Model):
             "for an events-hire company. Respond with ONLY a JSON object, no "
             "prose. Schema: {\"intent\": \"quote\"|\"other\", \"client\": "
             "string|null, \"items\": [{\"name\": string, \"qty\": integer, "
-            "\"stated_price\": number|null}], \"date\": string|null, "
+            "\"stated_price\": number|null, \"category\": "
+            "\"visual\"|\"lighting\"|\"staging\"|\"sound\"|\"effects\"|"
+            "\"trussing\"|\"cabling\"|null}], \"date\": string|null, "
             "\"phone\": string|null, \"email\": string|null, "
             "\"contact_person\": string|null, \"address\": string|null, "
             "\"event_name\": string|null}. Set intent='quote' if the "
@@ -1303,7 +1320,10 @@ class WhatsAppMessageWA12(models.Model):
         landing in the draft."""
         matched, unmatched = [], []
         for it in items:
-            hit = self._wa6_match_one(it.get("name") or "")
+            # M-A: pass the LLM family hint so the match is scoped to the
+            # obvious family (visual/lighting/staging), never cross-category.
+            hit = self._wa6_match_one(
+                it.get("name") or "", category_hint=it.get("category"))
             qty = int(it.get("qty") or hit.get("qty") or 1)
             if (hit.get("status") == "matched"
                     and hit.get("confidence") in ("exact", "strong")):
@@ -1321,6 +1341,36 @@ class WhatsAppMessageWA12(models.Model):
                                   "stated_price": it.get("stated_price"),
                                   "suggestions": sugg[:3]})
         return matched, unmatched
+
+    @api.model
+    def _wa12_discovery_family(self, text):
+        """M-B: catalogue-discovery intent ('list LED screens' / 'what screens
+        do you have' / 'show me the lighting') -> the family code, else None."""
+        import re
+        low = " ".join((text or "").lower().split())
+        if not re.match(
+                r"^(list|show( me)?|what|which|do you have|got any|any)\b", low):
+            return None
+        return self._wa6_family_code(low)
+
+    @api.model
+    def _wa12_family_names(self, fam):
+        """The EXACT catalogue names in a family (M-B pick-list = the names the
+        team knows; the rep replies with one)."""
+        P = self.env["product.template"].sudo()
+        return P.search([("is_workshop_item", "=", True)]).filtered(
+            lambda p: self._wa6_in_family(p, fam)).mapped("name")
+
+    @api.model
+    def _wa12_strip_correction(self, text):
+        """M-C: strip a correction lead-in ('no it's a', 'i mean', 'actually',
+        'make it', 'should be') so the remainder RE-SEARCHES as the intended
+        item -- never extracts to 'none'. Returns the stripped term."""
+        import re
+        return re.sub(
+            r"^(no[,\s]+|i mean[,\s]+|actually[,\s]+|it'?s\s+(a |an )?|"
+            r"make it\s+(a |an )?|should be\s+(a |an )?)+", "",
+            (text or "").strip(), flags=re.I).strip()
 
     @api.model
     def _wa12_match_text_items(self, text):

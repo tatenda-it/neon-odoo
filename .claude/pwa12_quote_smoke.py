@@ -1420,6 +1420,92 @@ _check("T-WA12-56", _step(SALES_PH) == "qc_pick",
        % _step(SALES_PH))
 _clear_sess(SALES_PH)
 
+# ---- T-WA12-57 (review M-A, proof #3 regression from the directors' wire) the
+# matcher is FAMILY-SCOPED & dimension-aware: "screen" resolves only within the
+# LED SCREEN (visual) family — NEVER a BOOTH; "3 x 2" is a dimension not qty;
+# lighting cans/molefays + trussing totems route to their own family. Fixtures
+# carry NO equipment_category_id (mimicking the catalogue-loaded products that
+# broke proof #3 — family is derived from the NAME).
+_scr = {k: PT.create({"name": "[TEST-WA12] %s" % nm, "is_workshop_item": True,
+                      "list_price": 1.0}) for k, nm in {
+    "3x2": "3M X 2M LED SCREEN", "6x2": "6M X 2M LED SCREEN",
+    "10x4": "10M X 4M LED SCREEN",
+    "8x4": "8M X4M LED SCREEN",          # missing space (data robustness)
+    "3x1": "3M X 1M SCREEN",             # missing "LED" (robustness)
+}.items()}
+PT.create({"name": "[TEST-WA12] 360 BOOTH", "is_workshop_item": True,
+           "list_price": 1.0})
+_mole = PT.create({"name": "[TEST-WA12] 4X100W INDOOR/OUTDOOR MOLEFAYS",
+                   "is_workshop_item": True, "list_price": 1.0})
+_zoom = PT.create({"name": "[TEST-WA12] RGBWAUV 18X18 ZOOM INDOOR LED CAN",
+                   "is_workshop_item": True, "list_price": 1.0})
+_totem = PT.create({"name": "[TEST-WA12] TRUSS TOTEM WITH BASE",
+                    "is_workshop_item": True, "list_price": 1.0})
+
+
+def _m1(raw):
+    return M.sudo()._wa6_match_one(raw)
+
+
+def _is_scr(h):
+    return bool(h.get("product_id")) and "SCREEN" in (
+        h.get("product_name") or "") and "BOOTH" not in (
+        h.get("product_name") or "")
+
+
+# EXACT dimensional hits (the rule — the sizes exist): 6x2 and 3x2 resolve to
+# their exact products, never a booth or a fuzzy guess; "3 x 2" qty stays 1.
+_h62, _h32 = _m1("6m x 2m screen"), _m1("3 x 2 screen")
+exact62 = _h62.get("product_id") == _scr["6x2"].id and _h62["confidence"] == "exact"
+exact32 = (_h32.get("product_id") == _scr["3x2"].id
+           and _h32["confidence"] == "exact" and _h32.get("qty") == 1)
+# data robustness: missing space "8 x 4" + missing "LED" "3 x 1".
+rob84 = _m1("8 x 4 screen").get("product_id") == _scr["8x4"].id
+rob31 = _m1("3 x 1 screen").get("product_id") == _scr["3x1"].id
+# bare family + never-a-booth.
+fam_ok = _is_scr(_m1("screen")) and _is_scr(_m1("led screen"))
+# nearest is the EXCEPTION (no 7x7 stocked) -> a screen, weak, never a booth.
+_h77 = _m1("7m x 7m screen")
+near_exc = _is_scr(_h77) and _h77.get("confidence") == "weak"
+# lighting / trussing route to their OWN family (never visual).
+mole_ok = _m1("4x100 molefay").get("product_id") == _mole.id
+zoom_ok = (_m1("zoom led cans").get("product_id") == _zoom.id
+           and "SCREEN" not in (_m1("zoom led cans").get("product_name") or ""))
+totem_ok = _m1("totem").get("product_id") == _totem.id
+_check("T-WA12-57",
+       exact62 and exact32 and rob84 and rob31 and fam_ok and near_exc
+       and mole_ok and zoom_ok and totem_ok,
+       "M-A: 6x2-exact=%s 3x2-exact/qty1=%s robust(8x4/3x1)=%s/%s family=%s "
+       "nearest-exception=%s molefay=%s zoom-can=%s totem=%s"
+       % (exact62, exact32, rob84, rob31, fam_ok, near_exc, mole_ok, zoom_ok,
+          totem_ok))
+
+# ---- T-WA12-58 (review M-B/M-C) catalogue discovery lists the family by its
+# EXACT names (never a booth); a correction lead-in re-searches the intended
+# item, never extracts to 'none'.
+_clear_sess(SALES_PH)
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_itemreq",
+    {"client_txt": "[TEST-WA12] Acme Events Co", "partner_id": client.id,
+     "date_txt": "", "prefills": {}})
+_s58 = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "what screens do you have"))
+_disc = (M.search([("id", ">", _s58), ("phone_number", "=", SALES_PH),
+                   ("direction", "=", "outbound")], order="id desc", limit=1
+                  ).message_body or "")
+disc_ok = ("LED SCREEN" in _disc and "BOOTH" not in _disc
+           and _step(SALES_PH) == "q_itemreq")
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "no, it's a 6m x 2m screen"))
+s58 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+b58 = s58._get_buffer() if s58 else {}
+mc_ok = (bool(s58) and s58.step == "q_items"
+         and any("6M X 2M LED SCREEN" in (it.get("product_name") or "")
+                 for it in (b58.get("matched") or [])))
+_check("T-WA12-58", disc_ok and mc_ok,
+       "M-B discovery lists family/no-booth=%s ; M-C 'no it's a 6m x 2m "
+       "screen' re-searches -> 6x2 matched=%s" % (disc_ok, mc_ok))
+_clear_sess(SALES_PH)
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(

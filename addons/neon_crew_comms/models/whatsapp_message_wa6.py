@@ -76,13 +76,21 @@ _WA6_STOP = {
 # neon.equipment.category by code at match time (the 9 seeded codes).
 _WA6_CAT_SYNONYMS = {
     "trussing": ["truss", "trussing", "f34", "f44", "goalpost", "goal post",
-                 "tower", "base plate", "baseplate", "clamp", "clamps"],
+                 "tower", "base plate", "baseplate", "clamp", "clamps",
+                 "totem", "totems"],
+    # NOTE (proof #3): bare "led" is REMOVED here -- it is shared by visual
+    # (LED screens) AND lighting (LED cans), so it wrongly pulled "led cans"
+    # into visual. "led screen" / "led wall" phrases stay; a screen is found by
+    # "screen". Bare "wall"/"monitor" dropped too (ambiguous with staging /
+    # stage-monitor).
     "visual": ["screen", "screens", "led wall", "ledwall", "led screen",
-               "wall", "projector", "projection", "plasma", "tv", "monitor",
-               "display", "switcher", "absen", "3x2", "2x3", "4x3", "led"],
+               "ledscreen", "projector", "projection", "plasma", "tv", "tvs",
+               "display", "switcher", "absen", "3x2", "2x3", "4x3"],
     "lighting": ["light", "lights", "lighting", "par", "pars", "wash",
                  "moving head", "mover", "movers", "spot", "beam",
-                 "uplighter", "uplighters", "uplight", "blinder", "strobe"],
+                 "uplighter", "uplighters", "uplight", "blinder", "strobe",
+                 "molefay", "molefays", "can", "cans", "zoom", "rgbwauv",
+                 "rgbw"],
     "sound": ["sound", "speaker", "speakers", "mic", "mics", "microphone",
               "microphones", "mixer", "qu16", "qu24", "di box", "di", "amp",
               "amplifier", "sub", "subs", "subwoofer", "wedge", "wedges",
@@ -782,19 +790,84 @@ class WhatsAppMessageWA6(models.Model):
     @api.model
     def _wa6_parse_qty(self, raw):
         """(qty, desc). 'truss x4'/'x4 truss' -> 4; '4x screen' -> 4;
-        'qty 4' -> 4; default 1. A dimension like '3x2' (digit-x-digit) is
-        NOT a qty."""
+        'qty 4' -> 4; default 1. A DIMENSION ('3x2', '3 x 2', '6m x 2m') is
+        NEVER a qty (proof #3: '3 x 2 screen' must keep the size, not read 3) --
+        dimensions are masked out before the qty scan."""
         s = " " + (raw or "").strip().lower() + " "
-        m = re.search(r"(?:^|\s)x\s*(\d+)(?=\s|$)", s)
+        # mask dimensions (digit [m] x digit [m]) so they can't be read as qty.
+        masked = s
+        for dm in re.finditer(
+                r"\d+(?:\.\d+)?\s*m?\s*[x×]\s*\d+(?:\.\d+)?\s*m?", s):
+            masked = (masked[:dm.start()] + (" " * (dm.end() - dm.start()))
+                      + masked[dm.end():])
+        m = re.search(r"(?:^|\s)x\s*(\d+)(?=\s|$)", masked)
         if not m:
-            m = re.search(r"(?:^|\s)(\d+)\s*x(?=\s|$)", s)
+            m = re.search(r"(?:^|\s)(\d+)\s*x(?=\s|$)", masked)
         if not m:
-            m = re.search(r"(?:^|\s)qty\.?\s*(\d+)(?=\s|$)", s)
+            m = re.search(r"(?:^|\s)qty\.?\s*(\d+)(?=\s|$)", masked)
         qty = 1
         if m:
             qty = max(1, int(m.group(1)))
-            s = s[:m.start()] + " " + s[m.end():]
+            s = s[:m.start()] + " " + s[m.end():]   # indices align (mask kept length)
         return qty, " ".join(s.split())
+
+    @api.model
+    def _wa6_parse_dims(self, text):
+        """(w, h) floats from a 'N x M' / 'NxM' / 'Nm x Mm' size, else None."""
+        m = re.search(
+            r"(\d+(?:\.\d+)?)\s*m?\s*[x×]\s*(\d+(?:\.\d+)?)\s*m?",
+            (text or "").lower())
+        return (float(m.group(1)), float(m.group(2))) if m else None
+
+    @api.model
+    def _wa6_family_code(self, desc):
+        """The category CODE (string, e.g. 'visual') whose synonyms hit the
+        description, else None. Decoupled from the seeded category RECORD so it
+        works even when catalogue-loaded products carry no equipment_category_id
+        (proof #3 root cause). Phrase synonyms substring-match; single tokens on
+        a word boundary."""
+        low = " " + (desc or "").lower() + " "
+        for code, syns in _WA6_CAT_SYNONYMS.items():
+            for syn in syns:
+                hit = (syn in low) if (" " in syn) else bool(
+                    re.search(r"(?:^|\s)%s(?:\s|$)" % re.escape(syn), low))
+                if hit:
+                    return code
+        return None
+
+    @api.model
+    def _wa6_norm_family(self, hint):
+        """Normalise an LLM category hint (Robin's visual/lighting/staging
+        label) to a known family code, else None (unknown hints are ignored ->
+        fall back to synonym derivation)."""
+        h = (hint or "").strip().lower()
+        if not h:
+            return None
+        if h in _WA6_CAT_SYNONYMS:
+            return h
+        return {"video": "visual", "screen": "visual", "screens": "visual",
+                "av": "visual", "light": "lighting", "lights": "lighting",
+                "stage": "staging", "audio": "sound", "pa": "sound",
+                "cables": "cabling", "cable": "cabling", "fx": "effects",
+                "special effects": "effects"}.get(h)
+
+    @api.model
+    def _wa6_in_family(self, product, code):
+        """True if a product belongs to family ``code`` -- by its
+        equipment_category_id.code OR (the M-A fix for un-categorised loaded
+        products) its NAME/workshop_name hitting a family synonym. Scopes a
+        match to the obvious family (a 'screen' query -> the LED SCREEN products,
+        NEVER a BOOTH)."""
+        if product.equipment_category_id \
+                and product.equipment_category_id.code == code:
+            return True
+        hay = " " + ((product.name or "") + " "
+                     + (product.workshop_name or "")).lower() + " "
+        for syn in _WA6_CAT_SYNONYMS.get(code, []):
+            if (syn in hay) if (" " in syn) else re.search(
+                    r"(?:^|\s)%s(?:\s|$)" % re.escape(syn), hay):
+                return True
+        return False
 
     @api.model
     def _wa6_category_for(self, desc):
@@ -814,7 +887,7 @@ class WhatsAppMessageWA6(models.Model):
         return None
 
     @api.model
-    def _wa6_match_one(self, raw):
+    def _wa6_match_one(self, raw, category_hint=None):
         """Resolve one free-text item to {product_id, qty, status,
         suggestions, confidence}. NEVER auto-invents: a no-token-overlap item
         is 'not_found' with closest-in-category suggestions.
@@ -832,66 +905,106 @@ class WhatsAppMessageWA6(models.Model):
             return " ".join(re.findall(r"[a-z0-9.]+", (s or "").lower()))
 
         Product = self.env["product.template"].sudo()
-        # 1) EXACT / near-exact name equality across ALL workshop items (no
-        #    category narrowing -- the typed name IS the identification).
+        allp = Product.search([("is_workshop_item", "=", True)])
+        tokens = [t for t in re.findall(r"[a-z0-9.]+", desc.lower())
+                  if t and t not in _WA6_STOP]
+
+        def hit(raw_, pid, pname, cat_, conf, sugg):
+            return {"raw": raw, "qty": qty, "product_id": pid,
+                    "product_name": pname, "category": cat_,
+                    "status": "matched" if pid else "not_found",
+                    "suggestions": sugg, "confidence": conf,
+                    "family": fam}
+
+        # 1) EXACT name equality across ALL families (the typed name IS the id).
         want = _norm(desc)
         if want:
-            allp = Product.search([("is_workshop_item", "=", True)])
             exact = [p for p in allp
                      if _norm(p.name) == want
                      or (p.workshop_name and _norm(p.workshop_name) == want)]
             if len(exact) == 1:
-                p = exact[0]
-                return {"raw": raw, "qty": qty, "product_id": p.id,
-                        "product_name": p.name, "category": "",
-                        "status": "matched", "suggestions": [],
-                        "confidence": "exact"}
-        # 2) the original token scorer (category-narrowed fuzzy tier).
-        cat = self._wa6_category_for(desc)
-        domain = [("is_workshop_item", "=", True)]
-        if cat:
-            domain.append(("equipment_category_id", "=", cat.id))
-        candidates = Product.search(domain)
-        if not candidates and cat:
-            # category had no products -> widen to all workshop items.
-            candidates = Product.search([("is_workshop_item", "=", True)])
-            cat = None
-        tokens = [t for t in re.findall(r"[a-z0-9.]+", desc.lower())
-                  if t and t not in _WA6_STOP]
+                fam = self._wa6_family_code(desc) or ""
+                return hit(raw, exact[0].id, exact[0].name, "", "exact", [])
 
-        def score(p):
+        # 2) FAMILY scope (M-A): the LLM category_hint (Robin's
+        #    visual/lighting/staging label), else the synonym-derived family. A
+        #    matched family is NEVER widened to all items -> no cross-category
+        #    (a 'screen' resolves only within visual, never a BOOTH).
+        fam = self._wa6_norm_family(category_hint) or self._wa6_family_code(desc)
+        if fam:
+            cands = allp.filtered(lambda p: self._wa6_in_family(p, fam))
+            if not cands:
+                return hit(raw, False, "", fam, "none", [])  # M-B: family empty
+            dims = self._wa6_parse_dims(desc)
+            if dims:
+                target = dims[0] * dims[1]
+                sized = [(p, self._wa6_parse_dims(p.name)) for p in cands]
+                sized = [(p, d) for p, d in sized if d]
+                # the requested size IS stocked -> an EXACT dimensional hit (the
+                # rule, per the verified 47-product list); parse_dims already
+                # normalised case / "x" / spacing / "m", so "6m x 2m" == the
+                # "6M X 2M LED SCREEN" product. Only a NON-stocked size falls to
+                # nearest + the F8 custom path (the exception).
+                exactd = [p for p, d in sized if d == dims]
+                if len(exactd) == 1:
+                    return hit(raw, exactd[0].id, exactd[0].name, fam,
+                               "exact", [])
+                if len(exactd) > 1:
+                    # exact size but a catalogue DUP (casing/space variants) ->
+                    # surface them as a pick (data-cleanup flagged separately).
+                    return hit(raw, exactd[0].id, exactd[0].name, fam, "weak",
+                               [p.name for p in exactd[:3]])
+                if sized:
+                    # M-D EXCEPTION: no stocked size -> nearest by area, weak ->
+                    # the confirm offers it / the F8 custom-price path.
+                    sized.sort(key=lambda pd: abs(pd[1][0] * pd[1][1] - target))
+                    return hit(raw, sized[0][0].id, sized[0][0].name, fam,
+                               "weak", [p.name for p, _ in sized[:3]])
+            # token tier WITHIN the family.
+            def score(p):
+                hay = ((p.name or "") + " " + (p.workshop_name or "")).lower()
+                return sum(1 for t in tokens if t in hay)
+            ranked = cands.sorted(
+                key=lambda p: (-score(p), (p.name or "").lower()))
+            best = ranked[:1]
+            if best and score(best) > 0:
+                def wscore(p):
+                    hw = re.findall(r"[a-z0-9.]+",
+                                    ((p.name or "") + " "
+                                     + (p.workshop_name or "")).lower())
+                    return sum(1 for t in tokens if len(t) >= 3
+                               and any(w == t or w.startswith(t) for w in hw))
+                s1 = wscore(best)
+                s2 = wscore(ranked[1]) if len(ranked) > 1 else 0
+                conf = "strong" if (s1 >= 2 and s1 > s2) else "weak"
+                return hit(raw, best.id, best.name, fam, conf,
+                           [p.name for p in ranked[:3]] if conf == "weak"
+                           else [])
+            # family known, no token hit -> suggest the family (M-B recovery).
+            return hit(raw, False, "", fam, "none",
+                       [p.name for p in cands[:3]])
+
+        # 3) NO family identified -> conservative all-items token scorer.
+        fam = ""
+
+        def score3(p):
             hay = ((p.name or "") + " " + (p.workshop_name or "")).lower()
             return sum(1 for t in tokens if t in hay)
-
-        ranked = candidates.sorted(
-            key=lambda p: (-score(p), (p.name or "").lower()))
+        ranked = allp.sorted(key=lambda p: (-score3(p), (p.name or "").lower()))
         best = ranked[:1]
-        if best and score(best) > 0:
-            # confidence counts only MEANINGFUL tokens (>=3 chars) hitting a
-            # word start -- plain substring containment lets fragments like
-            # 'it'/'be' inflate a sentence into a 'strong' product match.
-            def wscore(p):
-                hay_words = re.findall(
-                    r"[a-z0-9.]+",
-                    ((p.name or "") + " " + (p.workshop_name or "")).lower())
-                return sum(
-                    1 for t in tokens if len(t) >= 3
-                    and any(w == t or w.startswith(t) for w in hay_words))
-            s1 = wscore(best)
-            s2 = wscore(ranked[1]) if len(ranked) > 1 else 0
+        if best and score3(best) > 0:
+            def wscore3(p):
+                hw = re.findall(r"[a-z0-9.]+",
+                                ((p.name or "") + " "
+                                 + (p.workshop_name or "")).lower())
+                return sum(1 for t in tokens if len(t) >= 3
+                           and any(w == t or w.startswith(t) for w in hw))
+            s1 = wscore3(best)
+            s2 = wscore3(ranked[1]) if len(ranked) > 1 else 0
             conf = "strong" if (s1 >= 2 and s1 > s2) else "weak"
-            return {"raw": raw, "qty": qty, "product_id": best.id,
-                    "product_name": best.name,
-                    "category": cat.name if cat else "",
-                    "status": "matched",
-                    "suggestions": ([p.name for p in ranked[:3]]
-                                    if conf == "weak" else []),
-                    "confidence": conf}
-        sugg = [p.name for p in ranked[:3]] if cat else []
-        return {"raw": raw, "qty": qty, "product_id": False,
-                "product_name": "", "category": cat.name if cat else "",
-                "status": "not_found", "suggestions": sugg,
-                "confidence": "none"}
+            return hit(raw, best.id, best.name, "", conf,
+                       [p.name for p in ranked[:3]] if conf == "weak" else [])
+        return hit(raw, False, "", "", "none", [])
 
     # ================================================================
     # WA-6.1 -- Face-3 crew-initiated dispatch (command -> list -> pick ->

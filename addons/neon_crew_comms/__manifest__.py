@@ -274,7 +274,23 @@
     # (FSM-2); greeting check skipped at q_client so a greeting-named client
     # resolves (FSM-8); translated yes/cancel handled, submit stays explicit
     # (FSM-7); the F5 event-name write is actor-honest (FSM-9). pwa12 60/60.
-    "version": "17.0.1.13.0",
+    # 17.0.1.14.0 = M-A..M-C matcher overhaul (proof #3 — the systemic matcher
+    # failure). _wa6_match_one is now FAMILY-SCOPED & dimension-aware: never
+    # cross-category (a "screen" resolves only within the visual/LED-SCREEN
+    # family, never a BOOTH); exact dimensional match ("6m x 2m" == the
+    # "6M X 2M LED SCREEN" product after case/x/spacing normalisation), nearest
+    # size only when a size isn't stocked; family derived from the NAME when the
+    # product carries no equipment_category_id (the catalogue-load gap) or from
+    # an LLM category hint. parse_qty no longer reads a dimension ("3 x 2") as a
+    # qty. Synonyms: bare "led" removed from visual (shared w/ lighting cans);
+    # +molefay/can/zoom/rgbwauv (lighting), +totem (trussing). M-B catalogue
+    # discovery ("what screens do you have" -> the family pick-list by exact
+    # name); M-C correction lead-in strip ("no, it's an LED screen" re-searches,
+    # never 'none'). M-E role fallback already in place (partner function ->
+    # group lens). pwa12 62/62; pwa6 58/58, pwa8 33/33, pwa13 15/15.
+    # ⚠️ BASELINE: a superseding Resolver v2 (re-map equipment_category_id from
+    # Robin's CSV `category` column, not keyword-guessing) is incoming.
+    "version": "17.0.1.14.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
