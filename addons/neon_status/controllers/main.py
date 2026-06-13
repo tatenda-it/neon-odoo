@@ -42,16 +42,19 @@ STATUS_BOARD_GROUPS = ()
 # editable constants. Only the "Live from prod" box reads real-time
 # values (via neon.status.live). Bump these numbers as the programme
 # moves; the donut + bars + WA cards all derive from this one block.
-OVERALL_PCT = 90
-
 TRACKS = [
-    {"key": "core", "name": "Core ERP Programme", "pct": 91,
+    {"key": "core", "name": "Core ERP Programme", "pct": 94,
      "accent": "purple"},
-    {"key": "ai", "name": "AI Equipment Module", "pct": 90,
+    {"key": "ai", "name": "AI Equipment Module", "pct": 96,
      "accent": "teal"},
-    {"key": "hr", "name": "HR & Payroll", "pct": 92,
+    {"key": "hr", "name": "HR & Payroll", "pct": 99,
      "accent": "amber"},
 ]
+
+# Overall DERIVES from the three tracks (straight mean, rounded) so a track
+# bump ALWAYS moves the donut -- never a hand-set literal (Robin direction,
+# 13 Jun). (94 + 96 + 99) / 3 = 96.33 -> 96.
+OVERALL_PCT = round(sum(t["pct"] for t in TRACKS) / len(TRACKS))
 
 # B11 WhatsApp module breakdown (inside the AI Equipment Module track).
 WA_MODULES = [
@@ -197,24 +200,44 @@ WA_MODULES = [
              "(WA-11.1)."},
     {"key": "WA-12", "title": "Quote-by-WhatsApp", "pct": 100,
      "state": "verifying",
-     "body": "MACHINERY PHONE-PROVEN on prod (12 Jun, Robin first-tap-wins). "
-             "A sales rep texts \"Quote: client - items, date\" -> a draft on "
-             "a provisional booking chain, ENGINE-priced (rule x bracket x "
-             "day-multiplier, never list_price), an MD/OD approval ping (cold "
-             "template), [View PDF] (DRAFT-stamped), [Approve] first-tap-wins "
-             "with honest authorship, then the final agreed-design PDF back to "
-             "the rep. Full adversarial review + the real-phone proof passed, "
-             "torn down to baseline. NOT yet LIVE -- gated behind the ticked "
-             "pricing worksheet + the catalogue load, Robin's money sign-off, "
-             "and the LIVE-batch deploy (pricing leg + catalogue + neon_finance "
-             "17.0.7.10.2 / neon_crew_comms 17.0.1.8.2 = the send-leg email "
-             "guard + the agreed-design quote PDF)."},
+     "body": "LIVE BATCH DEPLOYED on prod. A sales rep texts \"Quote: client "
+             "- items, date\" -> a draft on a provisional booking chain, "
+             "ENGINE-priced from the REAL catalogue (547 products / 299 "
+             "per-product rules loaded; the $1 placeholders deactivated), an "
+             "MD/OD approval ping, [View PDF] (DRAFT-stamped), [Approve], then "
+             "the final agreed-design PDF back to the rep. The pricing "
+             "worksheet is ticked, the catalogue is loaded, Robin's money "
+             "sign-off is given, and the batch (product-keyed pricing engine + "
+             "per-line discounts / custom lines / tax toggle + the agreed PDF "
+             "+ the WA-12.2 conversational lane) is on prod. Status stays IN "
+             "VERIFICATION -- gated only on the final unscripted phone proof + "
+             "the test teardown to baseline."},
+    {"key": "WA-12.2", "title": "Conversational quoting", "pct": 100,
+     "state": "verifying",
+     "body": "BUILT & DEPLOYED, gated with WA-12. Deterministic-first: the "
+             "tight \"Quote:\" parser still claims exact commands; for natural "
+             "phrasing an LLM TRANSLATES the brief into {client, items, qty, "
+             "date} (extraction only -- it never prices, approves, or bypasses "
+             "a guard) and hands it to the same deterministic engine, which "
+             "confirms every matched line + rate BEFORE drafting. New-client "
+             "intake (company/individual, near-duplicate check, phone/email) "
+             "runs in-chat; reps can price genuinely-unpriced items by hand "
+             "(loudly flagged). Goes live with WA-12."},
+    {"key": "WA-13", "title": "Quote / invoice retrieval", "pct": 100,
+     "state": "verifying",
+     "body": "BUILT & DEPLOYED, gated. Face 1 (retrieval): \"Send quote / "
+             "invoice <client>\" returns the PDF -- sales see their own "
+             "quotes, finance + MD/OD see all (posted invoices only); rides "
+             "WA-12 going live. Face 2 (invoice-from-quote): an accepted quote "
+             "-> a finance-approved DRAFT invoice on the existing multi-stage "
+             "schedule engine; switches on at the Zoho -> Odoo finance "
+             "cutover (Robin's call)."},
 ]
 
 # Section 4 -- real track milestones (Live / Remaining per track).
 TRACK_MILESTONES = [
     {
-        "name": "Core ERP Programme", "pct": 91, "accent": "purple",
+        "name": "Core ERP Programme", "pct": 94, "accent": "purple",
         "live": "Phases 1–10 (CRM, finance, commercial + event "
                 "jobs, Action Centre, Workshop, Training/LMS 7a–7e, "
                 "Finance Module, Dashboards, Venue Maps) + Phase 12 "
@@ -229,7 +252,7 @@ TRACK_MILESTONES = [
                      "digest → Copilot M12.2 / M12.3-A LAST (no hurry).",
     },
     {
-        "name": "AI Equipment Module", "pct": 90, "accent": "teal",
+        "name": "AI Equipment Module", "pct": 96, "accent": "teal",
         "live": "AI core = B1, B2 Conflict Engine, B3, B13 doc-gen, "
                 "B14, P5.M11 quantity-aware reservation engine (reserve/"
                 "checkout/check-in honour quantity_on_hand); B4 / B5 "
@@ -246,11 +269,18 @@ TRACK_MILESTONES = [
                      "predictive deferred; B12 Drive dropped.",
     },
     {
-        "name": "HR & Payroll", "pct": 92, "accent": "amber",
-        "live": "R1a, R1b, R2 (leave, payroll, wages, loans) + access "
-                "wired (Kudzaiishe HR Admin, Robin / Munashe leave "
-                "approvers).",
-        "remaining": "R3.",
+        "name": "HR & Payroll", "pct": 99, "accent": "amber",
+        "live": "BUILT & LIVE (neon_hr 17.0.6.0.0): employee master, "
+                "leave, payroll, event-wages, commission, loans + the "
+                "Zimbabwe statutory rules populated — PAYE, NSSA, AIDS "
+                "Levy, NEC — with role-lens access verified 11 Jun "
+                "(Kudzaiishe HR Admin; Robin / Munashe leave approvers).",
+        "remaining": "Statutory-value finance confirmation before payroll "
+                     "runs on the new rules: the NSSA daily-rate figure "
+                     "($20/day) + deadline, the Labour-Act 5-day leave "
+                     "wording, and NEC no-overtime — each rule carries a "
+                     "needs_finance_confirmation flag awaiting Kudzai / "
+                     "Robin's tick.",
     },
 ]
 

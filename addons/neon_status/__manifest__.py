@@ -111,7 +111,15 @@
     # worksheet + catalogue load + Robin money sign-off + the LIVE-batch deploy
     # = neon_finance 17.0.7.10.2 / neon_crew_comms 17.0.1.8.2). Intro + build-lane
     # note updated (WA-13 next). Text/constants only.
-    "version": "17.0.1.0.19",
+    # 17.0.1.0.20 = programme-board refresh (13 Jun): track bumps Core ERP
+    # 91->94 / AI 90->96 / HR 92->99; OVERALL_PCT now DERIVES from the three
+    # tracks (straight mean, rounded -> 96) instead of a hand-set literal so a
+    # track bump always moves the donut; HR remaining rewritten (built+live
+    # neon_hr 17.0.6.0.0, Zimbabwe statutory rules populated, 1% = finance
+    # value confirmation, not "R3"); WA-12 card = LIVE batch deployed (real
+    # catalogue loaded), still in-verification; new WA-12.2 + WA-13 cards
+    # (built & deployed, gated). Text/constants only.
+    "version": "17.0.1.0.20",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """
