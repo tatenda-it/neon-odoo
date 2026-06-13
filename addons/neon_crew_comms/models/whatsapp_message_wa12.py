@@ -118,6 +118,20 @@ _WA12_SHOW_WORDS = ("show", "show me", "preview", "pdf", "let me see",
 # accept both as aliases where the turn actually reaches the handler.
 _WA12_RESUME_WORDS = ("continue", "resume")
 
+# WA-12.4 stepper. SKIP drops the current item (state='skipped'); CONFIRM
+# accepts a confident card (state='confirmed'). 'next' is a CONFIRM (advance),
+# never a drop (BUG-6). Q tokens route an unrecognised/question message to HELP
+# + re-show, NEVER a catalogue match (the "where do I tap" regression).
+_WA12_SKIP_WORDS = ("skip", "skip it", "skip this", "remove", "remove this",
+                    "drop", "drop it", "drop this", "none of these", "none")
+_WA12_CONFIRM_WORDS = ("ok", "okay", "correct", "yes that", "right", "next",
+                       "looks good", "good", "confirm", "yep", "yeah", "ya")
+_WA12_Q_TOKENS = ("where", "how", "what", "which", "why", "who", "when",
+                  "help", "do i", "can i", "should i", "tap", "explain",
+                  "confused", "i dont", "i don't", "huh")
+_WA12_NUM = {1: "①", 2: "②", 3: "③", 4: "④", 5: "⑤", 6: "⑥",
+             7: "⑦", 8: "⑧", 9: "⑨", 10: "⑩"}
+
 # Fresh advisory-lock namespace (NOT 5593500/600/700/800) -- first-tap-wins on
 # the approver pair so only ONE of uids 7/21 wins a concurrent Approve/Reject.
 _WA12_LOCK_NS = 5593900
@@ -325,7 +339,8 @@ class WhatsAppMessageWA12(models.Model):
             # (intent, ("pick", parts)) so _wa12_maybe_intercept routes it to the
             # pick handler, NOT _wa12_handle_tap (which would .exists() a list).
             if decoded and decoded[0] in (
-                    "wa12_pick", "wa12_pick_more", "wa12_pick_skip"):
+                    "wa12_pick", "wa12_pick_more", "wa12_pick_skip",
+                    "wa12_ok", "wa12_change"):  # WA-12.4 stepper (R1 ship-block)
                 return (decoded[0], ("pick", list(decoded[1])))
             if decoded and decoded[0].startswith("wa12_"):
                 intent, parts = decoded
@@ -390,21 +405,20 @@ class WhatsAppMessageWA12(models.Model):
         if not matched and not unmatched:
             return self._wa6_reply(raw_from, from_e164, _(
                 "Couldn't match any catalogue items in \"%s\".") % items_txt)
-        if unmatched:
-            return self._wa12_open_items_confirm(
-                sender, client_txt, matched, unmatched, date_txt, {},
-                from_e164, raw_from)
-        # resolve the client: exactly one -> proceed; 0 or >1 -> the guided
-        # new-client intake / list-then-pick (items + date are buffered so the
-        # quote resumes without re-entry). Fixes the old >1 'be more specific'
-        # dead-end + adds in-session client capture (LIVE-blocking amendment).
+        # CLIENT INTAKE BEFORE ITEMS (must-preserve): resolve the named client
+        # first. exactly one -> proceed to the item stepper with that partner; 0
+        # or >1 -> the guided new-client intake / list-then-pick (items + date
+        # buffered, intake resumes into the stepper). WA-12.4: ALL items then go
+        # through the STEPPER (confident -> ✅+[✓/✗]; ambiguous/family -> LIST);
+        # no item auto-drafts without the rep confirming it.
         partner, candidates = self._wa12_client_candidates(client_txt)
         if not partner:
             return self._wa12_start_client_intake(
                 sender, client_txt, candidates, matched, date_txt, days,
                 from_e164, raw_from)
-        return self._wa12_quote_from_slots(
-            sender, partner, matched, date_txt, days, from_e164, raw_from)
+        return self._wa12_open_items_confirm(
+            sender, partner.name, matched, unmatched, date_txt, {},
+            from_e164, raw_from, partner_id=partner.id)
 
     def _wa12_quote_from_slots(self, sender, partner, matched, date_txt, days,
                                from_e164, raw_from, extras=None):
@@ -537,10 +551,14 @@ class WhatsAppMessageWA12(models.Model):
                 return self._wa6_reply(raw_from, from_e164, _(
                     "%s — what items? (e.g. `2x RGB LED CAN, smoke machine`)")
                     % partner.name)
-            return self._wa12_quote_from_slots(
-                sender, partner, buf.get("matched") or [],
-                buf.get("date_txt") or "", buf.get("days") or 1,
-                from_e164, raw_from, extras=buf.get("prefills") or {})
+            # WA-12.4: client now resolved -> open the item STEPPER (not a direct
+            # draft) so each buffered item is confirmed one at a time. The
+            # buffered `matched` were extracted upstream; re-split into matched/
+            # unmatched is unnecessary (they were confident) -> all matched.
+            return self._wa12_open_items_confirm(
+                sender, partner.name, buf.get("matched") or [], [],
+                buf.get("date_txt") or "", buf.get("prefills") or {},
+                from_e164, raw_from, partner_id=partner.id)
 
         def ask_after_name(ack=""):
             """Advance to the next MISSING slot (M3: brief-sourced phone/
@@ -719,12 +737,22 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
         raw = (body or "").strip()
         norm = " ".join(raw.lower().split())
-        buf = sess._get_buffer()
-        buf = buf if isinstance(buf, dict) else {}
+        buf = self._wa12_buf_migrate(sess._get_buffer())   # yields v4
 
         if self._wa12_is_cancel(norm):
             sess.sudo().write({"step": "done", "active": False})
             return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
+
+        # WA-12.4: the FOCUSED SUB-STATE owns the turn. Gated on step==q_items
+        # AND focus (can never fire at q_confirm even with a dirty buffer). This
+        # MUST precede greeting / discovery / submit / show-continue / complaint
+        # below -- those call the legacy combined block and would re-create the
+        # "where do I tap" confusion mid-step. Inside focus, greeting/continue/a
+        # question all re-present the cursor; a re-typed item re-matches item N;
+        # nothing here can spawn a new line except an explicit `add <item>`.
+        if sess.step == "q_items" and buf.get("focus") and buf.get("cur"):
+            return self._wa12_focus_dispatch(
+                sess, buf, raw, norm, from_e164, raw_from)
 
         # F6: a greeting mid-session greets + offers continue/cancel, never the
         # syntax card. SKIPPED at q_client (FSM-8): there the whole message is a
@@ -955,13 +983,24 @@ class WhatsAppMessageWA12(models.Model):
         q_items buffer consumer so a pre-deploy session degrades cleanly and no
         path leaves BOTH `lines` and the legacy keys."""
         if not isinstance(buf, dict):
-            return {"v": 3, "next_lid": 1, "lines": [], "pending": None}
+            return {"v": 4, "next_lid": 1, "lines": [], "pending": None,
+                    "cur": None, "focus": False, "seq": 0}
+        if buf.get("v") == 4 and "lines" in buf:
+            return buf
         if buf.get("v") == 3 and "lines" in buf:
+            # v3 -> v4: stamp per-line state, add cursor fields, PRESERVE a live
+            # `pending` (a pre-deploy mid-pick session keeps its disambiguation).
+            for ln in buf.get("lines") or []:
+                ln.setdefault("state", "pending")
+            buf.setdefault("cur", None)
+            buf.setdefault("focus", False)
+            buf.setdefault("seq", 0)
+            buf["v"] = 4
             return buf
         lines, lid = [], 1
         for it in (buf.get("matched") or []):
             lines.append({
-                "lid": lid, "kind": "matched",
+                "lid": lid, "kind": "matched", "state": "pending",
                 "product_id": it.get("product_id"),
                 "product_name": it.get("product_name") or "",
                 "qty": it.get("qty") or 1,
@@ -970,7 +1009,7 @@ class WhatsAppMessageWA12(models.Model):
             lid += 1
         for um in (buf.get("unmatched") or []):
             lines.append({
-                "lid": lid, "kind": "unmatched",
+                "lid": lid, "kind": "unmatched", "state": "pending",
                 "raw": um.get("name") or "", "qty": um.get("qty") or 1,
                 "stated_price": um.get("stated_price"),
                 "suggestions": um.get("suggestions") or [],
@@ -978,18 +1017,23 @@ class WhatsAppMessageWA12(models.Model):
             lid += 1
         buf["lines"] = lines
         buf["next_lid"] = lid
-        buf["v"] = 3
+        buf["v"] = 4
+        buf.setdefault("cur", None)
+        buf.setdefault("focus", False)
+        buf.setdefault("seq", 0)
         buf.setdefault("pending", None)
         buf.pop("matched", None)
         buf.pop("unmatched", None)
         return buf
 
     def _wa12_add_line(self, buf, **vals):
-        """Append a line, allocating a fresh never-reused lid. Returns it."""
+        """Append a line, allocating a fresh never-reused lid. Returns it. New
+        lines are born 'pending' (the cursor will reach them)."""
         lid = buf.get("next_lid") or 1
         ln = dict(vals)
         ln["lid"] = lid
         ln.setdefault("qty", 1)
+        ln.setdefault("state", "pending")
         buf["next_lid"] = lid + 1
         buf.setdefault("lines", []).append(ln)
         return ln
@@ -1008,15 +1052,103 @@ class WhatsAppMessageWA12(models.Model):
         return None
 
     def _wa12_set_pending(self, buf, lid, kind, candidates, label, family,
-                          overflow=False):
+                          overflow=False, seq=None):
         buf["pending"] = {"lid": lid, "kind": kind,
                           "candidates": list(candidates), "label": label,
-                          "family": family or "", "overflow": overflow}
+                          "family": family or "", "overflow": overflow,
+                          "seq": seq}
 
     def _wa12_clear_pending_for(self, buf, lid):
         p = buf.get("pending")
         if p and p.get("lid") == lid:
             buf["pending"] = None
+
+    # ---- WA-12.4 stepper: cursor + focused sub-state over the v4 lines. ----
+    def _wa12_first_unresolved(self, buf):
+        return next((ln for ln in buf.get("lines") or []
+                     if ln.get("state") == "pending"), None)
+
+    def _wa12_assert_focus(self, buf):
+        """Invariant: focus True <=> cur is a live pending line. Defensive; a
+        violation re-anchors rather than raises (a stale buffer must degrade)."""
+        cur = buf.get("cur")
+        ln = self._wa12_line_by_lid(buf, cur) if cur else None
+        if buf.get("focus") and not (ln and ln.get("state") == "pending"):
+            nxt = self._wa12_first_unresolved(buf)
+            buf["cur"] = nxt["lid"] if nxt else None
+            buf["focus"] = bool(nxt)
+
+    def _wa12_pos(self, buf, ln):
+        try:
+            return (buf.get("lines") or []).index(ln) + 1
+        except ValueError:
+            return 1
+
+    def _wa12_counter(self, buf, ln):
+        i, n = self._wa12_pos(buf, ln), len(buf.get("lines") or [])
+        return _("%s of %d") % (_WA12_NUM.get(i, "(%d)" % i), n)
+
+    def _wa12_family_word_for(self, label, fam):
+        """Alias-aware family word: prefer the term-alias expansion of `label`
+        ('blinders' -> 'molefays') over the generic family word ('lights')."""
+        kind, val, _exp = self._r2_alias_expand(label or "")
+        if kind == "term" and val:
+            w = val.strip()
+            return w if w.endswith("s") else (w + "s")
+        return self._wa12_family_word(fam)
+
+    def _wa12_advance_cursor(self, sess, buf, from_e164, raw_from):
+        """Resolved one item -> move the cursor to the next pending line and
+        present it; when none remain, finalize to the draft. The SINGLE exit for
+        'an item is done'."""
+        buf["pending"] = None
+        nxt = self._wa12_first_unresolved(buf)
+        if nxt is None:
+            buf["cur"] = None
+            buf["focus"] = False
+            sess._set_buffer(buf)
+            return self._wa12_finalize_to_draft(sess, buf, from_e164, raw_from)
+        buf["cur"] = nxt["lid"]
+        buf["focus"] = True
+        sess._set_buffer(buf)
+        return self._wa12_present_item(sess, buf, nxt, from_e164, raw_from)
+
+    def _wa12_finalize_to_draft(self, sess, buf, from_e164, raw_from):
+        """All items resolved -> project the draftable lines (matched +
+        confirmed/picked ONLY; skipped/unmatched/pending excluded) and route to
+        the UNCHANGED _wa12_quote_from_slots (-> q_confirm + [Submit][Edit])."""
+        buf["focus"] = False
+        buf["cur"] = None
+        buf["pending"] = None
+        draftable = [{"product_id": ln["product_id"],
+                      "product_name": ln["product_name"],
+                      "qty": ln.get("qty") or 1,
+                      "rep_price": ln.get("rep_price"),
+                      "stated_price": ln.get("stated_price")}
+                     for ln in buf.get("lines") or []
+                     if ln.get("kind") == "matched"
+                     and ln.get("state") in ("confirmed", "picked")]
+        sender = sess.user_id
+        if not draftable:
+            sess.sudo().write({"step": "done", "active": False})
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Nothing left to quote — every item was skipped. Send new "
+                "items or *cancel*."))
+        partner = self.env["res.partner"].sudo().browse(
+            buf.get("partner_id") or 0).exists()
+        candidates = self.env["res.partner"].sudo().browse()
+        if not partner:
+            partner, candidates = self._wa12_client_candidates(
+                buf.get("client_txt") or "")
+        if not partner:
+            return self._wa12_start_client_intake(
+                sender, buf.get("client_txt") or "", candidates, draftable,
+                buf.get("date_txt") or "", buf.get("days") or 1,
+                from_e164, raw_from, prefills=buf.get("prefills") or {})
+        return self._wa12_quote_from_slots(
+            sender, partner, draftable, buf.get("date_txt") or "",
+            buf.get("days") or 1, from_e164, raw_from,
+            extras=buf.get("prefills") or {})
 
     # ---- the variant-vs-unsure signal + candidate sources (matcher untouched).
     def _wa12_is_family_term(self, raw):
@@ -1128,28 +1260,49 @@ class WhatsAppMessageWA12(models.Model):
     _WA12_LIST_MAX = 10
 
     def _wa12_send_pick(self, sess, target, kind, cand_ids, label, family,
-                        from_e164, raw_from):
+                        from_e164, raw_from, counter=None, seq=None,
+                        drop_pid=None):
         """Offer the candidate set as taps. <=2 -> buttons (+skip); >=3 -> LIST
         (so a 'None of these' row never displaces a candidate); >10 -> 9 + a
-        'Type to narrow' row. Titles truncated to Meta limits; full name in the
-        list-row description. `target` is 'b<lid>' (q_items) or 'l<line_id>'."""
+        'Type to narrow' row. Titles truncated to Meta limits; the list-row
+        DESCRIPTION carries the FULL name + per-day rate. `target` is 'b<lid>'
+        (q_items) or 'l<line_id>'. WA-12.4: counter prefix ("② of 4"), seq in the
+        payloads (idempotency), drop_pid (exclude a just-rejected product), and
+        an alias-aware family word ("blinders -> molefays")."""
         PT = self.env["product.template"].sudo()
         secret = self.env["ir.config_parameter"].sudo().get_param(
             "database.secret") or ""
+        if drop_pid:
+            cand_ids = [p for p in cand_ids if p != drop_pid]
         cand_ids = [p for p in cand_ids if PT.browse(p).exists()]
         if not cand_ids:
             return self._wa6_reply(raw_from, from_e164, _(
                 "I don't have a confident option for that — please re-type it."))
         if kind == "variant":
             body = _("*%s* → %s — which one?") % (
-                label, self._wa12_family_word(family))
+                label, self._wa12_family_word_for(label, family))
         else:
             body = _("\"%s\" — did you mean one of these?") % label
+        if counter:
+            body = "%s\n%s" % (counter, body)
+
+        def _enc(intent, *extra):
+            args = [sess.id, target] + list(extra)
+            if seq is not None:
+                args.append(seq)
+            return wa_payload.encode(secret, intent, *args)
 
         def pick(pid):
-            return wa_payload.encode(secret, "wa12_pick", sess.id, target, pid)
-        skip = wa_payload.encode(secret, "wa12_pick_skip", sess.id, target)
-        more = wa_payload.encode(secret, "wa12_pick_more", sess.id, target)
+            return _enc("wa12_pick", pid)
+        skip = _enc("wa12_pick_skip")
+        more = _enc("wa12_pick_more")
+
+        def desc(pid):
+            prod = PT.browse(pid)
+            rate, cur = self._wa12_price_lookup(prod)
+            d = ("%s · %s %.2f/day" % (prod.name, cur, rate)
+                 if rate and rate > _WA12_PLACEHOLDER_RATE else prod.name)
+            return d[:72]
         n = len(cand_ids)
         if n <= 2:
             buttons = [{"id": pick(p),
@@ -1160,8 +1313,9 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_send_buttons(raw_from, from_e164, body, buttons)
         show = (cand_ids[:self._WA12_LIST_MAX - 1]
                 if n > self._WA12_LIST_MAX else cand_ids)
-        rows = [{"id": pick(p), "title": PT.browse(p).name[:self._WA12_LIST_TITLE],
-                 "description": PT.browse(p).name} for p in show]
+        rows = [{"id": pick(p),
+                 "title": PT.browse(p).name[:self._WA12_LIST_TITLE],
+                 "description": desc(p)} for p in show]
         if n > self._WA12_LIST_MAX:
             rows.append({"id": more,
                          "title": _("Type to narrow")[:self._WA12_LIST_TITLE],
@@ -1170,9 +1324,246 @@ class WhatsAppMessageWA12(models.Model):
         else:
             rows.append({"id": skip,
                          "title": _("None of these")[:self._WA12_LIST_TITLE],
-                         "description": ""})
+                         "description": _("none of these")})
         return self._wa6_send_list(raw_from, from_e164, body, _("Pick item"),
                                    rows)
+
+    # ================================================================
+    # WA-12.4 -- the one-item stepper: presenters + focused dispatch. Each item
+    # is resolved in its OWN message with a counter; ALL input while focused on
+    # item N applies to N only and can NEVER spawn a new line (the fix for the
+    # "where do I tap" -> matched-as-item regression, Robin wire 618-629).
+    # ================================================================
+    def _wa12_present_item(self, sess, buf, ln, from_e164, raw_from):
+        """Bump the idempotency seq, then present the cursor line: a confident
+        matched line as a ✓/✗ card, an unmatched line as a pick LIST."""
+        self._wa12_assert_focus(buf)
+        buf["seq"] = (buf.get("seq") or 0) + 1
+        if ln.get("kind") == "matched":
+            return self._wa12_present_confident(sess, buf, ln, from_e164,
+                                                raw_from)
+        return self._wa12_present_pick(sess, buf, ln, from_e164, raw_from)
+
+    def _wa12_present_confident(self, sess, buf, ln, from_e164, raw_from):
+        """A confident line -> "✅ <product> ×qty — $X/day" + [✓ Correct][✗
+        Change], with the progress counter. NOT auto-confirmed (D-NOAUTO)."""
+        secret = self.env["ir.config_parameter"].sudo().get_param(
+            "database.secret") or ""
+        prod = self.env["product.template"].sudo().browse(ln["product_id"])
+        rate, cur = self._wa12_price_lookup(prod)
+        if rate is not None and rate > _WA12_PLACEHOLDER_RATE:
+            money = "%s %.2f/day" % (cur, rate)
+        elif ln.get("rep_price"):
+            money = _("%s %.2f/day (rep-priced)") % (cur, ln["rep_price"])
+        else:
+            money = _("no rate yet — reply `price <amt>`")
+        body = _("%s\n✅ *%s* ×%d — %s") % (
+            self._wa12_counter(buf, ln), prod.name, ln.get("qty") or 1, money)
+        sq = buf["seq"]
+        self._wa12_set_pending(buf, ln["lid"], "confirm", [prod.id], prod.name,
+                               ln.get("family") or "", seq=sq)
+        sess._set_buffer(buf)
+        ok = wa_payload.encode(secret, "wa12_ok", sess.id, "b%d" % ln["lid"], sq)
+        chg = wa_payload.encode(secret, "wa12_change", sess.id,
+                                "b%d" % ln["lid"], sq)
+        return self._wa6_send_buttons(raw_from, from_e164, body, [
+            {"id": ok, "title": _("✓ Correct")[:self._WA12_BTN_TITLE]},
+            {"id": chg, "title": _("✗ Change")[:self._WA12_BTN_TITLE]}])
+
+    def _wa12_present_pick(self, sess, buf, ln, from_e164, raw_from):
+        """An unmatched line -> the candidate LIST (variant or ambiguous),
+        counter-prefixed. No candidates -> ask for a re-type (still focused)."""
+        cand_ids = ln.get("_cand_ids") or []
+        sq = buf["seq"]
+        kind = "variant" if ln.get("_variant") else "ambiguous"
+        if not cand_ids:
+            self._wa12_set_pending(buf, ln["lid"], kind, [],
+                                   ln.get("raw") or "", ln.get("family") or "",
+                                   seq=sq)
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "%s  I couldn't place \"%s\" — type the item name, or 'skip'.")
+                % (self._wa12_counter(buf, ln), ln.get("raw") or ""))
+        self._wa12_set_pending(
+            buf, ln["lid"], kind, cand_ids, ln.get("raw") or "",
+            ln.get("family") or "",
+            overflow=len(cand_ids) > self._WA12_LIST_MAX, seq=sq)
+        sess._set_buffer(buf)
+        return self._wa12_send_pick(
+            sess, "b%d" % ln["lid"], kind, cand_ids, ln.get("raw") or "",
+            ln.get("family") or "", from_e164, raw_from,
+            counter=self._wa12_counter(buf, ln), seq=sq)
+
+    def _wa12_focus_help(self, buf, ln):
+        """One-line HELP for the focused item (mode-tailored)."""
+        c = self._wa12_counter(buf, ln)
+        if ln.get("kind") == "matched":
+            return _("%s  Tap *✓ Correct* to keep it, *✗ Change* to swap it, "
+                     "or type the product name. 'skip' to drop it.") % c
+        return _("%s  Tap an option for \"%s\", or type the product name. "
+                 "'skip' to drop it.") % (c, ln.get("raw") or "")
+
+    def _wa12_retype_confident(self, raw):
+        """True iff `raw` confidently re-identifies a product OR names a family
+        the picker can resolve. Reuses the byte-unchanged matcher."""
+        hit = self._wa6_match_one(raw)
+        if hit.get("status") == "matched" and hit.get("confidence") in (
+                "exact", "strong"):
+            return True
+        fam = hit.get("family") or self._wa6_family_code(raw) or ""
+        return bool(fam and self._wa12_is_family_term(raw)
+                    and self._wa12_family_candidate_ids(fam))
+
+    def _wa12_is_question(self, raw):
+        """A question / meta / unrecognised message -> HELP + reshow (never a
+        catalogue match). '?' or a leading wh/help token; a greeting/show/
+        continue mid-step is also meta."""
+        low = " ".join((raw or "").lower().split())
+        if not low:
+            return True
+        if (low in _WA12_GREETINGS or low in _WA12_SHOW_WORDS
+                or low in _WA12_RESUME_WORDS):
+            return True
+        if "?" in low:
+            return True
+        return any(low == t or low.startswith(t + " ") for t in _WA12_Q_TOKENS)
+
+    def _wa12_focus_dispatch(self, sess, buf, raw, norm, from_e164, raw_from):
+        """ALL input applies to buf['cur'] ONLY. The ONLY line-creating verb on
+        this path is an explicit 'add <item>'. _wa12_q_items_try /
+        _wa12_surface_unmatched / the LLM batch are NOT reachable while focused,
+        so a question/unrecognised text can never spawn a new line."""
+        import re
+        sender = sess.user_id
+        if not (sender and sender.active and self._wa12_can_quote(sender)):
+            sess.sudo().write({"active": False})
+            return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
+        ln = self._wa12_line_by_lid(buf, buf.get("cur"))
+        if ln is None:
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+
+        # 1) explicit 'add <item>' -- the ONLY new-line verb (tight).
+        m = re.match(r"^add\s+(.+)$", raw, re.I)
+        if m:
+            return self._wa12_focus_add_item(sess, buf, m.group(1).strip(),
+                                             from_e164, raw_from)
+        # 2) skip / remove / drop THIS item -> skipped, advance.
+        if norm in _WA12_SKIP_WORDS:
+            ln["state"] = "skipped"
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+        # 3) header edits -> mutate the header, re-present the SAME item.
+        m = re.match(r"^client\s+(.+)$", raw, re.I)
+        if m:
+            partner, _c = self._wa12_client_candidates(m.group(1).strip())
+            buf["client_txt"] = partner.name if partner else m.group(1).strip()
+            buf["partner_id"] = partner.id if partner else False
+            sess._set_buffer(buf)
+            return self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
+        ev_date, ph = self._wa12_resolve_date(raw)
+        if not ph:
+            buf["date_txt"] = ev_date.isoformat()
+            sess._set_buffer(buf)
+            return self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
+        if re.match(r"^qty\s+(?:to\s+)?\d+\s*$", norm) and \
+                ln.get("kind") == "matched":
+            ln["qty"] = max(1, int(re.search(r"\d+", norm).group()))
+            sess._set_buffer(buf)
+            return self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
+        m = re.match(r"^price\s+([0-9]+(?:\.[0-9]+)?)\s*$", norm)
+        if m and ln.get("kind") == "matched":
+            return self._wa12_focus_price(sess, buf, ln, float(m.group(1)),
+                                          from_e164, raw_from)
+        # 4) bare confirm on a CONFIDENT card = confirm-and-advance (BUG-6).
+        if ln.get("kind") == "matched" and norm in _WA12_CONFIRM_WORDS:
+            ln["state"] = "confirmed"
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+        # 5) a redirected 'yes'/'submit' inside focus -> nudge, never draft.
+        if norm in _WA12_SUBMIT_WORDS:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Let's finish item %s first — tap an option, type the item, "
+                "or 'skip'.") % self._wa12_counter(buf, ln))
+        # 5b) M4 complaint language mid-item -> the repair prompt (never a
+        #     catalogue match). Re-present the item card FIRST (so it's still on
+        #     screen), then the repair prompt as the final word.
+        if any(t in norm for t in _WA12_COMPLAINT_TOKENS):
+            self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
+            return self._wa12_repair_prompt(raw_from, from_e164)
+        # 6) QUESTION / unrecognised -> HELP + RE-SHOW N. Never a catalogue
+        #    match, never a new line. A confident/family RE-TYPE wins first.
+        if (not self._wa12_retype_confident(raw)) or self._wa12_is_question(raw):
+            self._wa6_reply(raw_from, from_e164, self._wa12_focus_help(buf, ln))
+            return self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
+        # 7) a deliberate CONFIDENT/family RE-TYPE of N -> re-match, bind or
+        #    re-frame N's LIST. Never appends.
+        return self._wa12_focus_retype(sess, buf, ln, raw, from_e164, raw_from)
+
+    def _wa12_focus_retype(self, sess, buf, ln, raw, from_e164, raw_from):
+        """Re-match the cursor line through the funnel. Confident -> bind N +
+        advance; weak/family -> re-frame N's candidates and STAY on N (never a
+        new line). Preserves the stable lid + qty."""
+        lid_saved = ln["lid"]
+        qty_saved = ln.get("qty") or 1
+        hit = self._wa6_match_one(raw)
+        if hit.get("status") == "matched" and hit.get("confidence") in (
+                "exact", "strong"):
+            ln.clear()
+            ln.update({"lid": lid_saved, "kind": "matched", "state": "picked",
+                       "product_id": hit["product_id"],
+                       "product_name": hit["product_name"],
+                       "qty": hit.get("qty") or qty_saved,
+                       "rep_price": None, "stated_price": None})
+            self._wa12_clear_pending_for(buf, lid_saved)
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+        fam = hit.get("family") or self._wa6_family_code(raw) or ""
+        is_v = bool(fam and self._wa12_is_family_term(raw))
+        cids = (self._wa12_family_candidate_ids(fam) if is_v
+                else self._wa12_suggestion_ids(hit.get("suggestions") or []))
+        for k in ("product_id", "product_name"):
+            ln.pop(k, None)
+        ln.update({"kind": "unmatched", "raw": raw,
+                   "qty": hit.get("qty") or qty_saved,
+                   "suggestions": hit.get("suggestions") or [], "family": fam,
+                   "_variant": is_v, "_cand_ids": cids, "state": "pending"})
+        return self._wa12_present_pick(sess, buf, ln, from_e164, raw_from)
+
+    def _wa12_focus_add_item(self, sess, buf, term, from_e164, raw_from):
+        """The ONLY in-focus line creator: append the term as new pending
+        line(s) at the tail; the cursor stays on the current item."""
+        m, u = self._wa12_match_text_items(term)
+        cur_ln = self._wa12_line_by_lid(buf, buf.get("cur"))
+        if not m and not u:
+            self._wa6_reply(raw_from, from_e164, _(
+                "Couldn't read \"%s\" as an item — finish item %s first, or "
+                "type a catalogue name.") % (
+                    term, self._wa12_counter(buf, cur_ln) if cur_ln else "?"))
+            if cur_ln:
+                return self._wa12_present_item(sess, buf, cur_ln, from_e164,
+                                               raw_from)
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+        self._wa12_build_buf_lines(buf, m, u)  # appends, state='pending'
+        self._wa6_reply(raw_from, from_e164,
+                        _("Added \"%s\" — I'll get to it.") % term)
+        if cur_ln:
+            return self._wa12_present_item(sess, buf, cur_ln, from_e164,
+                                           raw_from)
+        return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+
+    def _wa12_focus_price(self, sess, buf, ln, amt, from_e164, raw_from):
+        """Guarded rep-price on the cursor line (mirrors the q_items price
+        guard): refuse when a catalogue rate exists; refuse a placeholder-low
+        amount; else set rep_price + re-present."""
+        prod = self.env["product.template"].sudo().browse(ln["product_id"])
+        rate, cur = self._wa12_price_lookup(prod)
+        if rate is not None and rate > _WA12_PLACEHOLDER_RATE:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "%s has a catalogue rate (%s %.2f/day) — that's what drafts.")
+                % (ln["product_name"], cur, rate))
+        if amt <= _WA12_PLACEHOLDER_RATE:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "That rate is too low — give the real day rate."))
+        ln["rep_price"] = amt
+        sess._set_buffer(buf)
+        return self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
 
     def _wa12_offer_pick_for_buffer(self, sess, buf, ln, from_e164, raw_from):
         """Set `pending` for an unmatched/variant buffer line and send the pick.
@@ -1244,27 +1635,53 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_pick_apply_buffer(self, sess, intent, target, parts, from_e164,
                                 raw_from):
-        """Apply a q_items tap to the stable-lid buffer line."""
+        """Apply a stepper tap (wa12_ok / wa12_change / wa12_pick / _more /
+        _skip) to the cursor's stable-lid buffer line. SEQ-IDEMPOTENT: a tap
+        acts only if its lid is the live cursor AND its trailing seq matches the
+        live pending offer; a duplicate/stale delivery just re-presents the
+        cursor (no double-advance, no wrong bind)."""
         buf = self._wa12_buf_migrate(sess._get_buffer())
         lid = int(target[1:]) if target.startswith("b") and target[1:].isdigit() \
             else 0
         ln = self._wa12_line_by_lid(buf, lid)
-        if ln is None:
-            # the line was removed since the offer -> just reshow current.
-            buf["pending"] = None
-            sess._set_buffer(buf)
-            return self._wa6_reply(raw_from, from_e164,
-                                   self._wa12_items_confirm_text(buf))
+        pend = buf.get("pending") or {}
+        # trailing seq: wa12_pick carries (.., pid, seq) -> parts[3]; the others
+        # carry (.., seq) -> parts[2]. Absent on a legacy payload -> None.
+        seq_i = 3 if intent == "wa12_pick" else 2
+        tap_seq = (int(parts[seq_i]) if len(parts) > seq_i
+                   and str(parts[seq_i]).isdigit() else None)
+        # idempotency + stale-anchor gate: only the live cursor's live offer acts.
+        if (ln is None or lid != buf.get("cur") or not buf.get("focus")
+                or (tap_seq is not None and pend.get("seq") not in
+                    (None, tap_seq))):
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+
+        if intent == "wa12_ok":
+            ln["state"] = "confirmed"
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
+        if intent == "wa12_change":
+            # re-derive family candidates from the bound product, drop the
+            # rejected one, flip N back to a pending pick, re-present (NO advance).
+            prod = self.env["product.template"].sudo().browse(
+                ln.get("product_id"))
+            fam = (prod.equipment_category_id.code
+                   or self._wa6_family_code(prod.name) or "")
+            cids = [p for p in (self._wa12_family_candidate_ids(fam)
+                                or self._wa12_suggestion_ids([prod.name]))
+                    if p != prod.id]
+            ln.update({"kind": "unmatched", "raw": prod.name, "family": fam,
+                       "_variant": bool(fam), "state": "pending",
+                       "_cand_ids": cids})
+            ln.pop("product_id", None)
+            ln.pop("product_name", None)
+            return self._wa12_present_pick(sess, buf, ln, from_e164, raw_from)
         if intent == "wa12_pick_more":
             return self._wa12_pick_narrow(sess, buf, lid, from_e164, raw_from)
         if intent == "wa12_pick_skip":
-            self._wa12_clear_pending_for(buf, lid)
-            sess._set_buffer(buf)
-            return self._wa6_reply(raw_from, from_e164,
-                                   self._wa12_items_confirm_text(buf))
+            ln["state"] = "skipped"
+            return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
         # wa12_pick: validate the product against the OFFERED candidate set.
         pid = int(parts[2]) if len(parts) > 2 and str(parts[2]).isdigit() else 0
-        pend = buf.get("pending") or {}
         offered = set(pend.get("candidates") or []) | set(ln.get("_cand_ids")
                                                           or [])
         prod = self.env["product.template"].sudo().browse(pid)
@@ -1273,13 +1690,10 @@ class WhatsAppMessageWA12(models.Model):
                 "That option is no longer available — re-type the item."))
         ln.update({"kind": "matched", "product_id": pid,
                    "product_name": prod.name, "rep_price": None,
-                   "stated_price": None})
+                   "stated_price": None, "state": "picked"})
         for k in ("raw", "suggestions", "family", "_variant", "_cand_ids"):
             ln.pop(k, None)
-        self._wa12_clear_pending_for(buf, lid)
-        sess._set_buffer(buf)
-        return self._wa6_reply(raw_from, from_e164,
-                               self._wa12_items_confirm_text(buf))
+        return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
 
     def _wa12_pick_apply_draft(self, sess, intent, target, parts, from_e164,
                                raw_from):
@@ -1960,9 +2374,18 @@ class WhatsAppMessageWA12(models.Model):
                 "machine`)") % client)
         # match EVERY extracted item (stated prices are HINTS, never the rate).
         matched, unmatched = self._wa12_match_slot_items(items)
+        # CLIENT-BEFORE-ITEMS (must-preserve): resolve the named client first.
+        # exactly one -> the item stepper with that partner; 0/>1 -> guided
+        # intake / list-then-pick (items buffered, intake resumes into the
+        # stepper). Mirrors _wa12_run_quote so both entry points behave alike.
+        partner, candidates = self._wa12_client_candidates(client)
+        if not partner:
+            return self._wa12_start_client_intake(
+                sender, client, candidates, matched, date_txt, 1,
+                from_e164, raw_from, prefills=prefills)
         return self._wa12_open_items_confirm(
-            sender, client, matched, unmatched, date_txt, prefills,
-            from_e164, raw_from)
+            sender, partner.name, matched, unmatched, date_txt, prefills,
+            from_e164, raw_from, partner_id=partner.id)
 
     @api.model
     def _wa12_match_slot_items(self, items):
@@ -2078,27 +2501,26 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(
                 "I couldn't read any items from that — what items should I "
                 "quote?"))
-        # WA-12.3: build the v3 ordered `lines` buffer (one numbered list).
-        buf = {"v": 3, "next_lid": 1, "lines": [], "pending": None,
+        # WA-12.4 STEPPER: build the v4 ordered `lines` buffer, then resolve ONE
+        # item at a time (each its own message + counter). No combined block.
+        buf = {"v": 4, "next_lid": 1, "lines": [], "pending": None,
+               "cur": None, "focus": False, "seq": 0,
                "client_txt": client_txt, "partner_id": partner_id,
                "date_txt": date_txt or "", "days": 1,
                "prefills": prefills or {}}
         buf = self._wa12_build_buf_lines(buf, matched, unmatched)
+        for ln in buf["lines"]:
+            ln.setdefault("state", "pending")
         sess = self.env["neon.wa.equip.session"]._start_quote(
             from_e164, sender, "q_items", buf)
-        # If the FIRST unmatched line has tappable candidates, offer the pick in
-        # the SAME turn (B) -- "blinders -> molefays - which one?" with buttons.
-        first_pick = next(
-            (ln for ln in buf["lines"]
-             if ln.get("kind") == "unmatched" and ln.get("_cand_ids")), None)
-        if first_pick:
-            self._wa6_reply(raw_from, from_e164,
-                            self._wa12_items_confirm_text(buf))
-            return self._wa12_offer_pick_for_buffer(
-                sess, buf, first_pick, from_e164, raw_from)
-        return self._wa6_reply(
-            raw_from, from_e164,
-            self._wa12_items_confirm_text(buf))
+        if not buf["lines"]:
+            sess.sudo().write({"step": "done", "active": False})
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I couldn't read any items — what should I quote?"))
+        self._wa6_reply(raw_from, from_e164, _(
+            "Let's confirm %d item(s) for *%s*, one at a time. 👇")
+            % (len(buf["lines"]), client_txt or _("the client")))
+        return self._wa12_advance_cursor(sess, buf, from_e164, raw_from)
 
     def _wa12_items_confirm_text(self, buf):
         """The M1 confirmation message: every matched line with the ENGINE

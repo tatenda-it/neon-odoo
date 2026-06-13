@@ -115,6 +115,12 @@ INTENTS = frozenset({
     #   wa12_pick_more:<session_id>:<target>   -- ">10" overflow: re-prompt narrow
     #   wa12_pick_skip:<session_id>:<target>   -- "none of these" -> leave unmatched
     "wa12_pick", "wa12_pick_more", "wa12_pick_skip",
+    # WA-12.4 -- one-item stepper confident-line confirm/change. Each carries
+    # (session_id, 'b<lid>', seq); the product is on the buffer line, not the
+    # payload. The LIST taps reuse wa12_pick/_more/_skip with a trailing :<seq>.
+    #   wa12_ok:<session_id>:b<lid>:<seq>      -- ✓ Correct -> confirmed, advance
+    #   wa12_change:<session_id>:b<lid>:<seq>  -- ✗ Change  -> open the pick LIST
+    "wa12_ok", "wa12_change",
     # WA-13: quote/invoice retrieval + invoice-from-quote (routed by the
     # neon_crew_comms bridge intercept AFTER WA-12, before WA-6). Retrieval and
     # the schedule-stage pick use NUMBER replies via the doc_pick / inv_pick

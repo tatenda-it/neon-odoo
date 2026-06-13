@@ -1110,6 +1110,34 @@ class WhatsAppMessageWA6(models.Model):
         return {"product_id": p.id, "product_name": p.name}
 
     @api.model
+    def _wa6_is_package_intent(self, desc):
+        """True iff the rep is asking for a PACKAGE (not a single item that a
+        package name happens to embed). Signal: the word 'package'/'packages'/
+        'bundle' appears as a whole word, OR the phrase exactly names a package
+        product. A bare component word ('smoke machine') is NOT package-intent
+        -> the single product wins (the embedded-words pollution fix)."""
+        low = " " + (desc or "").lower() + " "
+        if re.search(r"(?:^|\s)(packages?|bundle)(?:\s|$)", low):
+            return True
+        # exact-ish name of a real package (handles "premium corporate package"
+        # typed in full even without a fresh 'package' token elsewhere).
+        Cat = self.env["neon.equipment.category"].sudo()
+        pkg = Cat.search([("code", "=", "packages")], limit=1)
+        if not pkg:
+            return False
+        want = " ".join(re.findall(r"[a-z0-9.]+", (desc or "").lower()))
+        if not want:
+            return False
+        for p in self.env["product.template"].sudo().search(
+                [("is_workshop_item", "=", True),
+                 ("equipment_category_id", "=", pkg.id)]):
+            pn = " ".join(re.findall(r"[a-z0-9.]+", (p.name or "").lower()))
+            # the typed phrase is a leading chunk of the package name.
+            if pn.startswith(want) and len(want) >= 6:
+                return True
+        return False
+
+    @api.model
     def _wa6_match_one(self, raw, category_hint=None):
         """Resolve one free-text item to {product_id, qty, status,
         suggestions, confidence, family}. Resolver v2 funnel (S0-S8; design
@@ -1135,31 +1163,40 @@ class WhatsAppMessageWA6(models.Model):
                     "suggestions": sugg, "confidence": conf, "family": fam}
 
         Product = self.env["product.template"].sudo()
-        # Single-item matching EXCLUDES the Packages family: a rep naming a piece
-        # of gear ("smoke machine") never means a bundled DJ/wedding PACKAGE that
-        # merely lists that item in its name -- packages are reached only when a
-        # rep explicitly asks for a package (a separate, future path). Without
-        # this, "smoke machine" leaked to 3 PACKAGE products (live-wire finding
-        # 614-617). Code resolved once; absent on a fresh DB -> no exclusion.
+        # PACKAGES scoping (user-confirmed rule, 13 Jun). Each package NAME embeds
+        # its component words ("...3M X 2M SCREEN, PA SYSTEM, 12 CANS, SMOKE
+        # MACHINE..."), so a SINGLE-ITEM search ("smoke machine"/"screen"/"cans")
+        # must EXCLUDE the Packages family or the bundle competes on those
+        # embedded words. The INVERSE -- a PACKAGE-INTENT phrase ("basic DJ
+        # package", "wedding package", or any "...package") -- scopes WITHIN the
+        # Packages family so the package returns as ONE per-day line (packages
+        # price per-day like any product; no flat-fee logic).
         pkg = self.env["neon.equipment.category"].sudo().search(
             [("code", "=", "packages")], limit=1)
-        pdomain = [("is_workshop_item", "=", True)]
-        if pkg:
-            pdomain.append(("equipment_category_id", "!=", pkg.id))
-        allp = Product.search(pdomain)
+        is_pkg_intent = bool(pkg) and self._wa6_is_package_intent(desc)
+        if is_pkg_intent:
+            allp = Product.search([("is_workshop_item", "=", True),
+                                   ("equipment_category_id", "=", pkg.id)])
+        else:
+            pdomain = [("is_workshop_item", "=", True)]
+            if pkg:
+                pdomain.append(("equipment_category_id", "!=", pkg.id))
+            allp = Product.search(pdomain)
 
         # S2 -- CONFIRMED alias expansion (before family derivation). A product
         # alias is terminal; a category alias forces the family; a term alias
         # rewrites desc and we continue. proposed/open rows are invisible.
+        # (Skipped on a package-intent search -- the family is already packages.)
         forced_fam = ""
-        kind, value, desc = self._r2_alias_expand(desc)
-        if kind == "product":
-            p = Product.browse(value)
-            if p.exists():
-                fam = self._wa6_family_code(p.name) or ""
-                return hit(p.id, p.name, "exact", [])
-        elif kind == "category":
-            forced_fam = value
+        if not is_pkg_intent:
+            kind, value, desc = self._r2_alias_expand(desc)
+            if kind == "product":
+                p = Product.browse(value)
+                if p.exists():
+                    fam = self._wa6_family_code(p.name) or ""
+                    return hit(p.id, p.name, "exact", [])
+            elif kind == "category":
+                forced_fam = value
 
         # S1 -- normalise (after any term rewrite). want = canonical key.
         want = self._r2_norm(desc)

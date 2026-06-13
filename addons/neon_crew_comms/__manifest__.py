@@ -306,7 +306,16 @@
     # variant framing, C edit-by-line-number, D conversational multi-correction).
     # Buffer schema v3 (one ordered `lines` list, stable lid, single pending
     # pick). Matcher byte-UNCHANGED; the variant signal is derived builder-side.
-    "version": "17.0.1.17.0",
+    # 17.0.1.18.0: WA-12.4 ONE-ITEM STEPPER (fixes Robin's "where do I tap" →
+    # matched-as-item regression). Client-before-items, then resolve items ONE
+    # at a time (✅+[✓/✗] for confident, LIST for ambiguous/family, counter
+    # "① of N"); FOCUSED sub-state (all input applies to the cursor item, a
+    # question/unrecognised → HELP+reshow NEVER a new line); finalize → UNCHANGED
+    # draft path (totals/VAT/discount/intake intact). PACKAGES scoping: single-
+    # item words exclude Packages; "package"/a package name scopes within (one
+    # per-day line, parity unchanged). Buffer v4 (per-line state + cursor + focus
+    # + seq). intents wa12_ok/wa12_change. C/D edits relocated POST-DRAFT.
+    "version": "17.0.1.18.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
