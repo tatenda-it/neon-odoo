@@ -1213,16 +1213,26 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_suggestion_ids(self, names):
         """Map matcher `suggestions` NAMES -> product ids by exact _r2_norm
-        equality within the (package-excluded) workshop catalogue. Caps at 3."""
+        equality within the workshop catalogue. EXCLUDES the Packages family +
+        test residue: a raw `name ilike "3M X 2M SCREEN"` otherwise matches a
+        PACKAGE whose long name embeds that phrase (wire 675-707), and prefers
+        an EXACT _r2_norm match so a substring package can't win. Caps at 3."""
         if not names:
             return []
         PT = self.env["product.template"].sudo()
+        pkg = self.env["neon.equipment.category"].sudo().search(
+            [("code", "=", "packages")], limit=1)
         out = []
         for nm in names[:3]:
             want = self._r2_norm(nm)
-            p = PT.search([("is_workshop_item", "=", True),
-                           ("name", "ilike", nm)], limit=5)
-            hit = p.filtered(lambda x: self._r2_norm(x.name) == want)[:1] or p[:1]
+            dom = [("is_workshop_item", "=", True), ("name", "ilike", nm),
+                   ("name", "not ilike", "[TEST"),
+                   ("name", "not ilike", "REMOTES")]
+            if pkg:
+                dom.append(("equipment_category_id", "!=", pkg.id))
+            p = PT.search(dom, limit=8)
+            # EXACT normalised-name match only -- never a substring package.
+            hit = p.filtered(lambda x: self._r2_norm(x.name) == want)[:1]
             if hit and hit.id not in out:
                 out.append(hit.id)
         return out
@@ -1411,14 +1421,17 @@ class WhatsAppMessageWA12(models.Model):
         return _("%s  Tap an option for \"%s\", or type the product name. "
                  "'skip' to drop it.") % (c, ln.get("raw") or "")
 
-    def _wa12_retype_confident(self, raw):
+    def _wa12_retype_confident(self, raw, hint=None):
         """True iff `raw` confidently re-identifies a product OR names a family
-        the picker can resolve. Reuses the byte-unchanged matcher."""
-        hit = self._wa6_match_one(raw)
+        the picker can resolve. `hint` = the cursor line's family, so a bare-
+        dimension correction ("3 x 2" on a screen line) is judged WITHIN that
+        family (dimensional-exact -> confident) instead of failing as cross-
+        category noise. Reuses the byte-unchanged matcher."""
+        hit = self._wa6_match_one(raw, category_hint=hint or None)
         if hit.get("status") == "matched" and hit.get("confidence") in (
                 "exact", "strong"):
             return True
-        fam = hit.get("family") or self._wa6_family_code(raw) or ""
+        fam = hit.get("family") or hint or self._wa6_family_code(raw) or ""
         return bool(fam and self._wa12_is_family_term(raw)
                     and self._wa12_family_candidate_ids(fam))
 
@@ -1497,21 +1510,39 @@ class WhatsAppMessageWA12(models.Model):
             self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
             return self._wa12_repair_prompt(raw_from, from_e164)
         # 6) QUESTION / unrecognised -> HELP + RE-SHOW N. Never a catalogue
-        #    match, never a new line. A confident/family RE-TYPE wins first.
-        if (not self._wa12_retype_confident(raw)) or self._wa12_is_question(raw):
+        #    match, never a new line. A confident/family RE-TYPE wins first --
+        #    and confidence is judged WITH the cursor line's family as the hint,
+        #    so a bare-dimension correction ("3 x 2" on a screen line) scopes to
+        #    Visual and counts as confident (wire defect 7), instead of being
+        #    bounced to HELP as "no confident match".
+        hint = ln.get("family") or ""
+        if not hint and ln.get("product_id"):
+            _p = self.env["product.template"].sudo().browse(ln["product_id"])
+            hint = (_p.equipment_category_id.code
+                    or self._wa6_family_code(_p.name) or "")
+        if self._wa12_is_question(raw) or not self._wa12_retype_confident(
+                raw, hint):
             self._wa6_reply(raw_from, from_e164, self._wa12_focus_help(buf, ln))
             return self._wa12_present_item(sess, buf, ln, from_e164, raw_from)
-        # 7) a deliberate CONFIDENT/family RE-TYPE of N -> re-match, bind or
-        #    re-frame N's LIST. Never appends.
+        # 7) a deliberate CONFIDENT/family RE-TYPE of N -> re-match (with the
+        #    family hint), bind or re-frame N's LIST. Never appends.
         return self._wa12_focus_retype(sess, buf, ln, raw, from_e164, raw_from)
 
     def _wa12_focus_retype(self, sess, buf, ln, raw, from_e164, raw_from):
         """Re-match the cursor line through the funnel. Confident -> bind N +
         advance; weak/family -> re-frame N's candidates and STAY on N (never a
-        new line). Preserves the stable lid + qty."""
+        new line). Preserves the stable lid + qty. Passes the CURRENT line's
+        family as the category_hint so a bare-dimension correction ("3 x 2" on a
+        screen line) scopes to that family -> 3M X 2M LED SCREEN, not a cross-
+        category 3M X 2M GOALPOST TRUSS (wire defect 7)."""
         lid_saved = ln["lid"]
         qty_saved = ln.get("qty") or 1
-        hit = self._wa6_match_one(raw)
+        hint = ln.get("family") or ""
+        if not hint and ln.get("product_id"):
+            prod0 = self.env["product.template"].sudo().browse(ln["product_id"])
+            hint = (prod0.equipment_category_id.code
+                    or self._wa6_family_code(prod0.name) or "")
+        hit = self._wa6_match_one(raw, category_hint=hint or None)
         if hit.get("status") == "matched" and hit.get("confidence") in (
                 "exact", "strong"):
             ln.clear()
@@ -2454,9 +2485,16 @@ class WhatsAppMessageWA12(models.Model):
     @api.model
     def _wa12_family_names(self, fam):
         """The EXACT catalogue names in a family (M-B pick-list = the names the
-        team knows; the rep replies with one)."""
+        team knows; the rep replies with one). EXCLUDES the Packages family +
+        test residue so a single-item discovery never lists a bundle (wire
+        675-707)."""
         P = self.env["product.template"].sudo()
-        return P.search([("is_workshop_item", "=", True)]).filtered(
+        pkg = self.env["neon.equipment.category"].sudo().search(
+            [("code", "=", "packages")], limit=1)
+        dom = [("is_workshop_item", "=", True), ("name", "not ilike", "[TEST")]
+        if pkg:
+            dom.append(("equipment_category_id", "!=", pkg.id))
+        return P.search(dom).filtered(
             lambda p: self._wa6_in_family(p, fam)).mapped("name")
 
     @api.model

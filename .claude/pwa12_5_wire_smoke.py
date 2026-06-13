@@ -305,6 +305,79 @@ w5 = {"net_recovered_3": len(buf5.get("lines") or []) == 3}
 _check("W5-item-drop-net", all(w5.values()),
        "merged-extraction recovered to %d lines" % len(buf5.get("lines") or []))
 
+# ============================================================ W6: list scope
+# The candidate-list builders must EXCLUDE Packages + cross-category noise
+# (wire 675-707: "smoke" listed 3 DJ/WEDDING packages; "3M X 2M" listed a
+# goalpost truss + packages). _wa12_suggestion_ids must never return a PACKAGE
+# whose long name embeds the typed phrase.
+def _pname(i):
+    return PT.browse(i).name
+
+
+def _is_pkg(i):
+    return "PACKAGE" in (_pname(i) or "").upper()
+
+
+sug_ids = M._wa12_suggestion_ids(["3M X 2M SCREEN", "3M X 2M LED SCREEN"])
+w6 = {
+    "suggestion_ids_no_package": not any(_is_pkg(i) for i in sug_ids),
+    # family_names (the discovery pick-list) excludes packages.
+    "family_names_no_package": not any(
+        "PACKAGE" in (n or "").upper()
+        for n in (M._wa12_family_names("effects") or [])),
+    # family candidate ids stay in-category (no cross-family leak).
+    "visual_cands_all_visual": all(
+        PT.browse(i).equipment_category_id.code == "visual"
+        for i in M._wa12_family_candidate_ids("visual")),
+}
+_check("W6-list-scope-no-packages", all(w6.values()),
+       "%s (sug_ids=%s)" % (w6, [(_pname(i))[:24] for i in sug_ids]))
+
+# ============================================================ W7: smoke -> single
+# the confirmed 'smoke' alias resolves to ONE product -> a confident card, NOT
+# a fuzzy list of packages (wire defect: smoke listed 3 packages).
+_wire_clear(); _clear_sess(PHONE)
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: _quote_brief([("smoke machine", 1)])):
+    D._wa12_llm_intake_maybe(_txt(PHONE, "quote acme a smoke machine for the 20th"))
+allmsg7 = _wire_all()
+w7 = {
+    "names_smoke_machine": "VERTICAL SMOKE MACHINES" in allmsg7,
+    "no_package": "PACKAGE" not in allmsg7.upper(),
+    "confident_card": any(e["kind"] == "buttons" and "✅" in e["body"]
+                          for e in _WIRE),
+}
+_check("W7-smoke-single-not-list", all(w7.values()), "%s" % w7)
+
+# ============================================================ W8: family-hint retype
+# a bare-dimension correction on a SCREEN line scopes to Visual -> 3M X 2M LED
+# SCREEN, never a 3M X 2M GOALPOST TRUSS (wire defect 7). Drive the focused
+# retype: seed a screen line at the cursor, type "3 x 2".
+_wire_clear(); _clear_sess(PHONE)
+_bufW8 = {"v": 4, "next_lid": 2, "pending": None, "cur": 1, "focus": True,
+          "seq": 0, "client_txt": "[TEST-WA125] Acme Events Co",
+          "partner_id": client.id, "date_txt": "", "days": 1, "prefills": {},
+          "lines": [{"lid": 1, "kind": "matched", "state": "pending",
+                     "product_id": scr62.id, "product_name": scr62.name,
+                     "qty": 1, "rep_price": None, "stated_price": None,
+                     "family": "visual"}]}
+sessW8 = env["neon.wa.equip.session"].sudo()._start_quote(
+    PHONE, u_sales, "q_items", _bufW8)
+M._wa12_present_item(sessW8, sessW8._get_buffer(), _bufW8["lines"][0],
+                     PHONE, PHONE)
+_wire_clear()
+D._wa12_maybe_intercept(_txt(PHONE, "3 x 2"))   # correct the screen
+bW8 = sessW8._get_buffer()
+ln8 = M._wa12_line_by_lid(bW8, 1) or {}
+allmsg8 = _wire_all()
+w8 = {
+    "bound_3x2_screen": (ln8.get("product_id") == scr32.id
+                         or "3M X 2M LED SCREEN" in allmsg8),
+    "not_goalpost": "GOALPOST" not in allmsg8.upper(),
+}
+_check("W8-dim-retype-family-scope", all(w8.values()),
+       "%s (line now=%r)" % (w8, (ln8.get("product_name") or "")[:30]))
+
 # ---------------------------------------------------------------- teardown
 _clear_sess(PHONE)
 _tq = env["neon.finance.quote"].sudo().with_context(active_test=False).search(
