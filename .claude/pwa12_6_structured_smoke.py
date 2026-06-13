@@ -310,6 +310,106 @@ else:
 _check("S8-REVIEW-money-discount-vat", bool(review_ok) and all(review_ok.values()),
        "%s" % review_ok)
 
+# ============================================================ S12-S17: WA-12.6 review polish
+# (B) review fall-through carries NO command syntax; (C) whole-quote discount /
+# target-total (incl-VAT default + ex-VAT override) lands EXACTLY + labels the
+# basis + clears the stale note on a per-line edit; (A) the "Quote a client" tap
+# routes into begin_structured. All on the live q_confirm session `q`/s8.
+from odoo.addons.neon_channels.models import wa_payload as _wp  # noqa
+_SECRET = env["ir.config_parameter"].sudo().get_param("database.secret") or ""
+
+
+def _clean_base():
+    """Clear all line discounts + the note, recalc -> the undiscounted base."""
+    q.line_ids.with_context().write({"discount_pct": 0.0, "discount_amount": 0.0})
+    q.write({"wa12_discount_note": False})
+    q.action_recalculate_pricing()
+    q.invalidate_recordset()
+
+
+if s8 and s8.step == "q_confirm" and q:
+    # S12: an UNRECOGNISED edit at the review -> the fall-through help, which
+    # must be PLAIN language (no command-syntax cheat sheet). LLM forced down so
+    # the deterministic fall-through fires (not an LLM translation).
+    _clear()
+    with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: None):
+        D._wa12_maybe_intercept(_txt("zxqw mmm pls"))
+    fall = _alltext()
+    _bad = [t for t in ("<", "`", "price <", "discount <", "qty <", "e.g. `")
+            if t in fall]
+    _check("S12-review-fallthrough-no-command-syntax",
+           bool(fall) and not _bad, "offenders=%s reply=%r" % (_bad, fall[:90]))
+
+    # S13: whole-quote discount, DEFAULT (VAT-INCLUSIVE) -> the displayed Total
+    # drops by EXACTLY 179; the note labels "(incl. VAT)".
+    _clean_base()
+    base_total = q.amount_total
+    _clear(); D._wa12_maybe_intercept(_txt("discount 179"))
+    q.invalidate_recordset()
+    _drop13 = base_total - q.amount_total
+    _check("S13-whole-quote-discount-incl-total-minus-179",
+           abs(_drop13 - 179.0) < 0.5
+           # the note TIES OUT with the achieved drop on the PDF (review fix):
+           and ("%.2f" % _drop13) in (q.wa12_discount_note or "")
+           and "incl" in (q.wa12_discount_note or "").lower(),
+           "base=%.2f now=%.2f drop=%.2f note=%r"
+           % (base_total, q.amount_total, _drop13, q.wa12_discount_note))
+
+    # S14: EX-VAT override -> the GOODS (untaxed) drop by 179; the Total drops by
+    # MORE (VAT comes off too); the note labels "(ex VAT)".
+    _clean_base()
+    base_untaxed, base_total2 = q.amount_untaxed, q.amount_total
+    _clear(); D._wa12_maybe_intercept(_txt("discount 179 ex vat"))
+    q.invalidate_recordset()
+    _goods14 = base_untaxed - q.amount_untaxed
+    _check("S14-whole-quote-discount-ex-vat-goods-minus-179",
+           abs(_goods14 - 179.0) < 0.5
+           and (base_total2 - q.amount_total) > 179.5
+           # note ties out with the achieved GOODS drop (ex-VAT basis):
+           and ("%.2f" % _goods14) in (q.wa12_discount_note or "")
+           and "ex vat" in (q.wa12_discount_note or "").lower(),
+           "goods drop=%.2f total drop=%.2f note=%r"
+           % (_goods14, base_total2 - q.amount_total, q.wa12_discount_note))
+
+    # S15: target-total (incl-VAT default) -> the displayed Total lands on 500.
+    _clean_base()
+    _clear(); D._wa12_maybe_intercept(_txt("total should be 500"))
+    q.invalidate_recordset()
+    _check("S15-target-total-lands-exactly",
+           abs(q.amount_total - 500.0) < 0.5,
+           "total now=%.2f (want 500)" % q.amount_total)
+
+    # S16: the whole-quote note is CLEARED on a subsequent per-line edit (never a
+    # stale label on the PDF the approver reads).
+    _clean_base()
+    _clear(); D._wa12_maybe_intercept(_txt("discount 179"))
+    q.invalidate_recordset(); _had = bool(q.wa12_discount_note)
+    _clear(); D._wa12_maybe_intercept(_txt("no tax"))
+    q.invalidate_recordset()
+    _check("S16-note-cleared-on-per-line-edit",
+           _had and not q.wa12_discount_note,
+           "had=%s after=%r" % (_had, q.wa12_discount_note))
+else:
+    for _n in ("S12-review-fallthrough-no-command-syntax",
+               "S13-whole-quote-discount-incl-total-minus-179",
+               "S14-whole-quote-discount-ex-vat-goods-minus-179",
+               "S15-target-total-lands-exactly",
+               "S16-note-cleared-on-per-line-edit"):
+        _check(_n, False, "review session not reached")
+
+# S17: the deterministic menu "Quote a client" tap -> begin_structured (q_client).
+_clear_sess()
+_tapid = _wp.encode(_SECRET, "wa12_start", u_sales.id)
+D._wa12_maybe_intercept({"from": PHONE, "type": "interactive",
+                         "interactive": {"button_reply": {"id": _tapid,
+                                                          "title": "Quote a client"}},
+                         "id": "wa12start"})
+s17 = _sess()
+_check("S17-quote-a-client-tap-opens-structured",
+       bool(s17) and s17.step == "q_client",
+       "step=%s" % (s17.step if s17 else None))
+_clear_sess()
+
 # ============================================================ S6: smoke -> only smoke
 _clear(); _clear_sess()
 # jump a session straight to the item step to test the item search in isolation.

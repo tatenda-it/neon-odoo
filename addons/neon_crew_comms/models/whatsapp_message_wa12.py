@@ -288,6 +288,9 @@ class WhatsAppMessageWA12(models.Model):
             if isinstance(payload, tuple) and payload and payload[0] == "pick":
                 return self._wa12_handle_pick_tap(
                     intent, payload[1], from_e164, raw_from, message)
+            # menu "Quote a client" -> start the structured flow (re-checks entitlement).
+            if isinstance(payload, tuple) and payload and payload[0] == "start":
+                return self._wa12_handle_start_tap(from_e164, raw_from, message)
             return self._wa12_handle_tap(
                 intent, payload, from_e164, raw_from, message)
 
@@ -353,6 +356,10 @@ class WhatsAppMessageWA12(models.Model):
                     "wa12_pick", "wa12_pick_more", "wa12_pick_skip",
                     "wa12_ok", "wa12_change"):  # WA-12.4 stepper (R1 ship-block)
                 return (decoded[0], ("pick", list(decoded[1])))
+            # menu "Quote a client" -> a START sentinel (NOT a quote id; parts[0]
+            # is the bot_user id). Routed to begin_structured, never browsed.
+            if decoded and decoded[0] == "wa12_start":
+                return ("wa12_start", ("start", list(decoded[1])))
             if decoded and decoded[0].startswith("wa12_"):
                 intent, parts = decoded
                 quote = self.env["neon.finance.quote"].sudo().browse(
@@ -372,6 +379,22 @@ class WhatsAppMessageWA12(models.Model):
             quote = self._wa12_pending_for_approver(sender)
             return (intent, quote)
         return None
+
+    def _wa12_handle_start_tap(self, from_e164, raw_from, message):
+        """The deterministic Hello/menu 'Quote a client' row -> start the WA-12
+        structured flow. The menu only DISPLAYS this row for quote-capable lenses;
+        this re-checks _wa12_can_quote as the real gate (a forwarded payload from
+        a non-sales sender is refused, never silently quoting)."""
+        sender = self._wa6_resolve_user(from_e164)
+        if not sender:
+            return None  # unmapped -> fall through (client lane / Copilot)
+        if not self._wa12_can_quote(sender):
+            self._wa6_audit_in(from_e164, message, "wa12-start-deny")
+            return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
+        # begin_structured resets to step 1 (client); an empty dump means no
+        # pre-fill, just the clean "which client?" opener.
+        return self._wa12_begin_structured(
+            sender, "", from_e164, raw_from, message=message)
 
     @api.model
     def _wa12_pending_for_approver(self, user):
@@ -3087,11 +3110,10 @@ class WhatsAppMessageWA12(models.Model):
                     if edited is not None:
                         return edited
             return self._wa6_reply(raw_from, from_e164, _(
-                "Reply *yes* to submit, *cancel*, *preview* (draft PDF), or "
-                "edit — e.g. `price <item> <amt>` · `discount <item> 10%` · "
-                "`qty <item> 2` · `days 3` · `add <item> x2` · "
-                "`add custom <desc> at <amt>` · `remove <item>` · "
-                "`no tax` / `with tax` · `client <name>`."))
+                "Reply *yes* to submit, *preview* to see the draft PDF, or "
+                "*cancel* to drop it. To change something, just tell me in "
+                "plain words — an item, a quantity, a discount, the date, or "
+                "the client — and I'll sort it."))
         if sess.step == "q_reject":
             # the APPROVER typed a rejection comment -> relay to the requester.
             return self._wa12_apply_reject_comment(
@@ -3126,9 +3148,14 @@ class WhatsAppMessageWA12(models.Model):
                 "Several lines match \"%s\" — say the number: %s") % (token, menu)
         return lines.browse(), _("No line matches \"%s\".") % token
 
-    def _wa12_after_edit(self, quote, from_e164, raw_from, note):
-        """Recalc + re-show the draft summary with the edit note + the prompt."""
+    def _wa12_after_edit(self, quote, from_e164, raw_from, note, keep_note=False):
+        """Recalc + re-show the draft summary with the edit note + the prompt.
+        ``keep_note`` preserves quote.wa12_discount_note (set ONLY by the whole-
+        quote discount path); every OTHER edit clears it so a per-line change
+        can never leave a stale whole-quote-discount label on the PDF."""
         actor = quote.salesperson_id.id or self.env.uid
+        if not keep_note and quote.wa12_discount_note:
+            quote.with_user(actor).sudo().write({"wa12_discount_note": False})
         # ⚠️ DECISION (review WA12-FLEX-2): a `days N` recalc re-prices an
         # engine line through the day-bracket. With binding (b) every per-
         # product rule is FLAT (1..* x1.0) and binding (a) deactivates the
@@ -3152,6 +3179,77 @@ class WhatsAppMessageWA12(models.Model):
                 "\n\nReply *yes* to submit, *cancel*, or keep editing.")
         return self._wa6_reply(raw_from, from_e164,
                                "%s — done.\n\n%s%s" % (note, summary, tail))
+
+    def _wa12_whole_quote_discount(self, quote, value, ex_vat, is_target,
+                                   from_e164, raw_from):
+        """Apply a WHOLE-QUOTE discount (review WA12-FLEX). ``value`` is the $
+        discount (is_target=False) or the desired total (is_target=True).
+        ``ex_vat`` picks the basis: default (False) operates on the VAT-INCLUSIVE
+        Total so it lands EXACTLY on target; ex_vat=True operates on the ex-VAT
+        goods subtotal (VAT then applies on top). Mechanism: clear existing
+        discounts -> recalc to read the true BASE -> set a uniform per-line
+        discount_pct = D/base -> recalc. The reduction lands on the chosen base
+        exactly (per-line rounding aside). Sets wa12_discount_note for the
+        summary/PDF label; the parity gate reads the BASE unit_rate so a discount
+        never trips it; confirm-before-draft is intact (the draft is re-shown,
+        nothing is submitted)."""
+        actor = quote.salesperson_id.id or self.env.uid
+        cur = quote.currency_id.name
+        lines = quote.line_ids
+        if not lines:
+            return self._wa6_reply(raw_from, from_e164,
+                                   _("This quote has no lines yet."))
+        # BASE = undiscounted totals: clear discounts, recalc, read.
+        lines.with_user(actor).sudo().write(
+            {"discount_pct": 0.0, "discount_amount": 0.0})
+        try:
+            quote.with_user(actor).sudo().action_recalculate_pricing()
+        except (UserError, AccessError) as e:
+            return self._wa6_reply(raw_from, from_e164, str(e))
+        base = (quote.amount_untaxed or 0.0) if ex_vat else (
+            quote.amount_total or 0.0)
+        label = _("subtotal") if ex_vat else _("total")
+        if base <= _WA12_PLACEHOLDER_RATE:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "No priced lines to discount yet — set a rate first."))
+        if is_target:
+            if value <= 0:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "The target %s must be a positive amount.") % label)
+            if value >= base:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "That target (%s %.2f) is at or above the current %s "
+                    "(%s %.2f) — that's not a discount.")
+                    % (cur, value, label, cur, base))
+            disc = base - value
+        else:
+            disc = value
+            if disc >= base:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "%s %.2f is the whole %s (%s %.2f) or more — can't discount "
+                    "to zero.") % (cur, disc, label, cur, base))
+        frac = disc / base
+        lines.with_user(actor).sudo().write(
+            {"discount_pct": round(frac * 100.0, 6), "discount_amount": 0.0})
+        # Label the note with the ACHIEVED drop (read AFTER recalc), not the
+        # requested figure: per-line cent rounding means the realized total can
+        # differ by a few cents, and the label must TIE OUT with the Subtotal/
+        # VAT/Total on the client-facing PDF (review WA12-FLEX, money lens).
+        try:
+            quote.with_user(actor).sudo().action_recalculate_pricing()
+        except (UserError, AccessError) as e:
+            return self._wa6_reply(raw_from, from_e164, str(e))
+        quote.invalidate_recordset()
+        realized = ((base - (quote.amount_untaxed or 0.0)) if ex_vat
+                    else (base - (quote.amount_total or 0.0)))
+        basis = _("ex VAT") if ex_vat else _("incl. VAT")
+        quote.with_user(actor).sudo().write(
+            {"wa12_discount_note": _("Discount %s %.2f (%s)")
+             % (cur, realized, basis)})
+        return self._wa12_after_edit(
+            quote, from_e164, raw_from,
+            _("Whole-quote discount: %s %.2f off (%s)") % (cur, realized, basis),
+            keep_note=True)
 
     def _wa12_try_edit(self, quote, body, from_e164, raw_from):
         """Parse + apply ONE draft-edit command; return the re-shown summary,
@@ -3303,6 +3401,31 @@ class WhatsAppMessageWA12(models.Model):
                 {"discount_amount": line.unit_rate - amt, "discount_pct": 0.0})
             return self._wa12_after_edit(quote, from_e164, raw_from,
                                          _("%s -> %s %.2f/day") % (line.name, cur, amt))
+
+        # WHOLE-QUOTE discount / target-total (review WA12-FLEX). A BARE amount
+        # (no item token) discounts the WHOLE quote; "total <amt>" / "total
+        # should be <amt>" / "make the total <amt>" sets the target. DEFAULT
+        # basis = VAT-INCLUSIVE (the headline Total the client pays); an explicit
+        # "ex vat" / "on goods" switches to the ex-VAT goods subtotal (matches
+        # the per-item discounts). Distributed as a uniform per-line discount_pct
+        # so it renders per-line + in the total; wa12_discount_note labels the
+        # basis on the summary/PDF. MUST precede the per-item `discount <item>
+        # <n>` regex (a bare number has no item token, so they're disjoint).
+        _ex_vat = bool(re.search(
+            r"\b(ex[\s-]*vat|on\s+goods|before\s+vat|excl\.?\s*vat)\b", low))
+        _dlow = re.sub(
+            r"\b(ex[\s-]*vat|on\s+goods|before\s+vat|excl\.?\s*vat|"
+            r"incl\.?\s*vat|with\s+vat)\b", "", low).strip()
+        m = re.match(r"(?:make\s+(?:the\s+)?total|total)\s*"
+                     r"(?:should\s+be|is|=|:|of)?\s*"
+                     r"([0-9]+(?:\.[0-9]+)?)\s*$", _dlow)
+        if m:
+            return self._wa12_whole_quote_discount(
+                quote, float(m.group(1)), _ex_vat, True, from_e164, raw_from)
+        m = re.match(r"discount\s+([0-9]+(?:\.[0-9]+)?)\s*$", _dlow)
+        if m:
+            return self._wa12_whole_quote_discount(
+                quote, float(m.group(1)), _ex_vat, False, from_e164, raw_from)
 
         m = re.match(r"discount\s+(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*(%?)\s*$",
                      raw, re.I)
@@ -3793,8 +3916,13 @@ class WhatsAppMessageWA12(models.Model):
         date_line = _("📅 %s%s\n") % (
             ev.strftime("%d %b %Y") if ev else _("date not set"),
             _(" — TBC, reply with a date") if ev_ph else "")
-        return _("*Quote %s* for %s\n%s%s\n*Total: %s %.2f*%s") % (
+        # WA-12 whole-quote discount label (the per-line discounts above already
+        # carry the math; this names the basis the rep chose).
+        disc_line = (_("💸 %s\n") % quote.wa12_discount_note
+                     if quote.wa12_discount_note else "")
+        return _("*Quote %s* for %s\n%s%s%s\n*Total: %s %.2f*%s") % (
             quote.name, quote.partner_id.name, date_line, "\n".join(rows),
+            "\n" + disc_line if disc_line else "",
             cur, quote.amount_total or 0.0, vat)
 
     def _wa12_send_approval_ping(self, quote, requester):

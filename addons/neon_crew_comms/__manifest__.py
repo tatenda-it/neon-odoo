@@ -326,6 +326,16 @@
     # / ✓✗ card / custom line) -> q_confirm review. A dump resets to step 1 (no
     # bulk-parse); client locked. pwa12_6 wire harness 7/7. NOT a complete cutover
     # yet (old pwa12 flow suite + review-step wire-test pending). NOT deployed.
+    # 17.0.1.19.2: WA-12.6 review polish. (B) the q_confirm fall-through no
+    # longer prints a command-syntax cheat sheet -> plain language only. (C)
+    # WHOLE-QUOTE discount + target-total at the review step: "discount <amt>"
+    # / "total <amt>" (default VAT-INCLUSIVE so the displayed Total lands exactly
+    # on target) and an "ex vat"/"on goods" override (ex-VAT goods basis, VAT on
+    # top); distributed as a uniform per-line discount_pct; quote.wa12_discount_
+    # note labels the basis on the summary/PDF; the note is cleared on any
+    # per-line edit (no stale label). (A) the deterministic Hello/menu "Quote a
+    # client" row taps into begin_structured (new wa12_start sentinel +
+    # _wa12_handle_start_tap, re-checks _wa12_can_quote).
     # 17.0.1.19.1: WA-12.6 CUTOVER complete + refinements. (a) DURATION: a date
     # RANGE never auto-assumes the day count -> bot ASKS "how many chargeable
     # days?" (Robin's billing convention; await_days FSM); _wa12_parse_event_dates
@@ -336,7 +346,7 @@
     # convo lane; T-43r/T-45r re-prove the no-cat-rule $ + rep-priced surfaces);
     # review-step MONEY wire-test hardened (VAT 15% exact + discount math exact)
     # + no-command-syntax sweep. pwa12 61/61, pwa12_6 11/11.
-    "version": "17.0.1.19.1",
+    "version": "17.0.1.19.2",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

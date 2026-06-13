@@ -258,6 +258,45 @@ with ExitStack() as st:
           "count=%d text=%r" % (rbtext.lower().count("tap an option"),
                                 rbtext[:80]))
 
+    # ---- R8/R9: WA-12.6 menu polish (rows are VARIANT-gated, not entitlement-
+    # gated for the lead row; the tap re-checks entitlement separately -> S17).
+    def _menu_keys(res):
+        inter = res.get("interactive") or {}
+        ids = []
+        if inter.get("kind") == "buttons":
+            ids = [b.get("id") for b in inter.get("buttons", [])]
+        elif inter.get("kind") == "list":
+            for sec in inter.get("sections", []):
+                ids += [r.get("id") for r in sec.get("rows", [])]
+        keys = []
+        for i in ids:
+            d = wa_payload.decode(secret, i or "")
+            if not d:
+                continue
+            keys.append("menu:" + d[1][0] if d[0] == "menu" else d[0])
+        return keys
+
+    dir_keys = _menu_keys(svc.build_menu_result(bu_book, variant="director"))
+    sales_keys = _menu_keys(svc.build_menu_result(bu_book, variant="sales"))
+    bk_keys = _menu_keys(svc.build_menu_result(bu_book, variant="bookkeeper"))
+    # R8: "Quote a client" (wa12_start) LEADS the menu for quote-capable lenses
+    # (sales/director), absent for the bookkeeper lens.
+    check("R8: 'Quote a client' (wa12_start) on sales+director menus, not bookkeeper",
+          dir_keys and dir_keys[0] == "wa12_start"
+          and sales_keys and sales_keys[0] == "wa12_start"
+          and "wa12_start" not in bk_keys,
+          "dir[0]=%s sales[0]=%s bk_has=%s"
+          % (dir_keys[0] if dir_keys else None,
+             sales_keys[0] if sales_keys else None,
+             "wa12_start" in bk_keys))
+    # R9: "Overdue invoices" hidden from the DIRECTOR menu, kept on bookkeeper.
+    check("R9: 'Overdue invoices' dropped from director menu, kept on bookkeeper",
+          "menu:get_overdue_invoices" not in dir_keys
+          and "menu:get_overdue_invoices" in bk_keys,
+          "dir_has=%s bk_has=%s"
+          % ("menu:get_overdue_invoices" in dir_keys,
+             "menu:get_overdue_invoices" in bk_keys))
+
 # ---- teardown --------------------------------------------------------------
 _wipe_login("resil_book_smoke")
 if g_hr:

@@ -181,6 +181,17 @@ _GREETINGS = {"hi", "hii", "hie", "hey", "yo", "hello", "helo", "hallo",
               "hi there", "hello there", "hey there", "greetings",
               "good morning", "good afternoon", "good evening", "good day",
               "morning", "afternoon", "evening", "start", "/start"}
+# Tools HIDDEN from a variant's deterministic MENU (still callable via chat /
+# tool dispatch -- this is display-only, no entitlement change). The director
+# lens holds every tool but doesn't tap "Overdue invoices"; the bookkeeper
+# (Kudzai) lens keeps it (user direction 2026-06-13).
+_MENU_HIDE_FOR_VARIANT = {"director": {"get_overdue_invoices"}}
+# Lenses that can START a quote -> a "Quote a client" row LEADS the menu (taps
+# straight into the deterministic WA-12 structured flow; works even when the LLM
+# is down). Mirrors _wa12_can_quote (sales + superuser/director); the tap itself
+# re-checks entitlement, so this is display gating only.
+_QUOTE_CAPABLE_VARIANTS = {"sales", "director"}
+_MENU_QUOTE_KEY = "__wa12_quote__"   # sentinel row key -> wa12_start payload
 
 # ======================================================================
 # WA-4 -- dual-role lens routing constants
@@ -820,32 +831,43 @@ class WhatsAppCopilotService:
         user = bot_user.user_id
         variant = variant or self.variant_for(user)
         tools = self.whatsapp_tools(user, variant)
+        hide = _MENU_HIDE_FOR_VARIANT.get(variant, set())
         opts = [(t.name, _MENU_LABELS.get(
             t.name, t.name.replace("get_", "").replace("_", " ").title()))
-            for t in tools]
-        if not opts:
+            for t in tools if t.name not in hide]
+        # LEAD with "Quote a client" for quote-capable lenses -> the structured
+        # WA-12 flow (deterministic; works LLM-down). Sentinel key -> wa12_start.
+        lead = ([(_MENU_QUOTE_KEY, "🧾 Quote a client")]
+                if variant in _QUOTE_CAPABLE_VARIANTS else [])
+        rows_spec = lead + opts
+        if not rows_spec:
             return self._safe(
                 (prefix or "") +
                 "You can ask me about your work and I'll help where I can.")
+
+        def _row_id(key):
+            return (self._payload("wa12_start", bot_user.id)
+                    if key == _MENU_QUOTE_KEY else self._payload("menu", key))
+
         body = (prefix + "Here's what I can help with, %s. Tap an option:"
                 % (user.name or "there"))
-        if len(opts) <= 3:
-            buttons = [{"id": self._payload("menu", k), "title": lbl[:20]}
-                       for k, lbl in opts[:3]]
+        if len(rows_spec) <= 3:
+            buttons = [{"id": _row_id(k), "title": lbl[:20]}
+                       for k, lbl in rows_spec[:3]]
             interactive = {"kind": "buttons", "body": body[:1024],
                            "buttons": buttons}
         else:
-            shown = opts[:10]
-            rows = [{"id": self._payload("menu", k), "title": lbl[:24],
+            shown = rows_spec[:10]
+            rows = [{"id": _row_id(k), "title": lbl[:24],
                      "description": ""} for k, lbl in shown]
-            if len(opts) > 10:
+            if len(rows_spec) > 10:
                 body += " (and more -- just ask)"
             interactive = {"kind": "list", "body": body[:1024],
                            "button_text": "Options",
                            "sections": [{"title": "What I can do",
                                          "rows": rows}]}
         fallback = body + "\n" + "\n".join(
-            "- %s" % lbl for _, lbl in opts[:10])
+            "- %s" % lbl for _, lbl in rows_spec[:10])
         return {"text": body, "cta_url": None, "interactive": interactive,
                 "text_fallback": fallback, "error": None,
                 "provider_key": None}

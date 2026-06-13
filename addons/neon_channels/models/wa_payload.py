@@ -121,6 +121,12 @@ INTENTS = frozenset({
     #   wa12_ok:<session_id>:b<lid>:<seq>      -- ✓ Correct -> confirmed, advance
     #   wa12_change:<session_id>:b<lid>:<seq>  -- ✗ Change  -> open the pick LIST
     "wa12_ok", "wa12_change",
+    # WA-12 menu entry: the deterministic Hello/menu "Quote a client" row taps
+    # straight into the structured quote flow (begin_structured). Carries the
+    # bot_user id only (identity comes from the inbound phone; the handler
+    # re-checks _wa12_can_quote). Caught by the neon_crew_comms WA-12 intercept.
+    #   wa12_start:<bot_user_id>
+    "wa12_start",
     # WA-13: quote/invoice retrieval + invoice-from-quote (routed by the
     # neon_crew_comms bridge intercept AFTER WA-12, before WA-6). Retrieval and
     # the schedule-stage pick use NUMBER replies via the doc_pick / inv_pick

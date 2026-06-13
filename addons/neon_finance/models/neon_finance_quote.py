@@ -227,6 +227,17 @@ class NeonFinanceQuote(models.Model):
         currency_field="currency_id",
         tracking=True,
     )
+    # WA-12: a human-readable label for a WHOLE-QUOTE discount applied over
+    # WhatsApp (e.g. "Discount USD 179.00 (incl. VAT)" / "(ex VAT)"). DISPLAY
+    # ONLY — the actual discount lives in the per-line discount_pct, so this
+    # does NOT enter _compute_amounts. Set by the WA-12 review edit; cleared on
+    # any subsequent per-line price/discount edit so it can never go stale on a
+    # finance document the approver reads.
+    wa12_discount_note = fields.Char(
+        string="WA Whole-Quote Discount",
+        help="Display label for a whole-quote discount applied via WhatsApp; "
+             "the amount itself is distributed across the line discounts.",
+    )
     margin_total = fields.Monetary(
         string="Margin Total",
         compute="_compute_margin",

@@ -285,9 +285,16 @@ try:
             sales, "sales")}
         check("S3: 'menu' renders a capability picker",
               bool(menu) and bool(menu_ids))
-        check("S3: every menu id is menu:<key>, key in the user's scope",
-              all(d and d[0] == "menu" and d[1][0] in allowed
+        # WA-12.6: a quote-capable lens (sales) now LEADS with a "Quote a
+        # client" row (wa12_start, not a menu:<tool> id). Every OTHER row is
+        # still a scoped menu:<key>.
+        check("S3: menu rows are menu:<scoped-key> (or the Quote-a-client lead)",
+              all(d and ((d[0] == "menu" and d[1][0] in allowed)
+                         or d[0] == "wa12_start")
                   for d in menu_ids), menu_ids)
+        check("S3: sales menu LEADS with the 'Quote a client' (wa12_start) row",
+              bool(menu_ids) and menu_ids[0] and menu_ids[0][0] == "wa12_start",
+              menu_ids[0] if menu_ids else None)
         # tap a read capability -> routed through run_turn (canned phrase)
         menu_read = next((d for d in menu_ids
                           if d[1][0] == "get_my_pipeline"), None)

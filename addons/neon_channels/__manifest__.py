@@ -228,7 +228,13 @@
     # the provider error kept for audit, instead of the dead-end "can't reach the
     # assistant". WA-4 multi-role greeting still gets the deterministic lens ask.
     # build_menu_result gains an optional prefix. pwa_copilot_resilience 10/10.
-    'version': '17.0.1.22.5',
+    # 17.0.1.22.6: menu polish (WA-12.6). build_menu_result LEADS with a "Quote
+    # a client" row for quote-capable lenses (sales/director) -> wa12_start
+    # payload -> the deterministic structured flow (works LLM-down). "Overdue
+    # invoices" hidden from the DIRECTOR menu (kept on bookkeeper) via
+    # _MENU_HIDE_FOR_VARIANT (display-only; still callable by asking). New
+    # wa12_start INTENT in wa_payload.
+    'version': '17.0.1.22.6',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

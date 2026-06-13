@@ -35,7 +35,13 @@
     # re-assert of the UI-added grant; no-op on the current prod DB). WA-13 adds
     # no finance model/engine -- it is a WhatsApp face on the existing P6.M7
     # invoice.schedule machinery (lives in neon_crew_comms).
-    'version': '17.0.7.11.0',
+    # 17.0.7.11.1 = WA-12.6 review polish: a DISPLAY-ONLY wa12_discount_note Char
+    # on neon.finance.quote (a human label for a whole-quote WhatsApp discount,
+    # e.g. "Discount USD 179.00 (incl. VAT)") + a conditional row on the quote
+    # PDF totals block. Display only -- the discount itself lives in the per-line
+    # discount_pct, so _compute_amounts is byte-unchanged. New nullable field ->
+    # no migration; the note is set/cleared by the neon_crew_comms review edit.
+    'version': '17.0.7.11.1',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

@@ -167,6 +167,16 @@
                                                   t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                                         </td>
                                     </tr>
+                                    <!-- WA-12 whole-quote discount label (the
+                                         amount is already distributed across the
+                                         per-line discounts above; this names the
+                                         basis the rep used). -->
+                                    <tr t-if="o.wa12_discount_note">
+                                        <td colspan="2"
+                                            style="font-size:0.85em;color:#7165AC;">
+                                            <span t-field="o.wa12_discount_note"/>
+                                        </td>
+                                    </tr>
                                     <!-- VAT row only when tax applies ('no tax'
                                          clears the line taxes -> amount_tax 0). -->
                                     <tr t-if="o.amount_tax">
