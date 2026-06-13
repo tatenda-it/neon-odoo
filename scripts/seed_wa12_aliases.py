@@ -50,10 +50,26 @@ def find_product(*needles):
            ("name", "not ilike", "[TEST"),
            ("name", "not ilike", "[P5M2"),
            ("name", "not ilike", "P1.M1"),
-           ("name", "not ilike", "smoke test")]
+           ("name", "not ilike", "smoke test"),
+           # exclude bundled PACKAGES/WEDDING/DJ kits -- a needle like 'smoke'
+           # otherwise hits a DJ package whose name lists 'SMOKE MACHINE'.
+           ("name", "not ilike", "PACKAGE"),
+           ("name", "not ilike", "WEDDING")]
     for n in needles:
         dom.append(("name", "ilike", n))
     return PT.search(dom, order="name", limit=1)
+
+
+def candidates(*needles):
+    """Real product NAMES matching the needles (for an OPEN-row note when more
+    than one genuine product matches and Robin must pick)."""
+    dom = [("active", "=", True),
+           ("name", "not ilike", "[TEST"), ("name", "not ilike", "[P5M2"),
+           ("name", "not ilike", "P1.M1"), ("name", "not ilike", "smoke test"),
+           ("name", "not ilike", "PACKAGE"), ("name", "not ilike", "WEDDING")]
+    for n in needles:
+        dom.append(("name", "ilike", n))
+    return [p.name for p in PT.search(dom, order="name")]
 
 
 # Seed plan. Each entry: (phrase, kind, key, state, note).
@@ -85,30 +101,36 @@ PLAN = [
     ("sound system", "term", "pa system", "open",
      "Same as 'PA' -> PA-system packages. Confirm."),
 
-    # --- products: resolve straight to a single catalogue item ---
-    ("totem", "product", ("truss totem",), "proposed",
-     "TRUSS TOTEM WITH BASE. Robin: confirm bare 'totem' = the truss totem "
-     "(not a digital/poster totem)."),
-    ("totems", "product", ("truss totem",), "proposed", "Plural of 'totem'."),
+    # --- products: resolve straight to a single catalogue item. Where the real
+    #     catalogue has >1 genuine match (sizes/variants), the row is OPEN with
+    #     the candidate list appended so Robin picks (never auto-assumed).
+    #     Prod catalogue confirmed 13 Jun: 3 totem sizes, 4 molefays, 4
+    #     monitors, fog=LOW FOGGER, smoke=VERTICAL SMOKE MACHINES.
+    ("totem", "product", ("truss totem", "with base"), "open",
+     "TRUSS TOTEM family — 3 sizes exist. ROBIN: pick the DEFAULT bare 'totem' "
+     "should resolve to (a size-bearing phrase like '3m totem' should override)."),
+    ("totems", "product", ("truss totem", "with base"), "open",
+     "Plural of 'totem' — same Q (pick default size)."),
     ("blinder", "product", ("molefay",), "open",
-     "PROPOSED -> MOLEFAY family. ROBIN: is a 'blinder' a molefay at Neon, or "
-     "a distinct fixture? (In '4 blinders on totems', 4 = QUANTITY and 'on "
-     "totems' = a separate TRUSS TOTEM line.)"),
+     "MOLEFAY family — 4 variants exist. ROBIN: is a 'blinder' a molefay at "
+     "Neon (and which variant), or a distinct fixture? (In '4 blinders on "
+     "totems', 4 = QUANTITY and 'on totems' = a separate TRUSS TOTEM line.)"),
     ("blinders", "product", ("molefay",), "open", "Plural of 'blinder' — same Q."),
     ("wedge", "product", ("monitor",), "open",
-     "PROPOSED -> a stage monitor (POWERWORKS MONITOR). ROBIN: confirm the "
-     "exact product 'wedge'/'monitor' should resolve to (floor wedge vs in-ear)."),
+     "A 'wedge' is a FLOOR monitor (likely POWERWORKS MONITOR, not in-ear). "
+     "ROBIN: pick the exact product."),
     ("monitor", "product", ("monitor",), "open",
-     "Stage monitor. ROBIN: confirm exact product (floor wedge vs in-ear vs a "
-     "video monitor)."),
-    ("fogger", "product", ("fog",), "open",
-     "PROPOSED -> a fog/smoke effects unit. ROBIN: confirm the EXACT item "
-     "('fogger' vs 'low fogger' vs hazer) bare 'fogger' should resolve to."),
-    ("smoke", "product", ("smoke",), "open",
-     "PROPOSED -> smoke/fog effects. ROBIN: confirm exact item; 'smoke' may be "
-     "ambiguous (smoke machine vs low fogger)."),
-    ("fog machine", "product", ("fog",), "open",
-     "Same family as 'fogger' — confirm exact item."),
+     "Stage monitor — several exist (floor / in-ear / personal). ROBIN: pick "
+     "the exact product bare 'monitor' should resolve to."),
+    ("fogger", "product", ("low fogger",), "proposed",
+     "-> LOW FOGGER (the only fogger product; 'LOWFOGGER REMOTES' is the "
+     "remote accessory). Robin: confirm."),
+    ("fog machine", "product", ("low fogger",), "proposed",
+     "Same as 'fogger' -> LOW FOGGER. Robin: confirm."),
+    ("smoke", "product", ("vertical smoke machine",), "open",
+     "-> VERTICAL SMOKE MACHINES (the smoke-machine product; 'REMOTES' is the "
+     "accessory). ROBIN: confirm 'smoke' = vertical smoke machine, not the "
+     "LOW FOGGER or HAZER."),
 ]
 
 
@@ -135,10 +157,15 @@ for phrase, kind, key, state, note in PLAN:
         vals["term"] = key
         target_desc = "term:%r" % key
     elif kind == "product":
+        cands = candidates(*key)
         rec = find_product(*key)
         if rec:
             vals["product_template_id"] = rec.id
             target_desc = "product:%s" % rec.name
+            # >1 genuine match -> force OPEN and list the choices for Robin.
+            if len(cands) > 1:
+                vals["state"] = "open"
+                vals["note"] = "%s  CANDIDATES: %s" % (note, " | ".join(cands))
         else:
             vals["state"] = "open"
             vals["term"] = " ".join(key)  # fallback so the row is valid + matchable
