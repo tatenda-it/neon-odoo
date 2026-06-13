@@ -718,12 +718,20 @@ class WhatsAppMessageWA12(models.Model):
         return not (words - _WA12_CANCEL_VERBS - _WA12_CANCEL_FILLER)
 
     def _wa12_repair_prompt(self, raw_from, from_e164):
-        """M4: complaint/correction language gets a REPAIR prompt, never the
-        syntax menu."""
+        """M4: complaint/correction language gets a REPAIR prompt in PLAIN
+        language -- no command syntax shown to the rep (user directive)."""
         return self._wa6_reply(raw_from, from_e164, _(
-            "What should I fix — the items, the client, or the date? "
-            "e.g. `remove <item>` · `qty <item> 2` · a new date · "
-            "`client <name>`."))
+            "No problem — what should I change? You can tell me an item to "
+            "swap, a quantity, a discount, the date, or the client, and I'll "
+            "sort it."))
+
+    def _wa12_draft_help(self, quote, from_e164, raw_from):
+        """DEFECT-3: a QUESTION at the draft step gets a plain HELP answer and
+        NEVER mutates the quote. No command grammar shown."""
+        return self._wa6_reply(raw_from, from_e164, _(
+            "That's the draft so far — nothing's changed. Tap *Submit for "
+            "approval* to send it, *Preview* to see the PDF, *Edit* to change "
+            "a line, or *Cancel*. Or just tell me what to change."))
 
     def _wa12_handle_convo(self, sess, body, from_e164, raw_from):
         """WA-12.2 conversational steps. q_items = the M1 confirm-before-draft
@@ -2400,26 +2408,36 @@ class WhatsAppMessageWA12(models.Model):
         landing in the draft."""
         matched, unmatched = [], []
         for it in items:
-            # M-A: pass the LLM family hint so the match is scoped to the
-            # obvious family (visual/lighting/staging), never cross-category.
-            hit = self._wa6_match_one(
-                it.get("name") or "", category_hint=it.get("category"))
-            qty = int(it.get("qty") or hit.get("qty") or 1)
-            if (hit.get("status") == "matched"
-                    and hit.get("confidence") in ("exact", "strong")):
-                matched.append({
-                    "product_id": hit["product_id"],
-                    "product_name": hit["product_name"], "qty": max(1, qty),
-                    "stated_price": it.get("stated_price")})
-            else:
-                sugg = hit.get("suggestions") or []
-                if hit.get("status") == "matched" and hit.get("product_name") \
-                        and hit["product_name"] not in sugg:
-                    sugg = [hit["product_name"]] + sugg
-                unmatched.append({"name": it.get("name") or "",
-                                  "qty": max(1, qty),
-                                  "stated_price": it.get("stated_price"),
-                                  "suggestions": sugg[:3]})
+            name = it.get("name") or ""
+            # DEFECT-1 safety net: an LLM item name may itself contain MULTIPLE
+            # items the model failed to separate ("4 blinders on totems",
+            # "screen and a stage"). Re-split each name deterministically
+            # (_wa6_match_items splits on , / newline / ' and ') so EVERY item
+            # reaches the stepper -- the LLM is never the sole splitter.
+            sub = self._wa6_match_items(name)
+            multi = len(sub) > 1
+            for hit in sub:
+                # qty: a re-split sub-item keeps its OWN parsed qty; a single
+                # item takes the LLM slot qty (the rep's stated count).
+                qty = (int(hit.get("qty") or 1) if multi
+                       else int(it.get("qty") or hit.get("qty") or 1))
+                sp = it.get("stated_price") if not multi else None
+                if (hit.get("status") == "matched"
+                        and hit.get("confidence") in ("exact", "strong")):
+                    matched.append({
+                        "product_id": hit["product_id"],
+                        "product_name": hit["product_name"],
+                        "qty": max(1, qty), "stated_price": sp})
+                else:
+                    sugg = hit.get("suggestions") or []
+                    if hit.get("status") == "matched" \
+                            and hit.get("product_name") \
+                            and hit["product_name"] not in sugg:
+                        sugg = [hit["product_name"]] + sugg
+                    unmatched.append({"name": hit.get("raw") or name,
+                                      "qty": max(1, qty), "stated_price": sp,
+                                      "suggestions": sugg[:3],
+                                      "family": hit.get("family") or ""})
         return matched, unmatched
 
     @api.model
@@ -2651,6 +2669,14 @@ class WhatsAppMessageWA12(models.Model):
                 edited = self._wa12_try_edit(quote, body, from_e164, raw_from)
                 if edited is not None:
                     return edited
+                # DEFECT-3: a QUESTION post-draft ("how did you know I want a
+                # smoke machine?", "where do I tap?") must get a HELP answer, NOT
+                # be translated into an edit command (the LLM read it as `remove
+                # smoke` and dropped the line on the wire). Same rule as the
+                # stepper's focused sub-state, extended to the draft step:
+                # a question NEVER mutates the quote.
+                if self._wa12_is_question(body):
+                    return self._wa12_draft_help(quote, from_e164, raw_from)
                 # M4: complaint/correction language -> the repair prompt,
                 # never the syntax menu (deterministic check first -- free).
                 if any(t in norm for t in _WA12_COMPLAINT_TOKENS):

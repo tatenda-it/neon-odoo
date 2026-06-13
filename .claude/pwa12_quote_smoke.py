@@ -1117,7 +1117,7 @@ D_sales._wa12_maybe_intercept(_txt(
 r39a = (M.search([("id", ">", _s39), ("phone_number", "=", SALES_PH),
                   ("direction", "=", "outbound")], order="id desc", limit=1
                  ).message_body or "")
-repair_qconfirm = "what should i fix" in r39a.lower()
+repair_qconfirm = "what should i change" in r39a.lower()
 _clear_sess(SALES_PH)
 with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _brief):
     D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "the same brief once more"))
@@ -1127,9 +1127,9 @@ r39b = (M.search([("id", ">", _s39b), ("phone_number", "=", SALES_PH),
                   ("direction", "=", "outbound")], order="id desc", limit=1
                  ).message_body or "")
 _check("T-WA12-39",
-       repair_qconfirm and "what should i fix" in r39b.lower(),
+       repair_qconfirm and "what should i change" in r39b.lower(),
        "repair prompt: q_confirm=%s q_items=%s"
-       % (repair_qconfirm, "what should i fix" in r39b.lower()))
+       % (repair_qconfirm, "what should i change" in r39b.lower()))
 _clear_sess(SALES_PH)
 
 # ---- T-WA12-40 (M2) identity-aware chat: the copilot system prompt ASSERTS
