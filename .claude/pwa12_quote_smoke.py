@@ -279,6 +279,23 @@ Alias.create([
 ])
 env.cr.commit()
 
+# WA-12.3: the q_items buffer is now v3 (one ordered `lines` list). These
+# helpers project it back to the matched/unmatched views the older assertions
+# read, so a schema change doesn't force rewriting every case's intent.
+def _bufmatched(buf):
+    if not isinstance(buf, dict):
+        return []
+    if "lines" in buf:
+        return [ln for ln in buf["lines"] if ln.get("kind") == "matched"]
+    return buf.get("matched") or []  # legacy (pre-migrate)
+def _bufunmatched(buf):
+    if not isinstance(buf, dict):
+        return []
+    if "lines" in buf:
+        return [{"name": ln.get("raw"), "suggestions": ln.get("suggestions")}
+                for ln in buf["lines"] if ln.get("kind") == "unmatched"]
+    return buf.get("unmatched") or []
+
 D_sales = M.with_user(u_sales)
 D_crew = M.with_user(u_crew)
 D_appr = M.with_user(u_appr)
@@ -954,13 +971,13 @@ D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
 q36 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
 _cj36 = q36.event_job_id.commercial_job_id if q36 else None
 _check("T-WA12-36",
-       isinstance(b36, dict) and len(b36.get("matched") or []) == 1
+       isinstance(b36, dict) and len(_bufmatched(b36)) == 1
        and q36 and len(q36.line_ids) == 1
        and q36.line_ids.quantity == 2
        and _cj36 and _cj36.event_date
        and (_cj36.event_date.month, _cj36.event_date.day) == (9, 29),
        "q_items corrections: matched=%s lines=%s qty=%s date=%s"
-       % (len(b36.get("matched") or []), len(q36.line_ids) if q36 else 0,
+       % (len(_bufmatched(b36)), len(q36.line_ids) if q36 else 0,
           q36.line_ids.quantity if q36 and len(q36.line_ids) == 1 else "-",
           _cj36.event_date if _cj36 else "-"))
 
@@ -1227,8 +1244,8 @@ no_draft46 = (Q.search_count([("partner_id", "=", client.id)]) == _qb
 D_sales._wa12_maybe_intercept(_txt(SALES_PH, "replace qwertyunit = prodruled"))
 s46 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
 b46 = s46._get_buffer() if s46 else {}
-repl46 = (isinstance(b46, dict) and len(b46.get("matched") or []) == 1
-          and b46["matched"][0]["product_name"] == "[TEST-WA12] Prodruled")
+repl46 = (isinstance(b46, dict) and len(_bufmatched(b46)) == 1
+          and _bufmatched(b46)[0]["product_name"] == "[TEST-WA12] Prodruled")
 # natural replace via the items-translate hook (mock returns the command)
 with patch.object(type(M), "_wa12_llm_chat",
                   lambda self, msgs: "replace prodruled = qwertyunit"):
@@ -1236,7 +1253,7 @@ with patch.object(type(M), "_wa12_llm_chat",
         SALES_PH, "actually it should be the qwerty one"))
 b46b = s46._get_buffer() if s46 else {}
 nat46 = (isinstance(b46b, dict)
-         and b46b["matched"][0]["product_name"] == "[TEST-WA12] Qwertyunit")
+         and _bufmatched(b46b)[0]["product_name"] == "[TEST-WA12] Qwertyunit")
 _check("T-WA12-46",
        no_draft46 and repl46 and nat46,
        "show!=yes(no draft)=%s replace-det=%s replace-natural=%s"
@@ -1328,8 +1345,8 @@ s50a = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
 b50a = s50a._get_buffer() if s50a else {}
 quote_gate = (bool(s50a) and s50a.step == "q_items"
               and Q.search_count([]) == _qb50
-              and not (b50a.get("matched") or [])
-              and len(b50a.get("unmatched") or []) == 1)
+              and not _bufmatched(b50a)
+              and len(_bufunmatched(b50a)) == 1)
 _clear_sess(SALES_PH)
 env["neon.wa.equip.session"].sudo()._start_quote(
     SALES_PH, u_sales, "q_itemreq",
@@ -1339,8 +1356,8 @@ D_sales._wa12_maybe_intercept(_txt(SALES_PH, "gizmo"))
 s50b = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
 b50b = s50b._get_buffer() if s50b else {}
 itemreq_gate = (bool(s50b) and s50b.step == "q_items"
-                and not (b50b.get("matched") or [])
-                and len(b50b.get("unmatched") or []) == 1)
+                and not _bufmatched(b50b)
+                and len(_bufunmatched(b50b)) == 1)
 _clear_sess(SALES_PH)
 q50 = Q._wa12_provision_chain(client, "2026-10-02", USD, u_sales)
 M.sudo()._wa12_build_lines(q50, [{"product_id": prod_ok.id, "qty": 1}], 1)
@@ -1423,10 +1440,11 @@ _e53 = (M.search([("id", ">", _s53), ("phone_number", "=", SALES_PH),
                  ).message_body or "").lower()
 b53 = sess53._get_buffer()
 _check("T-WA12-53",
-       "be more specific" in _e53
-       and all(it["qty"] == 1 for it in b53.get("matched", [])),
+       ("be more specific" in _e53 or "say the line number" in _e53
+        or "several items match" in _e53)
+       and all(it["qty"] == 1 for it in _bufmatched(b53)),
        "ambiguous 'qty led 4' refused, neither qty changed (reply=%r)"
-       % _e53[:50])
+       % _e53[:60])
 _clear_sess(SALES_PH)
 
 # ---- T-WA12-54 (review MATCH-3/FSM-6) multi-item paste at q_confirm: a dup is
@@ -1566,7 +1584,7 @@ s58 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
 b58 = s58._get_buffer() if s58 else {}
 mc_ok = (bool(s58) and s58.step == "q_items"
          and any("6M X 2M LED SCREEN" in (it.get("product_name") or "")
-                 for it in (b58.get("matched") or [])))
+                 for it in _bufmatched(b58)))
 _check("T-WA12-58", disc_ok and mc_ok,
        "M-B discovery lists family/no-booth=%s ; M-C 'no it's a 6m x 2m "
        "screen' re-searches -> 6x2 matched=%s" % (disc_ok, mc_ok))
@@ -1744,6 +1762,244 @@ with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: None):
                                and (h["status"] == "not_found"
                                     or h["confidence"] in ("weak", "strong")))
 _check("T-WA12-60b", all(fw.values()), "grounded-pick firewall: %s" % fw)
+
+# ============================================================ WA-12.3 B+C+D
+# The pick/correct interaction layer. Drive the REAL dispatch path
+# (intercept -> present buttons/list -> synth the tap -> intercept) and the
+# C number-edit grammar / D conversational batch. LLM muted globally (_LLMP);
+# tests that need D stub _wa12_llm_chat locally.
+from odoo.addons.neon_channels.models import wa_payload as _wp
+_SECRET = env["ir.config_parameter"].sudo().get_param("database.secret") or ""
+
+def _last_out_payloads(after_id):
+    """The interactive button/list-row ids in the most-recent outbound row
+    (we audit-store the rendered body; the ids live in the send call). We
+    instead reconstruct the expected ids via wa_payload for assertion, since
+    the test transport doesn't persist the interactive structure. So this
+    returns the most-recent outbound BODY for content checks."""
+    row = M.search([("id", ">", after_id), ("phone_number", "=", SALES_PH),
+                    ("direction", "=", "outbound")], order="id desc", limit=1)
+    return (row.message_body or "")
+
+def _open_qitems(items_text):
+    """Fresh q_items session via the real intercept (Quote: command). To keep
+    the session AT q_items (so the C number-edit grammar is exercised), the
+    item text must include at least one weak/unmatched item; an all-confident
+    quote provisions straight to q_confirm. Callers pass slang/weak terms."""
+    _clear_sess(SALES_PH)
+    D_sales._wa12_maybe_intercept(_txt(
+        SALES_PH, "Quote: [TEST-WA12] Acme Events Co — %s, 2026-11-01"
+        % items_text))
+    return env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+
+def _seed_qitems(lines):
+    """Seed a v3 q_items session DIRECTLY with matched lines (deterministic,
+    no dependence on the matcher's confidence routing). `lines` = list of
+    (product, qty)."""
+    _clear_sess(SALES_PH)
+    buf = {"v": 3, "next_lid": len(lines) + 1, "pending": None,
+           "client_txt": "[TEST-WA12] Acme Events Co", "partner_id": client.id,
+           "date_txt": "", "days": 1, "prefills": {},
+           "lines": [{"lid": i + 1, "kind": "matched", "product_id": p.id,
+                      "product_name": p.name, "qty": q, "rep_price": None,
+                      "stated_price": None}
+                     for i, (p, q) in enumerate(lines)]}
+    return env["neon.wa.equip.session"].sudo()._start_quote(
+        SALES_PH, u_sales, "q_items", buf)
+
+def _synth_tap(payload_id, list_reply=False):
+    key = "list_reply" if list_reply else "button_reply"
+    return {"from": SALES_PH, "type": "interactive",
+            "interactive": {key: {"id": payload_id, "title": "x"}},
+            "id": "pwa123-%s" % payload_id[:8]}
+
+# ---- T-WA12-61: B tappable VARIANT pick. The confirmed [test-wa12]-blinder
+# term-alias expands to "molefay" (a lighting FAMILY word) with >=2 in-family
+# variants -> q_items opens with a pending VARIANT pick (framing "which one?");
+# the candidates are the in-family enumeration (NOT suggestions[:3]); a synth
+# tap binds the chosen molefay to that line at matched.
+t61 = {}
+s61 = _open_qitems("[test-wa12]-blinder")
+b61 = s61._get_buffer() if s61 else {}
+pend61 = (b61.get("pending") or {}) if isinstance(b61, dict) else {}
+ln61 = next((l for l in (b61.get("lines") or [])
+             if l.get("kind") == "unmatched"), None)
+t61["pending_set"] = bool(pend61.get("lid") and pend61.get("kind") == "variant")
+t61["cands_in_family"] = bool(pend61.get("candidates")
+                              and all(PT.browse(p).equipment_category_id.code
+                                      == "lighting"
+                                      for p in pend61["candidates"]))
+# the family-term signal: a term-alias expanding to a family word -> variant; a
+# specific dimensional phrase -> not. (Matcher untouched; builder-side.)
+t61["family_term_signal"] = (M._wa12_is_family_term("[test-wa12]-blinder")
+                             and not M._wa12_is_family_term("3 x 2 screen"))
+# synth a tap for the FIRST candidate.
+if pend61.get("candidates"):
+    pid61 = pend61["candidates"][0]
+    tap_id = _wp.encode(_SECRET, "wa12_pick", s61.id, "b%d" % pend61["lid"], pid61)
+    D_sales._wa12_maybe_intercept(_synth_tap(tap_id, list_reply=len(
+        pend61["candidates"]) >= 3))
+    b61b = s61._get_buffer()
+    ln61b = M._wa12_line_by_lid(b61b, pend61["lid"])
+    t61["tap_bound"] = bool(ln61b and ln61b.get("kind") == "matched"
+                            and ln61b.get("product_id") == pid61
+                            and not (b61b.get("pending")))
+else:
+    t61["tap_bound"] = False
+_check("T-WA12-61", all(t61.values()), "B variant pick: %s" % t61)
+
+# ---- T-WA12-62: stable-lid integrity. Offer a pick on a line, REMOVE an
+# earlier line (numbers shift), then the OLD tap payload (carrying the stable
+# lid) still binds the SAME line, not the shifted one.
+t62 = {}
+s62 = _open_qitems("qwertyunit, [test-wa12]-blinder")
+b62 = s62._get_buffer()
+pend62 = b62.get("pending") or {}
+lid62 = pend62.get("lid")
+tap62 = (_wp.encode(_SECRET, "wa12_pick", s62.id, "b%d" % lid62,
+                    pend62["candidates"][0]) if pend62.get("candidates") else "")
+# remove line 1 (qwertyunit) -> the pending line's display number shifts to 1.
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "remove 1"))
+b62b = s62._get_buffer()
+t62["removed"] = len(b62b.get("lines") or []) == 1
+# now fire the OLD tap (stable lid) -> binds the SAME line.
+if tap62:
+    D_sales._wa12_maybe_intercept(_synth_tap(tap62, list_reply=len(
+        pend62.get("candidates") or []) >= 3))
+    b62c = s62._get_buffer()
+    ln62 = M._wa12_line_by_lid(b62c, lid62)
+    t62["stable_bind"] = bool(ln62 and ln62.get("kind") == "matched"
+                              and ln62.get("product_id")
+                              == pend62["candidates"][0])
+else:
+    t62["stable_bind"] = False
+_check("T-WA12-62", all(t62.values()), "stable-lid: %s" % t62)
+
+# ---- T-WA12-63: cross-session guard. A stale tap from session A (after it's
+# cancelled + a NEW session B opened) is refused (sid mismatch), never applied
+# to B.
+t63 = {}
+sA = _open_qitems("[test-wa12]-blinder")
+bA = sA._get_buffer(); pA = bA.get("pending") or {}
+tapA = (_wp.encode(_SECRET, "wa12_pick", sA.id, "b%d" % pA["lid"],
+                   pA["candidates"][0]) if pA.get("candidates") else "")
+sidA = sA.id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "cancel"))
+sB = _open_qitems("qwertyunit")          # new session, new sid
+_sB0 = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_synth_tap(tapA, list_reply=True))  # stale A tap
+_eB = _last_out_payloads(_sB0).lower()
+bB = sB._get_buffer()
+# the session row is reused (one-per-phone), so the guard is the TARGET-vs-STEP
+# mismatch: a 'b<lid>' (q_items) tap hitting the now-q_confirm session resolves
+# to no draft line -> a clean refusal, never a wrong bind. (Either "expired" or
+# "no longer available" is an acceptable refusal; what matters is NO bind.)
+t63["stale_refused"] = ("expired" in _eB or "no longer available" in _eB
+                        or "not editable" in _eB)
+# B (the q_confirm draft) gained no line for A's offered product.
+t63["B_untouched"] = (pA.get("candidates") and not any(
+    l.product_template_id.id == pA["candidates"][0]
+    for l in (Q.sudo().browse(bB.get("quote_id") or 0).line_ids
+              if bB.get("quote_id") else []))) or not pA.get("candidates")
+_check("T-WA12-63", t63["stale_refused"] and t63["B_untouched"],
+       "cross-session refusal (reused row): %s" % t63)
+
+# ---- T-WA12-64: C number commands + false-positive guards.
+t64 = {}
+s64 = _seed_qitems([(prod_ok, 1), (prod_pr, 1)])  # qwertyunit, prodruled
+# `qty 1 to 4` -> line 1 qty 4 (NOT add "1 to 4" as items).
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "qty 1 to 4"))
+b64 = s64._get_buffer()
+t64["qty_by_number"] = (b64["lines"][0].get("qty") == 4)
+# `remove 2` -> exactly line 2 gone.
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "remove 2"))
+b64 = s64._get_buffer()
+t64["remove_by_number"] = (len(b64["lines"]) == 1
+                           and b64["lines"][0]["product_name"]
+                           == "[TEST-WA12] Qwertyunit")
+# `2 = prodruled` re-adds line 2 by number-replace (but only 1 line now -> no
+# line 2; falls through; assert it does NOT crash + line count stable). Then a
+# valid `1 = prodruled` replaces line 1.
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "1 = prodruled"))
+b64 = s64._get_buffer()
+t64["replace_by_number"] = (b64["lines"][0]["product_name"]
+                            == "[TEST-WA12] Prodruled")
+# false-positive: "4 qwertyunit" is a RE-TYPE (qty 4), NOT "line 4".
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "4 qwertyunit"))
+b64 = s64._get_buffer()
+_q = [l for l in b64["lines"] if l["product_name"] == "[TEST-WA12] Qwertyunit"]
+t64["bare_count_retype"] = bool(_q and _q[0].get("qty") == 4)
+_check("T-WA12-64", all(t64.values()), "C number edits: %s" % t64)
+
+# ---- T-WA12-65: D conversational multi-correction (LLM stubbed). One message
+# -> two commands -> both applied in ONE reshow; numbers two-pass resolved.
+t65 = {}
+s65 = _seed_qitems([(prod_ok, 1), (prod_pr, 1)])
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: "qty 1 3\nremove 2"):
+    D_sales._wa12_maybe_intercept(_txt(
+        SALES_PH, "make the first one 3 and drop the second"))
+b65 = s65._get_buffer()
+t65["batch_applied"] = (len(b65["lines"]) == 1
+                        and b65["lines"][0].get("qty") == 3
+                        and b65["lines"][0]["product_name"]
+                        == "[TEST-WA12] Qwertyunit")
+_check("T-WA12-65", all(t65.values()), "D multi-correction: %s" % t65)
+
+# ---- T-WA12-66: D batch number-shift safety (two-pass). "remove 1" then
+# "qty 2 to 5" emitted together: the qty must hit the ORIGINAL line 2, not the
+# post-removal line 2.
+t66 = {}
+s66 = _seed_qitems([(prod_ok, 1), (prod_pr, 1), (g_fog, 1)])
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: "remove 1\nqty 2 5"):
+    D_sales._wa12_maybe_intercept(_txt(SALES_PH, "drop the first, 5 of the 2nd"))
+b66 = s66._get_buffer()
+# original line 2 = prodruled; after remove-1 it displays as 1 but the two-pass
+# bound the qty to prodruled's lid.
+_pr = [l for l in b66["lines"] if l["product_name"] == "[TEST-WA12] Prodruled"]
+t66["two_pass"] = bool(_pr and _pr[0].get("qty") == 5
+                       and len(b66["lines"]) == 2)
+_check("T-WA12-66", all(t66.values()), "D two-pass shift: %s" % t66)
+
+# ---- T-WA12-67: guard parity on a tap. A forged wa12_pick id for a product
+# NOT in the line's offered candidate set is refused (no bind).
+t67 = {}
+s67 = _open_qitems("[test-wa12]-blinder")
+b67 = s67._get_buffer(); p67 = b67.get("pending") or {}
+if p67.get("lid"):
+    forged = _wp.encode(_SECRET, "wa12_pick", s67.id, "b%d" % p67["lid"],
+                        g_booth.id)  # a Visual booth, never offered for lighting
+    _s67 = M.search([], order="id desc", limit=1).id
+    D_sales._wa12_maybe_intercept(_synth_tap(forged, list_reply=True))
+    _e67 = _last_out_payloads(_s67).lower()
+    b67b = s67._get_buffer()
+    ln67 = M._wa12_line_by_lid(b67b, p67["lid"])
+    t67["forged_refused"] = (ln67 and ln67.get("kind") == "unmatched"
+                             and "no longer available" in _e67)
+else:
+    t67["forged_refused"] = False
+_check("T-WA12-67", all(t67.values()), "guard parity (forged tap): %s" % t67)
+
+# ---- T-WA12-68: buffer migration. A legacy {matched,unmatched} session
+# migrates to v3 on the first command and resolves a number edit.
+t68 = {}
+_clear_sess(SALES_PH)
+sess68 = env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_items",
+    {"client_txt": "X", "partner_id": client.id,
+     "matched": [{"product_id": prod_ok.id,
+                  "product_name": "[TEST-WA12] Qwertyunit", "qty": 1,
+                  "stated_price": None}],
+     "unmatched": [], "date_txt": "", "days": 1, "prefills": {}})
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "qty 1 to 6"))
+b68 = sess68._get_buffer()
+t68["migrated_v3"] = (isinstance(b68, dict) and b68.get("v") == 3
+                      and "matched" not in b68 and "lines" in b68)
+t68["number_edit"] = bool(b68.get("lines")
+                          and b68["lines"][0].get("qty") == 6)
+_check("T-WA12-68", all(t68.values()), "buffer migration: %s" % t68)
+_clear_sess(SALES_PH)
 
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived

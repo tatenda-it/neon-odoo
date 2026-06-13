@@ -106,6 +106,15 @@ INTENTS = frozenset({
     #   wa12_view_pdf:<quote_id>  -- send the (draft|final) quote PDF in-chat
     #   wa12_send:<quote_id>      -- requester sends the approved quote to client
     "wa12_approve", "wa12_reject", "wa12_view_pdf", "wa12_send",
+    # WA-12.3 -- tappable candidate/variant pick on a q_items buffer line
+    # (stable lid) OR a q_confirm draft line (real line id). Routed by the
+    # neon_crew_comms bridge intercept (q_items/q_confirm session), NOT Copilot.
+    #   wa12_pick:<session_id>:<target>:<product_id>  -- bind product to target
+    #       target = 'b<lid>'  (a q_items buffer line, stable lid)
+    #             | 'l<line_id>' (a q_confirm draft quote.line)
+    #   wa12_pick_more:<session_id>:<target>   -- ">10" overflow: re-prompt narrow
+    #   wa12_pick_skip:<session_id>:<target>   -- "none of these" -> leave unmatched
+    "wa12_pick", "wa12_pick_more", "wa12_pick_skip",
     # WA-13: quote/invoice retrieval + invoice-from-quote (routed by the
     # neon_crew_comms bridge intercept AFTER WA-12, before WA-6). Retrieval and
     # the schedule-stage pick use NUMBER replies via the doc_pick / inv_pick

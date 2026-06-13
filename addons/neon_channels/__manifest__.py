@@ -217,7 +217,9 @@
     # 17.0.1.22.2: M-E -- when the partner has no Job Position, the greeting role
     # is resolved from the user's GROUPS (functional role first, superuser last)
     # so a sales user greets "Sales", never the lens-default "Director".
-    'version': '17.0.1.22.2',
+    # 17.0.1.22.3: WA-12.3 -- 3 new wa_payload INTENTS (wa12_pick/_more/_skip)
+    # for the tappable candidate/variant pick.
+    'version': '17.0.1.22.3',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',

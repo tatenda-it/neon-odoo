@@ -302,7 +302,11 @@
     # family (a bare "smoke machine" no longer leaks to a DJ package); confirmed
     # product-alias short-circuit tolerates a generic-noun residue ("smoke
     # machine" -> the confirmed smoke product).
-    "version": "17.0.1.16.1",
+    # 17.0.1.17.0: WA-12.3 pick/correct interaction layer (B tappable pick +
+    # variant framing, C edit-by-line-number, D conversational multi-correction).
+    # Buffer schema v3 (one ordered `lines` list, stable lid, single pending
+    # pick). Matcher byte-UNCHANGED; the variant signal is derived builder-side.
+    "version": "17.0.1.17.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

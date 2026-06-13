@@ -47,6 +47,9 @@ from odoo.exceptions import AccessError, UserError
 
 from odoo.addons.neon_channels.models.phone_utils import to_e164
 from odoo.addons.neon_channels.models import wa_payload
+# WA-12.3 family-term test reuses the matcher's stopword / generic-noun sets.
+from odoo.addons.neon_crew_comms.models.whatsapp_message_wa6 import (
+    _WA6_STOP, _WA6_GENERIC_NOUN)
 
 _logger = logging.getLogger(__name__)
 
@@ -253,9 +256,15 @@ class WhatsAppMessageWA12(models.Model):
         #    /.text (plain "Approve"/...); interactive -> button_reply.id (HMAC).
         tap = self._wa12_extract_tap(message)
         if tap:
-            intent, quote = tap
+            intent, payload = tap
+            # WA-12.3 pick sentinel -> the pick handler (payload is a parts
+            # list, NOT a quote recordset; routing it to _wa12_handle_tap would
+            # .exists() a list and crash).
+            if isinstance(payload, tuple) and payload and payload[0] == "pick":
+                return self._wa12_handle_pick_tap(
+                    intent, payload[1], from_e164, raw_from, message)
             return self._wa12_handle_tap(
-                intent, quote, from_e164, raw_from, message)
+                intent, payload, from_e164, raw_from, message)
 
         # 2) A live q_* session turn for this phone (confirm / reject comment).
         sess = self.env["neon.wa.equip.session"]._active_for_phone(from_e164)
@@ -303,11 +312,21 @@ class WhatsAppMessageWA12(models.Model):
         mtype = message.get("type")
         # interactive (in-window) -> HMAC id.
         if mtype == "interactive":
-            payload = ((message.get("interactive") or {})
-                       .get("button_reply") or {}).get("id")
+            inter = message.get("interactive") or {}
+            # WA-12.3: a 4-10 candidate pick comes back as list_reply, not
+            # button_reply -- read BOTH or the list tap dead-ends.
+            payload = ((inter.get("button_reply") or {}).get("id")
+                       or (inter.get("list_reply") or {}).get("id"))
             secret = self.env["ir.config_parameter"].sudo().get_param(
                 "database.secret") or ""
             decoded = wa_payload.decode(secret, payload or "")
+            # WA-12.3 pick intents: tested BEFORE the startswith("wa12_") block
+            # (which browses parts[0] as a QUOTE id). Return a sentinel tuple
+            # (intent, ("pick", parts)) so _wa12_maybe_intercept routes it to the
+            # pick handler, NOT _wa12_handle_tap (which would .exists() a list).
+            if decoded and decoded[0] in (
+                    "wa12_pick", "wa12_pick_more", "wa12_pick_skip"):
+                return (decoded[0], ("pick", list(decoded[1])))
             if decoded and decoded[0].startswith("wa12_"):
                 intent, parts = decoded
                 quote = self.env["neon.finance.quote"].sudo().browse(
@@ -764,11 +783,30 @@ class WhatsAppMessageWA12(models.Model):
 
         # ---- q_items: the confirm-before-draft gate (M1). ----
         if norm in _WA12_SUBMIT_WORDS:
-            matched = buf.get("matched") or []
+            # WA-12.3 yes-projection: draft ONLY the matched lines (an unmatched/
+            # pending line can't be drafted), stripped of transient keys. Same
+            # contract _wa12_quote_from_slots expects.
+            buf = self._wa12_buf_migrate(buf)
+            matched = [{"product_id": ln["product_id"],
+                        "product_name": ln["product_name"],
+                        "qty": ln.get("qty") or 1,
+                        "rep_price": ln.get("rep_price"),
+                        "stated_price": ln.get("stated_price")}
+                       for ln in buf["lines"] if ln.get("kind") == "matched"]
+            pending_un = [ln for ln in buf["lines"]
+                          if ln.get("kind") == "unmatched"]
             if not matched:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "Nothing matched to draft yet — re-type the items, or "
                     "*cancel*."))
+            if pending_un:
+                # don't silently drop unresolved lines on submit -- flag them.
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "%d item(s) still need a pick before I draft: %s. "
+                    "Resolve them (tap an option or `remove <n>`), then *yes*.")
+                    % (len(pending_un),
+                       ", ".join('"%s"' % (u.get("raw") or "")
+                                 for u in pending_un)))
             sess.sudo().write({"step": "done", "active": False})
             partner = self.env["res.partner"].sudo().browse(
                 buf.get("partner_id") or 0).exists()
@@ -800,33 +838,62 @@ class WhatsAppMessageWA12(models.Model):
         if any(t in norm for t in _WA12_COMPLAINT_TOKENS):
             return self._wa12_repair_prompt(raw_from, from_e164)
 
-        # deterministic corrections first (free).
+        # WA-12.3 precedence step 2: a NARROW follow-up (>10 overflow) re-targets
+        # the remembered line, scoped to its family; OR a bare free-text reply to
+        # a live `pending` pick narrows that line. Only when the text is not a
+        # command/yes/cancel (those are handled above / below).
+        nt = (buf.get("narrow_target") or {}) if isinstance(buf, dict) else {}
+        if nt.get("lid"):
+            narrowed = self._wa12_try_narrow(sess, buf, raw, from_e164, raw_from)
+            if narrowed is not None:
+                return narrowed
+
+        # deterministic corrections first (free). C line-number commands resolve
+        # here (number-aware find_one).
         handled = self._wa12_q_items_try(sess, buf, raw, from_e164, raw_from)
         if handled is not None:
             return handled
 
-        # F3: natural corrections -> ONE translated command, re-run through the
-        # SAME deterministic parser ("the LED screen should be the 5m x 3m
-        # one" -> replace ... = ...). REPAIR -> the repair prompt.
-        cmd = self._wa12_llm_translate_items(raw, buf)
-        if cmd:
-            if cmd.upper().startswith("REPAIR"):
+        # D: natural corrections -> a LIST of translated commands (one per line),
+        # two-pass lid-resolved so a `remove` can't shift a later command's
+        # number, then each re-run through the SAME deterministic parser. REPAIR
+        # -> the repair prompt.
+        cmds = self._wa12_llm_translate_items(raw, buf)
+        if cmds:
+            if any(c.upper().startswith("REPAIR") for c in cmds):
                 return self._wa12_repair_prompt(raw_from, from_e164)
-            cmd_norm = " ".join(cmd.lower().split())
-            # FSM-7: the translator may emit 'cancel'/'yes' -- the deterministic
-            # re-run can't execute those, so handle them here (cancel runs; a
-            # natural confirm asks for one explicit 'yes' -- no LLM-triggered
-            # state transition).
-            if self._wa12_is_cancel(cmd_norm):
+            # FSM-7: a translated 'cancel'/'yes' is handled here, never executed
+            # as a state transition by the deterministic re-run.
+            if any(self._wa12_is_cancel(" ".join(c.lower().split()))
+                   for c in cmds):
                 sess.sudo().write({"step": "done", "active": False})
                 return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
-            if cmd_norm in _WA12_SUBMIT_WORDS:
+            real = [c for c in cmds
+                    if " ".join(c.lower().split()) not in _WA12_SUBMIT_WORDS]
+            if not real:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "Ready when you are — reply *yes* to draft the quote."))
-            handled = self._wa12_q_items_try(
-                sess, buf, cmd, from_e164, raw_from)
-            if handled is not None:
-                return handled
+            buf = self._wa12_buf_migrate(buf)
+            resolved = self._wa12_batch_resolve_lids(buf, real)
+            applied = 0
+            for cmd in resolved:
+                if self._wa12_q_items_try(sess, buf, cmd, from_e164, raw_from,
+                                          batch=True) == "applied":
+                    applied += 1
+            if applied:
+                sess._set_buffer(buf)
+                # if the batch left a line needing a pick, offer the first one.
+                pick_ln = next(
+                    (ln for ln in buf["lines"]
+                     if ln.get("kind") == "unmatched" and ln.get("_cand_ids")),
+                    None)
+                if pick_ln:
+                    self._wa6_reply(raw_from, from_e164,
+                                    self._wa12_items_confirm_text(buf))
+                    return self._wa12_offer_pick_for_buffer(
+                        sess, buf, pick_ln, from_e164, raw_from)
+                return self._wa6_reply(raw_from, from_e164,
+                                       self._wa12_items_confirm_text(buf))
         # MATCH-2/FSM-5: neither a command nor a translatable correction -> if
         # the raw text weak/near-matches catalogue items, SURFACE them as picks
         # in the confirm echo (never silently drop); else the syntax card.
@@ -835,9 +902,9 @@ class WhatsAppMessageWA12(models.Model):
         if surfaced is not None:
             return surfaced
         return self._wa6_reply(raw_from, from_e164, _(
-            "Reply *yes* to draft, *cancel*, or correct me — `remove <item>` "
-            "· `qty <item> 2` · `price <item> <amt>` · a date · "
-            "`client <name>` · re-type an item."))
+            "Reply *yes* to draft, *cancel*, or correct me by line number — "
+            "`2 = <item>` · `remove 3` · `qty 1 to 4` · `price 2 <amt>` · "
+            "a date · `client <name>`."))
 
     def _wa12_surface_unmatched(self, sess, buf, raw, from_e164, raw_from):
         """MATCH-2/FSM-5: a re-typed item that only WEAK/near-matches is added
@@ -848,45 +915,513 @@ class WhatsAppMessageWA12(models.Model):
         weak = [w for w in weak if w.get("suggestions")]
         if not weak:
             return None
-        un = list(buf.get("unmatched") or [])
-        seen = {(u.get("name") or "").lower() for u in un}
+        buf = self._wa12_buf_migrate(buf)
+        seen = {(ln.get("raw") or "").lower() for ln in buf["lines"]
+                if ln.get("kind") == "unmatched"}
+        first_new = None
         for w in weak:
-            if (w.get("name") or "").lower() not in seen:
-                un.append(w)
-        buf["unmatched"] = un
+            nm = w.get("name") or ""
+            if nm.lower() in seen:
+                continue
+            fam = w.get("family") or self._wa6_family_code(nm) or ""
+            is_v = bool(fam and self._wa12_is_family_term(nm))
+            cids = (self._wa12_family_candidate_ids(fam) if is_v
+                    else self._wa12_suggestion_ids(w.get("suggestions") or []))
+            ln = self._wa12_add_line(
+                buf, kind="unmatched", raw=nm, qty=w.get("qty") or 1,
+                suggestions=w.get("suggestions") or [], family=fam,
+                _variant=is_v, _cand_ids=cids)
+            first_new = first_new or (ln if cids else None)
+        sess._set_buffer(buf)
+        if first_new:
+            self._wa6_reply(raw_from, from_e164,
+                            self._wa12_items_confirm_text(buf))
+            return self._wa12_offer_pick_for_buffer(
+                sess, buf, first_new, from_e164, raw_from)
+        return self._wa6_reply(raw_from, from_e164,
+                               self._wa12_items_confirm_text(buf))
+
+    # ================================================================
+    # WA-12.3 -- pick/correct interaction layer (B tap-pick, C line-number,
+    # D conversational). Buffer schema v3: ONE ordered `lines` list with a
+    # stable `lid` per line + at-most-one `pending` pick slot. Design:
+    # docs/phase-11/WA12_3_interaction_redesign_spec.md. The matcher
+    # (_wa6_match_one) is byte-UNCHANGED; the variant-vs-unsure signal is
+    # derived HERE from family + confidence + a family-term test.
+    # ================================================================
+    def _wa12_buf_migrate(self, buf):
+        """Fold a legacy {matched,unmatched} buffer into v3 {lines,next_lid}.
+        Idempotent: a v3 buffer returns unchanged. Called at the TOP of every
+        q_items buffer consumer so a pre-deploy session degrades cleanly and no
+        path leaves BOTH `lines` and the legacy keys."""
+        if not isinstance(buf, dict):
+            return {"v": 3, "next_lid": 1, "lines": [], "pending": None}
+        if buf.get("v") == 3 and "lines" in buf:
+            return buf
+        lines, lid = [], 1
+        for it in (buf.get("matched") or []):
+            lines.append({
+                "lid": lid, "kind": "matched",
+                "product_id": it.get("product_id"),
+                "product_name": it.get("product_name") or "",
+                "qty": it.get("qty") or 1,
+                "rep_price": it.get("rep_price"),
+                "stated_price": it.get("stated_price")})
+            lid += 1
+        for um in (buf.get("unmatched") or []):
+            lines.append({
+                "lid": lid, "kind": "unmatched",
+                "raw": um.get("name") or "", "qty": um.get("qty") or 1,
+                "stated_price": um.get("stated_price"),
+                "suggestions": um.get("suggestions") or [],
+                "family": um.get("family") or ""})
+            lid += 1
+        buf["lines"] = lines
+        buf["next_lid"] = lid
+        buf["v"] = 3
+        buf.setdefault("pending", None)
+        buf.pop("matched", None)
+        buf.pop("unmatched", None)
+        return buf
+
+    def _wa12_add_line(self, buf, **vals):
+        """Append a line, allocating a fresh never-reused lid. Returns it."""
+        lid = buf.get("next_lid") or 1
+        ln = dict(vals)
+        ln["lid"] = lid
+        ln.setdefault("qty", 1)
+        buf["next_lid"] = lid + 1
+        buf.setdefault("lines", []).append(ln)
+        return ln
+
+    def _wa12_line_by_lid(self, buf, lid):
+        for ln in buf.get("lines") or []:
+            if ln.get("lid") == lid:
+                return ln
+        return None
+
+    def _wa12_line_by_number(self, buf, n):
+        """1-based display number -> the line dict, or None if out of range."""
+        lines = buf.get("lines") or []
+        if 1 <= n <= len(lines):
+            return lines[n - 1]
+        return None
+
+    def _wa12_set_pending(self, buf, lid, kind, candidates, label, family,
+                          overflow=False):
+        buf["pending"] = {"lid": lid, "kind": kind,
+                          "candidates": list(candidates), "label": label,
+                          "family": family or "", "overflow": overflow}
+
+    def _wa12_clear_pending_for(self, buf, lid):
+        p = buf.get("pending")
+        if p and p.get("lid") == lid:
+            buf["pending"] = None
+
+    # ---- the variant-vs-unsure signal + candidate sources (matcher untouched).
+    def _wa12_is_family_term(self, raw):
+        """True when the rep NAMED a family/alias (a variant pick is owed), not
+        a specific product. Reuses the matcher's own public helpers -- a
+        confirmed CATEGORY alias, or a synonym-derived family with no residual
+        product token (modulo stopwords / generic nouns)."""
+        import re
+        raw = (raw or "").strip()
+        if not raw:
+            return False
+        kind, val, expanded = self._r2_alias_expand(raw)
+        if kind == "category":
+            return True
+        # a confirmed TERM alias whose expansion is itself a bare family word
+        # ("blinder" -> term "molefay" -> lighting family) is a variant pick.
+        if kind == "term" and self._wa6_family_code(val or "") \
+                and self._wa12_is_family_term(val or ""):
+            return True
+        fam = self._wa6_family_code(raw)
+        if not fam:
+            return False
+        # the family synonym IS essentially the whole phrase (no extra product
+        # token) -> a bare family word like "blinder"/"screen"/"cans".
+        toks = [t for t in re.findall(r"[a-z0-9.]+", raw.lower())
+                if t not in _WA6_STOP and t not in _WA6_GENERIC_NOUN]
+        # strip the tokens that themselves derive the family.
+        residual = [t for t in toks if not self._wa6_family_code(t) == fam]
+        return len(residual) == 0
+
+    def _wa12_family_candidate_ids(self, fam, limit=10):
+        """In-family product ids (the variant set) -- NOT from suggestions[:3]
+        (the matcher caps that at 3). Prefer products whose equipment_category_id
+        IS this family (the keystone made categories reliable) so a name-synonym
+        leak from an UNcategorised product can't pull a cross-family item into
+        the variant list. Falls back to the name-synonym set only if the
+        category yields nothing."""
+        if not fam:
+            return []
+        PT = self.env["product.template"].sudo()
+        Cat = self.env["neon.equipment.category"].sudo()
+        cat = Cat.search([("code", "=", fam)], limit=1)
+        if cat:
+            by_cat = PT.search([("is_workshop_item", "=", True),
+                                ("equipment_category_id", "=", cat.id)])
+            if by_cat:
+                return by_cat.ids[:limit]
+        pkg = Cat.search([("code", "=", "packages")], limit=1)
+        dom = [("is_workshop_item", "=", True)]
+        if pkg:
+            dom.append(("equipment_category_id", "!=", pkg.id))
+        cands = PT.search(dom).filtered(lambda p: self._wa6_in_family(p, fam))
+        return cands.ids[:limit]
+
+    def _wa12_suggestion_ids(self, names):
+        """Map matcher `suggestions` NAMES -> product ids by exact _r2_norm
+        equality within the (package-excluded) workshop catalogue. Caps at 3."""
+        if not names:
+            return []
+        PT = self.env["product.template"].sudo()
+        out = []
+        for nm in names[:3]:
+            want = self._r2_norm(nm)
+            p = PT.search([("is_workshop_item", "=", True),
+                           ("name", "ilike", nm)], limit=5)
+            hit = p.filtered(lambda x: self._r2_norm(x.name) == want)[:1] or p[:1]
+            if hit and hit.id not in out:
+                out.append(hit.id)
+        return out
+
+    _WA12_FAMILY_WORD = {
+        "visual": "screens", "lighting": "lights", "sound": "speakers",
+        "trussing": "truss pieces", "staging": "stage pieces",
+        "effects": "effects units", "cabling": "cables",
+        "dance_floor": "dance-floor panels", "laptops": "laptops"}
+
+    def _wa12_family_word(self, fam):
+        return self._WA12_FAMILY_WORD.get(fam, _("options"))
+
+    def _wa12_build_buf_lines(self, buf, matched, unmatched):
+        """Build/extend the v3 `lines` from a fresh _wa12_match_text_items
+        result. Confident hits -> matched lines; weak/no hits -> unmatched lines
+        carrying their family + a transient `_variant`/`_cand_ids` so the picker
+        can frame a family variant vs a genuinely-unsure 'did you mean'. q_items
+        ONLY (the matcher is unchanged; the signal is derived here)."""
+        buf = self._wa12_buf_migrate(buf)
+        for it in matched or []:
+            self._wa12_add_line(
+                buf, kind="matched", product_id=it.get("product_id"),
+                product_name=it.get("product_name") or "",
+                qty=it.get("qty") or 1, rep_price=it.get("rep_price"),
+                stated_price=it.get("stated_price"))
+        for um in unmatched or []:
+            raw = um.get("name") or ""
+            fam = um.get("family") or self._wa6_family_code(raw) or ""
+            is_variant = bool(fam and self._wa12_is_family_term(raw))
+            cand_ids = (self._wa12_family_candidate_ids(fam) if is_variant
+                        else self._wa12_suggestion_ids(um.get("suggestions") or []))
+            self._wa12_add_line(
+                buf, kind="unmatched", raw=raw, qty=um.get("qty") or 1,
+                stated_price=um.get("stated_price"),
+                suggestions=um.get("suggestions") or [], family=fam,
+                _variant=is_variant, _cand_ids=cand_ids)
+        return buf
+
+    # ---- B: present a pick (count branching + Meta truncation + framing).
+    _WA12_BTN_TITLE = 20
+    _WA12_LIST_TITLE = 24
+    _WA12_LIST_MAX = 10
+
+    def _wa12_send_pick(self, sess, target, kind, cand_ids, label, family,
+                        from_e164, raw_from):
+        """Offer the candidate set as taps. <=2 -> buttons (+skip); >=3 -> LIST
+        (so a 'None of these' row never displaces a candidate); >10 -> 9 + a
+        'Type to narrow' row. Titles truncated to Meta limits; full name in the
+        list-row description. `target` is 'b<lid>' (q_items) or 'l<line_id>'."""
+        PT = self.env["product.template"].sudo()
+        secret = self.env["ir.config_parameter"].sudo().get_param(
+            "database.secret") or ""
+        cand_ids = [p for p in cand_ids if PT.browse(p).exists()]
+        if not cand_ids:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I don't have a confident option for that — please re-type it."))
+        if kind == "variant":
+            body = _("*%s* → %s — which one?") % (
+                label, self._wa12_family_word(family))
+        else:
+            body = _("\"%s\" — did you mean one of these?") % label
+
+        def pick(pid):
+            return wa_payload.encode(secret, "wa12_pick", sess.id, target, pid)
+        skip = wa_payload.encode(secret, "wa12_pick_skip", sess.id, target)
+        more = wa_payload.encode(secret, "wa12_pick_more", sess.id, target)
+        n = len(cand_ids)
+        if n <= 2:
+            buttons = [{"id": pick(p),
+                        "title": PT.browse(p).name[:self._WA12_BTN_TITLE]}
+                       for p in cand_ids]
+            buttons.append({"id": skip,
+                            "title": _("None of these")[:self._WA12_BTN_TITLE]})
+            return self._wa6_send_buttons(raw_from, from_e164, body, buttons)
+        show = (cand_ids[:self._WA12_LIST_MAX - 1]
+                if n > self._WA12_LIST_MAX else cand_ids)
+        rows = [{"id": pick(p), "title": PT.browse(p).name[:self._WA12_LIST_TITLE],
+                 "description": PT.browse(p).name} for p in show]
+        if n > self._WA12_LIST_MAX:
+            rows.append({"id": more,
+                         "title": _("Type to narrow")[:self._WA12_LIST_TITLE],
+                         "description": _("None of these — type a few more words")})
+            body += _("\n(showing the closest %d — or narrow it)") % len(show)
+        else:
+            rows.append({"id": skip,
+                         "title": _("None of these")[:self._WA12_LIST_TITLE],
+                         "description": ""})
+        return self._wa6_send_list(raw_from, from_e164, body, _("Pick item"),
+                                   rows)
+
+    def _wa12_offer_pick_for_buffer(self, sess, buf, ln, from_e164, raw_from):
+        """Set `pending` for an unmatched/variant buffer line and send the pick.
+        Returns the send result. Candidates come from the line's transient
+        `_cand_ids` (in-family variants OR suggestion ids)."""
+        cand_ids = ln.get("_cand_ids") or []
+        kind = "variant" if ln.get("_variant") else "ambiguous"
+        self._wa12_set_pending(buf, ln["lid"], kind, cand_ids,
+                               ln.get("raw") or "", ln.get("family") or "",
+                               overflow=len(cand_ids) > self._WA12_LIST_MAX)
+        sess._set_buffer(buf)
+        return self._wa12_send_pick(
+            sess, "b%d" % ln["lid"], kind, cand_ids, ln.get("raw") or "",
+            ln.get("family") or "", from_e164, raw_from)
+
+    def _wa12_offer_pick_for_replace(self, sess, buf, target_ln, new_txt,
+                                     new_hit, from_e164, raw_from):
+        """A non-confident REPLACE (C `<n> = <weak>` / the existing `replace`
+        path / a D batch item) -> a B pick instead of a 'did you mean' text. The
+        target buffer line becomes pending against the new term's candidates."""
+        fam = new_hit.get("family") or self._wa6_family_code(new_txt) or ""
+        is_variant = bool(fam and self._wa12_is_family_term(new_txt))
+        cand_ids = (self._wa12_family_candidate_ids(fam) if is_variant
+                    else self._wa12_suggestion_ids(new_hit.get("suggestions")
+                                                   or []))
+        if not cand_ids:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Couldn't confidently match \"%s\" — try a catalogue name.")
+                % new_txt)
+        target_ln["raw"] = new_txt
+        target_ln["family"] = fam
+        target_ln["_variant"] = is_variant
+        target_ln["_cand_ids"] = cand_ids
+        kind = "variant" if is_variant else "ambiguous"
+        self._wa12_set_pending(buf, target_ln["lid"], kind, cand_ids, new_txt,
+                               fam, overflow=len(cand_ids) > self._WA12_LIST_MAX)
+        sess._set_buffer(buf)
+        return self._wa12_send_pick(sess, "b%d" % target_ln["lid"], kind,
+                                    cand_ids, new_txt, fam, from_e164, raw_from)
+
+    # ---- B: handle the tap. Entered from _wa12_maybe_intercept (sentinel).
+    def _wa12_handle_pick_tap(self, intent, parts, from_e164, raw_from, message):
+        """A wa12_pick* tap. parts = [session_id, target(, product_id)]. Resolve
+        the session by PHONE, then assert it matches the payload session_id
+        (cross-session lid-collision guard) AND the sender is still quote-
+        capable (two-factor). target = 'b<lid>' (q_items) | 'l<line_id>'
+        (q_confirm). The bound product is re-validated against the OFFERED set
+        so a tap can never bind a product the matcher didn't surface."""
+        self._wa6_audit_in(from_e164, message, intent)
+        sess = self.env["neon.wa.equip.session"].sudo()._active_for_phone(
+            from_e164)
+        sid = int(parts[0]) if parts and str(parts[0]).isdigit() else 0
+        if not (sess and sess.id == sid
+                and sess.step in ("q_items", "q_confirm")
+                and from_e164 == sess.phone_number):
+            return self._wa6_reply(raw_from, from_e164, _(
+                "That choice has expired — send the items again to re-quote."))
+        sender = sess.user_id
+        if not (sender and sender.active and self._wa12_can_quote(sender)):
+            sess.sudo().write({"active": False})
+            return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
+        sess.sudo().write({"last_inbound": fields.Datetime.now()})
+        target = str(parts[1]) if len(parts) > 1 else ""
+        if sess.step == "q_confirm":
+            return self._wa12_pick_apply_draft(
+                sess, intent, target, parts, from_e164, raw_from)
+        return self._wa12_pick_apply_buffer(
+            sess, intent, target, parts, from_e164, raw_from)
+
+    def _wa12_pick_apply_buffer(self, sess, intent, target, parts, from_e164,
+                                raw_from):
+        """Apply a q_items tap to the stable-lid buffer line."""
+        buf = self._wa12_buf_migrate(sess._get_buffer())
+        lid = int(target[1:]) if target.startswith("b") and target[1:].isdigit() \
+            else 0
+        ln = self._wa12_line_by_lid(buf, lid)
+        if ln is None:
+            # the line was removed since the offer -> just reshow current.
+            buf["pending"] = None
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164,
+                                   self._wa12_items_confirm_text(buf))
+        if intent == "wa12_pick_more":
+            return self._wa12_pick_narrow(sess, buf, lid, from_e164, raw_from)
+        if intent == "wa12_pick_skip":
+            self._wa12_clear_pending_for(buf, lid)
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164,
+                                   self._wa12_items_confirm_text(buf))
+        # wa12_pick: validate the product against the OFFERED candidate set.
+        pid = int(parts[2]) if len(parts) > 2 and str(parts[2]).isdigit() else 0
+        pend = buf.get("pending") or {}
+        offered = set(pend.get("candidates") or []) | set(ln.get("_cand_ids")
+                                                          or [])
+        prod = self.env["product.template"].sudo().browse(pid)
+        if not (pid and prod.exists() and pid in offered):
+            return self._wa6_reply(raw_from, from_e164, _(
+                "That option is no longer available — re-type the item."))
+        ln.update({"kind": "matched", "product_id": pid,
+                   "product_name": prod.name, "rep_price": None,
+                   "stated_price": None})
+        for k in ("raw", "suggestions", "family", "_variant", "_cand_ids"):
+            ln.pop(k, None)
+        self._wa12_clear_pending_for(buf, lid)
         sess._set_buffer(buf)
         return self._wa6_reply(raw_from, from_e164,
                                self._wa12_items_confirm_text(buf))
 
-    def _wa12_q_items_try(self, sess, buf, raw, from_e164, raw_from):
-        """Apply ONE q_items correction command (deterministic). Returns the
-        reply, or None if ``raw`` isn't a recognised correction. Used for both
-        the rep's literal text and the LLM-translated command (F3)."""
+    def _wa12_pick_apply_draft(self, sess, intent, target, parts, from_e164,
+                               raw_from):
+        """Apply a q_confirm tap to a real draft quote.line. Re-matches the
+        product NAME through the funnel + the parity gate (uniform with the
+        draft edit path), then writes as the salesperson."""
+        buf = sess._get_buffer() if sess else {}
+        buf = buf if isinstance(buf, dict) else {}
+        quote = self.env["neon.finance.quote"].sudo().browse(
+            buf.get("quote_id") or 0).exists()
+        if not quote:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "That quote is no longer editable."))
+        if intent in ("wa12_pick_skip", "wa12_pick_more"):
+            unpriced = self._wa12_unpriced_lines(quote)
+            return self._wa6_reply(raw_from, from_e164,
+                                   self._wa12_draft_summary(quote, unpriced))
+        lid = int(target[1:]) if target.startswith("l") and target[1:].isdigit() \
+            else 0
+        line = self.env["neon.finance.quote.line"].sudo().browse(lid)
+        pid = int(parts[2]) if len(parts) > 2 and str(parts[2]).isdigit() else 0
+        prod = self.env["product.template"].sudo().browse(pid)
+        if not (line.exists() and line.quote_id == quote and prod.exists()):
+            return self._wa6_reply(raw_from, from_e164, _(
+                "That option is no longer available."))
+        new_hit = self._wa6_match_one(prod.name)
+        if not (new_hit.get("status") == "matched"
+                and new_hit.get("confidence") in ("exact", "strong")):
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Couldn't confirm that product — re-type it."))
+        sender = sess.user_id
+        actor = sender.id or quote.salesperson_id.id or self.env.uid
+        line.with_user(actor).sudo().write({"product_template_id": prod.id})
+        return self._wa12_after_edit(
+            quote, from_e164, raw_from, _("Set line to %s") % prod.name)
+
+    def _wa12_pick_narrow(self, sess, buf, lid, from_e164, raw_from):
+        """>10 overflow: remember WHICH line the next free-text should re-target,
+        scoped to that line's family. The narrow phrase re-runs the matcher."""
+        ln = self._wa12_line_by_lid(buf, lid)
+        buf["narrow_target"] = {"lid": lid,
+                                "family": (ln or {}).get("family") or ""}
+        sess._set_buffer(buf)
+        return self._wa6_reply(raw_from, from_e164, _(
+            "Type a few more words for that item (e.g. a size or wattage) and "
+            "I'll narrow it down."))
+
+    def _wa12_q_items_try(self, sess, buf, raw, from_e164, raw_from,
+                          batch=False):
+        """Apply ONE q_items correction command against the v3 `lines` buffer.
+        Returns the reply (or 'applied' sentinel when batch=True, mutating buf
+        without replying so a multi-command batch yields ONE reshow), or None if
+        ``raw`` isn't a recognised correction. WA-12.3 adds line-NUMBER
+        addressing (C): a bare leading int targets a line by display position;
+        `<n> = <new>` replaces; `remove <n>` removes exactly that line.
+        Every replacement re-matches through _wa6_match_one + the parity gate;
+        a non-confident replace routes to a B tappable pick."""
         import re
-        matched = buf.get("matched") or []
+        buf = self._wa12_buf_migrate(buf)
+        lines = buf["lines"]
         norm = " ".join((raw or "").strip().lower().split())
 
         def reshow():
             sess._set_buffer(buf)
+            if batch:
+                return "applied"
             return self._wa6_reply(raw_from, from_e164,
                                    self._wa12_items_confirm_text(buf))
 
-        # FSM-4: resolve a token to EXACTLY ONE buffered line. >1 contains-match
-        # -> refuse with the colliding names (mirrors the post-draft
-        # _wa12_match_line resolver; never silently target the first hit).
+        def find_by_number(tok):
+            """(line, err). A 'lid#<L>' sentinel (from the D two-pass) resolves
+            by stable lid; a bare int by 1-based display position."""
+            tok = str(tok).strip()
+            if tok.startswith("lid#") and tok[4:].isdigit():
+                ln = self._wa12_line_by_lid(buf, int(tok[4:]))
+                if ln is None:
+                    return None, self._wa6_reply(raw_from, from_e164, _(
+                        "That line is gone — check the list and try again."))
+                return ln, None
+            if not tok.isdigit():
+                return None, None
+            ln = self._wa12_line_by_number(buf, int(tok))
+            if ln is None:
+                return None, self._wa6_reply(raw_from, from_e164, _(
+                    "There's no line %s — you have %d.")
+                    % (tok, len(lines)))
+            return ln, None
+
         def find_one(tok):
-            tok = (tok or "").strip().lower()
-            hits = [it for it in matched
-                    if tok in (it.get("product_name") or "").lower()]
+            """A bare int / lid# -> by number; else a contains-match on a
+            MATCHED product name (>1 -> refuse; 0 -> refuse)."""
+            t = (tok or "").strip()
+            if t.isdigit() or t.startswith("lid#"):
+                ln, err = find_by_number(t)
+                if ln is not None or err is not None:
+                    return ln, err
+            tl = t.lower()
+            hits = [ln for ln in lines if ln.get("kind") == "matched"
+                    and tl in (ln.get("product_name") or "").lower()]
             if not hits:
                 return None, self._wa6_reply(raw_from, from_e164, _(
-                    "No line matches \"%s\".") % tok)
+                    "No line matches \"%s\".") % t)
             if len(hits) > 1:
                 return None, self._wa6_reply(raw_from, from_e164, _(
-                    "Several items match \"%s\" — be more specific: %s")
-                    % (tok, " / ".join(it["product_name"] for it in hits)))
+                    "Several items match \"%s\" — say the line number: %s")
+                    % (t, " / ".join("%d) %s" % (lines.index(h) + 1,
+                                                 h["product_name"])
+                                     for h in hits)))
             return hits[0], None
 
+        def apply_replace(target_ln, new_txt):
+            new_hit = self._wa6_match_one(new_txt)
+            if (new_hit.get("status") == "matched"
+                    and new_hit.get("confidence") in ("exact", "strong")):
+                target_ln.clear()
+                target_ln.update({
+                    "lid": target_ln_lid, "kind": "matched",
+                    "product_id": new_hit["product_id"],
+                    "product_name": new_hit["product_name"],
+                    "qty": new_qty, "rep_price": None, "stated_price": None})
+                self._wa12_clear_pending_for(buf, target_ln_lid)
+                return reshow()
+            # non-confident -> a B tappable pick (never a "did you mean" text).
+            self._wa12_clear_pending_for(buf, target_ln_lid)
+            if batch:
+                # in a batch we can't send a pick per item; flag the line
+                # unmatched + let the post-batch reshow offer the first pick.
+                target_ln.clear()
+                fam = new_hit.get("family") or self._wa6_family_code(new_txt) or ""
+                is_v = bool(fam and self._wa12_is_family_term(new_txt))
+                cids = (self._wa12_family_candidate_ids(fam) if is_v
+                        else self._wa12_suggestion_ids(new_hit.get("suggestions")
+                                                       or []))
+                target_ln.update({
+                    "lid": target_ln_lid, "kind": "unmatched", "raw": new_txt,
+                    "qty": new_qty, "suggestions": new_hit.get("suggestions")
+                    or [], "family": fam, "_variant": is_v, "_cand_ids": cids})
+                return "applied"
+            return self._wa12_offer_pick_for_replace(
+                sess, buf, target_ln, new_txt, new_hit, from_e164, raw_from)
+
+        # client <name>
         m = re.match(r"client\s+(.+)$", raw, re.I)
         if m:
             name = m.group(1).strip()
@@ -895,68 +1430,86 @@ class WhatsAppMessageWA12(models.Model):
             buf["partner_id"] = partner.id if partner else False
             return reshow()
 
-        # F3: per-item replace -- `replace <old> = <new>` (also `<old> -> <new>`).
-        m = re.match(r"replace\s+(.+?)\s*(?:=|->)\s*(.+)$", raw, re.I)
+        # C: `<n> = <new>` / `<n> -> <new>` -- replace BY NUMBER. ':' is NOT a
+        # separator (avoids time/ratio collision). A non-numeric LHS falls to
+        # the `replace` form below; a non-existent index falls through (None).
+        m = re.match(r"^\s*((?:lid#)?\d+)\s*(?:=|->)\s*(.+)$", raw, re.I)
         if m:
-            old_tok, new_txt = m.group(1).strip(), m.group(2).strip()
-            it, err = find_one(old_tok)
+            ln, err = find_by_number(m.group(1))
             if err:
                 return err
-            new_hit = self._wa6_match_one(new_txt)
-            if not (new_hit.get("status") == "matched"
-                    and new_hit.get("confidence") in ("exact", "strong")):
-                sugg = new_hit.get("suggestions") or []
-                return self._wa6_reply(raw_from, from_e164, _(
-                    "Couldn't confidently match \"%s\"%s.") % (
-                        new_txt,
-                        (_(" — did you mean: %s?") % " / ".join(sugg[:3]))
-                        if sugg else ""))
-            it.update({"product_id": new_hit["product_id"],
-                       "product_name": new_hit["product_name"],
-                       "rep_price": None, "stated_price": None})
-            return reshow()
+            if ln is not None:
+                target_ln, target_ln_lid = ln, ln["lid"]
+                new_qty = ln.get("qty") or 1
+                return apply_replace(ln, m.group(2).strip())
+            # not a valid index -> fall through (so "2x100 molefay" re-types).
 
+        # name-led replace -- `replace <old> = <new>` (also `<old> -> <new>`).
+        m = re.match(r"replace\s+(.+?)\s*(?:=|->)\s*(.+)$", raw, re.I)
+        if m:
+            it, err = find_one(m.group(1).strip())
+            if err:
+                return err
+            target_ln, target_ln_lid = it, it["lid"]
+            new_qty = it.get("qty") or 1
+            return apply_replace(it, m.group(2).strip())
+
+        # remove -- a bare int / lid# removes EXACTLY that line; a token removes
+        # by contains-match (announcing a multi-remove, never silent).
         m = re.match(r"remove\s+(.+)$", raw, re.I)
         if m:
-            tok = m.group(1).strip().lower()
-            keep = [it for it in matched
-                    if tok not in (it.get("product_name") or "").lower()]
-            un_keep = [um for um in (buf.get("unmatched") or [])
-                       if tok not in (um.get("name") or "").lower()]
-            n_removed = (len(matched) - len(keep)) + (
-                len(buf.get("unmatched") or []) - len(un_keep))
+            tok = m.group(1).strip()
+            if tok.isdigit() or tok.startswith("lid#"):
+                ln, err = find_by_number(tok)
+                if err:
+                    return err
+                self._wa12_clear_pending_for(buf, ln["lid"])
+                lines.remove(ln)
+                return reshow()
+            tl = tok.lower()
+            keep = [ln for ln in lines
+                    if tl not in (ln.get("product_name")
+                                  or ln.get("raw") or "").lower()]
+            n_removed = len(lines) - len(keep)
             if not n_removed:
                 return self._wa6_reply(raw_from, from_e164, _(
-                    "No line matches \"%s\".") % m.group(1).strip())
-            buf["matched"], buf["unmatched"] = keep, un_keep
-            # FSM-4 side: announce a multi-line removal so it's never silent.
-            note = (_("Removed %d lines matching \"%s\".\n\n") % (
-                n_removed, m.group(1).strip())) if n_removed > 1 else ""
+                    "No line matches \"%s\".") % tok)
+            for ln in lines:
+                if ln not in keep:
+                    self._wa12_clear_pending_for(buf, ln["lid"])
+            buf["lines"] = keep
+            note = (_("Removed %d lines matching \"%s\".\n\n")
+                    % (n_removed, tok)) if n_removed > 1 else ""
             sess._set_buffer(buf)
+            if batch:
+                return "applied"
             return self._wa6_reply(raw_from, from_e164,
                                    note + self._wa12_items_confirm_text(buf))
 
-        m = re.match(r"qty\s+(.+?)\s+(\d+)\s*$", raw, re.I)
+        # qty -- `qty <tok> <m>` / `qty <tok> to <m>`. tok may be a number.
+        m = re.match(r"qty\s+(.+?)\s+(?:to\s+)?(\d+)\s*$", raw, re.I)
         if m:
-            it, err = find_one(m.group(1))
+            it, err = find_one(m.group(1).strip())
             if err:
                 return err
             it["qty"] = max(1, int(m.group(2)))
             return reshow()
 
-        # F8: `price <item> <amt>` -- ONLY where no catalogue rate exists.
+        # price -- `price <tok> <amt>`, ONLY where no catalogue rate exists.
         m = re.match(r"price\s+(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*$", raw, re.I)
         if m:
-            it, err = find_one(m.group(1))
+            it, err = find_one(m.group(1).strip())
             if err:
                 return err
+            if it.get("kind") != "matched":
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "That line isn't matched yet — pick the product first."))
             prod = self.env["product.template"].sudo().browse(it["product_id"])
             rate, cur = self._wa12_price_lookup(prod)
             if rate is not None and rate > _WA12_PLACEHOLDER_RATE:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "%s has a catalogue rate (%s %.2f/day) — that's what "
-                    "drafts. You can apply a discount after drafting "
-                    "(`price <item> <amt>` on the draft).")
+                    "drafts. You can apply a discount after drafting.")
                     % (it["product_name"], cur, rate))
             amt = float(m.group(2))
             if amt <= _WA12_PLACEHOLDER_RATE:
@@ -970,24 +1523,29 @@ class WhatsAppMessageWA12(models.Model):
             buf["date_txt"] = ev_date.isoformat()
             return reshow()
 
-        # re-typed item(s): only CONFIDENT matches add here (reconciling any
-        # unmatched pick they resolve). A purely-weak/no-match input returns
-        # None so the caller can first try the F3 LLM translate (a conversational
-        # correction must reach translate, not be swallowed as a weak item);
-        # genuinely-weak re-types are surfaced by the caller's post-translate
-        # fallback (_wa12_surface_unmatched). qty carried.
+        # re-typed item(s): only CONFIDENT matches add here. A purely-weak/
+        # no-match input returns None so the caller can try the LLM translate;
+        # genuinely-weak re-types are surfaced by the caller's fallback. qty
+        # carried; a re-type reconciles a matching unmatched line.
         adds, _weak = self._wa12_match_text_items(raw)
         if adds:
-            known = {it["product_id"] for it in matched}
+            known = {ln["product_id"] for ln in lines
+                     if ln.get("kind") == "matched"}
+            added_names = set()
             for a in adds:
                 if a["product_id"] not in known:
-                    matched.append(a)
+                    self._wa12_add_line(
+                        buf, kind="matched", product_id=a["product_id"],
+                        product_name=a["product_name"], qty=a.get("qty") or 1,
+                        rep_price=a.get("rep_price"),
+                        stated_price=a.get("stated_price"))
                     known.add(a["product_id"])
-            buf["matched"] = matched
-            added_names = {a["product_name"] for a in adds}
-            buf["unmatched"] = [um for um in (buf.get("unmatched") or [])
-                                if not (added_names
-                                        & set(um.get("suggestions") or []))]
+                added_names.add(a["product_name"])
+            # drop any unmatched line whose suggestions the add resolved.
+            buf["lines"] = [ln for ln in buf["lines"]
+                            if not (ln.get("kind") == "unmatched"
+                                    and (added_names
+                                         & set(ln.get("suggestions") or [])))]
             return reshow()
         return None
 
@@ -1046,30 +1604,129 @@ class WhatsAppMessageWA12(models.Model):
         return self._wa12_after_edit(
             quote, from_e164, raw_from, "\n".join(note_bits) or _("No change"))
 
+    _WA12_BATCH_MAX = 6
+
     def _wa12_llm_translate_items(self, text, buf):
-        """F3: translate a natural q_items correction into ONE deterministic
-        command (re-run through _wa12_q_items_try, which re-enforces every
-        guard). None on unclear / degraded."""
-        names = " · ".join((it.get("product_name") or "")
-                           for it in (buf.get("matched") or [])) or "(none)"
+        """D: translate a natural q_items message into a LIST of deterministic
+        commands (one per change), each re-run through _wa12_q_items_try (which
+        re-enforces every guard). Returns [cmd, ...] (deduped, capped), or None
+        on unclear / degraded. The current lines are shown WITH NUMBERS so the
+        model can address a line by position (`N = <item>`)."""
+        buf = self._wa12_buf_migrate(buf)
+        numbered = "\n".join(
+            "%d. %s" % (i, ln.get("product_name") or ("⚠️ " + (ln.get("raw")
+                        or "")))
+            for i, ln in enumerate(buf.get("lines") or [], 1)) or "(none)"
         sys = (
-            "You map a sales rep's WhatsApp message to EXACTLY ONE correction "
-            "command for an UNCONFIRMED quote item list, output as plain text "
-            "on one line, no quotes, no prose. Allowed: 'replace <item> = "
-            "<new item>', 'remove <item>', 'qty <item> <n>', 'price <item> "
-            "<amount>', 'client <name>', a date (YYYY-MM-DD), 'yes' "
-            "(confirm), or 'cancel'. Current items: " + names + ". If the "
-            "message is a complaint without one specific change, output "
-            "exactly REPAIR. If it doesn't map to one command, output exactly "
+            "You map a sales rep's WhatsApp message to a LIST of correction "
+            "commands for an UNCONFIRMED quote item list. Output ONE command "
+            "per line, one per change, plain text, no quotes, no prose. Allowed "
+            "forms: 'N = <new item>' (replace line number N), '<oldname> = "
+            "<new item>', 'remove N', 'remove <name>', 'qty N <n>', 'price N "
+            "<amount>', 'client <name>', a date (YYYY-MM-DD), 'yes', or "
+            "'cancel'. Prefer addressing a line by its NUMBER. Current lines:\n"
+            + numbered + "\nIf the message is a complaint with no specific "
+            "change, output exactly REPAIR. If nothing maps, output exactly "
             "UNKNOWN.")
         raw = self._wa12_llm_chat([{"role": "system", "content": sys},
                                    {"role": "user", "content": text or ""}])
         if not raw:
             return None
-        cmd = raw.strip().strip('"`').splitlines()[0].strip()
-        if not cmd or cmd.upper() == "UNKNOWN":
+        out, seen = [], set()
+        for line in raw.strip().splitlines():
+            cmd = line.strip().strip('"`').strip()
+            if not cmd or cmd.upper() == "UNKNOWN":
+                continue
+            key = " ".join(cmd.lower().split())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(cmd)
+        if not out:
             return None
-        return cmd
+        if len(out) > self._WA12_BATCH_MAX:
+            # too many at once -> safer to ask for them one at a time than to
+            # apply a long, possibly-misread batch.
+            return ["REPAIR_TOO_MANY"]
+        return out
+
+    def _wa12_batch_resolve_lids(self, buf, cmds):
+        """D two-pass: rewrite each NUMBER-addressed command's leading index to a
+        stable 'lid#<L>' token against the PRE-batch line order, so a `remove`
+        early in the batch can't shift the number a later command was generated
+        against. Non-number commands pass through unchanged."""
+        import re
+        buf = self._wa12_buf_migrate(buf)
+        lines = buf.get("lines") or []
+        out = []
+        for cmd in cmds:
+            c = cmd
+            m = re.match(r"^\s*(\d+)\s*(=|->)\s*(.+)$", cmd)
+            if m and 1 <= int(m.group(1)) <= len(lines):
+                lid = lines[int(m.group(1)) - 1]["lid"]
+                c = "lid#%d %s %s" % (lid, m.group(2), m.group(3).strip())
+            else:
+                m = re.match(r"^\s*(remove|qty|price)\s+(\d+)\b(.*)$", cmd, re.I)
+                if m and 1 <= int(m.group(2)) <= len(lines):
+                    lid = lines[int(m.group(2)) - 1]["lid"]
+                    c = "%s lid#%d%s" % (m.group(1).lower(), lid, m.group(3))
+            out.append(c)
+        return out
+
+    def _wa12_try_narrow(self, sess, buf, raw, from_e164, raw_from):
+        """A >10-overflow narrow follow-up: re-run the matcher on the typed
+        phrase scoped to the remembered line's family, then offer the (smaller)
+        candidate set as a pick. Returns the send, or None if the phrase looks
+        like a command/yes/cancel (let the normal parser handle it) or yields
+        nothing. Clears narrow_target on use."""
+        buf = self._wa12_buf_migrate(buf)
+        nt = buf.get("narrow_target") or {}
+        lid = nt.get("lid")
+        ln = self._wa12_line_by_lid(buf, lid) if lid else None
+        if not ln:
+            buf.pop("narrow_target", None)
+            sess._set_buffer(buf)
+            return None
+        norm = " ".join((raw or "").strip().lower().split())
+        # don't hijack an explicit command / yes / cancel / number-edit.
+        import re
+        if (norm in _WA12_SUBMIT_WORDS or self._wa12_is_cancel(norm)
+                or re.match(r"^(remove|qty|price|client|replace)\b", norm)
+                or re.match(r"^\s*\d+\s*(=|->)", norm)):
+            return None
+        hit = self._wa6_match_one(raw)
+        if hit.get("status") == "matched" and hit.get("confidence") in (
+                "exact", "strong"):
+            ln.clear()
+            ln.update({"lid": lid, "kind": "matched",
+                       "product_id": hit["product_id"],
+                       "product_name": hit["product_name"],
+                       "qty": nt.get("qty") or ln.get("qty") or 1,
+                       "rep_price": None, "stated_price": None})
+            buf.pop("narrow_target", None)
+            self._wa12_clear_pending_for(buf, lid)
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164,
+                                   self._wa12_items_confirm_text(buf))
+        fam = nt.get("family") or hit.get("family") or ""
+        cids = self._wa12_family_candidate_ids(fam) if fam else \
+            self._wa12_suggestion_ids(hit.get("suggestions") or [])
+        # scope to those whose name contains a typed token (the narrow).
+        PT = self.env["product.template"].sudo()
+        toks = [t for t in re.findall(r"[a-z0-9.]+", norm)
+                if t not in _WA6_STOP]
+        scoped = [p for p in cids
+                  if any(t in (PT.browse(p).name or "").lower() for t in toks)]
+        cids = scoped or cids
+        if not cids:
+            return None
+        buf.pop("narrow_target", None)
+        ln["raw"] = raw
+        ln["family"] = fam
+        ln["_cand_ids"] = cids
+        ln["_variant"] = bool(fam and self._wa12_is_family_term(raw))
+        return self._wa12_offer_pick_for_buffer(sess, buf, ln, from_e164,
+                                                raw_from)
 
     # ================================================================
     # WA-12.2 conversational lane — the LLM is a TRANSLATOR at the door:
@@ -1393,9 +2050,12 @@ class WhatsAppMessageWA12(models.Model):
                 if h.get("status") == "matched" and h.get("product_name") \
                         and h["product_name"] not in sugg:
                     sugg = [h["product_name"]] + sugg
+                # WA-12.3: carry the matcher's family (it scoped one even on a
+                # weak hit) so the builder can offer the in-family variant set.
                 unmatched.append({"name": h.get("raw") or "", "qty": qty,
                                   "stated_price": None,
-                                  "suggestions": sugg[:3]})
+                                  "suggestions": sugg[:3],
+                                  "family": h.get("family") or ""})
         return matched, unmatched
 
     def _wa12_open_items_confirm(self, sender, client_txt, matched, unmatched,
@@ -1418,12 +2078,24 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(
                 "I couldn't read any items from that — what items should I "
                 "quote?"))
-        buf = {"client_txt": client_txt, "partner_id": partner_id,
-               "matched": matched, "unmatched": unmatched,
+        # WA-12.3: build the v3 ordered `lines` buffer (one numbered list).
+        buf = {"v": 3, "next_lid": 1, "lines": [], "pending": None,
+               "client_txt": client_txt, "partner_id": partner_id,
                "date_txt": date_txt or "", "days": 1,
                "prefills": prefills or {}}
-        self.env["neon.wa.equip.session"]._start_quote(
+        buf = self._wa12_build_buf_lines(buf, matched, unmatched)
+        sess = self.env["neon.wa.equip.session"]._start_quote(
             from_e164, sender, "q_items", buf)
+        # If the FIRST unmatched line has tappable candidates, offer the pick in
+        # the SAME turn (B) -- "blinders -> molefays - which one?" with buttons.
+        first_pick = next(
+            (ln for ln in buf["lines"]
+             if ln.get("kind") == "unmatched" and ln.get("_cand_ids")), None)
+        if first_pick:
+            self._wa6_reply(raw_from, from_e164,
+                            self._wa12_items_confirm_text(buf))
+            return self._wa12_offer_pick_for_buffer(
+                sess, buf, first_pick, from_e164, raw_from)
         return self._wa6_reply(
             raw_from, from_e164,
             self._wa12_items_confirm_text(buf))
@@ -1435,40 +2107,53 @@ class WhatsAppMessageWA12(models.Model):
         echo-equals-draft binding): engine rate, or the rep price flagged
         '(rep-priced — no catalogue rate)' (F8), or 'no rate set — what
         should it be?' (which blocks until priced)."""
+        # WA-12.3: render the single numbered v3 `lines` list (matched +
+        # unmatched in one numbering space, so a number addresses ANY line).
+        buf = self._wa12_buf_migrate(buf)
         PT = self.env["product.template"].sudo()
+        pend = buf.get("pending") or {}
         rows = []
-        for it in (buf.get("matched") or []):
-            prod = PT.browse(it["product_id"])
-            rate, cur = self._wa12_price_lookup(prod)
-            note = ""
-            if rate is not None and rate > _WA12_PLACEHOLDER_RATE:
-                rate_txt = "%s %.2f/day" % (cur, rate)
-                sp = it.get("stated_price")
-                if sp and abs(float(sp) - rate) > 0.005:
-                    note = _(" (you said %.2f — the catalogue rate applies)"
-                             ) % sp
-            elif it.get("rep_price"):
-                rate_txt = "%s %.2f/day" % (cur, it["rep_price"])
-                note = _(" (rep-priced — no catalogue rate)")
+        for i, ln in enumerate(buf.get("lines") or [], 1):
+            if ln.get("kind") == "matched":
+                prod = PT.browse(ln["product_id"])
+                rate, cur = self._wa12_price_lookup(prod)
+                note = ""
+                if rate is not None and rate > _WA12_PLACEHOLDER_RATE:
+                    rate_txt = "%s %.2f/day" % (cur, rate)
+                    sp = ln.get("stated_price")
+                    if sp and abs(float(sp) - rate) > 0.005:
+                        note = _(" (you said %.2f — the catalogue rate applies)"
+                                 ) % sp
+                elif ln.get("rep_price"):
+                    rate_txt = "%s %.2f/day" % (cur, ln["rep_price"])
+                    note = _(" (rep-priced — no catalogue rate)")
+                else:
+                    rate_txt = _("no rate set — what should it be? "
+                                 "(`price %d <amt>`)") % i
+                rows.append("%d. %s ×%d @ %s%s" % (
+                    i, ln["product_name"], ln.get("qty") or 1, rate_txt, note))
             else:
-                rate_txt = _("no rate set — what should it be? "
-                             "(`price <item> <amt>`)")
-            rows.append("• %s ×%d @ %s%s" % (
-                it["product_name"], it.get("qty") or 1, rate_txt, note))
-        for um in (buf.get("unmatched") or []):
-            sugg = um.get("suggestions") or []
-            rows.append(_("• ⚠️ \"%s\" — not sure%s") % (
-                um.get("name"),
-                (_(" — did you mean: %s? (re-type the right one)")
-                 % " / ".join(sugg[:3])) if sugg else
-                _(" — no catalogue match (re-type or remove)")))
+                # unmatched: a pending line says "tap an option above"; else the
+                # variant / did-you-mean hint.
+                if pend.get("lid") == ln.get("lid"):
+                    tail = _(" — tap an option above")
+                elif ln.get("_variant"):
+                    tail = _(" — which one? (tap above, or re-type)")
+                else:
+                    sugg = ln.get("suggestions") or []
+                    tail = ((_(" — did you mean: %s? (`%d = <the right one>`)")
+                             % (" / ".join(sugg[:3]), i)) if sugg else
+                            _(" — no catalogue match (`%d = <item>` or "
+                              "`remove %d`)") % (i, i))
+                rows.append(_("%d. ⚠️ \"%s\"%s") % (i, ln.get("raw") or "",
+                                                    tail))
         head = _("I matched for *%s*%s:") % (
             buf.get("client_txt") or _("(client TBC)"),
             (_(" — %s") % buf["date_txt"]) if buf.get("date_txt") else "")
         return "%s\n%s\n\n%s" % (head, "\n".join(rows), _(
-            "Reply *yes* to draft the quote, or correct me — e.g. "
-            "`remove <item>` · `qty <item> 2` · `price <item> <amt>` · "
-            "a date · `client <name>` · re-type an item."))
+            "Reply *yes* to draft, or correct me by line number — e.g. "
+            "`2 = 4x100 molefay` · `remove 3` · `qty 1 to 4` · "
+            "`price 2 250` · a date · `client <name>`."))
 
     def _wa12_handle_session(self, sess, message, from_e164, raw_from):
         """A q_confirm / q_reject turn. Re-checks entitlement every turn, with
@@ -2238,7 +2923,9 @@ class WhatsAppMessageWA12(models.Model):
     def _wa12_draft_summary(self, quote, unpriced):
         cur = quote.currency_id.name
         rows = []
-        for l in quote.line_ids:
+        # WA-12.3: number the lines (1-based, the exact order _wa12_match_line
+        # indexes) so the rep can edit by number on the draft too.
+        for _i, l in enumerate(quote.line_ids, 1):
             base = l.unit_rate or 0.0
             if l.discount_amount:
                 eff, disc = base - l.discount_amount, "%s %.2f" % (
@@ -2260,8 +2947,9 @@ class WhatsAppMessageWA12(models.Model):
                     cur, base, max(eff, 0.0), disc)
             else:
                 rate_txt = "%s %.2f/day" % (cur, base)
-            rows.append("• %s%s ×%g — %s × %dd"
-                        % (tag, l.name, l.quantity, rate_txt, l.duration_days))
+            rows.append("%d. %s%s ×%g — %s × %dd"
+                        % (_i, tag, l.name, l.quantity, rate_txt,
+                           l.duration_days))
         # the VAT line is conditional: 'no tax' clears the line taxes -> no VAT.
         vat = _(" (incl. VAT)") if (quote.amount_tax or 0.0) else _(" (no VAT)")
         # event date is ALWAYS shown (proof wall b); a placeholder/unset date
