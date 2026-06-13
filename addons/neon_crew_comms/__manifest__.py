@@ -244,7 +244,37 @@
     # ping no longer skips the requester (an MD/OD requester gets their own
     # Approve button; the ratified self-approval principle -- pairs with the
     # neon_finance 17.0.7.10.8 SoD scoping). pwa12 44/44, pwa13 15/15.
-    "version": "17.0.1.12.0",
+    # 17.0.1.13.0 = WA-12.2 F1-F8 (unscripted proof #2 walls + the F8 ruling):
+    # F1 echo==draft (pairs with neon_finance 17.0.7.11.0 engine-gate fix);
+    # F2 matcher exact-name-first + per-item confidence (weak hits -> per-item
+    # pick in the echo, never silently drafted; confidence counts meaningful
+    # word-start tokens only); F3 q_items natural corrections (per-item
+    # `replace <old> = <new>` det + LLM-translated; show/preview != yes); F4
+    # multi-item at q_confirm routes through EXTRACTION (never a single `add`
+    # parse); F5 brief address -> partner street + event subject -> event-job
+    # client notes; F6 greeting mid-session -> resume/cancel offer; F7 multi-
+    # word cancels (verb + filler only; 'delete the X line' never cancels;
+    # 'no' at qc_dupe stays 'add new'); F8 rep-priced unpriced items (stated
+    # price -> manual line ONLY where no catalogue rate resolves, loudly
+    # flagged in echo/summary/ping/PDF, `price <item> <amt>` at q_items,
+    # guard EVOLVES to 'no silent zero/no invented rate' -- a real-rate manual
+    # line passes; engine items keep stated prices as hints). Extraction
+    # schema + few-shots drawn from the REAL proof briefs (552/574).
+    # pwa12 53/53; pwa13 15/15, pwa6 58/58, pwa8 33/33 (shared-matcher
+    # regressions green). + adversarial-review fixes (12 confirmed): F2
+    # confidence gate now enforced at the THREE remaining consumers (q_itemreq,
+    # direct Quote: -> confirm gate, q_confirm `add`) so a weak token-overlap
+    # never drafts as a confident line (MATCH-1/FSM-3); q_items re-typed weak
+    # items surface as picks AFTER the LLM translate (MATCH-2/FSM-5, ordered so
+    # a conversational correction still reaches translate); ambiguous
+    # qty/price/replace tokens refuse with the colliding names (FSM-4);
+    # apply_multi reports only true adds + routes a dup's qty to the existing
+    # line (MATCH-3/FSM-6); 'resume' (a Meta opt-in word) replaced by the
+    # advertised '*continue*' (FSM-1); 'no' at qc_email skips-email not cancels
+    # (FSM-2); greeting check skipped at q_client so a greeting-named client
+    # resolves (FSM-8); translated yes/cancel handled, submit stays explicit
+    # (FSM-7); the F5 event-name write is actor-honest (FSM-9). pwa12 60/60.
+    "version": "17.0.1.13.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

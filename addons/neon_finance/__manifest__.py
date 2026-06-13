@@ -15,6 +15,15 @@
     # an engine-priced reservation-less line re-prices instead of flipping to
     # manual, while a hand-set 'manual' line is preserved. Reservation-backed
     # lines are byte-unchanged (equipment_line_id short-circuit).
+    # 17.0.7.11.0 = WA-12.2 F1 (proof #2, MONEY-PATH): the create() and
+    # recalculate engine gates key on the PRODUCT, not equipment_category_id --
+    # per-product rules (WA-12.1 PRIMARY) resolve without a category (the
+    # catalogue-load CREATE products carry none), so the category gate made the
+    # confirm echo show the rule rate while the drafted line stayed $0.00
+    # 'not_yet' (the display-vs-provision divergence). No rule at all ->
+    # 'no_rule' -> blocked, never a silent $0. + F8 REP-PRICED badge on the
+    # quote PDF line (manual rate, no rule, no reservation -- as loud as
+    # CUSTOM). Engine wiring -> minor bump.
     # 17.0.7.10.8 = WA-12 addendum (user-ratified 12 Jun 2026): the MD/OD tier
     # (neon_core.group_neon_superuser) MAY self-approve their own quotes -- the
     # ratified WA-12/WA-13 "MD/OD self-approval principle" supersedes the
@@ -26,7 +35,7 @@
     # re-assert of the UI-added grant; no-op on the current prod DB). WA-13 adds
     # no finance model/engine -- it is a WhatsApp face on the existing P6.M7
     # invoice.schedule machinery (lives in neon_crew_comms).
-    'version': '17.0.7.10.8',
+    'version': '17.0.7.11.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

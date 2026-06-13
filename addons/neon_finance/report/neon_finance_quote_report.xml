@@ -125,6 +125,12 @@
                                     <td>
                                         <span t-if="l.line_type == 'custom'"
                                               style="color:#7165AC;font-weight:bold;">CUSTOM </span>
+                                        <!-- F8: a rep-priced line (manual rate, no
+                                             catalogue rule, no reservation) is flagged
+                                             as loudly as CUSTOM so the approver sees
+                                             exactly which numbers came from the rep. -->
+                                        <span t-if="l.line_type != 'custom' and l.pricing_status == 'manual' and not l.equipment_line_id"
+                                              style="color:#B05A00;font-weight:bold;">REP-PRICED </span>
                                         <span t-field="l.name"/>
                                     </td>
                                     <td class="text-end"><span t-field="l.quantity"/></td>

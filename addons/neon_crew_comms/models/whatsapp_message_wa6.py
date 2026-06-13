@@ -816,11 +816,38 @@ class WhatsAppMessageWA6(models.Model):
     @api.model
     def _wa6_match_one(self, raw):
         """Resolve one free-text item to {product_id, qty, status,
-        suggestions}. NEVER auto-invents: a no-token-overlap item is
-        'not_found' with closest-in-category suggestions."""
+        suggestions, confidence}. NEVER auto-invents: a no-token-overlap item
+        is 'not_found' with closest-in-category suggestions.
+
+        F2 (WA-12 proof #2): an EXACT / near-exact catalogue-NAME match wins
+        BEFORE any fuzzy/token logic ("5m x 3m LED screen" must hit "5M X 3M
+        LED SCREEN", never a token-overlap TV). ``confidence`` grades the hit:
+        'exact' (normalised name equality), 'strong' (>=2 tokens + a clear
+        margin), 'weak' (thin/tied overlap -- human-confirming consumers, e.g.
+        the WA-12.2 echo, list alternatives instead of trusting it). Consumers
+        that only read ``status`` are byte-compatible (extra key ignored)."""
         qty, desc = self._wa6_parse_qty(raw)
-        cat = self._wa6_category_for(desc)
+
+        def _norm(s):
+            return " ".join(re.findall(r"[a-z0-9.]+", (s or "").lower()))
+
         Product = self.env["product.template"].sudo()
+        # 1) EXACT / near-exact name equality across ALL workshop items (no
+        #    category narrowing -- the typed name IS the identification).
+        want = _norm(desc)
+        if want:
+            allp = Product.search([("is_workshop_item", "=", True)])
+            exact = [p for p in allp
+                     if _norm(p.name) == want
+                     or (p.workshop_name and _norm(p.workshop_name) == want)]
+            if len(exact) == 1:
+                p = exact[0]
+                return {"raw": raw, "qty": qty, "product_id": p.id,
+                        "product_name": p.name, "category": "",
+                        "status": "matched", "suggestions": [],
+                        "confidence": "exact"}
+        # 2) the original token scorer (category-narrowed fuzzy tier).
+        cat = self._wa6_category_for(desc)
         domain = [("is_workshop_item", "=", True)]
         if cat:
             domain.append(("equipment_category_id", "=", cat.id))
@@ -840,14 +867,31 @@ class WhatsAppMessageWA6(models.Model):
             key=lambda p: (-score(p), (p.name or "").lower()))
         best = ranked[:1]
         if best and score(best) > 0:
+            # confidence counts only MEANINGFUL tokens (>=3 chars) hitting a
+            # word start -- plain substring containment lets fragments like
+            # 'it'/'be' inflate a sentence into a 'strong' product match.
+            def wscore(p):
+                hay_words = re.findall(
+                    r"[a-z0-9.]+",
+                    ((p.name or "") + " " + (p.workshop_name or "")).lower())
+                return sum(
+                    1 for t in tokens if len(t) >= 3
+                    and any(w == t or w.startswith(t) for w in hay_words))
+            s1 = wscore(best)
+            s2 = wscore(ranked[1]) if len(ranked) > 1 else 0
+            conf = "strong" if (s1 >= 2 and s1 > s2) else "weak"
             return {"raw": raw, "qty": qty, "product_id": best.id,
                     "product_name": best.name,
                     "category": cat.name if cat else "",
-                    "status": "matched", "suggestions": []}
+                    "status": "matched",
+                    "suggestions": ([p.name for p in ranked[:3]]
+                                    if conf == "weak" else []),
+                    "confidence": conf}
         sugg = [p.name for p in ranked[:3]] if cat else []
         return {"raw": raw, "qty": qty, "product_id": False,
                 "product_name": "", "category": cat.name if cat else "",
-                "status": "not_found", "suggestions": sugg}
+                "status": "not_found", "suggestions": sugg,
+                "confidence": "none"}
 
     # ================================================================
     # WA-6.1 -- Face-3 crew-initiated dispatch (command -> list -> pick ->

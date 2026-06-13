@@ -358,14 +358,20 @@ class NeonFinanceQuoteLine(models.Model):
                 continue
             if line.line_type == "equipment" and (
                     line.equipment_line_id
-                    or (line.product_template_id.equipment_category_id
-                        and not line.unit_rate)):
-                # reservation-backed line, OR a reservation-less line that has a
-                # resolvable category and NO hand-set rate (WA-12) -> engine.
+                    or (line.product_template_id and not line.unit_rate)):
+                # reservation-backed line, OR a reservation-less PRODUCT line
+                # with NO hand-set rate (WA-12) -> engine. F1 (proof #2): keyed
+                # on the PRODUCT, not equipment_category_id -- per-product
+                # rules (WA-12.1 PRIMARY) resolve without a category (the
+                # catalogue-load CREATE products carry none), so gating on the
+                # category made the confirm echo show the rule rate while the
+                # drafted line stayed $0.00 'not_yet'. No rule at all ->
+                # _compute_line_pricing stamps 'no_rule' -> the guard blocks
+                # (never a silent $0 draft).
                 line._compute_line_pricing()
             elif line.unit_rate > 0:
                 # Salesperson typed in a rate without an equipment link
-                # -- treat as manual (unchanged).
+                # -- treat as manual (unchanged; F8 rep-priced lines ride this).
                 line.pricing_status = "manual"
         return lines
 

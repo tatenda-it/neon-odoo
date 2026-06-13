@@ -175,13 +175,17 @@ class GeminiChatAdapter:
             completion_tokens=int(usage.get("candidatesTokenCount") or 0),
             latency_ms=int((time.time() - start) * 1000))
 
-    def chat(self, messages, tools=None):
+    def chat(self, messages, tools=None, temperature=None, model=None):
         """generateContent with retry on transient 503/429. NEVER raises
         -- returns ChatTurnResult(success=False, ...) on any failure.
         gemini-2.5-flash free-tier returns 503 'high demand' ~half the
         time; a short retry resolves the large majority (200s land ms
         after the 503). If even the retries fail, the orchestrator
-        (run_turn) falls back to Groq."""
+        (run_turn) falls back to Groq.
+
+        ``temperature`` (WA-12.2): per-call override (extraction runs at 0);
+        ``model`` accepted for signature parity with the Groq adapter (the
+        Gemini endpoint is provider-row-bound; the override is ignored)."""
         start = time.time()
         try:
             api_key = self.provider._get_decrypted_api_key()
@@ -193,7 +197,8 @@ class GeminiChatAdapter:
         payload = {
             "contents": contents,
             "generationConfig": {
-                "temperature": self.provider.temperature,
+                "temperature": (self.provider.temperature
+                                if temperature is None else temperature),
                 "maxOutputTokens": self.provider.max_tokens or 800,
             },
         }

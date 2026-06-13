@@ -90,6 +90,31 @@ _WA12_STEPS = ("q_confirm", "q_reject") + _WA12_CAPTURE_STEPS + _WA12_CONVO_STEP
 _WA12_COMPLAINT_TOKENS = ("wrong", "incorrect", "mistake", "not what i",
                           "that is not", "that's not", "fix this")
 
+# F7: multi-word cancels ("cancel or delete", "scrap it"). A message cancels
+# when it contains a cancel VERB and nothing beyond filler — "delete the JVC
+# line" (a real noun) never cancels.
+_WA12_CANCEL_VERBS = {"cancel", "delete", "scrap", "abort", "drop"}
+_WA12_CANCEL_FILLER = {"or", "and", "it", "this", "that", "the", "quote",
+                       "draft", "please", "everything", "all", "whole",
+                       "thing", "no", "stop", "just"}
+
+# F6: a greeting into a live session greets + offers resume/cancel, never the
+# syntax card.
+_WA12_GREETINGS = ("hi", "hello", "hey", "hie", "hesi", "makadii",
+                   "good morning", "morning", "good afternoon",
+                   "good evening", "gm", "hi there", "hello there")
+
+# F3: "show me"-type messages are NOT a yes — nothing drafts until confirmed.
+_WA12_SHOW_WORDS = ("show", "show me", "preview", "pdf", "let me see",
+                    "let me see the draft", "show me the draft",
+                    "can i see it", "see the draft")
+
+# F6 (review FSM-1): the in-session "resume/continue" verbs. 'resume' is a
+# Meta opt-in keyword (released to the WA-2 rail before any session claim), so
+# it can NEVER be the ADVERTISED recovery word -- we advertise 'continue' and
+# accept both as aliases where the turn actually reaches the handler.
+_WA12_RESUME_WORDS = ("continue", "resume")
+
 # Fresh advisory-lock namespace (NOT 5593500/600/700/800) -- first-tap-wins on
 # the approver pair so only ONE of uids 7/21 wins a concurrent Approve/Reject.
 _WA12_LOCK_NS = 5593900
@@ -338,11 +363,18 @@ class WhatsAppMessageWA12(models.Model):
         if not client_txt or not items_txt:
             return self._wa6_reply(raw_from, from_e164, _(
                 "To quote, send:  Quote: <client> — <items>, <date>"))
-        items = self._wa6_match_items(items_txt)
-        matched = [it for it in items if it.get("status") == "matched"]
-        if not matched:
+        # F2 (review MATCH-1): confidence-gate the items. A WEAK/ambiguous hit
+        # must NOT draft a guessed product -> route the whole quote through the
+        # confirm-before-draft gate (q_items) so the rep resolves it; only an
+        # all-confident tight quote provisions directly (unchanged UX).
+        matched, unmatched = self._wa12_match_text_items(items_txt)
+        if not matched and not unmatched:
             return self._wa6_reply(raw_from, from_e164, _(
                 "Couldn't match any catalogue items in \"%s\".") % items_txt)
+        if unmatched:
+            return self._wa12_open_items_confirm(
+                sender, client_txt, matched, unmatched, date_txt, {},
+                from_e164, raw_from)
         # resolve the client: exactly one -> proceed; 0 or >1 -> the guided
         # new-client intake / list-then-pick (items + date are buffered so the
         # quote resumes without re-entry). Fixes the old >1 'be more specific'
@@ -356,10 +388,12 @@ class WhatsAppMessageWA12(models.Model):
             sender, partner, matched, date_txt, days, from_e164, raw_from)
 
     def _wa12_quote_from_slots(self, sender, partner, matched, date_txt, days,
-                               from_e164, raw_from):
+                               from_e164, raw_from, extras=None):
         """Provision + price a quote for a RESOLVED partner + matched items,
         open the q_confirm session, reply the draft summary. Shared by the
-        direct Quote: path and the post-intake resume."""
+        direct Quote: path and the post-intake resume. ``extras`` (F5): brief
+        slots beyond the core — event_name lands on the event job's client
+        notes so the subject isn't dropped."""
         event_date, placeholder = self._wa12_resolve_date(date_txt)
         currency = (sender.company_id.currency_id
                     or self.env.ref("base.USD", raise_if_not_found=False))
@@ -379,6 +413,17 @@ class WhatsAppMessageWA12(models.Model):
         quote.with_user(sender.id).sudo().action_recalculate_pricing()
         unpriced = self._wa12_unpriced_lines(quote)
         self._wa12_ensure_payment_term(quote, partner)
+        # F5: the event subject from the brief lands on the event job (the
+        # name fields are readonly sequence refs -> client_notes).
+        ev_name = ((extras or {}).get("event_name") or "").strip()
+        if ev_name and quote.event_job_id:
+            ej = quote.event_job_id
+            note = _("Event: %s (via WhatsApp quote)") % ev_name
+            # actor-honest write (hard rule; review FSM-9): stamp the rep, not
+            # the public webhook uid, on write_uid.
+            ej.with_user(sender.id).sudo().write({"client_notes": (
+                (ej.client_notes + "\n" + note)
+                if ej.client_notes else note)})
         self.env["neon.wa.equip.session"]._start_quote(
             from_e164, sender, "q_confirm", {"quote_id": quote.id})
         summary = self._wa12_draft_summary(quote, unpriced)
@@ -443,7 +488,14 @@ class WhatsAppMessageWA12(models.Model):
         P = self.env["res.partner"].sudo()
         step = sess.step
 
-        if norm in ("cancel", "scrap", "abort", "stop", "scrap this"):
+        # 'no'/'n' at qc_dupe means "not the same client -> add new", never a
+        # cancel (the dupe question is yes/no-shaped).
+        # yes/no-shaped slots keep their own vocabulary (FSM-2): 'no' at
+        # qc_dupe = "add new", 'no'/'none' at qc_email = "skip email" -- not a
+        # cancel of the whole intake.
+        if self._wa12_is_cancel(norm) and not (
+                (step == "qc_dupe" and norm in ("no", "n"))
+                or (step == "qc_email" and norm in ("no", "n", "none"))):
             sess.sudo().write({"step": "done", "active": False})
             return self._wa6_reply(raw_from, from_e164, _(
                 "New-client setup cancelled."))
@@ -469,7 +521,7 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa12_quote_from_slots(
                 sender, partner, buf.get("matched") or [],
                 buf.get("date_txt") or "", buf.get("days") or 1,
-                from_e164, raw_from)
+                from_e164, raw_from, extras=buf.get("prefills") or {})
 
         def ask_after_name(ack=""):
             """Advance to the next MISSING slot (M3: brief-sourced phone/
@@ -605,12 +657,28 @@ class WhatsAppMessageWA12(models.Model):
             vals["phone"] = ph
         if email:
             vals["email"] = email
+        # F5: a brief-supplied address lands on the new partner.
+        addr = ((buf.get("prefills") or {}).get("address") or "").strip()
+        if addr:
+            vals["street"] = addr
         partner = P.create(vals)
         if buf.get("kind") == "company" and buf.get("contact"):
             P.create({"name": buf["contact"], "parent_id": partner.id,
                       "type": "contact", "phone": ph or False,
                       "email": email or False})
         return partner
+
+    @api.model
+    def _wa12_is_cancel(self, norm):
+        """F7: True for 'cancel', 'scrap this', 'cancel or delete', 'delete
+        it' — a cancel VERB plus only filler. 'delete the JVC line' (a real
+        noun survives the filler strip) is NOT a cancel."""
+        if norm in _WA12_CANCEL_WORDS:
+            return True
+        words = set(norm.split())
+        if not (words & _WA12_CANCEL_VERBS):
+            return False
+        return not (words - _WA12_CANCEL_VERBS - _WA12_CANCEL_FILLER)
 
     def _wa12_repair_prompt(self, raw_from, from_e164):
         """M4: complaint/correction language gets a REPAIR prompt, never the
@@ -635,9 +703,21 @@ class WhatsAppMessageWA12(models.Model):
         buf = sess._get_buffer()
         buf = buf if isinstance(buf, dict) else {}
 
-        if norm in _WA12_CANCEL_WORDS:
+        if self._wa12_is_cancel(norm):
             sess.sudo().write({"step": "done", "active": False})
             return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
+
+        # F6: a greeting mid-session greets + offers continue/cancel, never the
+        # syntax card. SKIPPED at q_client (FSM-8): there the whole message is a
+        # client NAME slot, so a client literally named 'GM'/'Hello' must still
+        # resolve. 'continue' is advertised (FSM-1: 'resume' is a Meta opt-in
+        # keyword, released to the WA-2 rail before this handler ever runs).
+        if norm in _WA12_GREETINGS and sess.step != "q_client":
+            who = (sender.name or "").split(" ")[0]
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Hi %s 👋 — we have an unconfirmed quote in progress for %s. "
+                "Reply *continue* to see where we were, or *cancel* to drop it."
+            ) % (who, buf.get("client_txt") or _("a client")))
 
         if sess.step == "q_client":
             partner, candidates = self._wa12_client_candidates(raw)
@@ -655,16 +735,10 @@ class WhatsAppMessageWA12(models.Model):
                 from_e164, raw_from, prefills=buf.get("prefills") or {})
 
         if sess.step == "q_itemreq":
-            hits = self._wa6_match_items(raw)
-            matched = [{"product_id": h["product_id"],
-                        "product_name": h["product_name"],
-                        "qty": max(1, int(h.get("qty") or 1)),
-                        "stated_price": None}
-                       for h in hits if h.get("status") == "matched"]
-            unmatched = [{"name": h.get("raw") or "",
-                          "suggestions": h.get("suggestions") or []}
-                         for h in hits if h.get("status") != "matched"]
-            if not matched:
+            # F2 (review FSM-3): the confidence gate — weak hits become
+            # unmatched picks in the confirm echo, never confident rows.
+            matched, unmatched = self._wa12_match_text_items(raw)
+            if not matched and not unmatched:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "I couldn't match those in the catalogue — try item names "
                     "like on the rate card (e.g. `RGB LED CAN x5`)."))
@@ -674,14 +748,8 @@ class WhatsAppMessageWA12(models.Model):
                 from_e164, raw_from, partner_id=buf.get("partner_id") or False)
 
         # ---- q_items: the confirm-before-draft gate (M1). ----
-        matched = buf.get("matched") or []
-
-        def reshow():
-            sess._set_buffer(buf)
-            return self._wa6_reply(raw_from, from_e164,
-                                   self._wa12_items_confirm_text(buf))
-
         if norm in _WA12_SUBMIT_WORDS:
+            matched = buf.get("matched") or []
             if not matched:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "Nothing matched to draft yet — re-type the items, or "
@@ -699,11 +767,110 @@ class WhatsAppMessageWA12(models.Model):
                     from_e164, raw_from, prefills=buf.get("prefills") or {})
             return self._wa12_quote_from_slots(
                 sender, partner, matched, buf.get("date_txt") or "",
-                buf.get("days") or 1, from_e164, raw_from)
+                buf.get("days") or 1, from_e164, raw_from,
+                extras=buf.get("prefills") or {})
+
+        # F3: "show me"/"preview"/"continue" is NOT a yes — re-show the confirm
+        # echo; nothing is drafted yet. (FSM-1: 'continue' is the advertised
+        # recovery verb; 'resume' kept as an alias for anyone who types it with
+        # filler so the deterministic parser doesn't bounce them.)
+        if norm in _WA12_SHOW_WORDS or norm in _WA12_RESUME_WORDS:
+            note = "" if norm in _WA12_RESUME_WORDS else _(
+                "Nothing is drafted yet — there's no PDF until you confirm. ")
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, "%s%s" % (
+                note, self._wa12_items_confirm_text(buf)))
 
         # complaint -> repair (M4), before any command parsing.
         if any(t in norm for t in _WA12_COMPLAINT_TOKENS):
             return self._wa12_repair_prompt(raw_from, from_e164)
+
+        # deterministic corrections first (free).
+        handled = self._wa12_q_items_try(sess, buf, raw, from_e164, raw_from)
+        if handled is not None:
+            return handled
+
+        # F3: natural corrections -> ONE translated command, re-run through the
+        # SAME deterministic parser ("the LED screen should be the 5m x 3m
+        # one" -> replace ... = ...). REPAIR -> the repair prompt.
+        cmd = self._wa12_llm_translate_items(raw, buf)
+        if cmd:
+            if cmd.upper().startswith("REPAIR"):
+                return self._wa12_repair_prompt(raw_from, from_e164)
+            cmd_norm = " ".join(cmd.lower().split())
+            # FSM-7: the translator may emit 'cancel'/'yes' -- the deterministic
+            # re-run can't execute those, so handle them here (cancel runs; a
+            # natural confirm asks for one explicit 'yes' -- no LLM-triggered
+            # state transition).
+            if self._wa12_is_cancel(cmd_norm):
+                sess.sudo().write({"step": "done", "active": False})
+                return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
+            if cmd_norm in _WA12_SUBMIT_WORDS:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Ready when you are — reply *yes* to draft the quote."))
+            handled = self._wa12_q_items_try(
+                sess, buf, cmd, from_e164, raw_from)
+            if handled is not None:
+                return handled
+        # MATCH-2/FSM-5: neither a command nor a translatable correction -> if
+        # the raw text weak/near-matches catalogue items, SURFACE them as picks
+        # in the confirm echo (never silently drop); else the syntax card.
+        surfaced = self._wa12_surface_unmatched(sess, buf, raw, from_e164,
+                                                raw_from)
+        if surfaced is not None:
+            return surfaced
+        return self._wa6_reply(raw_from, from_e164, _(
+            "Reply *yes* to draft, *cancel*, or correct me — `remove <item>` "
+            "· `qty <item> 2` · `price <item> <amt>` · a date · "
+            "`client <name>` · re-type an item."))
+
+    def _wa12_surface_unmatched(self, sess, buf, raw, from_e164, raw_from):
+        """MATCH-2/FSM-5: a re-typed item that only WEAK/near-matches is added
+        to the confirm echo's unmatched bucket WITH its suggestions (a pick),
+        never silently dropped. Returns the reshow, or None if the text yields
+        no catalogue signal at all (-> the caller's syntax card)."""
+        _adds, weak = self._wa12_match_text_items(raw)
+        weak = [w for w in weak if w.get("suggestions")]
+        if not weak:
+            return None
+        un = list(buf.get("unmatched") or [])
+        seen = {(u.get("name") or "").lower() for u in un}
+        for w in weak:
+            if (w.get("name") or "").lower() not in seen:
+                un.append(w)
+        buf["unmatched"] = un
+        sess._set_buffer(buf)
+        return self._wa6_reply(raw_from, from_e164,
+                               self._wa12_items_confirm_text(buf))
+
+    def _wa12_q_items_try(self, sess, buf, raw, from_e164, raw_from):
+        """Apply ONE q_items correction command (deterministic). Returns the
+        reply, or None if ``raw`` isn't a recognised correction. Used for both
+        the rep's literal text and the LLM-translated command (F3)."""
+        import re
+        matched = buf.get("matched") or []
+        norm = " ".join((raw or "").strip().lower().split())
+
+        def reshow():
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164,
+                                   self._wa12_items_confirm_text(buf))
+
+        # FSM-4: resolve a token to EXACTLY ONE buffered line. >1 contains-match
+        # -> refuse with the colliding names (mirrors the post-draft
+        # _wa12_match_line resolver; never silently target the first hit).
+        def find_one(tok):
+            tok = (tok or "").strip().lower()
+            hits = [it for it in matched
+                    if tok in (it.get("product_name") or "").lower()]
+            if not hits:
+                return None, self._wa6_reply(raw_from, from_e164, _(
+                    "No line matches \"%s\".") % tok)
+            if len(hits) > 1:
+                return None, self._wa6_reply(raw_from, from_e164, _(
+                    "Several items match \"%s\" — be more specific: %s")
+                    % (tok, " / ".join(it["product_name"] for it in hits)))
+            return hits[0], None
 
         m = re.match(r"client\s+(.+)$", raw, re.I)
         if m:
@@ -713,26 +880,74 @@ class WhatsAppMessageWA12(models.Model):
             buf["partner_id"] = partner.id if partner else False
             return reshow()
 
+        # F3: per-item replace -- `replace <old> = <new>` (also `<old> -> <new>`).
+        m = re.match(r"replace\s+(.+?)\s*(?:=|->)\s*(.+)$", raw, re.I)
+        if m:
+            old_tok, new_txt = m.group(1).strip(), m.group(2).strip()
+            it, err = find_one(old_tok)
+            if err:
+                return err
+            new_hit = self._wa6_match_one(new_txt)
+            if not (new_hit.get("status") == "matched"
+                    and new_hit.get("confidence") in ("exact", "strong")):
+                sugg = new_hit.get("suggestions") or []
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Couldn't confidently match \"%s\"%s.") % (
+                        new_txt,
+                        (_(" — did you mean: %s?") % " / ".join(sugg[:3]))
+                        if sugg else ""))
+            it.update({"product_id": new_hit["product_id"],
+                       "product_name": new_hit["product_name"],
+                       "rep_price": None, "stated_price": None})
+            return reshow()
+
         m = re.match(r"remove\s+(.+)$", raw, re.I)
         if m:
             tok = m.group(1).strip().lower()
             keep = [it for it in matched
                     if tok not in (it.get("product_name") or "").lower()]
-            if len(keep) == len(matched):
+            un_keep = [um for um in (buf.get("unmatched") or [])
+                       if tok not in (um.get("name") or "").lower()]
+            n_removed = (len(matched) - len(keep)) + (
+                len(buf.get("unmatched") or []) - len(un_keep))
+            if not n_removed:
                 return self._wa6_reply(raw_from, from_e164, _(
                     "No line matches \"%s\".") % m.group(1).strip())
-            buf["matched"] = keep
-            return reshow()
+            buf["matched"], buf["unmatched"] = keep, un_keep
+            # FSM-4 side: announce a multi-line removal so it's never silent.
+            note = (_("Removed %d lines matching \"%s\".\n\n") % (
+                n_removed, m.group(1).strip())) if n_removed > 1 else ""
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164,
+                                   note + self._wa12_items_confirm_text(buf))
 
         m = re.match(r"qty\s+(.+?)\s+(\d+)\s*$", raw, re.I)
         if m:
-            tok, n = m.group(1).strip().lower(), max(1, int(m.group(2)))
-            hit = [it for it in matched
-                   if tok in (it.get("product_name") or "").lower()]
-            if not hit:
+            it, err = find_one(m.group(1))
+            if err:
+                return err
+            it["qty"] = max(1, int(m.group(2)))
+            return reshow()
+
+        # F8: `price <item> <amt>` -- ONLY where no catalogue rate exists.
+        m = re.match(r"price\s+(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*$", raw, re.I)
+        if m:
+            it, err = find_one(m.group(1))
+            if err:
+                return err
+            prod = self.env["product.template"].sudo().browse(it["product_id"])
+            rate, cur = self._wa12_price_lookup(prod)
+            if rate is not None and rate > _WA12_PLACEHOLDER_RATE:
                 return self._wa6_reply(raw_from, from_e164, _(
-                    "No line matches \"%s\".") % m.group(1).strip())
-            hit[0]["qty"] = n
+                    "%s has a catalogue rate (%s %.2f/day) — that's what "
+                    "drafts. You can apply a discount after drafting "
+                    "(`price <item> <amt>` on the draft).")
+                    % (it["product_name"], cur, rate))
+            amt = float(m.group(2))
+            if amt <= _WA12_PLACEHOLDER_RATE:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "That rate is too low — give the real day rate."))
+            it["rep_price"] = amt
             return reshow()
 
         ev_date, ph = self._wa12_resolve_date(raw)
@@ -740,20 +955,106 @@ class WhatsAppMessageWA12(models.Model):
             buf["date_txt"] = ev_date.isoformat()
             return reshow()
 
-        # re-typed item(s) -> match + ADD to the list.
-        hits = self._wa6_match_items(raw)
-        adds = [{"product_id": h["product_id"],
-                 "product_name": h["product_name"],
-                 "qty": max(1, int(h.get("qty") or 1)), "stated_price": None}
-                for h in hits if h.get("status") == "matched"]
+        # re-typed item(s): only CONFIDENT matches add here (reconciling any
+        # unmatched pick they resolve). A purely-weak/no-match input returns
+        # None so the caller can first try the F3 LLM translate (a conversational
+        # correction must reach translate, not be swallowed as a weak item);
+        # genuinely-weak re-types are surfaced by the caller's post-translate
+        # fallback (_wa12_surface_unmatched). qty carried.
+        adds, _weak = self._wa12_match_text_items(raw)
         if adds:
             known = {it["product_id"] for it in matched}
-            buf["matched"] = matched + [a for a in adds
-                                        if a["product_id"] not in known]
+            for a in adds:
+                if a["product_id"] not in known:
+                    matched.append(a)
+                    known.add(a["product_id"])
+            buf["matched"] = matched
+            added_names = {a["product_name"] for a in adds}
+            buf["unmatched"] = [um for um in (buf.get("unmatched") or [])
+                                if not (added_names
+                                        & set(um.get("suggestions") or []))]
             return reshow()
-        return self._wa6_reply(raw_from, from_e164, _(
-            "Reply *yes* to draft, *cancel*, or correct me — `remove <item>` "
-            "· `qty <item> 2` · a date · `client <name>` · re-type an item."))
+        return None
+
+    def _wa12_apply_multi(self, quote, body, from_e164, raw_from):
+        """F4: extract a multi-item message at q_confirm and ADD the confident
+        matches to the live draft (engine-priced / rep-priced per F8); report
+        weak/unmatched lines. None when extraction yields nothing (the caller
+        falls through to the translate-edit hook)."""
+        data = self._wa12_llm_extract_quote(body)
+        items = [it for it in ((data or {}).get("items") or [])
+                 if it.get("name")]
+        if not items:
+            return None
+        matched, unmatched = self._wa12_match_slot_items(items)
+        # F8 enrichment on the adds: stated price -> rep price ONLY where no
+        # catalogue rate resolves.
+        for it in matched:
+            prod = self.env["product.template"].sudo().browse(it["product_id"])
+            rate, _cur = self._wa12_price_lookup(prod)
+            sp = it.get("stated_price")
+            if ((rate is None or rate <= _WA12_PLACEHOLDER_RATE)
+                    and sp and float(sp) > _WA12_PLACEHOLDER_RATE):
+                it["rep_price"] = float(sp)
+        days = max(quote.line_ids.mapped("duration_days") or [1])
+        existing = set(quote.line_ids.mapped("product_template_id").ids)
+        adds = [it for it in matched if it["product_id"] not in existing]
+        dupes = [it for it in matched if it["product_id"] in existing]
+        if adds:
+            self._wa12_build_lines(quote, adds, int(days))
+        # MATCH-3/FSM-6: the note reports from `adds` ONLY (never claim an item
+        # was "Added" when it was deduped); a duplicate is reported honestly +
+        # its qty change routed through the guarded qty-edit (build_lines only
+        # creates, so the requested qty would otherwise be silently dropped).
+        note_bits = []
+        if adds:
+            note_bits.append(_("Added %s") % ", ".join(
+                it["product_name"] for it in adds))
+        for it in dupes:
+            ql = quote.line_ids.filtered(
+                lambda l: l.product_template_id.id == it["product_id"])[:1]
+            want = int(it.get("qty") or 1)
+            if ql and want > 1 and ql.quantity != want:
+                ql.with_user(quote.salesperson_id.id or self.env.uid).sudo(
+                    ).write({"quantity": want})
+                note_bits.append(_("%s already on the quote → qty %d")
+                                 % (it["product_name"], want))
+            else:
+                note_bits.append(_("%s already on the quote")
+                                 % it["product_name"])
+        for um in unmatched:
+            sugg = um.get("suggestions") or []
+            note_bits.append(_("⚠️ \"%s\" — not sure%s") % (
+                um.get("name"),
+                (_(" (did you mean: %s?)") % " / ".join(sugg[:3]))
+                if sugg else ""))
+        return self._wa12_after_edit(
+            quote, from_e164, raw_from, "\n".join(note_bits) or _("No change"))
+
+    def _wa12_llm_translate_items(self, text, buf):
+        """F3: translate a natural q_items correction into ONE deterministic
+        command (re-run through _wa12_q_items_try, which re-enforces every
+        guard). None on unclear / degraded."""
+        names = " · ".join((it.get("product_name") or "")
+                           for it in (buf.get("matched") or [])) or "(none)"
+        sys = (
+            "You map a sales rep's WhatsApp message to EXACTLY ONE correction "
+            "command for an UNCONFIRMED quote item list, output as plain text "
+            "on one line, no quotes, no prose. Allowed: 'replace <item> = "
+            "<new item>', 'remove <item>', 'qty <item> <n>', 'price <item> "
+            "<amount>', 'client <name>', a date (YYYY-MM-DD), 'yes' "
+            "(confirm), or 'cancel'. Current items: " + names + ". If the "
+            "message is a complaint without one specific change, output "
+            "exactly REPAIR. If it doesn't map to one command, output exactly "
+            "UNKNOWN.")
+        raw = self._wa12_llm_chat([{"role": "system", "content": sys},
+                                   {"role": "user", "content": text or ""}])
+        if not raw:
+            return None
+        cmd = raw.strip().strip('"`').splitlines()[0].strip()
+        if not cmd or cmd.upper() == "UNKNOWN":
+            return None
+        return cmd
 
     # ================================================================
     # WA-12.2 conversational lane — the LLM is a TRANSLATOR at the door:
@@ -762,29 +1063,40 @@ class WhatsAppMessageWA12(models.Model):
     # by an LLM outage).
     # ================================================================
     def _wa12_llm_chat(self, messages):
-        """One-shot LLM completion for EXTRACTION ONLY. Rides the WA provider
-        (config neon_channels.whatsapp_provider_key) with a Groq fallback.
-        Returns the assistant text, or None on ANY failure/timeout/absence
-        (graceful degradation)."""
+        """One-shot LLM completion for EXTRACTION ONLY, temperature 0 (a
+        translator must be deterministic -- bake-off ruling, 12 Jun). Fallback
+        chain RE-ORDERED by the bake-off evidence: groq/llama (primary, 9/9)
+        -> groq/openai/gpt-oss-120b (same key, 9/9) -> gemini (parse-fail +
+        3x latency, demoted last). Returns the assistant text, or None on ANY
+        failure/timeout/absence (graceful degradation -- quoting is never
+        blocked by an LLM outage)."""
         try:
             from odoo.addons.neon_ai_core.models.ai.chat_adapter_factory \
                 import get_chat_adapter
         except Exception:  # noqa: BLE001 -- ai_core absent -> degrade
             return None
         Prov = self.env["neon.dashboard.ai.provider"].sudo()
-        key = self.env["ir.config_parameter"].sudo().get_param(
-            "neon_channels.whatsapp_provider_key", "google")
-        keys = [key, "groq"] if key != "groq" else ["groq"]
-        for k in keys:
+        primary = self.env["ir.config_parameter"].sudo().get_param(
+            "neon_channels.whatsapp_provider_key", "groq")
+        # (provider_key, per-call model override) in evidence order; the
+        # configured primary leads, then the same-key Groq backup model,
+        # then the demoted Gemini lane.
+        attempts = [(primary, None)]
+        if primary == "groq":
+            attempts += [("groq", "openai/gpt-oss-120b"), ("google", None)]
+        else:
+            attempts += [("groq", None), ("groq", "openai/gpt-oss-120b")]
+        for k, model in attempts:
             prov = Prov.search([("provider_key", "=", k),
                                 ("is_enabled", "=", True)], limit=1)
             adapter = get_chat_adapter(prov) if prov else None
             if not adapter:
                 continue
             try:
-                res = adapter.chat(messages)
+                res = adapter.chat(messages, temperature=0.0, model=model)
             except Exception as e:  # noqa: BLE001 -- never crash a turn
-                _logger.warning("WA-12.2 LLM chat failed (%s): %s", k, e)
+                _logger.warning("WA-12.2 LLM chat failed (%s/%s): %s",
+                                k, model or "default", e)
                 continue
             if res is not None and getattr(res, "success", False) \
                     and res.assistant_message:
@@ -824,19 +1136,60 @@ class WhatsAppMessageWA12(models.Model):
             "string|null, \"items\": [{\"name\": string, \"qty\": integer, "
             "\"stated_price\": number|null}], \"date\": string|null, "
             "\"phone\": string|null, \"email\": string|null, "
-            "\"contact_person\": string|null}. Set intent='quote' if the "
+            "\"contact_person\": string|null, \"address\": string|null, "
+            "\"event_name\": string|null}. Set intent='quote' if the "
             "message asks to price/quote/hire equipment OR expresses the wish "
             "to make a quote (then client/items may be empty -- do NOT invent "
             "them). Extract EVERY equipment line in a multi-line brief as its "
             "own item (briefs list client details then several items). A price "
             "the rep states for an item goes in stated_price (it is a hint, "
             "not the rate). phone/email/contact_person: only if present in the "
-            "message. Resolve relative dates (e.g. 'next Friday', 'month end') "
+            "message. address = the client's street/physical address if "
+            "given; event_name = the event's subject/name (e.g. 'Redan "
+            "Launch') if given. Resolve relative dates (e.g. 'next Friday', "
+            "'month end') "
             "to an absolute YYYY-MM-DD in Africa/Harare given today is " + today
             + "; if no date or you are unsure, set date null. NEVER invent a "
-            "client, items, phone or email not in the message. JSON only.")
-        raw = self._wa12_llm_chat([{"role": "system", "content": sys},
-                                   {"role": "user", "content": text or ""}])
+            "client, items, phone, email or address not in the message. "
+            "JSON only.")
+        # few-shot pairs drawn from REAL rep briefs (proof corpus, 12 Jun):
+        # multi-line brief w/ phone + a system-price hint + a priced ad-hoc
+        # line; and a located-at/Subject brief with X2 qty notation.
+        fs_u1 = ("Name of client: Ellen Prestige \nPhone: +263773863012\n\n"
+                 "They have a wedding so they want to hire \n\nAudio "
+                 "equipment - pa system (the one for 250) \nLighting "
+                 "Equipment - RGB LED CAN quantity 5 they cost 10 each in "
+                 "the system \nLogistics is 150 \n\nDraft")
+        fs_a1 = ('{"intent": "quote", "client": "Ellen Prestige", "items": '
+                 '[{"name": "pa system 250", "qty": 1, "stated_price": null}, '
+                 '{"name": "RGB LED CAN", "qty": 5, "stated_price": 10}, '
+                 '{"name": "Logistics", "qty": 1, "stated_price": 150}], '
+                 '"date": null, "phone": "+263773863012", "email": null, '
+                 '"contact_person": null, "address": null, '
+                 '"event_name": "wedding"}')
+        fs_u2 = ("I want a quotation for EC Rentals located at 10 Hugh "
+                 "Fraser Road, Highlands, Harare Subject : EC Rentals, Redan "
+                 "Launch \nItems: 5m x 3m LED screen , 1m x 3m DIGITAL "
+                 "BANNERS X2, KOMMANDER MEDIA SERVER , STAGGING AND FLOORING "
+                 "EQUIPMENT - 5M X 5M OUTDOOR INFINITY DANCEFLOOR,\nAUDIO "
+                 "EQUIPMENT - PA SYSTEM 500 PAX.")
+        fs_a2 = ('{"intent": "quote", "client": "EC Rentals", "items": '
+                 '[{"name": "5M X 3M LED SCREEN", "qty": 1, "stated_price": '
+                 'null}, {"name": "1M X 3M DIGITAL BANNERS", "qty": 2, '
+                 '"stated_price": null}, {"name": "KOMMANDER MEDIA SERVER", '
+                 '"qty": 1, "stated_price": null}, {"name": "5M X 5M OUTDOOR '
+                 'INFINITY DANCEFLOOR", "qty": 1, "stated_price": null}, '
+                 '{"name": "PA SYSTEM 500 PAX", "qty": 1, "stated_price": '
+                 'null}], "date": null, "phone": null, "email": null, '
+                 '"contact_person": null, "address": "10 Hugh Fraser Road, '
+                 'Highlands, Harare", "event_name": "Redan Launch"}')
+        raw = self._wa12_llm_chat([
+            {"role": "system", "content": sys},
+            {"role": "user", "content": fs_u1},
+            {"role": "assistant", "content": fs_a1},
+            {"role": "user", "content": fs_u2},
+            {"role": "assistant", "content": fs_a2},
+            {"role": "user", "content": text or ""}])
         data = self._wa12_llm_json(raw)
         if not data or (data.get("intent") or "").lower() != "quote":
             return None
@@ -910,7 +1263,9 @@ class WhatsAppMessageWA12(models.Model):
         items = [it for it in (data.get("items") or []) if it.get("name")]
         prefills = {"phone": (data.get("phone") or "").strip(),
                     "email": (data.get("email") or "").strip(),
-                    "contact": (data.get("contact_person") or "").strip()}
+                    "contact": (data.get("contact_person") or "").strip(),
+                    "address": (data.get("address") or "").strip(),
+                    "event_name": (data.get("event_name") or "").strip()}
         date_txt = data.get("date") or ""
         self._wa6_audit_in(from_e164, message, "wa12-quote-ai")
         # M5 -- bare intent: enter the quote lane, never the generic Copilot.
@@ -940,26 +1295,75 @@ class WhatsAppMessageWA12(models.Model):
         """Resolve LLM-extracted items through the EXISTING catalogue matcher,
         one by one (qty from the slot, not re-parsed). Returns (matched,
         unmatched) where matched = [{product_id, product_name, qty,
-        stated_price}] and unmatched = [{name, suggestions}]."""
+        stated_price}] and unmatched = [{name, suggestions}].
+
+        F2: only an 'exact'/'strong'-confidence hit is auto-accepted; a WEAK
+        hit goes to the unmatched bucket WITH its alternatives, so the rep
+        picks per item in the confirm echo instead of a token-overlap guess
+        landing in the draft."""
         matched, unmatched = [], []
         for it in items:
             hit = self._wa6_match_one(it.get("name") or "")
             qty = int(it.get("qty") or hit.get("qty") or 1)
-            if hit.get("status") == "matched":
+            if (hit.get("status") == "matched"
+                    and hit.get("confidence") in ("exact", "strong")):
                 matched.append({
                     "product_id": hit["product_id"],
                     "product_name": hit["product_name"], "qty": max(1, qty),
                     "stated_price": it.get("stated_price")})
             else:
+                sugg = hit.get("suggestions") or []
+                if hit.get("status") == "matched" and hit.get("product_name") \
+                        and hit["product_name"] not in sugg:
+                    sugg = [hit["product_name"]] + sugg
                 unmatched.append({"name": it.get("name") or "",
-                                  "suggestions": hit.get("suggestions") or []})
+                                  "qty": max(1, qty),
+                                  "stated_price": it.get("stated_price"),
+                                  "suggestions": sugg[:3]})
+        return matched, unmatched
+
+    @api.model
+    def _wa12_match_text_items(self, text):
+        """Match a free-text item list with the F2 confidence gate (review
+        MATCH-1/FSM-3): only exact/strong hits are auto-accepted; weak /
+        not_found go to the unmatched bucket WITH the guess prepended to the
+        suggestions, so a thin token-overlap never lands as a confident line.
+        Same (matched, unmatched) contract as _wa12_match_slot_items, for
+        rep-TYPED text (q_itemreq / direct Quote: / q_confirm `add`)."""
+        matched, unmatched = [], []
+        for h in self._wa6_match_items(text):
+            qty = max(1, int(h.get("qty") or 1))
+            if (h.get("status") == "matched"
+                    and h.get("confidence") in ("exact", "strong")):
+                matched.append({"product_id": h["product_id"],
+                                "product_name": h["product_name"], "qty": qty,
+                                "stated_price": None})
+            else:
+                sugg = h.get("suggestions") or []
+                if h.get("status") == "matched" and h.get("product_name") \
+                        and h["product_name"] not in sugg:
+                    sugg = [h["product_name"]] + sugg
+                unmatched.append({"name": h.get("raw") or "", "qty": qty,
+                                  "stated_price": None,
+                                  "suggestions": sugg[:3]})
         return matched, unmatched
 
     def _wa12_open_items_confirm(self, sender, client_txt, matched, unmatched,
                                  date_txt, prefills, from_e164, raw_from,
                                  partner_id=False):
         """Open the q_items session + send the ONE confirmation message (M1).
-        NO quote exists yet -- provision happens only on the rep's yes."""
+        NO quote exists yet -- provision happens only on the rep's yes.
+
+        F8 enrichment: a rep-STATED price on an item with NO catalogue rate
+        becomes the rep price (line will draft 'manual', loudly flagged); on a
+        PRICED item it stays a disambiguation hint (the engine rate drafts)."""
+        for it in (matched or []):
+            prod = self.env["product.template"].sudo().browse(it["product_id"])
+            rate, _cur = self._wa12_price_lookup(prod)
+            sp = it.get("stated_price")
+            if ((rate is None or rate <= _WA12_PLACEHOLDER_RATE)
+                    and sp and float(sp) > _WA12_PLACEHOLDER_RATE):
+                it["rep_price"] = float(sp)
         if not matched and not unmatched:
             return self._wa6_reply(raw_from, from_e164, _(
                 "I couldn't read any items from that — what items should I "
@@ -976,37 +1380,45 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_items_confirm_text(self, buf):
         """The M1 confirmation message: every matched line with the ENGINE
-        rate + qty; unmatched lines listed honestly with suggestions. A
-        rep-stated price that differs from the engine rate is flagged (hint
-        only -- the engine rate is always the drafted rate)."""
+        rate + qty; weak/unmatched lines listed per-item with alternatives
+        (F2). Rates here are EXACTLY what the draft will carry (the F1
+        echo-equals-draft binding): engine rate, or the rep price flagged
+        '(rep-priced — no catalogue rate)' (F8), or 'no rate set — what
+        should it be?' (which blocks until priced)."""
         PT = self.env["product.template"].sudo()
         rows = []
         for it in (buf.get("matched") or []):
             prod = PT.browse(it["product_id"])
             rate, cur = self._wa12_price_lookup(prod)
-            if rate is None or rate <= _WA12_PLACEHOLDER_RATE:
-                rate_txt = _("no rate set yet")
-            else:
-                rate_txt = "%s %.2f/day" % (cur, rate)
             note = ""
-            sp = it.get("stated_price")
-            if sp and rate is not None and abs(float(sp) - rate) > 0.005:
-                note = _(" (you said %.2f — the catalogue rate applies)") % sp
+            if rate is not None and rate > _WA12_PLACEHOLDER_RATE:
+                rate_txt = "%s %.2f/day" % (cur, rate)
+                sp = it.get("stated_price")
+                if sp and abs(float(sp) - rate) > 0.005:
+                    note = _(" (you said %.2f — the catalogue rate applies)"
+                             ) % sp
+            elif it.get("rep_price"):
+                rate_txt = "%s %.2f/day" % (cur, it["rep_price"])
+                note = _(" (rep-priced — no catalogue rate)")
+            else:
+                rate_txt = _("no rate set — what should it be? "
+                             "(`price <item> <amt>`)")
             rows.append("• %s ×%d @ %s%s" % (
                 it["product_name"], it.get("qty") or 1, rate_txt, note))
         for um in (buf.get("unmatched") or []):
             sugg = um.get("suggestions") or []
-            rows.append(_("• ⚠️ \"%s\" — no match%s") % (
+            rows.append(_("• ⚠️ \"%s\" — not sure%s") % (
                 um.get("name"),
-                (_(" (did you mean: %s?)") % " / ".join(sugg[:3]))
-                if sugg else ""))
+                (_(" — did you mean: %s? (re-type the right one)")
+                 % " / ".join(sugg[:3])) if sugg else
+                _(" — no catalogue match (re-type or remove)")))
         head = _("I matched for *%s*%s:") % (
             buf.get("client_txt") or _("(client TBC)"),
             (_(" — %s") % buf["date_txt"]) if buf.get("date_txt") else "")
         return "%s\n%s\n\n%s" % (head, "\n".join(rows), _(
             "Reply *yes* to draft the quote, or correct me — e.g. "
-            "`remove <item>` · `qty <item> 2` · a date · `client <name>` · "
-            "re-type an item."))
+            "`remove <item>` · `qty <item> 2` · `price <item> <amt>` · "
+            "a date · `client <name>` · re-type an item."))
 
     def _wa12_handle_session(self, sess, message, from_e164, raw_from):
         """A q_confirm / q_reject turn. Re-checks entitlement every turn, with
@@ -1048,9 +1460,25 @@ class WhatsAppMessageWA12(models.Model):
             buf.get("quote_id") or 0)
         norm = " ".join((body or "").strip().lower().split())
         if sess.step == "q_confirm":
-            if norm in _WA12_CANCEL_WORDS:
+            if self._wa12_is_cancel(norm):
                 sess.sudo().write({"step": "done", "active": False})
                 return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
+            # F6: a greeting mid-draft greets + offers resume/cancel, never
+            # the syntax card.
+            if norm in _WA12_GREETINGS:
+                who = (sender.name or "").split(" ")[0]
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Hi %s 👋 — you have an open draft (%s for %s). Reply "
+                    "*continue* to see it, *yes* to submit, or *cancel* to "
+                    "drop it.") % (
+                        who, quote.name if quote.exists() else _("a quote"),
+                        quote.partner_id.name if quote.exists() else ""))
+            if norm in _WA12_RESUME_WORDS and quote.exists():
+                summary = self._wa12_draft_summary(
+                    quote, self._wa12_unpriced_lines(quote))
+                return self._wa6_reply(raw_from, from_e164, summary + _(
+                    "\n\nReply *yes* to submit, *cancel*, *preview*, or keep "
+                    "editing."))
             if norm in _WA12_SUBMIT_WORDS:
                 if not quote.exists() or quote.state != "draft":
                     sess.sudo().write({"active": False})
@@ -1070,15 +1498,36 @@ class WhatsAppMessageWA12(models.Model):
                 # never the syntax menu (deterministic check first -- free).
                 if any(t in norm for t in _WA12_COMPLAINT_TOKENS):
                     return self._wa12_repair_prompt(raw_from, from_e164)
+                # F4: a MULTI-item message (a pasted brief / price-list) routes
+                # through EXTRACTION, never a single-command parse (proof #2
+                # msg 594 was read as one `add JVC TV`). Adds confident
+                # matches to the draft + reports the rest.
+                if (body or "").count("\n") >= 1 or (body or "").count(",") >= 2:
+                    multi = self._wa12_apply_multi(
+                        quote, body, from_e164, raw_from)
+                    if multi is not None:
+                        return multi
                 # CONVERSATIONAL EDIT FALLBACK (WA-12.2): the deterministic
                 # parser missed -> translate the free text into ONE edit command
                 # and re-run it through the SAME guarded _wa12_try_edit. The LLM
                 # only TRANSLATES; the command it emits is re-validated here.
                 # 'REPAIR' = the model judged it a complaint -> repair prompt.
                 cmd = self._wa12_llm_translate_edit(body, quote)
-                if cmd and cmd.upper().startswith("REPAIR"):
-                    return self._wa12_repair_prompt(raw_from, from_e164)
                 if cmd:
+                    if cmd.upper().startswith("REPAIR"):
+                        return self._wa12_repair_prompt(raw_from, from_e164)
+                    cmd_norm = " ".join(cmd.lower().split())
+                    # FSM-7: translated cancel runs; a natural confirm asks for
+                    # one explicit 'yes' (the approval-triggering submit stays
+                    # an explicit human action, never an LLM interpretation).
+                    if self._wa12_is_cancel(cmd_norm):
+                        sess.sudo().write({"step": "done", "active": False})
+                        return self._wa6_reply(raw_from, from_e164, _(
+                            "Quote cancelled."))
+                    if cmd_norm in _WA12_SUBMIT_WORDS:
+                        return self._wa6_reply(raw_from, from_e164, _(
+                            "Reply *yes* to submit %s for approval.")
+                            % quote.name)
                     edited = self._wa12_try_edit(
                         quote, cmd, from_e164, raw_from)
                     if edited is not None:
@@ -1217,16 +1666,26 @@ class WhatsAppMessageWA12(models.Model):
 
         if low.startswith("add ") and not low.startswith("add custom"):
             text = raw[4:].strip()
-            items = self._wa6_match_items(text)
-            matched = [it for it in items if it.get("status") == "matched"]
+            # F2 (review MATCH-1c): only exact/strong matches add a line; a weak
+            # hit is refused WITH suggestions, never drafted as a guessed line.
+            matched, unmatched = self._wa12_match_text_items(text)
             if not matched:
-                return err(_("Couldn't match any catalogue item in \"%s\".")
-                           % text)
+                um = unmatched[0] if unmatched else {}
+                sugg = um.get("suggestions") or []
+                return err(_("Couldn't confidently match \"%s\"%s.") % (
+                    text, (_(" — did you mean: %s?") % " / ".join(sugg[:3]))
+                    if sugg else ""))
             days = max(quote.line_ids.mapped("duration_days") or [1])
             self._wa12_build_lines(quote, matched, int(days))
-            return self._wa12_after_edit(
-                quote, from_e164, raw_from,
-                _("Added %s") % ", ".join(it["product_name"] for it in matched))
+            note = _("Added %s") % ", ".join(
+                it["product_name"] for it in matched)
+            if unmatched:
+                note += "\n" + "\n".join(_("⚠️ \"%s\" — not sure%s") % (
+                    u.get("name"),
+                    (_(" (did you mean: %s?)") % " / ".join(
+                        (u.get("suggestions") or [])[:3]))
+                    if u.get("suggestions") else "") for u in unmatched)
+            return self._wa12_after_edit(quote, from_e164, raw_from, note)
 
         m = re.match(r"remove\s+(.+)$", raw, re.I)
         if m:
@@ -1639,12 +2098,13 @@ class WhatsAppMessageWA12(models.Model):
         QL = self.env["neon.finance.quote.line"].with_user(actor).sudo()
         for it in matched:
             prod = self.env["product.template"].sudo().browse(it["product_id"])
-            # unit_rate is left UNSET -> the pricing ENGINE resolves it from the
-            # product's equipment_category_id x the quote currency (rule +
-            # bracket + day-multiplier). A category with no rule -> 'no_rule' ->
-            # the no_rule guard blocks submit. The WA-12 lane NEVER reads
-            # list_price, so it can never fabricate a 'manual'-priced line (the
-            # guard-bypass we closed; pinned by the pwa12 guard-bypass test).
+            # unit_rate is left UNSET (0.0) -> the pricing ENGINE resolves it
+            # (per-product rule PRIMARY -> category rule -> no_rule, which the
+            # guard blocks). The WA-12 lane NEVER reads list_price.
+            # F8 EXCEPTION: an item the engine can't price MAY carry an
+            # explicit REP price (it["rep_price"], set only when no catalogue
+            # rate resolves + loudly flagged in the echo/summary/ping/PDF) ->
+            # created WITH that rate, so the create() gate stamps 'manual'.
             QL.create({
                 "quote_id": quote.id,
                 "line_type": "equipment",
@@ -1652,25 +2112,31 @@ class WhatsAppMessageWA12(models.Model):
                 "name": prod.name,
                 "quantity": float(it.get("qty") or 1),
                 "duration_days": int(days or 1),
-                # explicit 0.0 (the column is NOT NULL); falsy -> the create()
-                # gate fires the engine instead of stamping 'manual'.
-                "unit_rate": 0.0,
+                "unit_rate": float(it.get("rep_price") or 0.0),
             })
 
     def _wa12_unpriced_lines(self, quote):
         """Names of lines with NO real rate (binding-1 guard, line_type-aware).
-        EQUIPMENT line blocks if pricing_status not_yet/no_rule/MANUAL (the lane
-        can't fabricate a hidden manual rate on an engine item) or base
-        unit_rate<=$1. A CUSTOM line (explicit typed rate) passes once its
-        unit_rate>$1. Reads the BASE unit_rate, not the discounted effective —
-        a discount (even 100%) is an explicit, approval-visible choice."""
+
+        F8 EVOLUTION (user-ratified): the guard's job is "no silent zero / no
+        invented rate" — an EQUIPMENT line blocks on not_yet/no_rule or a base
+        unit_rate<=$1. A 'manual' line with a REAL rate now PASSES: the only
+        WA-12 path that creates one is the explicit, loudly-flagged rep-price
+        mechanism (no catalogue rate -> the rep typed the rate; rendered
+        '(rep-priced)' in the echo/summary/ping/PDF and queryable via
+        pricing_status='manual' for Robin's rate-promotion review). The old
+        blanket manual-block predates per-product rules; the engine path still
+        NEVER fabricates manual (lines are created at 0.0 unless rep-priced).
+        A CUSTOM line (explicit typed rate) passes once its unit_rate>$1.
+        Reads the BASE unit_rate, not the discounted effective — a discount
+        (even 100%) is an explicit, approval-visible choice."""
         bad = []
         for l in quote.line_ids:
             if l.line_type == "custom":
                 if (l.unit_rate or 0.0) <= _WA12_PLACEHOLDER_RATE:
                     bad.append(l.name or "(item)")
                 continue
-            if l.pricing_status in ("not_yet", "no_rule", "manual") \
+            if l.pricing_status in ("not_yet", "no_rule") \
                     or (l.unit_rate or 0.0) <= _WA12_PLACEHOLDER_RATE:
                 bad.append(l.name or "(item)")
         return bad
@@ -1724,7 +2190,13 @@ class WhatsAppMessageWA12(models.Model):
                     l.discount_pct)
             else:
                 eff, disc = base, None
-            tag = "[CUSTOM] " if l.line_type == "custom" else ""
+            if l.line_type == "custom":
+                tag = "[CUSTOM] "
+            elif l.pricing_status == "manual" and not l.equipment_line_id:
+                # F8: a rep-priced line (no catalogue rate) is LOUD everywhere.
+                tag = "[REP-PRICED] "
+            else:
+                tag = ""
             if disc:
                 rate_txt = "%s %.2f → %.2f/day (disc. %s)" % (
                     cur, base, max(eff, 0.0), disc)
@@ -1792,7 +2264,14 @@ class WhatsAppMessageWA12(models.Model):
 
     @api.model
     def _wa12_item_summary(self, quote):
-        names = [("%s×%g" % (l.name, l.quantity)) for l in quote.line_ids[:4]]
+        names = []
+        for l in quote.line_ids[:4]:
+            flag = ""
+            if l.line_type != "custom" and l.pricing_status == "manual" \
+                    and not l.equipment_line_id:
+                # F8: the approver sees exactly which rates came from the rep.
+                flag = _(" (rep-priced)")
+            names.append("%s×%g%s" % (l.name, l.quantity, flag))
         more = "…" if len(quote.line_ids) > 4 else ""
         return ", ".join(names) + more
 

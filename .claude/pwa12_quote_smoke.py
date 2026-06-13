@@ -165,23 +165,38 @@ prod_ok = PT.create({
     # unique token so _wa6_match_one token-matches THIS product only; the
     # list_price is DELIBERATELY 999 (!= the $50 rule) to PROVE the engine
     # ignores list_price -- the line must price at $50 via tcat -> trule.
-    "name": "[TEST-WA12] Qwertyunit", "is_workshop_item": True,
+    # workshop_name = the bare name (F2: the exact-match tier compares
+    # normalised names; real catalogue names carry no [TEST-*] prefix).
+    "name": "[TEST-WA12] Qwertyunit", "workshop_name": "qwertyunit",
+    "is_workshop_item": True,
     "list_price": 999.0,
     "equipment_category_id": tcat.id})
 prod_ph = PT.create({
     # a category with NO rule -> the engine stamps 'no_rule' -> guard blocks.
-    "name": "[TEST-WA12] Placeholder Gizmo", "is_workshop_item": True,
+    "name": "[TEST-WA12] Placeholder Gizmo",
+    "workshop_name": "placeholder gizmo", "is_workshop_item": True,
     "list_price": 1.0,
     "equipment_category_id": tcat_norule.id})
 # WA-12.1: a PRODUCT-scoped rule ($77) on a product that ALSO sits in tcat (the
 # $50 category rule) with list_price 999 -> must price $77 (product rule wins).
 prod_pr = PT.create({
-    "name": "[TEST-WA12] Prodruled", "is_workshop_item": True,
+    "name": "[TEST-WA12] Prodruled", "workshop_name": "prodruled",
+    "is_workshop_item": True,
     "list_price": 999.0, "equipment_category_id": tcat.id})
 prule = Rule.create({
     "name": "[TEST-WA12] ProdRule", "product_template_id": prod_pr.id,
     "currency_id": USD.id, "base_rate": 77.0, "effective_date": "2020-01-01"})
 Bracket.create({"rule_id": prule.id, "sequence": 1, "day_from": 1,
+                "day_to": -1, "multiplier": 1.0})
+# F1 (proof #2): the CATALOGUE-LOAD shape — a product rule but NO
+# equipment_category_id. The echo and the DRAFT must both price it $200.
+prod_nocat = PT.create({
+    "name": "[TEST-WA12] Kommandr Server", "workshop_name": "kommandr server",
+    "is_workshop_item": True, "list_price": 5.0})
+nrule = Rule.create({
+    "name": "[TEST-WA12] NoCatRule", "product_template_id": prod_nocat.id,
+    "currency_id": USD.id, "base_rate": 200.0, "effective_date": "2020-01-01"})
+Bracket.create({"rule_id": nrule.id, "sequence": 1, "day_from": 1,
                 "day_to": -1, "multiplier": 1.0})
 # a partner-scoped payment term so _wa12_ensure_payment_term resolves (the
 # prod DB carries terms; the test DB starts with none).
@@ -1040,6 +1055,371 @@ _check("T-WA12-42",
        % (s42.step if s42 else "-", q42.state))
 _clear_sess(SALES_PH)
 
+# ---- T-WA12-43 (F1 regression: ECHO RATE == DRAFT RATE, always) the
+# catalogue-load shape (product rule, NO category): echo $200 -> yes -> the
+# DRAFTED line is priced $200 (never a silent $0.00 'not_yet').
+_clear_sess(SALES_PH)
+_f1 = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
+       '"items":[{"name":"kommandr server","qty":1,"stated_price":null}],'
+       '"date":"2026-09-25","phone":null,"email":null,"contact_person":null,'
+       '"address":null,"event_name":null}')
+_s43 = M.search([], order="id desc", limit=1).id
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f1):
+    D_sales._wa12_llm_intake_maybe(_txt(
+        SALES_PH, "quote acme for the kommandr server please"))
+_e43 = (M.search([("id", ">", _s43), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+echo_200 = "200.00" in _e43
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
+q43 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+l43 = q43.line_ids[:1]
+_check("T-WA12-43",
+       echo_200 and l43 and l43.pricing_status == "priced"
+       and abs(l43.unit_rate - 200.0) < 0.01,
+       "echo==draft: echo$200=%s drafted(status=%s rate=%s; want priced/200)"
+       % (echo_200, l43.pricing_status if l43 else "-",
+          l43.unit_rate if l43 else "-"))
+
+# ---- T-WA12-44 (F2) exact catalogue-name match beats token logic; weak hits
+# carry confidence + suggestions (never silently drafted by the 12.2 lane).
+h_exact = M._wa6_match_one("kommandr server")
+h_weak = M._wa6_match_one("gizmo")     # 1-token overlap -> weak
+mm, uu = M._wa12_match_slot_items([{"name": "gizmo", "qty": 1}])
+_check("T-WA12-44",
+       h_exact.get("confidence") == "exact"
+       and h_exact.get("product_id") == prod_nocat.id
+       and h_weak.get("confidence") in ("weak", "none")
+       and not mm and len(uu) == 1 and uu[0].get("suggestions") is not None,
+       "exact wins (conf=%s id-ok=%s); weak -> pick bucket (conf=%s, "
+       "unmatched=%d)" % (h_exact.get("confidence"),
+                          h_exact.get("product_id") == prod_nocat.id,
+                          h_weak.get("confidence"), len(uu)))
+
+# ---- T-WA12-45 (F8) rep-priced unpriced item: brief price -> '(rep-priced —
+# no catalogue rate)' echo -> manual line passes the guard; summary+ping flag;
+# a PRICED item's stated price stays a hint; no-rate-no-price still blocks.
+_clear_sess(SALES_PH)
+_f8 = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
+       '"items":[{"name":"placeholder gizmo","qty":1,"stated_price":750},'
+       '{"name":"qwertyunit","qty":1,"stated_price":40}],'
+       '"date":"2026-09-26","phone":null,"email":null,"contact_person":null,'
+       '"address":null,"event_name":null}')
+_s45 = M.search([], order="id desc", limit=1).id
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f8):
+    D_sales._wa12_llm_intake_maybe(_txt(
+        SALES_PH, "quote acme gizmo at 750 and qwertyunit at 40"))
+_e45 = (M.search([("id", ">", _s45), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+flag45 = ("rep-priced — no catalogue rate" in _e45
+          and "750.00" in _e45
+          and "you said 40.00" in _e45 and "50.00" in _e45)
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
+q45 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+lg = q45.line_ids.filtered(lambda l: l.product_template_id == prod_ph)[:1]
+lq = q45.line_ids.filtered(lambda l: l.product_template_id == prod_ok)[:1]
+guard45 = not M.sudo()._wa12_unpriced_lines(q45)
+summ45 = "[REP-PRICED]" in M.sudo()._wa12_draft_summary(q45, [])
+ping45 = "(rep-priced)" in M.sudo()._wa12_item_summary(q45)
+drafted45 = (lg and lg.pricing_status == "manual"
+             and abs(lg.unit_rate - 750.0) < 0.01
+             and lq and abs(lq.unit_rate - 50.0) < 0.01)  # hint ignored
+# no-rate-no-price still blocks (the F1 $0 class): a bare gizmo brief.
+_clear_sess(SALES_PH)
+_f8b = _f8.replace(',"stated_price":750', ',"stated_price":null').replace(
+    ',{"name":"qwertyunit","qty":1,"stated_price":40}', '')
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f8b):
+    D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "quote acme one gizmo only"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))
+q45b = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+blocks45 = bool(M.sudo()._wa12_unpriced_lines(q45b))
+_check("T-WA12-45",
+       flag45 and bool(drafted45) and guard45 and summ45 and ping45 and blocks45,
+       "rep-price: echo-flag=%s drafted(manual@750 + engine@50)=%s guard-pass"
+       "=%s summary-tag=%s ping-flag=%s ; no-price still blocks=%s"
+       % (flag45, bool(drafted45), guard45, summ45, ping45, blocks45))
+
+# ---- T-WA12-46 (F3) q_items: per-item replace + show-words are NOT a yes.
+_clear_sess(SALES_PH)
+_f3 = ('{"intent":"quote","client":"[TEST-WA12] Acme Events Co",'
+       '"items":[{"name":"qwertyunit","qty":1,"stated_price":null}],'
+       '"date":null,"phone":null,"email":null,"contact_person":null,'
+       '"address":null,"event_name":null}')
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f3):
+    D_sales._wa12_llm_intake_maybe(_txt(SALES_PH, "quote acme a qwertyunit"))
+_qb = Q.search_count([("partner_id", "=", client.id)])
+_s46 = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "show me"))
+_e46 = (M.search([("id", ">", _s46), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+no_draft46 = (Q.search_count([("partner_id", "=", client.id)]) == _qb
+              and "Nothing is drafted yet" in _e46
+              and _step(SALES_PH) == "q_items")
+# deterministic replace
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "replace qwertyunit = prodruled"))
+s46 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+b46 = s46._get_buffer() if s46 else {}
+repl46 = (isinstance(b46, dict) and len(b46.get("matched") or []) == 1
+          and b46["matched"][0]["product_name"] == "[TEST-WA12] Prodruled")
+# natural replace via the items-translate hook (mock returns the command)
+with patch.object(type(M), "_wa12_llm_chat",
+                  lambda self, msgs: "replace prodruled = qwertyunit"):
+    D_sales._wa12_maybe_intercept(_txt(
+        SALES_PH, "actually it should be the qwerty one"))
+b46b = s46._get_buffer() if s46 else {}
+nat46 = (isinstance(b46b, dict)
+         and b46b["matched"][0]["product_name"] == "[TEST-WA12] Qwertyunit")
+_check("T-WA12-46",
+       no_draft46 and repl46 and nat46,
+       "show!=yes(no draft)=%s replace-det=%s replace-natural=%s"
+       % (no_draft46, repl46, nat46))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-47 (F4) a multi-item message at q_confirm routes through
+# EXTRACTION (never a single `add` parse).
+_clear_sess(SALES_PH)
+q47 = Q._wa12_provision_chain(client, "2026-09-27", USD, u_sales)
+M.sudo()._wa12_build_lines(q47, [{"product_id": prod_ok.id, "qty": 1}], 1)
+q47.action_recalculate_pricing()
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_confirm", {"quote_id": q47.id})
+_f4 = ('{"intent":"quote","client":null,'
+       '"items":[{"name":"prodruled","qty":1,"stated_price":null},'
+       '{"name":"kommandr server","qty":2,"stated_price":null}],'
+       '"date":null,"phone":null,"email":null,"contact_person":null,'
+       '"address":null,"event_name":null}')
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f4):
+    D_sales._wa12_maybe_intercept(_txt(
+        SALES_PH, "Items: prodruled , kommandr server X2, more stuff"))
+prods47 = set(q47.line_ids.mapped("product_template_id").ids)
+_check("T-WA12-47",
+       {prod_ok.id, prod_pr.id, prod_nocat.id} <= prods47
+       and len(q47.line_ids) == 3,
+       "multi-item at q_confirm -> extraction -> 3 lines (%s)"
+       % len(q47.line_ids))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-48 (F5) address + event subject from the brief: street on the
+# new partner; 'Event: <subject>' on the event job's client notes.
+_clear_sess(SALES_PH)
+_f5 = ('{"intent":"quote","client":"[TEST-WA12] Redan Co",'
+       '"items":[{"name":"qwertyunit","qty":1,"stated_price":null}],'
+       '"date":null,"phone":"+263774000222","email":"redan@x.test",'
+       '"contact_person":null,"address":"10 Hugh Fraser Road, Highlands",'
+       '"event_name":"Redan Launch"}')
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f5):
+    D_sales._wa12_llm_intake_maybe(_txt(
+        SALES_PH, "quotation for Redan Co located at 10 Hugh Fraser Road"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "yes"))     # -> intake
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "new"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "company"))
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "ok"))      # contact prefilled? no — contact null, asks
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "[TEST-WA12] Ruth"))  # qc_contact
+p48 = P.search([("name", "=", "[TEST-WA12] Redan Co")], limit=1)
+q48 = Q.search([("partner_id", "=", p48.id)], limit=1) if p48 else Q.browse()
+notes48 = (q48.event_job_id.client_notes or "") if q48 else ""
+_check("T-WA12-48",
+       bool(p48) and p48.street == "10 Hugh Fraser Road, Highlands"
+       and bool(q48) and "Redan Launch" in notes48,
+       "address->street=%s event-name->notes=%s (street=%r)"
+       % (bool(p48 and p48.street), "Redan Launch" in notes48,
+          p48.street if p48 else "-"))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-49 (F6/F7) greeting mid-draft -> resume offer (not the syntax
+# card); 'cancel or delete' cancels; 'delete the qwertyunit line' does NOT.
+q49 = Q._wa12_provision_chain(client, "2026-09-28", USD, u_sales)
+M.sudo()._wa12_build_lines(q49, [{"product_id": prod_ok.id, "qty": 1}], 1)
+q49.action_recalculate_pricing()
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_confirm", {"quote_id": q49.id})
+_s49 = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "hello"))
+_e49 = (M.search([("id", ">", _s49), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+greet49 = ("open draft" in _e49 and "continue" in _e49
+           and "price <item>" not in _e49)
+notcxl = not M._wa12_is_cancel("delete the qwertyunit line")
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "cancel or delete"))
+s49 = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+_check("T-WA12-49",
+       greet49 and notcxl and not s49,
+       "greeting->resume-offer=%s ; line-delete not a cancel=%s ; "
+       "'cancel or delete' cancelled=%s" % (greet49, notcxl, not s49))
+
+# ---- T-WA12-50 (review MATCH-1/FSM-3) the F2 weak-confidence gate at the
+# THREE remaining consumers. 'gizmo' weak-matches Placeholder Gizmo -> never a
+# confident line: (a) direct Quote: -> confirm gate, NO draft; (b) q_itemreq ->
+# unmatched pick; (c) q_confirm `add gizmo` -> refused with suggestions.
+_clear_sess(SALES_PH)
+_qb50 = Q.search_count([])
+D_sales._wa12_maybe_intercept(_txt(
+    SALES_PH, "Quote: [TEST-WA12] Acme Events Co — gizmo, 2026-10-01"))
+s50a = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+b50a = s50a._get_buffer() if s50a else {}
+quote_gate = (bool(s50a) and s50a.step == "q_items"
+              and Q.search_count([]) == _qb50
+              and not (b50a.get("matched") or [])
+              and len(b50a.get("unmatched") or []) == 1)
+_clear_sess(SALES_PH)
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_itemreq",
+    {"client_txt": "[TEST-WA12] Acme Events Co", "partner_id": client.id,
+     "date_txt": "", "prefills": {}})
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "gizmo"))
+s50b = env["neon.wa.equip.session"].sudo()._active_for_phone(SALES_PH)
+b50b = s50b._get_buffer() if s50b else {}
+itemreq_gate = (bool(s50b) and s50b.step == "q_items"
+                and not (b50b.get("matched") or [])
+                and len(b50b.get("unmatched") or []) == 1)
+_clear_sess(SALES_PH)
+q50 = Q._wa12_provision_chain(client, "2026-10-02", USD, u_sales)
+M.sudo()._wa12_build_lines(q50, [{"product_id": prod_ok.id, "qty": 1}], 1)
+q50.action_recalculate_pricing()
+_n50, _s50c = len(q50.line_ids), M.search([], order="id desc", limit=1).id
+M.sudo()._wa12_try_edit(q50, "add gizmo", SALES_PH, SALES_PH)
+_e50c = (M.search([("id", ">", _s50c), ("phone_number", "=", SALES_PH),
+                   ("direction", "=", "outbound")], order="id desc", limit=1
+                  ).message_body or "").lower()
+add_gate = (len(q50.line_ids) == _n50
+            and ("did you mean" in _e50c or "confidently" in _e50c))
+_check("T-WA12-50", quote_gate and itemreq_gate and add_gate,
+       "F2 gate: Quote:->confirm/no-draft=%s q_itemreq->pick=%s add-refused=%s"
+       % (quote_gate, itemreq_gate, add_gate))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-51 (review FSM-1) the greeting advertises *continue* (NOT the
+# Meta opt-in word *resume*); *continue* re-shows the confirm echo at q_items.
+_clear_sess(SALES_PH)
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_items",
+    {"client_txt": "[TEST-WA12] Acme Events Co", "partner_id": client.id,
+     "matched": [{"product_id": prod_ok.id,
+                  "product_name": "[TEST-WA12] Qwertyunit", "qty": 1,
+                  "stated_price": None}], "unmatched": [], "date_txt": "",
+     "days": 1, "prefills": {}})
+_s51 = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "hello"))
+_e51 = (M.search([("id", ">", _s51), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+greet_continue = "*continue*" in _e51 and "*resume*" not in _e51
+_s51b = M.search([], order="id desc", limit=1).id
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "continue"))
+_e51b = (M.search([("id", ">", _s51b), ("phone_number", "=", SALES_PH),
+                   ("direction", "=", "outbound")], order="id desc", limit=1
+                  ).message_body or "").lower()
+continue_works = "qwertyunit" in _e51b and _step(SALES_PH) == "q_items"
+_check("T-WA12-51", greet_continue and continue_works,
+       "greeting advertises continue not resume=%s ; continue re-shows=%s"
+       % (greet_continue, continue_works))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-52 (review FSM-2) 'no' at qc_email SKIPS email (client created,
+# resumes), never cancels the whole intake.
+_clear_sess(SALES_PH)
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "qc_email",
+    {"client_txt": "[TEST-WA12] NoEmail Co", "kind": "company",
+     "name": "[TEST-WA12] NoEmail Co", "contact": "[TEST-WA12] Bee",
+     "phone": "+263773111222", "phone_e164": "+263773111222",
+     "matched": [{"product_id": prod_ok.id,
+                  "product_name": "[TEST-WA12] Qwertyunit", "qty": 1,
+                  "stated_price": None}], "date_txt": "", "days": 1,
+     "prefills": {}})
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "no"))
+p52 = P.search([("name", "=", "[TEST-WA12] NoEmail Co")], limit=1)
+_check("T-WA12-52",
+       bool(p52) and not p52.email and _step(SALES_PH) == "q_confirm",
+       "qc_email 'no' -> client created/no-email=%s resumed=%s"
+       % (bool(p52), _step(SALES_PH)))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-53 (review FSM-4) an ambiguous token at q_items refuses with the
+# colliding names; no qty silently changed on the wrong line.
+_clear_sess(SALES_PH)
+sess53 = env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_items",
+    {"client_txt": "X", "partner_id": client.id, "matched": [
+        {"product_id": prod_ok.id, "product_name": "[TEST-WA12] LED Screen Big",
+         "qty": 1, "stated_price": None},
+        {"product_id": prod_pr.id, "product_name": "[TEST-WA12] LED Screen Sml",
+         "qty": 1, "stated_price": None}],
+     "unmatched": [], "date_txt": "", "days": 1, "prefills": {}})
+_s53 = M.search([], order="id desc", limit=1).id
+M.sudo()._wa12_q_items_try(sess53, sess53._get_buffer(), "qty led 4",
+                           SALES_PH, SALES_PH)
+_e53 = (M.search([("id", ">", _s53), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "").lower()
+b53 = sess53._get_buffer()
+_check("T-WA12-53",
+       "be more specific" in _e53
+       and all(it["qty"] == 1 for it in b53.get("matched", [])),
+       "ambiguous 'qty led 4' refused, neither qty changed (reply=%r)"
+       % _e53[:50])
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-54 (review MATCH-3/FSM-6) multi-item paste at q_confirm: a dup is
+# NOT reported 'Added', its qty IS applied to the existing line, new item added.
+_clear_sess(SALES_PH)
+q54 = Q._wa12_provision_chain(client, "2026-10-03", USD, u_sales)
+M.sudo()._wa12_build_lines(q54, [{"product_id": prod_ok.id, "qty": 1}], 1)
+q54.action_recalculate_pricing()
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_confirm", {"quote_id": q54.id})
+_f54 = ('{"intent":"quote","client":null,'
+        '"items":[{"name":"qwertyunit","qty":3,"stated_price":null},'
+        '{"name":"prodruled","qty":1,"stated_price":null}],'
+        '"date":null,"phone":null,"email":null,"contact_person":null,'
+        '"address":null,"event_name":null}')
+_s54 = M.search([], order="id desc", limit=1).id
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _f54):
+    D_sales._wa12_maybe_intercept(_txt(
+        SALES_PH, "qwertyunit x3, prodruled, plus more stuff"))
+_e54 = (M.search([("id", ">", _s54), ("phone_number", "=", SALES_PH),
+                  ("direction", "=", "outbound")], order="id desc", limit=1
+                 ).message_body or "")
+lq54 = q54.line_ids.filtered(lambda l: l.product_template_id == prod_ok)[:1]
+_check("T-WA12-54",
+       bool(lq54) and lq54.quantity == 3
+       and "Added [TEST-WA12] Qwertyunit" not in _e54
+       and prod_pr.id in q54.line_ids.mapped("product_template_id").ids,
+       "apply_multi: dup qty->existing=%s, dup not 'Added', new added=%s"
+       % (lq54.quantity if lq54 else "-",
+          prod_pr.id in q54.line_ids.mapped("product_template_id").ids))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-55 (review FSM-9) the F5 event-name write is actor-honest
+# (write_uid = the rep, never the public/odoobot uid).
+M.with_user(u_sales)._wa12_quote_from_slots(
+    u_sales, client, [{"product_id": prod_ok.id, "product_name": "x",
+                       "qty": 1, "stated_price": None}],
+    "", 1, SALES_PH, SALES_PH, extras={"event_name": "Garden Gala"})
+q55 = Q.search([("partner_id", "=", client.id)], order="id desc", limit=1)
+ej55 = q55.event_job_id
+_check("T-WA12-55",
+       "Garden Gala" in (ej55.client_notes or "")
+       and ej55.write_uid.id == u_sales.id,
+       "F5 event note=%s write_uid=rep=%s (uid=%s)"
+       % ("Garden Gala" in (ej55.client_notes or ""),
+          ej55.write_uid.id == u_sales.id, ej55.write_uid.id))
+_clear_sess(SALES_PH)
+
+# ---- T-WA12-56 (review FSM-8) a greeting WORD at q_client is treated as a
+# client NAME (resolver-first), not the greeting reply.
+_clear_sess(SALES_PH)
+env["neon.wa.equip.session"].sudo()._start_quote(
+    SALES_PH, u_sales, "q_client", {"date_txt": "", "prefills": {}})
+D_sales._wa12_maybe_intercept(_txt(SALES_PH, "hello"))
+_check("T-WA12-56", _step(SALES_PH) == "qc_pick",
+       "greeting word at q_client -> resolver ran (intake), step=%s"
+       % _step(SALES_PH))
+_clear_sess(SALES_PH)
+
 # ---------------------------------------------------------- T-WA12-10 teardown
 # reject a provisional quote -> chain archived
 arch = Q._wa12_provision_chain(
@@ -1098,7 +1478,7 @@ _trules = Rule.with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")])
 _trules.mapped("bracket_ids").unlink()
 _trules.unlink()
-(prod_ok | prod_ph | prod_pr).unlink()
+(prod_ok | prod_ph | prod_pr | prod_nocat).unlink()
 ECat.with_context(active_test=False).search(
     [("name", "like", "[TEST-WA12]")]).unlink()
 # payment terms: by NAME (our fixture) AND by PARTNER (_wa12_ensure_payment_term

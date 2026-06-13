@@ -761,8 +761,11 @@ class NeonFinanceQuote(models.Model):
                 # 'manual', while a genuinely hand-set 'manual' line is preserved.
                 if line.line_type == "equipment" and (
                         line.equipment_line_id
-                        or (line.product_template_id.equipment_category_id
+                        or (line.product_template_id
                             and line.pricing_status != "manual")):
+                    # F1 (proof #2): keyed on the PRODUCT, not the category --
+                    # per-product rules resolve without one (catalogue-load
+                    # CREATE products carry none). Mirrors the create() gate.
                     line._compute_line_pricing()
                 elif line.unit_rate > 0:
                     line.pricing_status = "manual"

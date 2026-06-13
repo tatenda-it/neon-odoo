@@ -18,7 +18,13 @@
     # activated + write.log action_confirm/cancel_from_ui (cta_url
     # deep-link target). Additive; dashboard Copilot unaffected (Groq
     # stays is_default).
-    "version": "17.0.1.1.0",
+    # 17.0.1.2.0 = WA-12.2 bake-off additions: per-CALL temperature + model
+    # overrides on GroqChatAdapter.chat / GeminiChatAdapter.chat (the
+    # extraction lane runs temperature=0 + a same-key llama->gpt-oss-120b
+    # model fallback WITHOUT touching the shared provider rows the dashboard
+    # Copilot uses; Gemini accepts the kwargs for parity, model ignored).
+    # None = the provider row's value -> every existing caller unchanged.
+    "version": "17.0.1.2.0",
     "summary": "Shared AI engine -- provider abstraction, tool-calling "
                "chat orchestrator, two-phase write guardrail, chat "
                "audit models. Neutral core for neon_dashboard + "

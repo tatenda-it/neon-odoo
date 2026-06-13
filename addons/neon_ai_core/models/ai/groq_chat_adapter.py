@@ -75,9 +75,16 @@ class GroqChatAdapter:
     def __init__(self, provider_record):
         self.provider = provider_record
 
-    def chat(self, messages, tools=None):
+    def chat(self, messages, tools=None, temperature=None, model=None):
         """Send messages (list of {role, content[, tool_calls,
         tool_call_id, name]} dicts) plus optional tool schemas.
+
+        ``temperature`` / ``model`` (WA-12.2 bake-off additions): per-CALL
+        overrides of the provider row's defaults -- the extraction lane needs
+        temperature=0 (a translator must be deterministic) and a same-key
+        model fallback (llama -> gpt-oss-120b) without touching the shared
+        provider record the dashboard Copilot also uses. None = the provider
+        row's value (all existing callers unchanged).
 
         Returns ChatTurnResult. NEVER raises -- the orchestrator
         relies on success=False / error_message to drive fallback.
@@ -99,9 +106,10 @@ class GroqChatAdapter:
             )
         try:
             payload = {
-                "model": self.provider.model_id,
+                "model": model or self.provider.model_id,
                 "messages": messages,
-                "temperature": self.provider.temperature,
+                "temperature": (self.provider.temperature
+                                if temperature is None else temperature),
                 "max_tokens": self.provider.max_tokens,
             }
             if tools:
