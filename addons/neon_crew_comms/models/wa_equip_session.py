@@ -77,6 +77,8 @@ class WaEquipSession(models.Model):
          ("q_items", "Quote — confirm matched items before draft (WA-12.2)"),
          ("q_client", "Quote — awaiting client for a bare quote intent (WA-12.2)"),
          ("q_itemreq", "Quote — awaiting item list (WA-12.2)"),
+         ("qs_event", "Quote — structured: event date/venue/note (WA-12.6)"),
+         ("qs_item", "Quote — structured: collecting ONE item at a time (WA-12.6)"),
          ("doc_pick", "Send — awaiting quote/invoice doc pick (WA-13)"),
          ("inv_pick", "Invoice-from-quote — awaiting scheduled-stage pick (WA-13)"),
          ("inv_confirm", "Invoice-from-quote — awaiting generate confirm (WA-13)"),

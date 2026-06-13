@@ -319,7 +319,14 @@
     # (_wa12_match_slot_items re-splits each LLM item name); post-draft QUESTION
     # guard -> plain HELP (never an edit); plain-language repair/help (no command
     # syntax). Wire-level golden harness pwa12_5 5/5.
-    "version": "17.0.1.18.1",
+    # 17.0.1.19.0: WA-12.6 STRUCTURED one-at-a-time collection (NEW SPINE; drops
+    # whole-brief LLM extraction as the failure point). Deterministic FSM:
+    # client(q_client/qc_*) -> qs_event (date/RANGE -> duration_days, the MONEY
+    # fix) -> qs_item (ONE item at a time, category-scoped packages-excluded list
+    # / ✓✗ card / custom line) -> q_confirm review. A dump resets to step 1 (no
+    # bulk-parse); client locked. pwa12_6 wire harness 7/7. NOT a complete cutover
+    # yet (old pwa12 flow suite + review-step wire-test pending). NOT deployed.
+    "version": "17.0.1.19.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

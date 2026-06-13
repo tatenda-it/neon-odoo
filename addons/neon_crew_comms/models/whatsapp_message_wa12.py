@@ -85,9 +85,20 @@ _WA12_CAPTURE_STEPS = ("qc_pick", "qc_kind", "qc_name", "qc_dupe",
 # slot-filling -- M5).
 _WA12_CONVO_STEPS = ("q_items", "q_client", "q_itemreq")
 
+# WA-12.6 STRUCTURED collection steps (the new deterministic spine): client
+# (reuses q_client/qc_*) -> qs_event -> qs_item (one-at-a-time loop) -> q_confirm
+# (review). The LLM is demoted to optional pre-fill suggestions; items are ALWAYS
+# collected one-by-one fresh, never seeded from a dump.
+_WA12_STRUCT_STEPS = ("qs_event", "qs_item")
+
 # Quote session steps live on the shared equip-session. WA-12 claims q_confirm /
-# q_reject + the new-client capture steps + the conversational steps.
-_WA12_STEPS = ("q_confirm", "q_reject") + _WA12_CAPTURE_STEPS + _WA12_CONVO_STEPS
+# q_reject + the new-client capture steps + the conversational + structured steps.
+_WA12_STEPS = (("q_confirm", "q_reject") + _WA12_CAPTURE_STEPS
+               + _WA12_CONVO_STEPS + _WA12_STRUCT_STEPS)
+
+# Item-loop "done" / "next" vocab (the rep ends collection or moves on).
+_WA12_DONE_WORDS = ("done", "that's all", "thats all", "finish", "finished",
+                    "no more", "nothing else", "that's it", "thats it", "end")
 
 # Complaint/correction language (M4): a repair prompt, never the syntax menu.
 _WA12_COMPLAINT_TOKENS = ("wrong", "incorrect", "mistake", "not what i",
@@ -387,38 +398,14 @@ class WhatsAppMessageWA12(models.Model):
     # Quote: flow — parse -> resolve client -> provision -> lines -> guard.
     # ================================================================
     def _wa12_run_quote(self, sender, body, from_e164, raw_from, message):
-        """Build a DRAFT quote on a provisional chain + echo it for confirm.
-        Returns True (claimed) once it looks like a real quote command; on a
-        resolution miss it replies an honest message (still claimed -- the
-        sender explicitly typed Quote:)."""
-        self._wa6_audit_in(from_e164, message, "wa12-quote")
+        """WA-12.6: a 'Quote:' command no longer bulk-extracts the brief (the
+        proven item-drop / wrong-client failure). It RESETS to the structured
+        one-at-a-time collection (client -> event -> items -> review); the brief
+        text only PRE-FILLS the client/date prompts as confirmable suggestions.
+        Still claimed (the sender explicitly typed Quote:)."""
         rest = self._wa12_strip_cmd(body, _WA12_QUOTE_CMDS + _WA12_QUOTE_TRIGGERS)
-        client_txt, items_txt, date_txt, days = self._wa12_parse_quote(rest)
-        if not client_txt or not items_txt:
-            return self._wa6_reply(raw_from, from_e164, _(
-                "To quote, send:  Quote: <client> — <items>, <date>"))
-        # F2 (review MATCH-1): confidence-gate the items. A WEAK/ambiguous hit
-        # must NOT draft a guessed product -> route the whole quote through the
-        # confirm-before-draft gate (q_items) so the rep resolves it; only an
-        # all-confident tight quote provisions directly (unchanged UX).
-        matched, unmatched = self._wa12_match_text_items(items_txt)
-        if not matched and not unmatched:
-            return self._wa6_reply(raw_from, from_e164, _(
-                "Couldn't match any catalogue items in \"%s\".") % items_txt)
-        # CLIENT INTAKE BEFORE ITEMS (must-preserve): resolve the named client
-        # first. exactly one -> proceed to the item stepper with that partner; 0
-        # or >1 -> the guided new-client intake / list-then-pick (items + date
-        # buffered, intake resumes into the stepper). WA-12.4: ALL items then go
-        # through the STEPPER (confident -> ✅+[✓/✗]; ambiguous/family -> LIST);
-        # no item auto-drafts without the rep confirming it.
-        partner, candidates = self._wa12_client_candidates(client_txt)
-        if not partner:
-            return self._wa12_start_client_intake(
-                sender, client_txt, candidates, matched, date_txt, days,
-                from_e164, raw_from)
-        return self._wa12_open_items_confirm(
-            sender, partner.name, matched, unmatched, date_txt, {},
-            from_e164, raw_from, partner_id=partner.id)
+        return self._wa12_begin_structured(
+            sender, rest, from_e164, raw_from, message=message)
 
     def _wa12_quote_from_slots(self, sender, partner, matched, date_txt, days,
                                from_e164, raw_from, extras=None):
@@ -733,6 +720,269 @@ class WhatsAppMessageWA12(models.Model):
             "approval* to send it, *Preview* to see the PDF, *Edit* to change "
             "a line, or *Cancel*. Or just tell me what to change."))
 
+    # ================================================================
+    # WA-12.6 -- STRUCTURED one-at-a-time collection (the deterministic spine).
+    # The bot drives the sequence: client -> event -> items (ONE at a time) ->
+    # review. It NEVER bulk-processes a dump; the LLM is optional pre-fill
+    # (client/date suggestions only -- items are always collected fresh). This
+    # makes item-drop / wrong-client / mis-parse structurally impossible.
+    # ================================================================
+    def _wa12_begin_structured(self, sender, dump, from_e164, raw_from,
+                               message=None):
+        """Entry: reset to step 1 (client). A first-message dump is NOT bulk-
+        extracted; a best-effort LLM read may PRE-FILL the client/date prompts
+        as confirmable suggestions (degrades silently). Opens q_client."""
+        if message is not None:
+            self._wa6_audit_in(from_e164, message, "wa12-structured")
+        prefills = {}
+        try:
+            data = self._wa12_llm_extract_quote(dump or "") or {}
+            prefills = {"client": (data.get("client") or "").strip(),
+                        "date": (data.get("date") or "").strip(),
+                        "venue": (data.get("address") or "").strip(),
+                        "note": (data.get("event_name") or "").strip()}
+        except Exception:  # noqa: BLE001 -- pre-fill is best-effort only
+            prefills = {}
+        buf = {"v": 5, "structured": True, "client_txt": "",
+               "partner_id": False, "date_txt": "", "venue": "", "note": "",
+               "prefills": prefills, "items": [], "pending_item": None,
+               "qty_for": False}
+        self.env["neon.wa.equip.session"]._start_quote(
+            from_e164, sender, "q_client", buf)
+        hint = ""
+        if prefills.get("client"):
+            hint = _(" (you mentioned *%s* — reply the client name to use it)"
+                     ) % prefills["client"]
+        return self._wa6_reply(raw_from, from_e164, _(
+            "Sure — I'll take this one step at a time so I get it right.\n\n"
+            "First, which client is this quote for?%s") % hint)
+
+    def _wa12_struct_after_client(self, sess, buf, partner, from_e164, raw_from):
+        """Client resolved/created -> LOG it (locked; later steps never re-
+        resolve) -> advance to the EVENT step. Shared by the q_client resolve
+        and the qc_* intake resume."""
+        buf["client_txt"] = partner.name
+        buf["partner_id"] = partner.id
+        buf["pending_item"] = None
+        sess.sudo().write({"step": "qs_event"})
+        sess._set_buffer(buf)
+        pf = buf.get("prefills") or {}
+        hint = (_(" (you mentioned *%s*)") % pf["date"]) if pf.get("date") else ""
+        return self._wa6_reply(raw_from, from_e164, _(
+            "Got it — *%s*.\n\nWhat's the event date?%s") % (partner.name, hint))
+
+    def _wa12_handle_struct_event(self, sess, buf, body, from_e164, raw_from):
+        """qs_event: capture the event DATE (required, day-first ZW), with an
+        optional 'venue: ...' / 'note: ...' on the same or later line. On a
+        valid date -> advance to the item loop (ask the first item)."""
+        import re
+        raw = (body or "").strip()
+        norm = " ".join(raw.lower().split())
+        # optional venue / note captured without leaving the step.
+        m = re.match(r"(?:venue|location)\s*[:\-]\s*(.+)$", raw, re.I)
+        if m:
+            buf["venue"] = m.group(1).strip()
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Venue noted. What's the event date?"))
+        m = re.match(r"note\s*[:\-]\s*(.+)$", raw, re.I)
+        if m:
+            buf["note"] = m.group(1).strip()
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Note saved. What's the event date?"))
+        # Parse a single date OR a range OR a 'for N days' span in ONE pass --
+        # a range string ("7 to 11 August") must NOT be fed whole to the single-
+        # date parser (it fails). MONEY: the resulting day count becomes every
+        # line's default duration_days (the duration-not-applied fix).
+        ev_date, days, end_date = self._wa12_parse_event_dates(raw)
+        if not ev_date:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I didn't catch a date there — send the event date "
+                "(e.g. 25/09/2026, 25 Sept 2026, or 7–11 Aug)."))
+        buf["date_txt"] = ev_date.isoformat()
+        buf["days"] = days
+        sess.sudo().write({"step": "qs_item"})
+        sess._set_buffer(buf)
+        span = ""
+        if days > 1:
+            span = (_("  (%d-day hire") % days
+                    + ((_(", %s–%s)") % (ev_date.strftime("%d"),
+                                         end_date.strftime("%d %b")))
+                       if end_date else _(")")))
+        return self._wa6_reply(raw_from, from_e164, _(
+            "📅 %s%s — got it.\n\nNow the equipment, one at a time. What's the "
+            "first item?") % (ev_date.strftime("%d %b %Y"), span))
+
+    def _wa12_parse_event_dates(self, raw):
+        """(start_date|None, days, end_date|None). Handles: a date RANGE
+        ('7th-11th August', '25/09-29/09') -> INCLUSIVE day count (Robin's money
+        convention -- 7..11 = 5 days); a single date + 'for N days'; a bare
+        single date -> 1 day. ⚠️ inclusive-vs-billable is Robin's call; inclusive
+        is the default + the review 'days' edit overrides."""
+        import re
+        from datetime import timedelta
+        low = " ".join((raw or "").lower().split())
+        # 1) a RANGE: two date-ish parts split by -/–/to/until/till/thru.
+        m = re.search(
+            r"(.+?)\s*(?:-|–|—|\bto\b|\buntil\b|\btill\b|\bthru\b)\s*(.+)$", low)
+        if m:
+            left, right = m.group(1).strip(), m.group(2).strip()
+            r_date, r_ph = self._wa12_resolve_date(right)
+            l_date, l_ph = self._wa12_resolve_date(left)
+            # the END usually carries the month/year; borrow it for a bare-day
+            # start ("7th - 11th of august" -> start "7 august").
+            if l_ph and not r_ph:
+                md = re.search(r"\d+", left)
+                if md:
+                    try:
+                        l_date = r_date.replace(day=int(md.group()))
+                        l_ph = False
+                    except ValueError:
+                        l_ph = True
+            if not l_ph and not r_ph and r_date >= l_date:
+                return l_date, (r_date - l_date).days + 1, r_date  # INCLUSIVE
+        # 2) a single date (+ optional 'for N days').
+        s_date, s_ph = self._wa12_resolve_date(low)
+        if s_ph:
+            return None, 1, None
+        m = re.search(r"\bfor\s+(\d+)\s*(?:day|days|nights?)\b", low)
+        if m:
+            n = max(1, int(m.group(1)))
+            return s_date, n, (s_date + timedelta(days=n - 1))
+        return s_date, 1, None
+
+    def _wa12_handle_struct_item(self, sess, buf, body, from_e164, raw_from):
+        """qs_item: the one-at-a-time item loop. Holds ONE item in flight. The
+        rep names ONE item -> category-scoped, packages-excluded LIST (or a
+        confident card / a custom-line offer) -> tap/confirm -> logged -> 'next
+        or done'. 'done' -> the review draft."""
+        import re
+        raw = (body or "").strip()
+        norm = " ".join(raw.lower().split())
+
+        if norm in _WA12_DONE_WORDS:
+            return self._wa12_struct_finalize(sess, buf, from_e164, raw_from)
+        # a pending qty reply for the just-bound item.
+        if buf.get("qty_for"):
+            m = re.match(r"^\s*(?:x\s*)?(\d+)\s*$", norm)
+            qty = max(1, int(m.group(1))) if m else 1
+            for it in buf["items"]:
+                if it.get("product_id") == buf["qty_for"] and not it.get("_qtyset"):
+                    it["qty"] = qty
+                    it["_qtyset"] = True
+                    break
+            buf["qty_for"] = False
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Added ×%d. What's the next item? (or *done*)") % qty)
+        # NOT-IN-CATALOGUE custom line: "custom <desc> at <amt>" / "<desc> @ amt".
+        m = re.match(r"(?:custom\s+)?(.+?)\s+(?:at|@)\s+([0-9]+(?:\.[0-9]+)?)\s*$",
+                     raw, re.I)
+        if m and not self._wa6_match_one(m.group(1)).get("product_id"):
+            desc, amt = m.group(1).strip(), float(m.group(2))
+            if amt <= _WA12_PLACEHOLDER_RATE:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Give a real per-day price for \"%s\".") % desc)
+            buf["items"].append({"product_id": False, "product_name": desc,
+                                 "custom_desc": desc, "rep_price": amt,
+                                 "qty": 1, "_qtyset": False})
+            buf["qty_for"] = False
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Added *%s* (custom, %s/day). How many? (or just say the next "
+                "item)") % (desc, amt))
+        # match ONE item (scoped, packages-excluded by the matcher).
+        hit = self._wa6_match_one(raw)
+        if (hit.get("status") == "matched"
+                and hit.get("confidence") in ("exact", "strong")):
+            return self._wa12_struct_offer_confirm(
+                sess, buf, hit, from_e164, raw_from)
+        # ambiguous / family -> the category-scoped LIST.
+        fam = hit.get("family") or self._wa6_family_code(raw) or ""
+        is_v = bool(fam and self._wa12_is_family_term(raw))
+        cids = (self._wa12_family_candidate_ids(fam) if is_v
+                else self._wa12_suggestion_ids(hit.get("suggestions") or []))
+        if cids:
+            buf["pending_item"] = {"raw": raw, "family": fam, "_variant": is_v,
+                                   "_cand_ids": cids}
+            sess._set_buffer(buf)
+            return self._wa12_struct_send_item_list(
+                sess, buf, raw, fam, is_v, cids, from_e164, raw_from)
+        # nothing matched -> offer the custom-line route (never dead-end).
+        return self._wa6_reply(raw_from, from_e164, _(
+            "I couldn't find \"%s\" in the catalogue. Not listed? Type the "
+            "item and its per-day price (e.g. *bespoke arch 250*). Or try "
+            "another name.") % raw)
+
+    def _wa12_struct_send_item_list(self, sess, buf, label, fam, is_v, cids,
+                                    from_e164, raw_from):
+        """Present the item candidate LIST (reuses the proven _wa12_send_pick
+        rails). Tap -> wa12_pick routed to the structured bind."""
+        kind = "variant" if is_v else "ambiguous"
+        return self._wa12_send_pick(
+            sess, "s0", kind, cids, label, fam, from_e164, raw_from,
+            seq=(buf.get("v") or 0))
+
+    def _wa12_struct_offer_confirm(self, sess, buf, hit, from_e164, raw_from):
+        """A confident item -> ✅ + [✓ Correct][✗ Change] (the stepper card the
+        rep likes). ✓ logs it + asks qty; ✗ re-opens the family list."""
+        secret = self.env["ir.config_parameter"].sudo().get_param(
+            "database.secret") or ""
+        prod = self.env["product.template"].sudo().browse(hit["product_id"])
+        rate, cur = self._wa12_price_lookup(prod)
+        money = ("%s %.2f/day" % (cur, rate)
+                 if rate and rate > _WA12_PLACEHOLDER_RATE
+                 else _("rate set at review"))
+        buf["pending_item"] = {"raw": hit.get("raw") or prod.name,
+                               "confirm_pid": prod.id,
+                               "family": hit.get("family") or ""}
+        sess._set_buffer(buf)
+        ok = wa_payload.encode(secret, "wa12_ok", sess.id, "s0", prod.id)
+        chg = wa_payload.encode(secret, "wa12_change", sess.id, "s0", prod.id)
+        return self._wa6_send_buttons(raw_from, from_e164, _(
+            "✅ *%s* — %s") % (prod.name, money), [
+            {"id": ok, "title": _("✓ Correct")[:self._WA12_BTN_TITLE]},
+            {"id": chg, "title": _("✗ Change")[:self._WA12_BTN_TITLE]}])
+
+    def _wa12_struct_log_item(self, sess, buf, prod, from_e164, raw_from):
+        """LOG a confirmed item (qty defaults 1; ask the rep for a count) ->
+        'next or done'."""
+        buf["items"].append({"product_id": prod.id, "product_name": prod.name,
+                             "qty": 1, "rep_price": None, "_qtyset": False})
+        buf["pending_item"] = None
+        buf["qty_for"] = prod.id
+        sess._set_buffer(buf)
+        return self._wa6_reply(raw_from, from_e164, _(
+            "Added *%s*. How many? (a number, or just say the next item / "
+            "*done*)") % prod.name)
+
+    def _wa12_struct_finalize(self, sess, buf, from_e164, raw_from):
+        """'done' -> build the draft from the LOGGED items + resolved client +
+        date, hand to the UNCHANGED q_confirm review (totals/VAT/discount/edit/
+        submit)."""
+        items = [{"product_id": it["product_id"],
+                  "product_name": it["product_name"], "qty": it.get("qty") or 1,
+                  "rep_price": it.get("rep_price"),
+                  "custom_desc": it.get("custom_desc")}
+                 for it in (buf.get("items") or [])]
+        if not items:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "No items yet — name the first item, or *cancel*."))
+        partner = self.env["res.partner"].sudo().browse(
+            buf.get("partner_id") or 0).exists()
+        if not partner:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I lost the client — please start the quote again."))
+        extras = {}
+        if buf.get("note"):
+            extras["event_name"] = buf["note"]
+        # MONEY: pass the computed hire DURATION so every line drafts at
+        # rate × qty × days (the duration-not-applied fix).
+        return self._wa12_quote_from_slots(
+            sess.user_id, partner, items, buf.get("date_txt") or "",
+            buf.get("days") or 1, from_e164, raw_from, extras=extras)
+
     def _wa12_handle_convo(self, sess, body, from_e164, raw_from):
         """WA-12.2 conversational steps. q_items = the M1 confirm-before-draft
         gate (NO quote exists until yes); q_client / q_itemreq = bare-intent
@@ -777,13 +1027,17 @@ class WhatsAppMessageWA12(models.Model):
         if sess.step == "q_client":
             partner, candidates = self._wa12_client_candidates(raw)
             if partner:
+                # WA-12.6 structured: client resolved -> LOG + advance to the
+                # EVENT step (the old path went straight to items).
+                if buf.get("structured"):
+                    return self._wa12_struct_after_client(
+                        sess, buf, partner, from_e164, raw_from)
                 buf.update({"client_txt": partner.name,
                             "partner_id": partner.id})
                 sess.sudo().write({"step": "q_itemreq"})
                 sess._set_buffer(buf)
                 return self._wa6_reply(raw_from, from_e164, _(
-                    "%s — what items? (e.g. `2x RGB LED CAN, smoke machine`)")
-                    % partner.name)
+                    "%s — what items?") % partner.name)
             return self._wa12_start_client_intake(
                 sender, raw, candidates, buf.get("matched") or [],
                 buf.get("date_txt") or "", buf.get("days") or 1,
@@ -1656,7 +1910,7 @@ class WhatsAppMessageWA12(models.Model):
             from_e164)
         sid = int(parts[0]) if parts and str(parts[0]).isdigit() else 0
         if not (sess and sess.id == sid
-                and sess.step in ("q_items", "q_confirm")
+                and sess.step in ("q_items", "q_confirm", "qs_item")
                 and from_e164 == sess.phone_number):
             return self._wa6_reply(raw_from, from_e164, _(
                 "That choice has expired — send the items again to re-quote."))
@@ -1666,11 +1920,67 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
         sess.sudo().write({"last_inbound": fields.Datetime.now()})
         target = str(parts[1]) if len(parts) > 1 else ""
+        # WA-12.6 structured item-loop taps carry the 's0' target.
+        if sess.step == "qs_item" or target.startswith("s"):
+            return self._wa12_struct_pick_apply(
+                sess, intent, parts, from_e164, raw_from)
         if sess.step == "q_confirm":
             return self._wa12_pick_apply_draft(
                 sess, intent, target, parts, from_e164, raw_from)
         return self._wa12_pick_apply_buffer(
             sess, intent, target, parts, from_e164, raw_from)
+
+    def _wa12_struct_pick_apply(self, sess, intent, parts, from_e164, raw_from):
+        """A structured item-loop tap. wa12_pick -> log the chosen product (re-
+        validated against the pending item's offered candidates) + ask qty;
+        wa12_ok -> log the confirmed product; wa12_change -> re-open the family
+        list; wa12_pick_skip -> drop the in-flight item (NOT logged) + ask next.
+        NEVER touches the client or earlier items."""
+        buf = sess._get_buffer()
+        buf = buf if isinstance(buf, dict) else {}
+        pend = buf.get("pending_item") or {}
+        PT = self.env["product.template"].sudo()
+        if intent == "wa12_pick_skip":
+            buf["pending_item"] = None
+            sess._set_buffer(buf)
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Skipped. What's the next item? (or *done*)"))
+        if intent == "wa12_change":
+            # re-open the family list for the in-flight item (never advances
+            # without a pick -- fixes the Change->silent-skip bug).
+            pid0 = int(parts[2]) if len(parts) > 2 and str(parts[2]).isdigit() \
+                else 0
+            prod0 = PT.browse(pid0)
+            fam = (prod0.equipment_category_id.code
+                   or self._wa6_family_code(prod0.name) or "") if prod0.exists() \
+                else (pend.get("family") or "")
+            cids = [p for p in (self._wa12_family_candidate_ids(fam)
+                                or self._wa12_suggestion_ids([prod0.name]))
+                    if p != pid0]
+            if not cids:
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "Type the correct item name (or *skip* it)."))
+            buf["pending_item"] = {"raw": prod0.name if prod0.exists()
+                                   else pend.get("raw") or "", "family": fam,
+                                   "_variant": bool(fam), "_cand_ids": cids}
+            sess._set_buffer(buf)
+            return self._wa12_struct_send_item_list(
+                sess, buf, buf["pending_item"]["raw"], fam, bool(fam), cids,
+                from_e164, raw_from)
+        # wa12_ok (confident card) OR wa12_pick (list) -> log the product.
+        if intent == "wa12_ok":
+            pid = pend.get("confirm_pid") or 0
+        else:
+            pid = int(parts[2]) if len(parts) > 2 and str(parts[2]).isdigit() \
+                else 0
+            if pid not in set(pend.get("_cand_ids") or []):
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "That option's gone — type the item again."))
+        prod = PT.browse(pid)
+        if not (pid and prod.exists()):
+            return self._wa6_reply(raw_from, from_e164, _(
+                "That option's gone — type the item again."))
+        return self._wa12_struct_log_item(sess, buf, prod, from_e164, raw_from)
 
     def _wa12_pick_apply_buffer(self, sess, intent, target, parts, from_e164,
                                 raw_from):
@@ -2377,54 +2687,20 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_llm_quote_fallback(self, sender, body, from_e164, raw_from,
                                  message):
-        """The conversational quote-INITIATION fallback (hook A). Extract slots
-        -> match -> CONFIRM-BEFORE-DRAFT (M1 binding: ONE confirmation message
-        listing every matched line with the ENGINE rate + qty; NO provision
-        until the rep says yes). Bare intent (no client/items) -> the guided
-        q_client lane (M5). Returns a reply, or None to fall through (not a
-        quote / LLM down)."""
+        """WA-12.6: a conversational quote intent RESETS to the structured one-
+        at-a-time collection -- the brief is NOT bulk-extracted (the proven
+        item-drop/wrong-client failure). The LLM read (inside begin_structured)
+        only PRE-FILLS the client/date prompts as confirmable suggestions; items
+        are always collected one-by-one fresh. Returns a reply, or None to fall
+        through only if this isn't a quote at all."""
+        # cheap gate: only claim if the LLM reads it as a quote intent (so a
+        # random chat still falls to the Copilot). Pre-fill happens in
+        # begin_structured; here we just confirm intent.
         data = self._wa12_llm_extract_quote(body)
-        if not data:
+        if not data or (data.get("intent") or "") != "quote":
             return None
-        client = (data.get("client") or "").strip()
-        items = [it for it in (data.get("items") or []) if it.get("name")]
-        prefills = {"phone": (data.get("phone") or "").strip(),
-                    "email": (data.get("email") or "").strip(),
-                    "contact": (data.get("contact_person") or "").strip(),
-                    "address": (data.get("address") or "").strip(),
-                    "event_name": (data.get("event_name") or "").strip()}
-        date_txt = data.get("date") or ""
-        self._wa6_audit_in(from_e164, message, "wa12-quote-ai")
-        # M5 -- bare intent: enter the quote lane, never the generic Copilot.
-        if not client and not items:
-            self.env["neon.wa.equip.session"]._start_quote(
-                from_e164, sender, "q_client",
-                {"date_txt": date_txt, "prefills": prefills})
-            return self._wa6_reply(raw_from, from_e164, _(
-                "Sure — which client is this quote for?"))
-        if not items:
-            # client known, items missing -> ask for the list (same lane).
-            self.env["neon.wa.equip.session"]._start_quote(
-                from_e164, sender, "q_itemreq",
-                {"client_txt": client, "date_txt": date_txt,
-                 "prefills": prefills})
-            return self._wa6_reply(raw_from, from_e164, _(
-                "A quote for %s — what items? (e.g. `2x RGB LED CAN, smoke "
-                "machine`)") % client)
-        # match EVERY extracted item (stated prices are HINTS, never the rate).
-        matched, unmatched = self._wa12_match_slot_items(items)
-        # CLIENT-BEFORE-ITEMS (must-preserve): resolve the named client first.
-        # exactly one -> the item stepper with that partner; 0/>1 -> guided
-        # intake / list-then-pick (items buffered, intake resumes into the
-        # stepper). Mirrors _wa12_run_quote so both entry points behave alike.
-        partner, candidates = self._wa12_client_candidates(client)
-        if not partner:
-            return self._wa12_start_client_intake(
-                sender, client, candidates, matched, date_txt, 1,
-                from_e164, raw_from, prefills=prefills)
-        return self._wa12_open_items_confirm(
-            sender, partner.name, matched, unmatched, date_txt, prefills,
-            from_e164, raw_from, partner_id=partner.id)
+        return self._wa12_begin_structured(
+            sender, body, from_e164, raw_from, message=message)
 
     @api.model
     def _wa12_match_slot_items(self, items):
@@ -2661,9 +2937,23 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(
                 "Reply *yes* to submit, *cancel*, or edit the draft."))
         body = self._extract_body(message, message.get("type"))
+        # global cancel works at every collection step.
+        if self._wa12_is_cancel(" ".join((body or "").lower().split())) \
+                and sess.step in _WA12_STRUCT_STEPS:
+            sess.sudo().write({"step": "done", "active": False})
+            return self._wa6_reply(raw_from, from_e164, _("Quote cancelled."))
         # new-client intake FSM (qc_*).
         if sess.step in _WA12_CAPTURE_STEPS:
             return self._wa12_handle_capture(sess, body, from_e164, raw_from)
+        # WA-12.6 STRUCTURED collection steps (event details / item loop).
+        if sess.step in _WA12_STRUCT_STEPS:
+            _sbuf = sess._get_buffer()
+            _sbuf = _sbuf if isinstance(_sbuf, dict) else {}
+            if sess.step == "qs_event":
+                return self._wa12_handle_struct_event(
+                    sess, _sbuf, body, from_e164, raw_from)
+            return self._wa12_handle_struct_item(
+                sess, _sbuf, body, from_e164, raw_from)
         # WA-12.2 conversational steps (confirm-before-draft / bare intent).
         if sess.step in _WA12_CONVO_STEPS:
             return self._wa12_handle_convo(sess, body, from_e164, raw_from)
@@ -3326,6 +3616,20 @@ class WhatsAppMessageWA12(models.Model):
         actor = quote.salesperson_id.id or self.env.uid
         QL = self.env["neon.finance.quote.line"].with_user(actor).sudo()
         for it in matched:
+            # WA-12.6 CUSTOM line: a not-in-catalogue item the rep wrote in
+            # (no product_id, an explicit per-day rep_price) -> line_type
+            # 'custom', rendered loudly CUSTOM, approval-visible (F8 rule).
+            if not it.get("product_id"):
+                QL.create({
+                    "quote_id": quote.id,
+                    "line_type": "custom",
+                    "name": it.get("custom_desc") or it.get("product_name")
+                    or _("Custom item"),
+                    "quantity": float(it.get("qty") or 1),
+                    "duration_days": int(days or 1),
+                    "unit_rate": float(it.get("rep_price") or 0.0),
+                })
+                continue
             prod = self.env["product.template"].sudo().browse(it["product_id"])
             # unit_rate is left UNSET (0.0) -> the pricing ENGINE resolves it
             # (per-product rule PRIMARY -> category rule -> no_rule, which the
