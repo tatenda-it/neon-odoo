@@ -81,7 +81,8 @@ DANCE_TOKENS = ("dancefloor", "dance floor", "vinyl", "infinity")
 NONEQ_RULES = [
     ("services", ["management", "service", "photograph", "video recording",
                   "editing", "transcription", "exhibition", "meeting", "golf",
-                  "symposium", "accomod", "sustenan", "transport"]),
+                  "symposium", "accomod", "sustenan", "transport",
+                  "installation", "install"]),
     ("catering_decor", ["glass", "cutlery", "plate", "napkin", "runner",
                         "underplate", "snack", "savoury", "balloon", "garland",
                         "vase", "flower", "lining", "tent", "canvas", "drap"]),
@@ -126,8 +127,12 @@ rows = list(csv.DictReader(open(CSV_PATH, encoding="utf-8")))
 name_to_section = {clean_name(r["zoho_full_name"], r.get("category")):
                    (r.get("category") or "").strip() for r in rows}
 
-orphans = PT.search([("is_workshop_item", "=", True),
-                     ("equipment_category_id", "=", False)])
+# ALL uncategorised products, not just is_workshop_item (proof-#3 verify found
+# non-workshop hire items -- FLOOR BOARDS INSTALLATION (service), "Speaker" --
+# that the workshop-only filter had skipped). resolve_code returns a category
+# for hire items; the 2 deposits resolve to DEPOSIT (no category, removal).
+orphans = PT.with_context(active_test=False).search(
+    [("equipment_category_id", "=", False)])
 by_code = {}
 deposits = []
 unclassified = []
@@ -166,8 +171,8 @@ else:
             p.write({"equipment_category_id": rec.id})
         out("ASSIGNED %d -> %s" % (len(prods), code))
     env.cr.commit()
-    still = PT.search_count([("is_workshop_item", "=", True),
-                             ("equipment_category_id", "=", False)])
+    still = PT.with_context(active_test=False).search_count(
+        [("equipment_category_id", "=", False)])
     out("\nAPPLIED + committed. Orphans remaining: %d (the %d deposits, "
         "left uncategorised pending Robin's removal)." % (still, len(deposits)))
 
