@@ -2577,8 +2577,14 @@ class WhatsAppMessageWA12(models.Model):
         except Exception:  # noqa: BLE001 -- ai_core absent -> degrade
             return None
         Prov = self.env["neon.dashboard.ai.provider"].sudo()
+        # Default ALIGNED to "google" (Gemini) to match _wa_provider() /
+        # handle_inbound / the wa_config_params seed -- so a DELETED param no
+        # longer splits the WA-12 extraction lane back to Groq while the Copilot
+        # uses Gemini. The live primary is whatever the param holds; this default
+        # only fires if the param is absent. (The bake-off note below describes
+        # the groq-primary ORDERING; it stays correct for the param=="groq" case.)
         primary = self.env["ir.config_parameter"].sudo().get_param(
-            "neon_channels.whatsapp_provider_key", "groq")
+            "neon_channels.whatsapp_provider_key", "google")
         # (provider_key, per-call model override) in evidence order; the
         # configured primary leads, then the same-key Groq backup model,
         # then the demoted Gemini lane.

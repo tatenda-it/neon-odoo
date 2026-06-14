@@ -326,6 +326,13 @@
     # / ✓✗ card / custom line) -> q_confirm review. A dump resets to step 1 (no
     # bulk-parse); client locked. pwa12_6 wire harness 7/7. NOT a complete cutover
     # yet (old pwa12 flow suite + review-step wire-test pending). NOT deployed.
+    # 17.0.1.19.3: provider-default alignment (no quote-spine change). The WA-12
+    # extraction lane (_wa12_llm_chat) read-defaulted the
+    # neon_channels.whatsapp_provider_key param to "groq" while _wa_provider /
+    # handle_inbound / the wa_config_params seed default to "google" (Gemini).
+    # Aligned to "google" so a DELETED param can't split the lanes (Copilot on
+    # Gemini, WA-12 on Groq). ZERO runtime effect while the param is set; the
+    # live flip is the prod System Parameter ("groq"->"google"), done in Settings.
     # 17.0.1.19.2: WA-12.6 review polish. (B) the q_confirm fall-through no
     # longer prints a command-syntax cheat sheet -> plain language only. (C)
     # WHOLE-QUOTE discount + target-total at the review step: "discount <amt>"
@@ -346,7 +353,7 @@
     # convo lane; T-43r/T-45r re-prove the no-cat-rule $ + rep-priced surfaces);
     # review-step MONEY wire-test hardened (VAT 15% exact + discount math exact)
     # + no-command-syntax sweep. pwa12 61/61, pwa12_6 11/11.
-    "version": "17.0.1.19.2",
+    "version": "17.0.1.19.3",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
