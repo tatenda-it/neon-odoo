@@ -64,6 +64,19 @@
                         <field name="neon_finance_budget_severe_pct"/>
                     </setting>
                 </block>
+                <block title="Quote Expiry (Neon)"
+                       id="neon_finance_quote_expiry_settings">
+                    <setting id="neon_finance_quote_validity_period_days_setting"
+                             string="Quote validity period (days)"
+                             help="Days added to the quotation date to compute a quote's Expires date (and the daily expiry-cron sweep). Default 30.">
+                        <field name="neon_finance_quote_validity_period_days"/>
+                    </setting>
+                    <setting id="neon_finance_show_quote_expiry_line_setting"
+                             string="Show the Expiration line on quote PDFs"
+                             help="When on, the quote PDF shows an Expiration line (quotation date + validity period). Off by default so expiry dates aren't forced onto every client quote.">
+                        <field name="neon_finance_show_quote_expiry_line"/>
+                    </setting>
+                </block>
             </xpath>
         </field>
     </record>

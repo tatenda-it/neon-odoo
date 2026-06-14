@@ -73,6 +73,25 @@ class ResConfigSettings(models.TransientModel):
         "True (banner appears on form). Default 120.",
     )
 
+    # ============================================================
+    # === WA-12.6 Part C -- quote expiry configurability
+    # ============================================================
+    neon_finance_quote_validity_period_days = fields.Integer(
+        string="Quote validity period (days)",
+        config_parameter="neon_finance.quote_validity_period_days",
+        default=30,
+        help="Days added to the quotation date to compute a quote's "
+        "Expires date (and the daily expiry-cron sweep). Default 30.",
+    )
+    neon_finance_show_quote_expiry_line = fields.Boolean(
+        string="Show the Expiration line on quote PDFs",
+        config_parameter="neon_finance.show_quote_expiry_line",
+        default=False,
+        help="When enabled, the quote PDF shows an 'Expiration' line "
+        "(quotation date + the validity period). Off by default so "
+        "expiry dates aren't forced onto every client quote.",
+    )
+
     @api.constrains(
         "neon_finance_budget_warn_pct",
         "neon_finance_budget_breach_pct",

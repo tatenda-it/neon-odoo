@@ -68,6 +68,53 @@ _WA12_PRICE_CMDS = ("price:", "price")
 _WA12_QUOTE_TRIGGERS = (
     "make a quotation for", "i want a quote for", "quote for")
 
+# WA-12.6 PART A — quote-by-template (PRIMARY collection). The copy-fill
+# skeleton the bot sends on a quote trigger; the rep fills + sends it back as
+# ONE message, parsed by _wa12_template_extract_fields. Plain helper lines only
+# (no command syntax). The structured stepper stays as the FALLBACK.
+_WA12_TEMPLATE_SKELETON = (
+    "Quote: \n"
+    "Contact: \n"
+    "Phone: \n"
+    "Email: \n"
+    "Event: \n"
+    "Venue: \n"
+    "Date: \n"
+    "Days: \n"
+    "Items:\n"
+    "- 1 x \n"
+    "- 1 x \n"
+    "- 1 x \n"
+)
+_WA12_TEMPLATE_HELP = (
+    "📋 Copy this, fill it in, send it back. Add or remove item lines freely.\n"
+    "• Existing client? Leave Contact/Phone/Email blank — we'll use what's on "
+    "file.\n"
+    "• Not in stock? write:  - <qty> x <description> @ $<price>")
+# label -> canonical slot. Synonyms tolerated; case-insensitive; loose spacing.
+# NB only the canonical skeleton labels + UNAMBIGUOUS synonyms. Bare common
+# words that the skeleton never emits AND collide with casual prose ('for',
+# 'subject', 'when', 'place', 'number', 'mail') are DELIBERATELY excluded so a
+# 2-line chat message can't false-positive as a filled template (tight-parser
+# rule; review finding #4).
+_WA12_TEMPLATE_LABELS = {
+    "quote": "client", "client": "client", "company": "client",
+    "customer": "client",
+    "contact": "contact", "contact person": "contact", "attn": "contact",
+    "attention": "contact",
+    "phone": "phone", "tel": "phone", "telephone": "phone", "mobile": "phone",
+    "cell": "phone", "cellphone": "phone",
+    "email": "email", "e-mail": "email",
+    "event": "event", "occasion": "event", "function": "event",
+    "event name": "event",
+    "venue": "venue", "location": "venue", "address": "venue",
+    "date": "date", "dates": "date", "event date": "date",
+    "days": "days", "duration": "days", "hire days": "days",
+    "chargeable days": "days", "no of days": "days",
+    "items": "items", "item": "items", "equipment": "items", "kit": "items",
+    "gear": "items",
+}
+
 # q_confirm draft-session vocabulary (synonym-tolerant, whole-message equals).
 _WA12_CANCEL_WORDS = ("cancel", "no", "stop", "delete", "scrap",
                       "cancel this", "delete this", "scrap this")
@@ -315,8 +362,13 @@ class WhatsAppMessageWA12(models.Model):
         #    misses (_wa12_llm_intake_maybe), so a WA-13 "send quote" / WA-6
         #    turn is never pre-empted by an LLM call.
         body = self._extract_body(message, message.get("type"))
+        # 3a) PART A: a FILLED multi-label TEMPLATE (the rep copied the skeleton,
+        #     filled it, sent it back). Self-contained -> no session needed.
+        #     Tight detect (>=2 labels + client/items) so a casual line never
+        #     trips it. Claimed only for a quote-capable mapped sender.
+        is_tmpl = self._wa12_is_template_filled(body)
         is_q, is_p = self._wa12_is_quote_cmd(body), self._wa12_is_price_cmd(body)
-        if not (is_q or is_p):
+        if not (is_tmpl or is_q or is_p):
             return None
         sender = self._wa6_resolve_user(from_e164)
         if not sender:
@@ -325,6 +377,9 @@ class WhatsAppMessageWA12(models.Model):
             # MAPPED but non-sales -> terse, non-advertising refusal.
             self._wa6_audit_in(from_e164, message, "wa12-deny")
             return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
+        if is_tmpl:
+            return self._wa12_process_template_filled(
+                sender, body, from_e164, raw_from, message)
         if is_q:
             return self._wa12_run_quote(
                 sender, body, from_e164, raw_from, message)
@@ -381,20 +436,20 @@ class WhatsAppMessageWA12(models.Model):
         return None
 
     def _wa12_handle_start_tap(self, from_e164, raw_from, message):
-        """The deterministic Hello/menu 'Quote a client' row -> start the WA-12
-        structured flow. The menu only DISPLAYS this row for quote-capable lenses;
-        this re-checks _wa12_can_quote as the real gate (a forwarded payload from
-        a non-sales sender is refused, never silently quoting)."""
+        """The deterministic Hello/menu 'Quote a client' row -> send the
+        copy-fill TEMPLATE (Part A: template is the PRIMARY collection). The
+        menu only DISPLAYS this row for quote-capable lenses; this re-checks
+        _wa12_can_quote as the real gate (a forwarded payload from a non-sales
+        sender is refused, never silently quoting). The rep who prefers stepping
+        can type 'step'."""
         sender = self._wa6_resolve_user(from_e164)
         if not sender:
             return None  # unmapped -> fall through (client lane / Copilot)
         if not self._wa12_can_quote(sender):
             self._wa6_audit_in(from_e164, message, "wa12-start-deny")
             return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
-        # begin_structured resets to step 1 (client); an empty dump means no
-        # pre-fill, just the clean "which client?" opener.
-        return self._wa12_begin_structured(
-            sender, "", from_e164, raw_from, message=message)
+        self._wa6_audit_in(from_e164, message, "wa12-template-start")
+        return self._wa12_send_template_skeleton(raw_from, from_e164)
 
     @api.model
     def _wa12_pending_for_approver(self, user):
@@ -421,23 +476,50 @@ class WhatsAppMessageWA12(models.Model):
     # Quote: flow — parse -> resolve client -> provision -> lines -> guard.
     # ================================================================
     def _wa12_run_quote(self, sender, body, from_e164, raw_from, message):
-        """WA-12.6: a 'Quote:' command no longer bulk-extracts the brief (the
-        proven item-drop / wrong-client failure). It RESETS to the structured
-        one-at-a-time collection (client -> event -> items -> review); the brief
-        text only PRE-FILLS the client/date prompts as confirmable suggestions.
-        Still claimed (the sender explicitly typed Quote:)."""
-        rest = self._wa12_strip_cmd(body, _WA12_QUOTE_CMDS + _WA12_QUOTE_TRIGGERS)
+        """WA-12.6 Part A: a quote TRIGGER is now PRIMARY-by-template. A bare
+        'quote'/'Quote:' (or 'step'/'guide me') sends the copy-fill skeleton;
+        the rep fills + sends it back (-> _wa12_process_template_filled). An
+        inline 'Quote: <brief>' (the old quick form) still routes to the
+        structured stepper as the FALLBACK. (A fully-filled multi-label template
+        is caught earlier in _wa12_maybe_intercept, before this.)"""
+        rest = (self._wa12_strip_cmd(
+            body, _WA12_QUOTE_CMDS + _WA12_QUOTE_TRIGGERS) or "").strip()
+        norm = " ".join(rest.lower().split())
+        # bare trigger OR an explicit 'step me through it' -> the template
+        # skeleton is the default; 'step'/'guide me' forces the stepper.
+        if norm in ("step", "step by step", "guide me", "one at a time",
+                    "stepper"):
+            return self._wa12_begin_structured(
+                sender, "", from_e164, raw_from, message=message)
+        if len(rest) < 3:
+            return self._wa12_send_template_skeleton(raw_from, from_e164)
+        # an inline brief (old quick form) -> the structured stepper (fallback;
+        # pre-fills client/date from the brief).
         return self._wa12_begin_structured(
             sender, rest, from_e164, raw_from, message=message)
 
     def _wa12_quote_from_slots(self, sender, partner, matched, date_txt, days,
-                               from_e164, raw_from, extras=None):
+                               from_e164, raw_from, extras=None, unmatched=None):
         """Provision + price a quote for a RESOLVED partner + matched items,
         open the q_confirm session, reply the draft summary. Shared by the
         direct Quote: path and the post-intake resume. ``extras`` (F5): brief
         slots beyond the core — event_name lands on the event job's client
-        notes so the subject isn't dropped."""
+        notes so the subject isn't dropped. ``unmatched`` (Part A): items the
+        matcher couldn't place — stashed in the q_confirm buffer as lettered
+        PENDING picks, FLAGGED on the draft (never dropped), and the submit gate
+        blocks until they're resolved or dropped."""
         event_date, placeholder = self._wa12_resolve_date(date_txt)
+        # Bug 1 (WA-12.6): a DATE RANGE's END rides in via extras (the stepper
+        # qs_event buffer OR the template parse both populate it) and is
+        # persisted on the SHARED provision chain -> neither path can drop it.
+        # Venue: (free-text, template) rides the same way.
+        _ex = extras or {}
+        event_end_date = None
+        end_txt = (_ex.get("event_end_date_txt") or "").strip()
+        if end_txt:
+            _ed, _eph = self._wa12_resolve_date(end_txt)
+            event_end_date = _ed if not _eph else None
+        venue_addr = (_ex.get("venue") or "").strip()
         currency = (sender.company_id.currency_id
                     or self.env.ref("base.USD", raise_if_not_found=False))
         if not currency:
@@ -449,33 +531,363 @@ class WhatsAppMessageWA12(models.Model):
         try:
             quote = self.env["neon.finance.quote"]._wa12_provision_chain(
                 partner, event_date, currency, sender,
-                date_is_placeholder=placeholder)
+                date_is_placeholder=placeholder,
+                event_end_date=event_end_date)
         except (UserError, AccessError) as e:
             return self._wa6_reply(raw_from, from_e164, str(e))
+        # F8 (review finding #3): a rep-stated "@ $price" on a MATCHED item that
+        # has NO catalogue rate becomes the rep price (matches the stepper/multi
+        # paths); a real catalogue rate stays authoritative.
+        for it in matched:
+            if not it.get("product_id"):
+                continue
+            prod = self.env["product.template"].sudo().browse(it["product_id"])
+            rate, _cur = self._wa12_price_lookup(prod)
+            sp = it.get("stated_price")
+            if ((rate is None or rate <= _WA12_PLACEHOLDER_RATE)
+                    and sp and float(sp) > _WA12_PLACEHOLDER_RATE):
+                it["rep_price"] = float(sp)
         self._wa12_build_lines(quote, matched, days or 1)
-        quote.with_user(sender.id).sudo().action_recalculate_pricing()
+        # recalc only when there ARE lines: an ALL-unmatched template drafts a
+        # zero-line quote + flags (the rep resolves the flags to add lines); a
+        # bare recalc on zero lines raises "no lines to recalculate" (review #1).
+        if quote.line_ids:
+            quote.with_user(sender.id).sudo().action_recalculate_pricing()
         unpriced = self._wa12_unpriced_lines(quote)
         self._wa12_ensure_payment_term(quote, partner)
-        # F5: the event subject from the brief lands on the event job (the
-        # name fields are readonly sequence refs -> client_notes).
+        # F5/Part A: the event subject + the free-text venue land on the event
+        # job's client_notes (the name fields are readonly sequence refs, and
+        # venue_full_address is COMPUTED from venue_id -> not writable). Both
+        # feed the cover letter without a schema change.
+        _notes = []
         ev_name = ((extras or {}).get("event_name") or "").strip()
-        if ev_name and quote.event_job_id:
+        if ev_name:
+            _notes.append(_("Event: %s") % ev_name)
+        if venue_addr:
+            _notes.append(_("Venue: %s") % venue_addr)
+        if _notes and quote.event_job_id:
             ej = quote.event_job_id
-            note = _("Event: %s (via WhatsApp quote)") % ev_name
+            note = "%s (via WhatsApp quote)" % " · ".join(_notes)
             # actor-honest write (hard rule; review FSM-9): stamp the rep, not
             # the public webhook uid, on write_uid.
             ej.with_user(sender.id).sudo().write({"client_notes": (
                 (ej.client_notes + "\n" + note)
                 if ej.client_notes else note)})
+        # Part A: stash unmatched template items as lettered PENDING picks on
+        # the q_confirm buffer (each {raw, qty, suggestions, family}); they flag
+        # on the draft + block submit until resolved.
+        pend = self._wa12_pending_from_unmatched(unmatched or [])
         self.env["neon.wa.equip.session"]._start_quote(
-            from_e164, sender, "q_confirm", {"quote_id": quote.id})
+            from_e164, sender, "q_confirm",
+            # wa12_days = the chargeable hire days, so resolving a flagged item
+            # later bills at the RIGHT duration even on an all-unmatched (zero-
+            # line) draft (review finding #1 — money undercharge).
+            {"quote_id": quote.id, "wa12_pending": pend,
+             "wa12_days": int(days or 1)})
         summary = self._wa12_draft_summary(quote, unpriced)
+        flag = self._wa12_pending_block(pend)
         if unpriced:
-            return self._wa6_reply(raw_from, from_e164, summary + "\n\n" + _(
+            return self._wa6_reply(raw_from, from_e164, summary + flag + "\n\n" + _(
                 "⚠️ Can't submit yet — these have no rate set: %s. "
                 "Pricing isn't loaded for them.") % ", ".join(unpriced))
+        if pend:
+            return self._wa6_reply(raw_from, from_e164, summary + flag + "\n\n" + _(
+                "Resolve the flagged item(s) above before submitting — reply "
+                "e.g. *A = LED screen* to set one, or *drop A* to leave it off."))
         return self._wa6_reply(raw_from, from_e164, summary + "\n\n" + _(
             "Reply *yes* to submit for approval, or *cancel*."))
+
+    # ================================================================
+    # PART A — QUOTE-BY-TEMPLATE (copy-fill-send), the PRIMARY collection.
+    # The bot sends a labelled skeleton; the rep fills + sends ONE message;
+    # _wa12_template_extract_fields parses the labels deterministically (LLM
+    # extractor as the forgiving fallback); the EXISTING matcher +
+    # _wa12_quote_from_slots produce the draft in ONE reply. The structured
+    # stepper stays as the fallback. Quote correctness never depends on the
+    # LLM (deterministic matcher resolves every item).
+    # ================================================================
+    def _wa12_send_template_skeleton(self, raw_from, from_e164):
+        """Reply the copy-fill template + plain helper lines (no command
+        syntax). The rep fills it and sends it back as one message."""
+        return self._wa6_reply(
+            raw_from, from_e164,
+            _WA12_TEMPLATE_SKELETON + "\n" + _WA12_TEMPLATE_HELP)
+
+    @api.model
+    def _wa12_parse_template_item(self, text):
+        """One item line -> {name, qty, stated_price}. '<qty> x <name>' sets
+        qty (kills the '4 blinders' ambiguity); '@ $<price>' = a custom/rep
+        price. Bullets/loose spacing tolerated. None if nothing usable."""
+        import re
+        t = (text or "").strip().lstrip("-*•·").strip()
+        if not t:
+            return None
+        # an UNFILLED skeleton item line ("1 x", "2 x", "1x") carries no name ->
+        # ignore it (review finding #2: blank skeleton lines must not become
+        # phantom flagged items on the headline path).
+        if re.match(r"^\d+\s*[xX×]$", t):
+            return None
+        # trailing "@ $<price>"
+        price = None
+        pm = re.search(r"@\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*$", t)
+        if pm:
+            price = float(pm.group(1))
+            t = t[:pm.start()].strip()
+        # leading "<qty> x <name>" — REQUIRE a space AFTER the x so a product
+        # spec like "4x100 molefay" (the 4x100 is a dimension) keeps its whole
+        # name (qty 1), while "2 x screen" / "2x screen" set qty 2.
+        qm = re.match(r"^(\d+)\s*[xX×]\s+(.+)$", t)
+        if qm:
+            qty, name = max(1, int(qm.group(1))), qm.group(2).strip()
+        else:
+            qty, name = 1, t
+        name = name.strip(" -:")
+        if not name:
+            return None
+        return {"name": name, "qty": qty, "stated_price": price}
+
+    def _wa12_template_extract_fields(self, body):
+        """Deterministic parse of the filled template into the slots shape
+        {client, contact, phone, email, event, venue, date, days,
+        items:[{name,qty,stated_price}]}. Label synonyms + loose spacing
+        tolerated. None if it doesn't look like a filled template (the caller
+        then falls back to the LLM extractor / stepper)."""
+        import re
+        if not body:
+            return None
+        out = {"client": "", "contact": "", "phone": "", "email": "",
+               "event": "", "venue": "", "date": "", "days": "", "items": []}
+        in_items = False
+        labels = 0
+        for ln in body.splitlines():
+            s = ln.strip()
+            if not s:
+                continue
+            lm = re.match(r"^([A-Za-z][A-Za-z /\-]{1,20}?)\s*:\s*(.*)$", s)
+            key = (_WA12_TEMPLATE_LABELS.get(lm.group(1).strip().lower())
+                   if lm else None)
+            if key:
+                labels += 1
+                if key == "items":
+                    in_items = True
+                    it = (self._wa12_parse_template_item(lm.group(2))
+                          if lm.group(2).strip() else None)
+                    if it:
+                        out["items"].append(it)
+                else:
+                    in_items = False
+                    if lm.group(2).strip():
+                        out[key] = lm.group(2).strip()
+                continue
+            # not a recognised label line: inside the Items block, treat it as
+            # an item (bulleted or bare); otherwise ignore (stray text).
+            if in_items:
+                it = self._wa12_parse_template_item(s)
+                if it:
+                    out["items"].append(it)
+        # detect: a filled template carries the client/items structure + >=2
+        # labels (tight -> a casual "Phone: 123" line never trips it).
+        if labels < 2 or not (out["client"] or out["items"]):
+            return None
+        return out
+
+    def _wa12_is_template_filled(self, body):
+        """Tight detect for _wa12_maybe_intercept: a labelled, multi-field
+        template message (claims the turn even with no live session)."""
+        return self._wa12_template_extract_fields(body) is not None
+
+    def _wa12_pending_from_unmatched(self, unmatched):
+        """Lettered (A,B,C…) PENDING picks from the matcher's unmatched bucket
+        — flagged on the draft, block submit until resolved/dropped."""
+        import string
+        out = []
+        unmatched = unmatched or []
+        for i, u in enumerate(unmatched[:26]):
+            out.append({"letter": string.ascii_uppercase[i],
+                        "raw": u.get("name") or u.get("raw") or "",
+                        "qty": int(u.get("qty") or 1),
+                        "suggestions": (u.get("suggestions") or [])[:3],
+                        "family": u.get("family") or ""})
+        # review finding #5: > 26 unmatched must NOT silently vanish. A
+        # non-lettered OVERFLOW sentinel rides the pending list so submit stays
+        # blocked + the loss is VISIBLE (the rep re-sends with fewer lines; >26
+        # items in one template is an extreme edge).
+        if len(unmatched) > 26:
+            out.append({"letter": "+", "overflow": True,
+                        "raw": _("+%d more item line(s) — remove some and "
+                                 "re-send") % (len(unmatched) - 26),
+                        "qty": 1, "suggestions": [], "family": ""})
+        return out
+
+    def _wa12_pending_block(self, pend):
+        """Render the FLAGGED unmatched section (Part A step 4): never drops a
+        line; submit stays blocked until each is set or dropped."""
+        if not pend:
+            return ""
+        rows = []
+        for p in pend:
+            sg = (_(" — did you mean: %s?") % ", ".join(p["suggestions"])
+                  if p.get("suggestions") else "")
+            rows.append("  %s) ⚠️ %s%s" % (p["letter"], p["raw"], sg))
+        return _("\n\n⚠️ *Not matched yet — NOT in the quote:*\n%s") % "\n".join(
+            rows)
+
+    def _wa12_resolve_pending(self, sess, buf, quote, body, from_e164, raw_from):
+        """Resolve a FLAGGED unmatched pick at the review: '<letter> = <item>'
+        sets it (re-match -> a real line, or a custom line if '@ $price', or
+        re-flag with new suggestions); 'drop/remove/skip <letter>' leaves it
+        off. Returns None if ``body`` isn't a pending command (so the normal
+        edit parser runs). Money-safe: only an exact/strong catalogue hit (or an
+        explicit rep price) becomes a line — a weak retype re-flags."""
+        import re
+        pend = list(buf.get("wa12_pending") or [])
+        if not pend:
+            return None
+        raw = (body or "").strip()
+        letters = {p["letter"] for p in pend}
+
+        def _days():
+            # the buffered chargeable days is AUTHORITATIVE (set at draft time)
+            # so an all-unmatched zero-line quote still bills the right duration
+            # when a flag is resolved (review finding #1). Existing lines, if
+            # any, agree with it; max() guards the empty-recordset blind spot.
+            if quote.line_ids:
+                return max(quote.line_ids.mapped("duration_days") or [1])
+            return int(buf.get("wa12_days") or 1)
+
+        m = re.match(r"^(?:drop|remove|skip)\s+([A-Za-z])\s*$", raw, re.I)
+        if m:
+            L = m.group(1).upper()
+            if L not in letters:
+                return self._wa6_reply(raw_from, from_e164,
+                                       _("No flagged item %s.") % L)
+            buf["wa12_pending"] = [p for p in pend if p["letter"] != L]
+            sess._set_buffer(buf)
+            return self._wa12_after_edit(
+                quote, from_e164, raw_from, _("Dropped flagged item %s") % L)
+
+        m = re.match(r"^([A-Za-z])\s*=\s*(.+)$", raw)
+        if m and m.group(1).upper() in letters:
+            L = m.group(1).upper()
+            target = next(p for p in pend if p["letter"] == L)
+            it = self._wa12_parse_template_item(m.group(2)) or {
+                "name": m.group(2).strip(),
+                "qty": target.get("qty") or 1, "stated_price": None}
+            qty = it.get("qty") or target.get("qty") or 1
+            matched, unmatched = self._wa12_match_slot_items(
+                [{"name": it["name"], "qty": qty,
+                  "stated_price": it.get("stated_price")}])
+            if matched:
+                self._wa12_build_lines(quote, matched, _days())
+                buf["wa12_pending"] = [p for p in pend if p["letter"] != L]
+                sess._set_buffer(buf)
+                return self._wa12_after_edit(
+                    quote, from_e164, raw_from,
+                    _("Added *%s*") % (matched[0].get("product_name")
+                                       or it["name"]))
+            if it.get("stated_price"):
+                # not in the catalogue but the rep gave a price -> custom line.
+                self._wa12_build_lines(quote, [{
+                    "product_id": False, "custom_desc": it["name"],
+                    "product_name": it["name"],
+                    "rep_price": it["stated_price"], "qty": qty}], _days())
+                buf["wa12_pending"] = [p for p in pend if p["letter"] != L]
+                sess._set_buffer(buf)
+                return self._wa12_after_edit(
+                    quote, from_e164, raw_from,
+                    _("Added *%s* (custom)") % it["name"])
+            u = (unmatched or [{}])[0]
+            target["raw"] = it["name"]
+            target["suggestions"] = (u.get("suggestions") or [])[:3]
+            target["family"] = u.get("family") or ""
+            buf["wa12_pending"] = pend
+            sess._set_buffer(buf)
+            sg = (_(" Did you mean: %s?") % ", ".join(target["suggestions"])
+                  if target["suggestions"] else "")
+            return self._wa6_reply(raw_from, from_e164, _(
+                "Still couldn't match \"%s\" for %s.%s Try another name, give "
+                "a price (*%s = %s @ $250*), or *drop %s*.")
+                % (it["name"], L, sg, L, it["name"], L))
+        return None
+
+    def _wa12_process_template_filled(self, sender, body, from_e164, raw_from,
+                                      message):
+        """Parse a filled template -> resolve/create client -> match items ->
+        ONE-reply draft (q_confirm) with any unmatched FLAGGED. The deterministic
+        matcher resolves items (LLM never gates correctness)."""
+        self._wa6_audit_in(from_e164, message, "wa12-template")
+        fields = self._wa12_template_extract_fields(body)
+        if not fields:
+            # forgiving fallback: not a clean template -> the structured spine.
+            return self._wa12_begin_structured(
+                sender, body, from_e164, raw_from, message=message)
+        client_txt = (fields.get("client") or "").strip()
+        if not client_txt:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I need the client — fill in the *Quote:* line and send again."))
+        partner, candidates = self._wa12_client_candidates(client_txt)
+        if not partner:
+            if candidates:
+                # ⚠️ DECISION: an AMBIGUOUS client in the one-shot template
+                # RE-PROMPTS for the exact name (not a pick-resume) so the
+                # template stays one message and never lands the wrong client.
+                rows = "\n".join("• %s" % p.name for p in candidates)
+                return self._wa6_reply(raw_from, from_e164, _(
+                    "More than one client matches \"%s\":\n%s\n\nSend the "
+                    "template again with the exact company name on the "
+                    "*Quote:* line.") % (client_txt, rows))
+            # NEW client: the Contact/Phone/Email lines ARE the intake (company
+            # + child contact in this one message). Blank lines -> none created.
+            ph = (fields.get("phone") or "").strip()
+            partner = self._wa12_create_client(
+                sender.id,
+                {"name": client_txt, "kind": "company",
+                 "contact": (fields.get("contact") or "").strip(),
+                 "phone": ph, "phone_e164": to_e164(ph) or ""},
+                (fields.get("email") or "").strip())
+        # items -> the EXISTING confidence-gated matcher (matched + unmatched).
+        matched, unmatched = self._wa12_match_slot_items(
+            fields.get("items") or [])
+        if not matched and not unmatched:
+            return self._wa6_reply(raw_from, from_e164, _(
+                "I couldn't read any items — fill in the *Items:* lines "
+                "(e.g. *- 2 x LED screen*) and send again."))
+        # date: single / range -> persist both ends via extras. days = the
+        # chargeable hire days (Days:) OR the range-inferred count, else 1.
+        date_txt, end_date_txt, days = self._wa12_template_dates(
+            fields.get("date") or "", fields.get("days") or "")
+        extras = {}
+        if (fields.get("event") or "").strip():
+            extras["event_name"] = fields["event"].strip()
+        if (fields.get("venue") or "").strip():
+            extras["venue"] = fields["venue"].strip()
+        if end_date_txt:
+            extras["event_end_date_txt"] = end_date_txt
+        return self._wa12_quote_from_slots(
+            sender, partner, matched, date_txt, days, from_e164, raw_from,
+            extras=extras, unmatched=unmatched)
+
+    def _wa12_template_dates(self, date_val, days_val):
+        """(date_txt, end_date_txt, days). Parses Date: (single or range) and
+        Days: (chargeable). Days blank + range -> inferred count; blank + single
+        -> 1. The range END (event span) is separate from Days (line duration).
+        Returns date_txt='' for a blank/unparseable date (placeholder + the
+        review nudges for a date)."""
+        import re
+        ev_date, days_hint, end_date, is_range = (None, 1, None, False)
+        if (date_val or "").strip():
+            ev_date, days_hint, end_date, is_range = \
+                self._wa12_parse_event_dates(date_val)
+        date_txt = ev_date.isoformat() if ev_date else ""
+        end_date_txt = (end_date.isoformat()
+                        if (is_range and end_date) else "")
+        days = 0
+        m = re.search(r"(\d+)", days_val or "")
+        if m:
+            days = max(1, int(m.group(1)))
+        if not days:
+            days = days_hint if (is_range and days_hint > 1) else 1
+        return date_txt, end_date_txt, days
 
     @api.model
     def _wa12_client_candidates(self, name):
@@ -851,6 +1263,12 @@ class WhatsAppMessageWA12(models.Model):
                 "I didn't catch a date there — send the event date "
                 "(e.g. 25/09/2026, 25 Sept 2026, or 7–11 Aug)."))
         buf["date_txt"] = ev_date.isoformat()
+        # Bug 1 (WA-12.6): a RANGE persists BOTH ends. Store the END so it
+        # reaches _wa12_quote_from_slots -> the shared provision chain ->
+        # commercial.job.event_end_date. A single date / 'for N days' is a
+        # single-day EVENT (Days drives the chargeable duration_days, separate
+        # from the event span), so end_date_txt stays unset there.
+        buf["end_date_txt"] = end_date.isoformat() if (is_range and end_date) else ""
         # MONEY (Robin's convention): a RANGE never auto-sets the day count --
         # ASK the rep (the inclusive count is offered only as a hint). A single
         # date -> 1; an explicit "for N days" -> N (the rep stated it). The
@@ -1042,6 +1460,12 @@ class WhatsAppMessageWA12(models.Model):
         extras = {}
         if buf.get("note"):
             extras["event_name"] = buf["note"]
+        # Bug 1: thread the RANGE END + the free-text venue through extras to the
+        # SHARED provision chain (so a stepper-built range persists both ends).
+        if buf.get("end_date_txt"):
+            extras["event_end_date_txt"] = buf["end_date_txt"]
+        if buf.get("venue"):
+            extras["venue"] = buf["venue"]
         # MONEY: pass the computed hire DURATION so every line drafts at
         # rate × qty × days (the duration-not-applied fix).
         return self._wa12_quote_from_slots(
@@ -3059,6 +3483,14 @@ class WhatsAppMessageWA12(models.Model):
                     sess.sudo().write({"active": False})
                     return self._wa6_reply(raw_from, from_e164, _(
                         "That quote is no longer a draft."))
+                # Part A (money-safety, non-negotiable): NEVER ship a quote with
+                # an unresolved flagged item -- block until each is set/dropped.
+                if buf.get("wa12_pending"):
+                    flag = self._wa12_pending_block(buf["wa12_pending"])
+                    return self._wa6_reply(raw_from, from_e164, _(
+                        "Can't submit yet — resolve the flagged item(s) "
+                        "first:%s\n\nReply *A = <item>* to set one, or "
+                        "*drop A* to leave it off.") % flag)
                 if self._wa12_unpriced_lines(quote):
                     return self._wa6_reply(raw_from, from_e164, _(
                         "Still can't submit — some lines have no rate set."))
@@ -3066,6 +3498,14 @@ class WhatsAppMessageWA12(models.Model):
             # draft-editing commands (price/discount/qty/days/add/remove/no tax/
             # with tax/client). Each mutates -> recalc -> re-show the summary.
             if quote.exists() and quote.state == "draft":
+                # Part A: resolve a FLAGGED unmatched pending first ("A = <item>"
+                # / "drop A"); needs the session buffer, so it's handled here
+                # (not in _wa12_try_edit, which only sees the quote).
+                if buf.get("wa12_pending"):
+                    pres = self._wa12_resolve_pending(
+                        sess, buf, quote, body, from_e164, raw_from)
+                    if pres is not None:
+                        return pres
                 edited = self._wa12_try_edit(quote, body, from_e164, raw_from)
                 if edited is not None:
                     return edited
@@ -3175,16 +3615,32 @@ class WhatsAppMessageWA12(models.Model):
         # ValidationError (<: UserError) becomes a clean reply, never a silent
         # half-applied turn or a 500.
         try:
-            quote.with_user(actor).sudo().action_recalculate_pricing()
+            # skip recalc on a zero-line quote (e.g. all flags dropped) -- a
+            # bare recalc raises "no lines"; the summary + guidance still show.
+            if quote.line_ids:
+                quote.with_user(actor).sudo().action_recalculate_pricing()
         except (UserError, AccessError) as e:
             return self._wa6_reply(raw_from, from_e164, str(e))
         unpriced = self._wa12_unpriced_lines(quote)
         summary = self._wa12_draft_summary(quote, unpriced)
-        tail = (_("\n\n⚠️ Can't submit yet — no rate set: %s.")
-                % ", ".join(unpriced)) if unpriced else _(
-                "\n\nReply *yes* to submit, *cancel*, or keep editing.")
+        # Part A: keep the flagged unmatched section on EVERY edit reply (read
+        # from the live session) so a pending pick never silently disappears.
+        pend = []
+        _s = self.env["neon.wa.equip.session"].sudo()._active_for_phone(from_e164)
+        if _s:
+            _b = _s._get_buffer()
+            pend = (_b.get("wa12_pending") or []) if isinstance(_b, dict) else []
+        flag = self._wa12_pending_block(pend)
+        if unpriced:
+            tail = _("\n\n⚠️ Can't submit yet — no rate set: %s.") % ", ".join(
+                unpriced)
+        elif pend:
+            tail = _("\n\nResolve the flagged item(s) before submitting — "
+                     "*A = <item>* to set one, or *drop A* to leave it off.")
+        else:
+            tail = _("\n\nReply *yes* to submit, *cancel*, or keep editing.")
         return self._wa6_reply(raw_from, from_e164,
-                               "%s — done.\n\n%s%s" % (note, summary, tail))
+                               "%s — done.\n\n%s%s%s" % (note, summary, flag, tail))
 
     def _wa12_whole_quote_discount(self, quote, value, ex_vat, is_target,
                                    from_e164, raw_from):

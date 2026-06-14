@@ -326,6 +326,32 @@
     # / ✓✗ card / custom line) -> q_confirm review. A dump resets to step 1 (no
     # bulk-parse); client locked. pwa12_6 wire harness 7/7. NOT a complete cutover
     # yet (old pwa12 flow suite + review-step wire-test pending). NOT deployed.
+    # 17.0.1.20.0: WA-12.6 QUOTE-BY-TEMPLATE (PRIMARY collection) + date fixes.
+    # PART A: a quote trigger ("Quote a client" tap / "quote") now sends a
+    # copy-fill TEMPLATE skeleton; the rep fills + sends ONE message, parsed by
+    # _wa12_template_extract_fields (deterministic labels + synonyms; LLM
+    # extractor is the forgiving fallback) -> the EXISTING matcher +
+    # _wa12_quote_from_slots -> a ONE-reply draft. UNMATCHED items FLAG as
+    # lettered pending picks (A/B/C) -> never dead-end; submit BLOCKED until
+    # each is set ("A = <item>" / a custom "@ $price") or dropped ("drop A").
+    # The structured stepper stays as the FALLBACK (inline "Quote: <brief>",
+    # "step"/"guide me", or an unparseable reply). Contact/Phone/Email on the
+    # template = new-client intake in one message (company + child contact).
+    # PART B Bug 1: a DATE RANGE persists BOTH ends -- end_date_txt rides extras
+    # through the SHARED _wa12_quote_from_slots -> _wa12_provision_chain (so the
+    # stepper path persists it too, not just the template). Venue: free-text ->
+    # event job client_notes (venue_full_address is COMPUTED, not writable).
+    # Days (chargeable duration_days) stays separate from the event date span.
+    # Carries the held 19.3 default-align. Adversarial review (4 lenses,
+    # verify-each) -> 6 confirmed + fixed: #1 HIGH (all-unmatched zero-line
+    # template billed days=1 not the Days value -> wa12_days buffered + zero-line
+    # recalc guarded); #2 MED (unfilled "- 1 x" skeleton lines became phantom
+    # flags -> bare-qty-prefix rejected); #3 LOW (matched no-rate "@ $price" not
+    # promoted -> F8 promotion added to the template path); #4 LOW (ambiguous
+    # label synonyms false-positived casual prose -> for/subject/when/place/
+    # number/mail dropped); #5 NIT (>26 unmatched silently dropped -> visible
+    # overflow sentinel keeps submit blocked). #6 NIT (1-char "drop A" vs a
+    # 1-char line-remove token) -> LOW polish backlog.
     # 17.0.1.19.3: provider-default alignment (no quote-spine change). The WA-12
     # extraction lane (_wa12_llm_chat) read-defaulted the
     # neon_channels.whatsapp_provider_key param to "groq" while _wa_provider /
@@ -353,7 +379,7 @@
     # convo lane; T-43r/T-45r re-prove the no-cat-rule $ + rep-priced surfaces);
     # review-step MONEY wire-test hardened (VAT 15% exact + discount math exact)
     # + no-command-syntax sweep. pwa12 61/61, pwa12_6 11/11.
-    "version": "17.0.1.19.3",
+    "version": "17.0.1.20.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

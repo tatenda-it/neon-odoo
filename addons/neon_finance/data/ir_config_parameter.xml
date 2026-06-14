@@ -69,5 +69,20 @@
             <field name="value">120</field>
         </record>
 
+        <!-- WA-12.6 Part C: quote expiry configurability. validity period
+             feeds expires_at = quotation_date + N days; the show-line flag
+             defaults OFF so the Expiration line isn't forced onto every PDF.
+             noupdate=1 -> admin edits via Settings survive -u. -->
+        <record id="ir_config_param_quote_validity_period_days"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.quote_validity_period_days</field>
+            <field name="value">30</field>
+        </record>
+        <record id="ir_config_param_show_quote_expiry_line"
+                model="ir.config_parameter">
+            <field name="key">neon_finance.show_quote_expiry_line</field>
+            <field name="value">False</field>
+        </record>
+
     </data>
 </odoo>

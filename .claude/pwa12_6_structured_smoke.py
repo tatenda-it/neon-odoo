@@ -397,17 +397,20 @@ else:
                "S16-note-cleared-on-per-line-edit"):
         _check(_n, False, "review session not reached")
 
-# S17: the deterministic menu "Quote a client" tap -> begin_structured (q_client).
-_clear_sess()
+# S17: WA-12.6 Part A -- the menu "Quote a client" tap now sends the COPY-FILL
+# TEMPLATE skeleton (template is the PRIMARY collection); the stepper is the
+# fallback (proven by pwa12_7 T9). (Was: tap -> q_client stepper.)
+_clear(); _clear_sess()
 _tapid = _wp.encode(_SECRET, "wa12_start", u_sales.id)
 D._wa12_maybe_intercept({"from": PHONE, "type": "interactive",
                          "interactive": {"button_reply": {"id": _tapid,
                                                           "title": "Quote a client"}},
                          "id": "wa12start"})
-s17 = _sess()
-_check("S17-quote-a-client-tap-opens-structured",
-       bool(s17) and s17.step == "q_client",
-       "step=%s" % (s17.step if s17 else None))
+_s17txt = _WIRE[-1]["body"] if _WIRE else ""
+_check("S17-quote-a-client-tap-sends-template-skeleton",
+       "Quote:" in _s17txt and "Items:" in _s17txt and "Copy this" in _s17txt
+       and not _sess(),
+       "reply=%r session=%s" % (_s17txt[:60], bool(_sess())))
 _clear_sess()
 
 # ============================================================ S6: smoke -> only smoke
@@ -503,7 +506,15 @@ for e in _allmsgs:
     _sweep_parts += e.get("opts") or []
     _sweep_parts += e.get("descs") or []
 _sweep = "\n".join(_sweep_parts)
-_FORBIDDEN = ["<", "`", "price <", "add <", "replace <", "qty <", "e.g. `"]
+# The copy-fill TEMPLATE skeleton legitimately shows the custom-line FORMAT
+# "<qty> x <description> @ $<price>" (the user-approved exception) -> strip those
+# placeholder tokens before the sweep. The forbidden patterns are COMMAND
+# templates ("price <item>", "qty <item>", a backtick cheat sheet), NOT a data
+# format -- those are still caught.
+for _ph in ("<qty>", "<description>", "<desc>", "<price>", "<amt>"):
+    _sweep = _sweep.replace(_ph, "")
+_FORBIDDEN = ["`", "price <", "add <", "replace <", "qty <", "discount <",
+              "e.g. `", "<item>"]
 _offenders = sorted({tok for tok in _FORBIDDEN if tok in _sweep})
 _check("S11-no-command-syntax",
        len(_allmsgs) >= 10 and not _offenders,

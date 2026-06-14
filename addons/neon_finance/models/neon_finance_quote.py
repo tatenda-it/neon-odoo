@@ -20,11 +20,20 @@ attach to; the form view in P6.M2 does NOT render the chatter
 """
 import logging
 
+import pytz
+
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 
 _logger = logging.getLogger(__name__)
+
+# Bug 3 (WA-12.6): create_date is UTC, so a quote made late-evening Harare
+# (UTC+2) shows the wrong DAY. The quotation_date default + the expires_at
+# rebase use this EXPLICIT Harare "today" -- independent of the acting user's
+# res.users.tz (which may be unset), so the date is always the Harare calendar
+# day the quote was made.
+_HARARE_TZ = pytz.timezone("Africa/Harare")
 
 
 _QUOTE_STATES = [
@@ -146,15 +155,40 @@ class NeonFinanceQuote(models.Model):
         "action_open_payment_term_wizard pre-populates from the "
         "partner's most recent term.",
     )
+    # Bug 3: quotation_date is the issue date shown on the PDF (replacing the
+    # UTC create_date). Default = Harare today, editable while draft. Old quotes
+    # (NULL) fall back to create_date on the report (no migration).
+    quotation_date = fields.Date(
+        string="Quotation Date",
+        default=lambda self: self._wa12_harare_today(),
+        tracking=True,
+        help="Issue date shown on the quote PDF. Defaults to today in "
+        "Africa/Harare; editable while the quote is a draft.",
+    )
     expires_at = fields.Date(
         string="Expires",
-        default=lambda self: fields.Date.add(
-            fields.Date.context_today(self), days=30),
+        default=lambda self: self._wa12_default_expires_at(),
         tracking=True,
         help="When state='sent' and expires_at < today, the daily "
         "expiry cron transitions the quote to 'expired'. Salesperson-"
-        "editable while state='draft'.",
+        "editable while state='draft'. Rebased on quotation_date + the "
+        "configured validity period (Settings -> Neon Finance).",
     )
+
+    @api.model
+    def _wa12_harare_today(self):
+        """Today's date in Africa/Harare (UTC+2), independent of the acting
+        user's res.users.tz. Bug 3 fix anchor."""
+        return _HARARE_TZ.fromutc(fields.Datetime.now()).date()
+
+    @api.model
+    def _wa12_default_expires_at(self):
+        """quotation_date (Harare today) + the configured validity period
+        (ir.config_parameter neon_finance.quote_validity_period_days, default
+        30). Part C: the period is admin-configurable."""
+        days = int(self.env["ir.config_parameter"].sudo().get_param(
+            "neon_finance.quote_validity_period_days", 30) or 30)
+        return fields.Date.add(self._wa12_harare_today(), days=days)
 
     # ============================================================
     # === Approval / send / accept / cancel audit (M2 placeholders

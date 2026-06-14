@@ -69,10 +69,20 @@
                                       t-options='{"widget": "contact", "fields": ["name", "address", "phone", "email"], "no_marker": true}'/>
                             </div>
                             <div class="col-6 text-end">
+                                <!-- Bug 3: render the editable, Harare-dated
+                                     quotation_date; old quotes (NULL) fall back
+                                     to create_date so nothing breaks (no
+                                     migration). -->
                                 <div><strong>Quotation Date:</strong>
-                                    <span t-field="o.create_date"
+                                    <span t-if="o.quotation_date"
+                                          t-field="o.quotation_date"/>
+                                    <span t-else=""
+                                          t-field="o.create_date"
                                           t-options='{"widget": "date"}'/></div>
-                                <div t-if="o.expires_at"><strong>Expiration:</strong>
+                                <!-- Part C: the Expiration line shows only when
+                                     the admin enables it (default OFF) AND a
+                                     date is set. -->
+                                <div t-if="o.expires_at and env['ir.config_parameter'].sudo().get_param('neon_finance.show_quote_expiry_line') in ('True', 'true', '1')"><strong>Expiration:</strong>
                                     <span t-field="o.expires_at"/></div>
                                 <div><strong>Salesperson:</strong>
                                     <span t-out="rep.name or '[not set]'"/></div>

@@ -41,7 +41,7 @@
     # PDF totals block. Display only -- the discount itself lives in the per-line
     # discount_pct, so _compute_amounts is byte-unchanged. New nullable field ->
     # no migration; the note is set/cleared by the neon_crew_comms review edit.
-    'version': '17.0.7.11.1',
+    'version': '17.0.7.12.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

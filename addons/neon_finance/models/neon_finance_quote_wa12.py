@@ -46,7 +46,8 @@ class NeonFinanceQuoteWA12(models.Model):
 
     @api.model
     def _wa12_provision_chain(self, partner, event_date, currency,
-                              salesperson, date_is_placeholder=False):
+                              salesperson, date_is_placeholder=False,
+                              event_end_date=None):
         """Provision a draft booking chain for a phone quote and return the
         DRAFT quote (no lines yet — the orchestration adds + prices them).
 
@@ -73,17 +74,27 @@ class NeonFinanceQuoteWA12(models.Model):
                 "provision a quote chain (neon_finance.wa12_tbc_venue)."))
         actor = (salesperson.id if salesperson and salesperson.id
                  else self.env.uid)
-        cjob = self.env["commercial.job"].with_user(actor).sudo().create({
+        cjob_vals = {
             "partner_id": partner.id,
             "event_date": event_date,
             "event_date_is_placeholder": bool(date_is_placeholder),
             "venue_id": venue.id,
             # state defaults 'pending' -> no event_job auto-cascade.
-        })
+        }
+        # Bug 1 (WA-12.6): a DATE RANGE must persist BOTH ends. event_end_date is
+        # writable on commercial.job (commercial.event.job mirrors it read-only).
+        # Guard end >= start so a bad range never inverts the span.
+        if event_end_date and event_date and event_end_date >= event_date:
+            cjob_vals["event_end_date"] = event_end_date
+        cjob = self.env["commercial.job"].with_user(actor).sudo().create(
+            cjob_vals)
         ejob = self.env["commercial.event.job"].with_user(actor).sudo().create({
             "commercial_job_id": cjob.id,
             "is_quote_provisional": True,
             # state defaults 'draft'; partner/venue/date related from cjob.
+            # NB the free-text Venue: from the template does NOT go here --
+            # venue_full_address is a COMPUTED field (from venue_id); the caller
+            # appends the typed venue to client_notes instead (writable + shown).
         })
         quote = self.with_user(actor).sudo().create({
             "event_job_id": ejob.id,

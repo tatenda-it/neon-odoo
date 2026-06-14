@@ -81,6 +81,7 @@ SMOKES=(
   pwa11_insights
   pwa12_quote
   pwa12_6_structured
+  pwa12_7_template
   pwa_copilot_resilience
   pneon_library
 )
