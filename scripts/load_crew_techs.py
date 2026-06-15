@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CREW LOAD — 9 technicians (gated one-shot, run at the human gate by Tatenda).
+CREW LOAD — crew technicians (gated one-shot, run at the human gate by Tatenda).
 
 Creates, per tech:
   * a res.users (internal) + the neon_jobs crew group (group_neon_jobs_crew,
@@ -18,18 +18,16 @@ NOT in this op (flagged, awaiting a separate decision):
     "Employed Technician" (4) vs "Freelance Technician" (5) therefore needs an
     hr.employee per tech and engages neon_hr's doc-compliance / assignment-gate
     machinery. Held for the A/B decision before any hr.employee is created here.
-  * Tadiwa M (+263782203304) — starts next month, employment unsettled. Create
-    fresh on his start date.
   * Lovejoy — separate repair-tech lane.
   * Ranganai (res.users uid 13, bot.user id 7) — already the lead; untouched.
 
 Run (two-step, gated):
   # 1) DRY-RUN (default) — prints the full plan + collision re-check, NO writes,
   #    NO passwords generated:
-  docker compose exec -T odoo odoo shell -d neon_crm --no-http < scripts/load_crew_9techs.py
+  docker compose exec -T odoo odoo shell -d neon_crm --no-http < scripts/load_crew_techs.py
   # 2) APPLY (after the human gate on the printed plan) — use `exec` (running
   #    container) so the password file persists for retrieval:
-  docker compose exec -T -e CREW_LOAD_APPLY=1 odoo odoo shell -d neon_crm --no-http < scripts/load_crew_9techs.py
+  docker compose exec -T -e CREW_LOAD_APPLY=1 odoo odoo shell -d neon_crm --no-http < scripts/load_crew_techs.py
   # 3) Retrieve the credentials on the HOST terminal (never chat), distribute via
   #    WhatsApp, then shred:
   docker compose exec odoo cat /tmp/crew_temp_passwords.txt
@@ -48,6 +46,7 @@ DOMAIN = "neonhiring.co.zw"
 # (display name, login handle, +263 phone, employment) — employment is recorded
 # here only for the SEPARATE hr.employee classification step; this op does NOT
 # apply it. Phones assistant-verified collision-free (no bot.user, no partner).
+# 10 techs (Tadiwa added 2026-06-15, Robin confirmed freelance + active now).
 CREW = [
     ("Arnold M", "arnold.m", "+263786280490", "permanent"),
     ("John",     "john",     "+263783433852", "freelance"),
@@ -58,6 +57,7 @@ CREW = [
     ("Trymore",  "trymore",  "+263773141666", "permanent"),
     ("Oswell",   "oswell",   "+263775617220", "freelance"),
     ("Adam M",   "adam",     "+263782232883", "permanent"),
+    ("Tadiwa M", "tadiwa",   "+263782203304", "freelance"),   # starts next month, active now
 ]
 
 # Unambiguous alphabet (no O/0/I/l/1) for WhatsApp-typeable temp passwords.
@@ -77,7 +77,7 @@ crew_group = env.ref("neon_jobs.group_neon_jobs_crew")   # res.groups (XML id)
 base_user = env.ref("base.group_user")
 
 print("=" * 70)
-print("CREW LOAD — 9 technicians  (APPLY=%s)" % APPLY)
+print("CREW LOAD — %d technicians  (APPLY=%s)" % (len(CREW), APPLY))
 print("crew group: %s  (res.groups id %d — confirm == 49)"
       % (crew_group.name, crew_group.id))
 print("=" * 70)
