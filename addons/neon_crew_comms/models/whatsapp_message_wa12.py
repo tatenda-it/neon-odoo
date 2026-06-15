@@ -3822,6 +3822,23 @@ class WhatsAppMessageWA12(models.Model):
             # hit is refused WITH suggestions, never drafted as a guessed line.
             matched, unmatched = self._wa12_match_text_items(text)
             if not matched:
+                # PRICE-IMPLIED CUSTOM (F8): "<desc> <amt> [per day]" with no
+                # catalogue match -> a CLEAN custom line at the rep price (the
+                # phrasing reps use, vs the explicit "add custom <desc> at
+                # <amt>"). name = the clean desc; line_type drives the marker.
+                pm = re.match(
+                    r"^(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*"
+                    r"(?:per\s*day|/\s*day|p/?d|a\s*day)?\s*$", text, re.I)
+                if pm and pm.group(1).strip() \
+                        and float(pm.group(2)) > _WA12_PLACEHOLDER_RATE:
+                    cdesc, cprice = pm.group(1).strip(), float(pm.group(2))
+                    days = max(quote.line_ids.mapped("duration_days") or [1])
+                    QL.create({"quote_id": quote.id, "line_type": "custom",
+                               "name": cdesc, "quantity": 1.0,
+                               "unit_rate": cprice, "duration_days": int(days)})
+                    return self._wa12_after_edit(
+                        quote, from_e164, raw_from,
+                        _("Added custom \"%s\" @ %s %.2f") % (cdesc, cur, cprice))
                 um = unmatched[0] if unmatched else {}
                 sugg = um.get("suggestions") or []
                 return err(_("Couldn't confidently match \"%s\"%s.") % (
@@ -4499,8 +4516,11 @@ class WhatsAppMessageWA12(models.Model):
         names = []
         for l in quote.line_ids[:4]:
             flag = ""
-            if l.line_type != "custom" and l.pricing_status == "manual" \
-                    and not l.equipment_line_id:
+            if l.line_type == "custom":
+                # INTERNAL custom marker on the approval ping (the client PDF no
+                # longer badges custom lines, so the approver still sees them here).
+                flag = _(" (custom)")
+            elif l.pricing_status == "manual" and not l.equipment_line_id:
                 # F8: the approver sees exactly which rates came from the rep.
                 flag = _(" (rep-priced)")
             names.append("%s×%g%s" % (l.name, l.quantity, flag))

@@ -41,7 +41,12 @@
     # PDF totals block. Display only -- the discount itself lives in the per-line
     # discount_pct, so _compute_amounts is byte-unchanged. New nullable field ->
     # no migration; the note is set/cleared by the neon_crew_comms review edit.
-    'version': '17.0.7.12.0',
+    # 17.0.7.12.1 = WA-12.6 custom-line final: the CLIENT quote PDF no longer
+    # badges a custom line ("CUSTOM" purple span removed) -- a custom line prints
+    # as a normal item (name + rate). The custom marker stays INTERNAL (WhatsApp
+    # draft ✍️ + the approval summary + the backend line_type). REP-PRICED badge
+    # (manual equipment, distinct from line_type=custom) is unchanged.
+    'version': '17.0.7.12.1',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

@@ -133,12 +133,17 @@
                             <tbody>
                                 <tr t-foreach="o.line_ids" t-as="l">
                                     <td>
-                                        <span t-if="l.line_type == 'custom'"
-                                              style="color:#7165AC;font-weight:bold;">CUSTOM </span>
+                                        <!-- The CLIENT quote shows a custom line as
+                                             a NORMAL item: the "CUSTOM" badge is
+                                             removed. The custom marker is INTERNAL
+                                             only (the WhatsApp draft pencil tag, the
+                                             approval summary, and the backend
+                                             line_type). -->
                                         <!-- F8: a rep-priced line (manual rate, no
                                              catalogue rule, no reservation) is flagged
-                                             as loudly as CUSTOM so the approver sees
-                                             exactly which numbers came from the rep. -->
+                                             so the approver sees exactly which numbers
+                                             came from the rep. (A custom line is
+                                             excluded by the t-if below.) -->
                                         <span t-if="l.line_type != 'custom' and l.pricing_status == 'manual' and not l.equipment_line_id"
                                               style="color:#B05A00;font-weight:bold;">REP-PRICED </span>
                                         <span t-field="l.name"/>
