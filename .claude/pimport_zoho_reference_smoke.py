@@ -28,8 +28,10 @@ AL = env["neon.finance.quote.archive.line"].sudo()
 IMP = env["neon.zoho.importer"].sudo()
 Seq = env["ir.sequence"].sudo()
 Q = env["neon.finance.quote"].sudo()
+AM = env["account.move"].sudo()
 
 TAG = "[TEST-ZIMP]"
+_INV_DOMAIN = [("move_type", "in", ("out_invoice", "out_refund"))]
 
 
 def _purge():
@@ -49,6 +51,7 @@ _purge()
 LIVE_Q_BEFORE = Q.search_count([])
 _seq_usd = Seq.search([("code", "=", "neon.finance.quote.usd")], limit=1)
 SEQ_USD_BEFORE = _seq_usd.number_next_actual if _seq_usd else -1
+INV_BEFORE = AM.search_count(_INV_DOMAIN)   # ledger invariant (must not move)
 
 # ---- fixtures: an existing partner to match on zoho_source_id, and one to
 #      fuzzy-match on email ----
@@ -250,6 +253,10 @@ _check("T10-live-quote-count-untouched", Q.search_count([]) == LIVE_Q_BEFORE,
        "live quote count moved %d -> %d" % (LIVE_Q_BEFORE, Q.search_count([])))
 _check("T10b-QUO-sequence-untouched", SEQ_USD_AFTER == SEQ_USD_BEFORE,
        "QUO-USD seq moved %s -> %s" % (SEQ_USD_BEFORE, SEQ_USD_AFTER))
+_check("T10c-ledger-invoices-untouched",
+       AM.search_count(_INV_DOMAIN) == INV_BEFORE,
+       "customer invoice count moved %d -> %d (import must create NO account.move)"
+       % (INV_BEFORE, AM.search_count(_INV_DOMAIN)))
 
 # ---- teardown ----
 _purge()
