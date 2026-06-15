@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_partner_form_zoho" model="ir.ui.view">
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <div name="button_box" position="inside">
+                <button class="oe_stat_button" type="object"
+                        name="action_view_archived_quotes"
+                        icon="fa-file-text-o"
+                        invisible="archived_quote_count == 0">
+                    <field name="archived_quote_count" widget="statinfo"
+                           string="Archived Quotes"/>
+                </button>
+            </div>
+
+            <notebook position="inside">
+                <page string="Zoho Import" name="zoho_import"
+                      groups="neon_core.group_neon_superuser">
+                    <group>
+                        <field name="zoho_source_id"/>
+                        <field name="zoho_dedup_review"/>
+                    </group>
+                </page>
+            </notebook>
+
+        </field>
+    </record>
+
+</odoo>

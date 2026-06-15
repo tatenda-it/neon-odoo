@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_quote_archive_tree" model="ir.ui.view">
+        <field name="model">neon.finance.quote.archive</field>
+        <field name="arch" type="xml">
+            <tree string="Archived Zoho Quotes" create="false" edit="false">
+                <field name="zoho_estimate_number"/>
+                <field name="quotation_date"/>
+                <field name="partner_id"/>
+                <field name="event_summary" optional="show"/>
+                <field name="status_bucket"/>
+                <field name="zoho_status" optional="hide"/>
+                <field name="currency_code"/>
+                <field name="amount_untaxed" sum="Untaxed" optional="hide"/>
+                <field name="amount_tax" optional="hide"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="salesperson_id" optional="show"/>
+                <field name="salesperson_name" optional="hide"/>
+                <field name="zoho_invoice_number" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_quote_archive_form" model="ir.ui.view">
+        <field name="model">neon.finance.quote.archive</field>
+        <field name="arch" type="xml">
+            <form string="Archived Zoho Quote" create="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="zoho_estimate_number" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="zoho_customer_source_id" readonly="1"/>
+                            <field name="quotation_date" readonly="1"/>
+                            <field name="event_summary" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="status_bucket" readonly="1"/>
+                            <field name="zoho_status" readonly="1"/>
+                            <field name="currency_code" readonly="1"/>
+                            <field name="salesperson_id" readonly="1"/>
+                            <field name="salesperson_name" readonly="1"/>
+                            <field name="zoho_invoice_number" readonly="1"/>
+                            <field name="active" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines">
+                            <field name="line_ids" readonly="1">
+                                <tree string="Lines">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="category_prefix"/>
+                                    <field name="name"/>
+                                    <field name="description" optional="hide"/>
+                                    <field name="unit" optional="show"/>
+                                    <field name="quantity"/>
+                                    <field name="unit_rate"/>
+                                    <field name="line_total"/>
+                                    <field name="zoho_item_id" optional="hide"/>
+                                </tree>
+                            </field>
+                            <group class="oe_subtotal_footer oe_right">
+                                <field name="amount_untaxed" readonly="1"/>
+                                <field name="amount_tax" readonly="1"/>
+                                <field name="amount_total" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Import Note">
+                            <field name="note" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_quote_archive_search" model="ir.ui.view">
+        <field name="model">neon.finance.quote.archive</field>
+        <field name="arch" type="xml">
+            <search string="Archived Zoho Quotes">
+                <field name="zoho_estimate_number"/>
+                <field name="partner_id"/>
+                <field name="event_summary"/>
+                <field name="salesperson_name"/>
+                <filter name="f_open" string="Open (follow-up)"
+                        domain="[('status_bucket','=','open')]"/>
+                <filter name="f_won" string="Won"
+                        domain="[('status_bucket','=','won')]"/>
+                <filter name="f_lost" string="Lost"
+                        domain="[('status_bucket','=','lost')]"/>
+                <filter name="f_historical" string="Historical"
+                        domain="[('status_bucket','=','historical')]"/>
+                <separator/>
+                <filter name="f_archived" string="Archived"
+                        domain="[('active','=',False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_status" string="Status"
+                            context="{'group_by':'status_bucket'}"/>
+                    <filter name="g_partner" string="Customer"
+                            context="{'group_by':'partner_id'}"/>
+                    <filter name="g_salesperson" string="Salesperson"
+                            context="{'group_by':'salesperson_id'}"/>
+                    <filter name="g_currency" string="Currency"
+                            context="{'group_by':'currency_code'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_quote_archive" model="ir.actions.act_window">
+        <field name="name">Archived Zoho Quotes</field>
+        <field name="res_model">neon.finance.quote.archive</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_quote_archive_search"/>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No archived Zoho quotes yet</p>
+            <p>Reference / historical estimates imported from Zoho Books.
+               Read-only — these never touch the live finance ledger.</p>
+        </field>
+    </record>
+
+    <!-- ⚠️ DECISION: menu visible to all internal (base.group_user), consistent
+         with the all-internal READ ACL. Honouring "finance/sales only" would
+         require depending on neon_finance's group defs and break this module's
+         isolation; reference quote history carries NO balances/ledger, so a
+         broad internal read is acceptable. Narrow later if Robin wants. -->
+    <menuitem id="menu_neon_migration_root" name="Zoho Archive"
+              sequence="95" groups="base.group_user"/>
+    <menuitem id="menu_quote_archive" name="Archived Quotes"
+              parent="menu_neon_migration_root"
+              action="action_quote_archive" sequence="10"/>
+
+</odoo>

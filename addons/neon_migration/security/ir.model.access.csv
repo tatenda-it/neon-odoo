@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_quote_archive_internal,neon.finance.quote.archive read (all internal),model_neon_finance_quote_archive,base.group_user,1,0,0,0
+access_quote_archive_super,neon.finance.quote.archive superuser (write/create/unlink),model_neon_finance_quote_archive,neon_core.group_neon_superuser,1,1,1,1
+access_quote_archive_line_internal,neon.finance.quote.archive.line read (all internal),model_neon_finance_quote_archive_line,base.group_user,1,0,0,0
+access_quote_archive_line_super,neon.finance.quote.archive.line superuser,model_neon_finance_quote_archive_line,neon_core.group_neon_superuser,1,1,1,1

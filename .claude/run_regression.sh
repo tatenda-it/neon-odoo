@@ -84,6 +84,7 @@ SMOKES=(
   pwa12_7_template
   pwa_copilot_resilience
   pneon_library
+  pimport_zoho_reference
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0
