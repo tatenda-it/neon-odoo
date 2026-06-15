@@ -379,6 +379,13 @@
     # convo lane; T-43r/T-45r re-prove the no-cat-rule $ + rep-priced surfaces);
     # review-step MONEY wire-test hardened (VAT 15% exact + discount math exact)
     # + no-command-syntax sweep. pwa12 61/61, pwa12_6 11/11.
+    # 17.0.1.20.2: custom-line "CUSTOM" DOUBLING fix. The "add custom <desc> at
+    # <amt>" handler baked "[CUSTOM] " into the stored line NAME, while the PDF
+    # template ALSO renders a line_type-driven CUSTOM badge -> "CUSTOM [CUSTOM]
+    # <desc>". Now the name stores the CLEAN description; the SINGLE marker is
+    # line_type-driven (PDF CUSTOM badge + the draft tag, changed from "[CUSTOM]"
+    # to "✍️ " so no "[CUSTOM]" text appears anywhere). _wa12_build_lines was
+    # already clean; only the add-custom path + the draft tag changed.
     # 17.0.1.20.1: the q_confirm REVIEW/draft reply renders as a WhatsApp
     # interactive 3-button message [✏️ Change a line][➕ Add item][👁 Preview]
     # (was plain text; the menu already shipped interactive). Submit stays a
@@ -387,7 +394,7 @@
     # prompt for the <n> = <item> / add <item> grammar) -- no new edit logic.
     # _wa6_send_buttons falls back to numbered text if the interactive send
     # fails (menu resilience pattern). 3 new wa_payload intents (wa12_rv_*).
-    "version": "17.0.1.20.1",
+    "version": "17.0.1.20.2",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

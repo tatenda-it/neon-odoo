@@ -3806,8 +3806,11 @@ class WhatsAppMessageWA12(models.Model):
         if m:
             desc, price = m.group(1).strip(), float(m.group(2))
             days = max(quote.line_ids.mapped("duration_days") or [1])
+            # store the CLEAN description -- line_type='custom' drives the SINGLE
+            # marker (draft ✍️ tag + PDF CUSTOM badge). Baking "[CUSTOM]" into
+            # the name doubled it ("CUSTOM [CUSTOM] ..." on the PDF).
             QL.create({"quote_id": quote.id, "line_type": "custom",
-                       "name": "[CUSTOM] %s" % desc, "quantity": 1.0,
+                       "name": desc, "quantity": 1.0,
                        "unit_rate": price, "duration_days": int(days)})
             return self._wa12_after_edit(quote, from_e164, raw_from,
                                          _("Added custom \"%s\" @ %s %.2f")
@@ -4413,7 +4416,8 @@ class WhatsAppMessageWA12(models.Model):
             else:
                 eff, disc = base, None
             if l.line_type == "custom":
-                tag = "[CUSTOM] "
+                # line_type-driven marker (the name is CLEAN); no "[CUSTOM]" text.
+                tag = "✍️ "
             elif l.pricing_status == "manual" and not l.equipment_line_id:
                 # F8: a rep-priced line (no catalogue rate) is LOUD everywhere.
                 tag = "[REP-PRICED] "

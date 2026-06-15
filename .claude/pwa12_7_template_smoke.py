@@ -535,6 +535,29 @@ q15.invalidate_recordset()
 _check("T15e-typed-yes-still-submits",
        q15.state in ("pending_approval", "approved"), "state=%s" % q15.state)
 
+# ============================================================ T16 CUSTOM doubling
+# A custom line stores a CLEAN name; the custom marker shows ONCE (draft ✍️, PDF
+# CUSTOM badge is line_type-driven); no "[CUSTOM]" text baked anywhere.
+_clear(); _clear_sess()
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _LLM_QUOTE):
+    D._wa12_maybe_intercept(_txt(_tmpl))             # -> q_confirm draft
+q16 = _latest_quote()
+_clear()
+D._wa12_maybe_intercept(_txt("add custom stage riser at 250"))
+q16.invalidate_recordset()
+cl16 = q16.line_ids.filtered(
+    lambda l: l.line_type == "custom"
+    and "stage riser" in (l.name or "").lower())[:1] if q16 else None
+draft16 = _last()
+_check("T16a-custom-line-name-is-CLEAN-no-bracket",
+       bool(cl16) and cl16.name == "stage riser",
+       "name=%r" % (cl16.name if cl16 else None))
+_check("T16b-draft-marks-custom-ONCE-no-[CUSTOM]-text",
+       "✍️" in draft16 and "[CUSTOM]" not in draft16
+       and abs((cl16.unit_rate or 0) - 250.0) < 0.5,
+       "draft=%r rate=%s" % (draft16[:110],
+                             cl16.unit_rate if cl16 else None))
+
 # ---- teardown ----
 _clear_sess()
 _purge()
