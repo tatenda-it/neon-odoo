@@ -400,7 +400,11 @@
     # prompt for the <n> = <item> / add <item> grammar) -- no new edit logic.
     # _wa6_send_buttons falls back to numbered text if the interactive send
     # fails (menu resilience pattern). 3 new wa_payload intents (wa12_rv_*).
-    "version": "17.0.1.20.3",
+    # 20.4: custom-line CASING -- uppercase the typed description on all custom-
+    # creation paths (add-custom / price-implied add / build_lines) AND the add-
+    # confirmation echo, so custom lines read uniformly with the UPPERCASE
+    # catalogue names on the draft + client PDF (e.g. "decor" -> "DECOR").
+    "version": "17.0.1.20.4",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

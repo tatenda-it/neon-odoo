@@ -550,7 +550,7 @@ cl16 = q16.line_ids.filtered(
     and "stage riser" in (l.name or "").lower())[:1] if q16 else None
 draft16 = _last()
 _check("T16a-custom-line-name-is-CLEAN-no-bracket",
-       bool(cl16) and cl16.name == "stage riser",
+       bool(cl16) and cl16.name == "STAGE RISER",
        "name=%r" % (cl16.name if cl16 else None))
 _check("T16b-draft-marks-custom-ONCE-no-[CUSTOM]-text",
        "✍️" in draft16 and "[CUSTOM]" not in draft16
@@ -569,7 +569,7 @@ try:
     # CUSTOM badge was the only ">CUSTOM " text in a line cell, so its absence is
     # the real check (clean name present, no CUSTOM badge).
     _check("T17-client-PDF-custom-line-no-CUSTOM-badge",
-           "stage riser" in _h and ">CUSTOM<" not in _h
+           "STAGE RISER" in _h and "stage riser" not in _h and ">CUSTOM<" not in _h
            and ">CUSTOM " not in _h,
            "name=%s badge=%s" % ("stage riser" in _h, (">CUSTOM" in _h)))
 except Exception as _e15:  # noqa: BLE001
@@ -579,7 +579,7 @@ except Exception as _e15:  # noqa: BLE001
 # T18 (PART 2): the INTERNAL approval-ping summary STILL marks a custom line.
 _isum = M.sudo()._wa12_item_summary(q16)
 _check("T18-approval-summary-keeps-internal-custom-marker",
-       "(custom)" in _isum and "stage riser" in _isum,
+       "(custom)" in _isum and "STAGE RISER" in _isum,
        "summary=%r" % _isum[:120])
 
 # T19 (PART 1): the price-implied "add <desc> <amt> per day" path now creates a
@@ -590,12 +590,30 @@ q16.invalidate_recordset()
 cs19 = q16.line_ids.filtered(
     lambda l: "customer search" in (l.name or "").lower())[:1] if q16 else None
 _check("T19-price-implied-custom-add-CLEAN-name",
-       bool(cs19) and cs19.name == "customer search"
+       bool(cs19) and cs19.name == "CUSTOMER SEARCH"
        and cs19.line_type == "custom"
        and abs((cs19.unit_rate or 0) - 300.0) < 0.5,
        "name=%r type=%s rate=%s"
        % (cs19.name if cs19 else None, cs19.line_type if cs19 else None,
           cs19.unit_rate if cs19 else None))
+
+# T20 (CASING): the user's literal wire-test -- "add custom decor at 300" stores
+# the description UPPERCASED ("DECOR") so custom lines match the catalogue casing
+# (all product names are stored uppercase). Draft + PDF show the same casing.
+_clear()
+D._wa12_maybe_intercept(_txt("add custom decor at 300"))
+q16.invalidate_recordset()
+cd20 = q16.line_ids.filtered(
+    lambda l: l.line_type == "custom"
+    and "decor" in (l.name or "").lower())[:1] if q16 else None
+draft20 = _last()
+_check("T20-add-custom-decor-stored-UPPERCASE-DECOR",
+       bool(cd20) and cd20.name == "DECOR"
+       and abs((cd20.unit_rate or 0) - 300.0) < 0.5
+       and "decor" not in draft20,  # the draft echoes DECOR, never "decor"
+       "name=%r rate=%s draft=%r"
+       % (cd20.name if cd20 else None,
+          cd20.unit_rate if cd20 else None, draft20[:110]))
 
 # ---- teardown ----
 _clear_sess()

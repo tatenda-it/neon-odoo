@@ -3810,11 +3810,13 @@ class WhatsAppMessageWA12(models.Model):
             # marker (draft ✍️ tag + PDF CUSTOM badge). Baking "[CUSTOM]" into
             # the name doubled it ("CUSTOM [CUSTOM] ..." on the PDF).
             QL.create({"quote_id": quote.id, "line_type": "custom",
-                       "name": desc, "quantity": 1.0,
+                       # UPPERCASE to match catalogue casing (all product names
+                       # are stored uppercase, e.g. "6M X 2M LED SCREEN").
+                       "name": desc.upper(), "quantity": 1.0,
                        "unit_rate": price, "duration_days": int(days)})
             return self._wa12_after_edit(quote, from_e164, raw_from,
                                          _("Added custom \"%s\" @ %s %.2f")
-                                         % (desc, cur, price))
+                                         % (desc.upper(), cur, price))
 
         if low.startswith("add ") and not low.startswith("add custom"):
             text = raw[4:].strip()
@@ -3834,11 +3836,13 @@ class WhatsAppMessageWA12(models.Model):
                     cdesc, cprice = pm.group(1).strip(), float(pm.group(2))
                     days = max(quote.line_ids.mapped("duration_days") or [1])
                     QL.create({"quote_id": quote.id, "line_type": "custom",
-                               "name": cdesc, "quantity": 1.0,
+                               # UPPERCASE to match catalogue casing.
+                               "name": cdesc.upper(), "quantity": 1.0,
                                "unit_rate": cprice, "duration_days": int(days)})
                     return self._wa12_after_edit(
                         quote, from_e164, raw_from,
-                        _("Added custom \"%s\" @ %s %.2f") % (cdesc, cur, cprice))
+                        _("Added custom \"%s\" @ %s %.2f")
+                        % (cdesc.upper(), cur, cprice))
                 um = unmatched[0] if unmatched else {}
                 sugg = um.get("suggestions") or []
                 return err(_("Couldn't confidently match \"%s\"%s.") % (
@@ -4306,8 +4310,10 @@ class WhatsAppMessageWA12(models.Model):
                 QL.create({
                     "quote_id": quote.id,
                     "line_type": "custom",
-                    "name": it.get("custom_desc") or it.get("product_name")
-                    or _("Custom item"),
+                    # UPPERCASE to match catalogue casing (template / stepper
+                    # custom lines too).
+                    "name": (it.get("custom_desc") or it.get("product_name")
+                             or _("Custom item")).upper(),
                     "quantity": float(it.get("qty") or 1),
                     "duration_days": int(days or 1),
                     "unit_rate": float(it.get("rep_price") or 0.0),
