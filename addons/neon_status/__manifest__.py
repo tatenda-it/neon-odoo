@@ -121,7 +121,14 @@
     # (built & deployed, gated). Text/constants only.
     # 17.0.1.0.21: Resolver v2 (matcher funnel + alias store) live -> WA-12.2
     # card line. Text only.
-    "version": "17.0.1.0.21",
+    # 17.0.1.0.22 (15 Jun): Phase-11 cutover refresh — Core ERP "remaining"
+    # now reflects the Zoho reference import (neon_migration BUILT+installed,
+    # blocked on creds-run) + crew load (10 techs, APPLY pending) + PHP
+    # retirement; WA-12 card refreshed to template-primary (director self-
+    # approve the open proof); PARKED_BACKLOG adds the Maz/FamCal/Excel
+    # data-migration lanes + drops the now-live WA-12 from the build lane.
+    # Text/constants only — no functional/data-model change.
+    "version": "17.0.1.0.22",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

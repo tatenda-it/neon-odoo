@@ -200,18 +200,22 @@ WA_MODULES = [
              "(WA-11.1)."},
     {"key": "WA-12", "title": "Quote-by-WhatsApp", "pct": 100,
      "state": "verifying",
-     "body": "LIVE BATCH DEPLOYED on prod. A sales rep texts \"Quote: client "
-             "- items, date\" -> a draft on a provisional booking chain, "
-             "ENGINE-priced from the REAL catalogue (547 products / 299 "
-             "per-product rules loaded; the $1 placeholders deactivated), an "
-             "MD/OD approval ping, [View PDF] (DRAFT-stamped), [Approve], then "
-             "the final agreed-design PDF back to the rep. The pricing "
-             "worksheet is ticked, the catalogue is loaded, Robin's money "
-             "sign-off is given, and the batch (product-keyed pricing engine + "
-             "per-line discounts / custom lines / tax toggle + the agreed PDF "
-             "+ the WA-12.2 conversational lane) is on prod. Status stays IN "
-             "VERIFICATION -- gated only on the final unscripted phone proof + "
-             "the test teardown to baseline."},
+     "body": "LIVE on prod (TEMPLATE-PRIMARY, after Robin's \"too many "
+             "steps\"). The rep sends one copy-fill template (or the "
+             "structured one-question-at-a-time fallback) -> an engine-priced "
+             "draft from the REAL catalogue (547 products / per-product "
+             "rules; $1 placeholders off), an MD/OD approval ping, [Preview "
+             "PDF] (DRAFT-stamped), a TYPED \"yes\" submit (deliberate money "
+             "commit), then the agreed-design PDF back. Shipped: whole-quote "
+             "+ per-line discounts, VAT 15.5% toggle, custom lines (clean on "
+             "the client PDF, marker internal-only + UPPERCASE to match the "
+             "catalogue), date-range persists both ends + a Harare quotation "
+             "date, configurable expiry. The matcher never crosses category "
+             "or invents a product; unmatched items FLAG and block submit "
+             "until resolved. Money sign-off given (Robin + Munashe). IN "
+             "VERIFICATION -- the one open proof is a director self-approving "
+             "their OWN quote on their phone (fill -> \"yes\" -> self-"
+             "approve)."},
     {"key": "WA-12.2", "title": "Conversational quoting", "pct": 100,
      "state": "verifying",
      "body": "BUILT & DEPLOYED, gated with WA-12. Deterministic-first: the "
@@ -250,13 +254,21 @@ TRACK_MILESTONES = [
                 "Finance Module, Dashboards, Venue Maps) + Phase 12 "
                 "Copilot through M12.2 (read + write tools, confirmation "
                 "cards).",
-        "remaining": "Phase 11 cutover & training — three legacy-source "
-                     "data-load mappings (Zoho / FamCal / Workshop) "
-                     "documented + R3 governance gates signed 11 Jun; "
-                     "awaiting Robin's walkthrough to schedule. Build "
-                     "lane: WA-12 machinery phone-proven (LIVE-gated) → "
-                     "WA-13 retrieval + invoice-from-quote → WA-11.1 "
-                     "digest → Copilot M12.2 / M12.3-A LAST (no hurry).",
+        "remaining": "Phase 11 cutover & training IN FLIGHT (15 Jun). Zoho "
+                     "reference import BUILT + installed on prod "
+                     "(neon_migration 17.0.1.0.0, verified INERT — live "
+                     "quotes/sequences/customer-invoices untouched; loader "
+                     "25/25, extractor contract-tested 11/11): pulls the "
+                     "client + quote HISTORY into a dedicated read-only "
+                     "archive (no AR migrated, Odoo ledger starts clean) — "
+                     "blocked only on the Zoho creds-run that produces the "
+                     "two export files, then dry-run → APPLY (≈895 customers "
+                     "/ 2,019 estimates as reference). Crew load (10 "
+                     "technicians) scripted + dry-run-validated, APPLY "
+                     "pending on the prod terminal. Then PHP retirement + a "
+                     "2-week parallel run. Quote-by-WhatsApp shipped "
+                     "(template-primary); the one open proof is a director "
+                     "self-approving their own quote on their phone.",
     },
     {
         "name": "AI Equipment Module", "pct": 96, "accent": "teal",
@@ -377,11 +389,12 @@ PARKED_BACKLOG = [
     "deferred.",
     "B12 Google Drive integration — dropped.",
     "Phase 11 cross-module scroll-fix sweep + cutover & training.",
-    "Build-lane order: R3 code + polish batch (on the 3 R3 verifies; "
-    "scroll-sweep findings fold in) → WA-12 quote-by-WhatsApp "
-    "(pricing-gated; Meta template drafts early) → M12.3-B / WA-11.1 "
-    "digest (when feedback corpus grows) → Copilot M12.2 (variant fixes) "
-    "+ M12.3-A (provider plurality) LAST.",
+    "Phase-11 data-migration lanes (after the Zoho reference import): "
+    "Maz / workshop open-job importer — awaiting the target-model confirm; "
+    "FamCal events-as-reference; Excel crew-pay history.",
+    "Build-lane order: WA-13 quote/invoice retrieval + invoice-from-quote → "
+    "WA-11.1 \"how are clients feeling\" digest → Copilot M12.2 (variant "
+    "fixes) + M12.3-A (provider plurality) LAST (no hurry).",
     "Leaflet bootstrap consolidation (deferred from Phase 9).",
     "main-branch reconciliation (production line tracked via phase tags).",
 ]
