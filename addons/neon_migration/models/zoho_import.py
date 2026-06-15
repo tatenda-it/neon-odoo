@@ -172,6 +172,7 @@ class ZohoImporter(models.AbstractModel):
             "partners": {"matched": 0, "created": 0, "flagged_review": 0,
                          "enriched": 0},
             "quotes": {"created": 0, "skipped_existing": 0,
+                       "skipped_unmatched_customer": 0, "no_customer_id": 0,
                        "open": 0, "historical": 0, "won": 0, "lost": 0},
             "currency": {},
             "unmatched_customers": [],
@@ -214,26 +215,39 @@ class ZohoImporter(models.AbstractModel):
                 report["warnings"].append("estimate with no number — skipped")
                 continue
 
-            existing = Archive.search(
-                [("zoho_estimate_number", "=", number)], limit=1)
             bucket = self._status_bucket(est.get("zoho_status"))
-            report["quotes"][bucket] += 1
             cur = (est.get("currency_code") or "USD").strip().upper()
+            # bucket + currency reflect the FULL Zoho distribution (every
+            # estimate seen), independent of whether this run imports it.
+            report["quotes"][bucket] += 1
             report["currency"][cur] = report["currency"].get(cur, 0) + 1
 
             raw_status = (est.get("zoho_status") or "").strip().lower()
             if raw_status and raw_status not in STATUS_MAP:
                 report["unknown_status"].add(est.get("zoho_status"))
 
-            cust_id = (est.get("zoho_customer_source_id") or "").strip()
-            if cust_id and cust_id not in seen_customer_ids:
-                report["unmatched_customers"].append(number)
-
             sp_id, sp_name = self._resolve_salesperson(
                 est.get("salesperson_name"))
             if est.get("salesperson_name") and not sp_id:
                 report["unmatched_salespeople"].add(est.get("salesperson_name"))
 
+            cust_id = (est.get("zoho_customer_source_id") or "").strip()
+            # UNMATCHED customer (has an id, but it's absent from the customers
+            # file) -> SKIP + report. Self-healing: once the customer is added
+            # and the import re-runs, this estimate imports LINKED (it was never
+            # created, so no permanent unlink). Never silent — the dry-run
+            # unmatched count is the review gate before APPLY.
+            if cust_id and cust_id not in seen_customer_ids:
+                report["unmatched_customers"].append(number)
+                report["quotes"]["skipped_unmatched_customer"] += 1
+                continue
+            if not cust_id:
+                # No customer id at all -> import UNLINKED (no id to ever match)
+                # + report, so it's never silently dropped.
+                report["quotes"]["no_customer_id"] += 1
+
+            existing = Archive.search(
+                [("zoho_estimate_number", "=", number)], limit=1)
             if existing:
                 report["quotes"]["skipped_existing"] += 1
                 continue

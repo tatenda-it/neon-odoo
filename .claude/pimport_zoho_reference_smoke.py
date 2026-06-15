@@ -110,8 +110,12 @@ _check("T1-dryrun-zero-writes",
 _check("T1b-dryrun-counts",
        rep["partners"] == {"matched": 2, "created": 2, "flagged_review": 1,
                            "enriched": 0}
-       and rep["quotes"]["created"] == 5 and rep["quotes"]["skipped_existing"] == 0,
-       "partners=%s quotes=%s" % (rep["partners"], rep["quotes"]))
+       and rep["quotes"]["created"] == 4              # TESTQT-004 cust absent -> skip
+       and rep["quotes"]["skipped_unmatched_customer"] == 1
+       and rep["quotes"]["skipped_existing"] == 0
+       and "TESTQT-004" in rep["unmatched_customers"],
+       "partners=%s quotes=%s unmatched=%s"
+       % (rep["partners"], rep["quotes"], rep["unmatched_customers"]))
 _check("T1c-dryrun-buckets",
        rep["quotes"]["won"] == 1 and rep["quotes"]["historical"] == 2
        and rep["quotes"]["open"] == 1 and rep["quotes"]["lost"] == 1,
@@ -120,8 +124,8 @@ _check("T1c-dryrun-buckets",
 # ============================================================ T2 APPLY creates
 rep2 = IMP.run(CUSTOMERS, ESTIMATES, apply=True)
 env.cr.commit()
-_check("T2-apply-archives-created", A.search_count([]) == a_before + 5,
-       "got %d want %d" % (A.search_count([]), a_before + 5))
+_check("T2-apply-archives-created", A.search_count([]) == a_before + 4,
+       "got %d want %d" % (A.search_count([]), a_before + 4))
 _check("T2b-apply-partners-created",
        rep2["partners"]["created"] == 2 and rep2["partners"]["matched"] == 2,
        "partners=%s" % rep2["partners"])
@@ -130,10 +134,12 @@ _check("T2b-apply-partners-created",
 rep3 = IMP.run(CUSTOMERS, ESTIMATES, apply=True)
 env.cr.commit()
 _check("T3-idempotent-no-new-quotes",
-       rep3["quotes"]["created"] == 0 and rep3["quotes"]["skipped_existing"] == 5
-       and A.search_count([("zoho_estimate_number", "=like", "TESTQT-%")]) == 5,
-       "created=%d skipped=%d total=%d" % (
+       rep3["quotes"]["created"] == 0 and rep3["quotes"]["skipped_existing"] == 4
+       and rep3["quotes"]["skipped_unmatched_customer"] == 1
+       and A.search_count([("zoho_estimate_number", "=like", "TESTQT-%")]) == 4,
+       "created=%d skipped=%d unmatched=%d total=%d" % (
            rep3["quotes"]["created"], rep3["quotes"]["skipped_existing"],
+           rep3["quotes"]["skipped_unmatched_customer"],
            A.search_count([("zoho_estimate_number", "=like", "TESTQT-%")])))
 _check("T3b-idempotent-no-new-partners", rep3["partners"]["created"] == 0,
        "created=%d" % rep3["partners"]["created"])
@@ -146,12 +152,30 @@ q4 = A.search([("zoho_estimate_number", "=", "TESTQT-004")], limit=1)
 q5 = A.search([("zoho_estimate_number", "=", "TESTQT-005")], limit=1)
 _check("T4-status-map",
        q1.status_bucket == "won" and q2.status_bucket == "historical"
-       and q3.status_bucket == "open" and q4.status_bucket == "lost"
-       and q5.status_bucket == "historical",
-       "%s/%s/%s/%s/%s" % (q1.status_bucket, q2.status_bucket, q3.status_bucket,
-                           q4.status_bucket, q5.status_bucket))
+       and q3.status_bucket == "open" and q5.status_bucket == "historical"
+       and not q4,                       # TESTQT-004 skipped (customer absent)
+       "%s/%s/%s/q4=%s/%s" % (q1.status_bucket, q2.status_bucket,
+                              q3.status_bucket, bool(q4), q5.status_bucket))
 _check("T4b-unknown-status-flagged", "weird_status" in rep2["unknown_status"],
        "unknown=%s" % rep2["unknown_status"])
+
+# ============================================================ T4c self-healing
+# Add the previously-absent customer + re-run: TESTQT-004 now imports LINKED
+# (never permanently dropped/unlinked).
+CUSTOMERS_HEAL = CUSTOMERS + [
+    {"zoho_source_id": "TESTZ-MISSING", "name": TAG + " Found Later",
+     "email": "zimp-found@test"}]
+rep_heal = IMP.run(CUSTOMERS_HEAL, ESTIMATES, apply=True)
+env.cr.commit()
+q4b = A.search([("zoho_estimate_number", "=", "TESTQT-004")], limit=1)
+found_p = P.search([("zoho_source_id", "=", "TESTZ-MISSING")], limit=1)
+_check("T4c-unmatched-customer-self-heals-on-rerun",
+       bool(q4b) and bool(found_p) and q4b.partner_id == found_p
+       and q4b.status_bucket == "lost" and rep_heal["quotes"]["created"] == 1
+       and rep_heal["quotes"]["skipped_unmatched_customer"] == 0,
+       "q4=%s partner=%s created=%s" % (
+           bool(q4b), q4b.partner_id.id if q4b else None,
+           rep_heal["quotes"]["created"]))
 
 # ============================================================ T5 salesperson map
 lisa = env["res.users"].sudo().search(

@@ -63,8 +63,13 @@ print("  matched=%d  created=%d  flagged-for-review=%d  enriched=%d"
       % (p["matched"], p["created"], p["flagged_review"], p["enriched"]))
 print("\nQUOTES (pass B):  created=%d  skipped-existing=%d"
       % (q["created"], q["skipped_existing"]))
-print("  buckets: open=%d  historical=%d  won=%d  lost=%d"
-      % (q["open"], q["historical"], q["won"], q["lost"]))
+print("  buckets (full Zoho distribution): open=%d  historical=%d  won=%d  "
+      "lost=%d" % (q["open"], q["historical"], q["won"], q["lost"]))
+print("  skipped-UNMATCHED-customer=%d  (the GATE — review before APPLY; "
+      "self-heals on re-run once the customer is added)"
+      % q["skipped_unmatched_customer"])
+print("  imported-with-NO-customer-id=%d  (unlinked, retained, reported)"
+      % q["no_customer_id"])
 print("  currency: %s" % ", ".join(
     "%s=%d" % (k, v) for k, v in sorted(report["currency"].items())))
 
