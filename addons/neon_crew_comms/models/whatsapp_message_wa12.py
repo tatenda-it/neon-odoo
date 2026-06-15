@@ -338,6 +338,11 @@ class WhatsAppMessageWA12(models.Model):
             # menu "Quote a client" -> start the structured flow (re-checks entitlement).
             if isinstance(payload, tuple) and payload and payload[0] == "start":
                 return self._wa12_handle_start_tap(from_e164, raw_from, message)
+            # REVIEW reply-buttons (change a line / add item / preview) -> the
+            # same action the typed word triggers. payload is the quote recordset.
+            if intent in ("wa12_rv_change", "wa12_rv_add", "wa12_rv_preview"):
+                return self._wa12_handle_review_tap(
+                    intent, payload, from_e164, raw_from, message)
             return self._wa12_handle_tap(
                 intent, payload, from_e164, raw_from, message)
 
@@ -450,6 +455,31 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(_WA12_REFUSAL))
         self._wa6_audit_in(from_e164, message, "wa12-template-start")
         return self._wa12_send_template_skeleton(raw_from, from_e164)
+
+    def _wa12_handle_review_tap(self, intent, quote, from_e164, raw_from,
+                                message):
+        """A review reply-button tap -> the SAME action the typed word triggers.
+        The live q_confirm session owns the quote; only acts on a DRAFT. No new
+        logic: Preview = the existing PDF; Change/Add = the plain prompt that
+        guides the existing typed edit grammar (<n> = <item> / add <item>)."""
+        self._wa6_audit_in(from_e164, message, "wa12-review-tap")
+        if not (quote and quote.exists()) or quote.state != "draft":
+            return self._wa6_reply(raw_from, from_e164, _(
+                "That quote is no longer a draft."))
+        if intent == "wa12_rv_preview":
+            return self._wa12_send_pdf(quote, raw_from, from_e164, draft=True)
+        if intent == "wa12_rv_change":
+            summary = self._wa12_draft_summary(
+                quote, self._wa12_unpriced_lines(quote))
+            return self._wa6_reply(raw_from, from_e164, summary + "\n\n" + _(
+                "Which line would you like to change? Reply the line number and "
+                "the new item — for example *2 = LED screen* — or *remove 2* to "
+                "delete it."))
+        # wa12_rv_add
+        return self._wa6_reply(raw_from, from_e164, _(
+            "What should I add? Reply for example *add 2 x LED screen*, or "
+            "*add custom stage riser at 250* for something not in the "
+            "catalogue."))
 
     @api.model
     def _wa12_pending_for_approver(self, user):
@@ -587,15 +617,18 @@ class WhatsAppMessageWA12(models.Model):
         summary = self._wa12_draft_summary(quote, unpriced)
         flag = self._wa12_pending_block(pend)
         if unpriced:
-            return self._wa6_reply(raw_from, from_e164, summary + flag + "\n\n" + _(
+            return self._wa12_send_draft(quote, summary + flag + "\n\n" + _(
                 "⚠️ Can't submit yet — these have no rate set: %s. "
-                "Pricing isn't loaded for them.") % ", ".join(unpriced))
+                "Pricing isn't loaded for them.") % ", ".join(unpriced),
+                from_e164, raw_from)
         if pend:
-            return self._wa6_reply(raw_from, from_e164, summary + flag + "\n\n" + _(
+            return self._wa12_send_draft(quote, summary + flag + "\n\n" + _(
                 "Resolve the flagged item(s) above before submitting — reply "
-                "e.g. *A = LED screen* to set one, or *drop A* to leave it off."))
-        return self._wa6_reply(raw_from, from_e164, summary + "\n\n" + _(
-            "Reply *yes* to submit for approval, or *cancel*."))
+                "e.g. *A = LED screen* to set one, or *drop A* to leave it off."),
+                from_e164, raw_from)
+        return self._wa12_send_draft(quote, summary + "\n\n" + _(
+            "Tap an option below, or reply *yes* to submit for approval "
+            "(or *cancel*)."), from_e164, raw_from)
 
     # ================================================================
     # PART A — QUOTE-BY-TEMPLATE (copy-fill-send), the PRIMARY collection.
@@ -3475,9 +3508,9 @@ class WhatsAppMessageWA12(models.Model):
             if norm in _WA12_RESUME_WORDS and quote.exists():
                 summary = self._wa12_draft_summary(
                     quote, self._wa12_unpriced_lines(quote))
-                return self._wa6_reply(raw_from, from_e164, summary + _(
-                    "\n\nReply *yes* to submit, *cancel*, *preview*, or keep "
-                    "editing."))
+                return self._wa12_send_draft(quote, summary + _(
+                    "\n\nTap an option below, or reply *yes* to submit "
+                    "(or *cancel*)."), from_e164, raw_from)
             if norm in _WA12_SUBMIT_WORDS:
                 if not quote.exists() or quote.state != "draft":
                     sess.sudo().write({"active": False})
@@ -3638,9 +3671,11 @@ class WhatsAppMessageWA12(models.Model):
             tail = _("\n\nResolve the flagged item(s) before submitting — "
                      "*A = <item>* to set one, or *drop A* to leave it off.")
         else:
-            tail = _("\n\nReply *yes* to submit, *cancel*, or keep editing.")
-        return self._wa6_reply(raw_from, from_e164,
-                               "%s — done.\n\n%s%s%s" % (note, summary, flag, tail))
+            tail = _("\n\nTap an option below, or reply *yes* to submit "
+                     "(or *cancel*).")
+        return self._wa12_send_draft(
+            quote, "%s — done.\n\n%s%s%s" % (note, summary, flag, tail),
+            from_e164, raw_from)
 
     def _wa12_whole_quote_discount(self, quote, value, ex_vat, is_target,
                                    from_e164, raw_from):
@@ -4337,6 +4372,30 @@ class WhatsAppMessageWA12(models.Model):
             term = self._wa12_default_payment_term()
         actor = quote.salesperson_id.id or self.env.uid
         quote.with_user(actor).sudo().write({"payment_term_id": term.id})
+
+    def _wa12_draft_buttons(self, quote):
+        """The 3 review reply-buttons (WhatsApp caps reply-buttons at 3). Submit
+        stays a TYPED 'yes' (a money-commit is better as a deliberate confirm
+        than a tap); discount / VAT toggle stay typed values (they need a
+        number/keyword). Each tap maps to the SAME action the typed word does."""
+        secret = self.env["ir.config_parameter"].sudo().get_param(
+            "database.secret") or ""
+        cap = self._WA12_BTN_TITLE
+        return [
+            {"id": wa_payload.encode(secret, "wa12_rv_change", quote.id),
+             "title": _("✏️ Change a line")[:cap]},
+            {"id": wa_payload.encode(secret, "wa12_rv_add", quote.id),
+             "title": _("➕ Add item")[:cap]},
+            {"id": wa_payload.encode(secret, "wa12_rv_preview", quote.id),
+             "title": _("👁 Preview")[:cap]},
+        ]
+
+    def _wa12_send_draft(self, quote, text, from_e164, raw_from):
+        """Send the q_confirm review/draft reply as an INTERACTIVE 3-button
+        message. _wa6_send_buttons falls back to numbered text if the
+        interactive send fails (same resilience as the menu)."""
+        return self._wa6_send_buttons(
+            raw_from, from_e164, text, self._wa12_draft_buttons(quote))
 
     def _wa12_draft_summary(self, quote, unpriced):
         cur = quote.currency_id.name

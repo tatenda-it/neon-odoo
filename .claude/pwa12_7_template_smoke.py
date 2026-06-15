@@ -70,7 +70,9 @@ def _cap_reply(self, raw_from, from_e164, text):
 
 
 def _cap_btn(self, raw_from, from_e164, body, buttons):
-    _WIRE.append({"kind": "buttons", "body": body or ""}); return True
+    _WIRE.append({"kind": "buttons", "body": body or "",
+                  "titles": [b.get("title") or "" for b in buttons],
+                  "ids": [b.get("id") for b in buttons]}); return True
 
 
 def _cap_list(self, raw_from, from_e164, body, bt, rows):
@@ -475,6 +477,63 @@ _real = D._wa12_is_template_filled(_tmpl)   # the real T2 template
 _check("T14-tight-detect-no-false-positive",
        _fp1 is False and _fp2 is False and _real is True,
        "fp1=%s fp2=%s real=%s" % (_fp1, _fp2, _real))
+
+# ============================================================ T15 REVIEW BUTTONS
+# The q_confirm draft renders as an INTERACTIVE 3-button message; taps map to the
+# existing actions; Submit stays a TYPED "yes"; only 3 buttons sent.
+_clear(); _clear_sess()
+with patch.object(type(M), "_wa12_llm_chat", lambda self, msgs: _LLM_QUOTE):
+    D._wa12_maybe_intercept(_txt(_tmpl))           # filled template -> draft
+q15 = _latest_quote()
+e15 = _WIRE[-1] if _WIRE else {}
+_sec = env["ir.config_parameter"].sudo().get_param("database.secret") or ""
+ids15 = e15.get("ids") or []
+ttl15 = e15.get("titles") or []
+intents15 = [wa_payload.decode(_sec, i)[0] for i in ids15
+             if wa_payload.decode(_sec, i)]
+
+
+def _tapmsg(pid):
+    return {"from": PHONE, "type": "interactive", "id": "rv",
+            "interactive": {"button_reply": {"id": pid, "title": "x"}}}
+
+
+_check("T15a-review-draft-is-interactive-EXACTLY-3-buttons",
+       e15.get("kind") == "buttons" and len(ids15) == 3
+       and any("Change" in t for t in ttl15)
+       and any("Add" in t for t in ttl15)
+       and any("Preview" in t for t in ttl15)
+       and set(intents15) == {"wa12_rv_change", "wa12_rv_add",
+                              "wa12_rv_preview"},
+       "kind=%s titles=%s intents=%s" % (e15.get("kind"), ttl15, intents15))
+# Preview tap -> the existing PDF path (patched to record, not render).
+_pdf = []
+with patch.object(type(M), "_wa12_send_pdf",
+                  lambda self, q, rt, te, draft=True, **k: _pdf.append(q.id) or True):
+    _pv = next(i for i in ids15
+               if wa_payload.decode(_sec, i)[0] == "wa12_rv_preview")
+    D._wa12_maybe_intercept(_tapmsg(_pv))
+_check("T15b-preview-tap-renders-the-pdf", _pdf == [q15.id],
+       "pdf_calls=%s" % _pdf)
+# Change tap -> the plain line-change prompt (matches the <n> = <item> grammar).
+_clear()
+_cg = next(i for i in ids15 if wa_payload.decode(_sec, i)[0] == "wa12_rv_change")
+D._wa12_maybe_intercept(_tapmsg(_cg))
+_check("T15c-change-tap-prompts-line-number",
+       "line" in _last().lower() and "2 = " in _last(),
+       "reply=%r" % _last()[:80])
+# Add tap -> the plain add prompt (matches the add <item> grammar).
+_clear()
+_ad = next(i for i in ids15 if wa_payload.decode(_sec, i)[0] == "wa12_rv_add")
+D._wa12_maybe_intercept(_tapmsg(_ad))
+_check("T15d-add-tap-prompts-add", "add " in _last().lower(),
+       "reply=%r" % _last()[:80])
+# typed "yes" STILL submits (the deliberate money-commit stays typed).
+_clear()
+D._wa12_maybe_intercept(_txt("yes"))
+q15.invalidate_recordset()
+_check("T15e-typed-yes-still-submits",
+       q15.state in ("pending_approval", "approved"), "state=%s" % q15.state)
 
 # ---- teardown ----
 _clear_sess()

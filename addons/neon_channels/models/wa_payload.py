@@ -127,6 +127,12 @@ INTENTS = frozenset({
     # re-checks _wa12_can_quote). Caught by the neon_crew_comms WA-12 intercept.
     #   wa12_start:<bot_user_id>
     "wa12_start",
+    # WA-12 REVIEW reply-buttons (the q_confirm draft renders as an interactive
+    # 3-button message; Submit stays a TYPED 'yes' -- a deliberate money-commit).
+    # Each carries the quote id; the tap maps to the SAME action the typed word
+    # triggers (change a line / add item / preview the draft PDF).
+    #   wa12_rv_change:<quote_id> · wa12_rv_add:<quote_id> · wa12_rv_preview:<quote_id>
+    "wa12_rv_change", "wa12_rv_add", "wa12_rv_preview",
     # WA-13: quote/invoice retrieval + invoice-from-quote (routed by the
     # neon_crew_comms bridge intercept AFTER WA-12, before WA-6). Retrieval and
     # the schedule-stage pick use NUMBER replies via the doc_pick / inv_pick

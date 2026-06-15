@@ -379,7 +379,15 @@
     # convo lane; T-43r/T-45r re-prove the no-cat-rule $ + rep-priced surfaces);
     # review-step MONEY wire-test hardened (VAT 15% exact + discount math exact)
     # + no-command-syntax sweep. pwa12 61/61, pwa12_6 11/11.
-    "version": "17.0.1.20.0",
+    # 17.0.1.20.1: the q_confirm REVIEW/draft reply renders as a WhatsApp
+    # interactive 3-button message [✏️ Change a line][➕ Add item][👁 Preview]
+    # (was plain text; the menu already shipped interactive). Submit stays a
+    # TYPED 'yes' (deliberate money-commit); discount/VAT stay typed values. Taps
+    # map to the EXISTING handlers (preview = the PDF; change/add = the plain
+    # prompt for the <n> = <item> / add <item> grammar) -- no new edit logic.
+    # _wa6_send_buttons falls back to numbered text if the interactive send
+    # fails (menu resilience pattern). 3 new wa_payload intents (wa12_rv_*).
+    "version": "17.0.1.20.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

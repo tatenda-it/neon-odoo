@@ -234,7 +234,10 @@
     # invoices" hidden from the DIRECTOR menu (kept on bookkeeper) via
     # _MENU_HIDE_FOR_VARIANT (display-only; still callable by asking). New
     # wa12_start INTENT in wa_payload.
-    'version': '17.0.1.22.6',
+    # 17.0.1.22.7: +3 wa_payload INTENTS (wa12_rv_change/_add/_preview) for the
+    # WA-12 review draft's interactive reply-buttons (render + routing live in
+    # neon_crew_comms). Registry-only change here.
+    'version': '17.0.1.22.7',
     'summary': 'WhatsApp + Twilio integration + WA-0 role-aware WhatsApp '
                'Copilot rails (on neon_ai_core)',
     'author': 'Tatenda Ngairongwe',
