@@ -56,6 +56,43 @@ TRACKS = [
 # 13 Jun). (94 + 96 + 99) / 3 = 96.33 -> 96.
 OVERALL_PCT = round(sum(t["pct"] for t in TRACKS) / len(TRACKS))
 
+# ACTIVE NOW band -- the in-flight Phase-11 cutover/migration surface, rendered
+# as a prominent tile row near the top (the rest of the board is steady-state).
+# state -> pill colour: blocked=red, progress=amber, pending=grey, done=green.
+# pip 's': done (green ✓) / blocked (red ⛔) / pending (grey).
+ACTIVE_NOW = {
+    "title": "Active now — Phase 11: cutover & migration",
+    "tiles": [
+        {"key": "Zoho reference import",
+         "badge": "In flight · Blocked (creds-run)", "state": "blocked",
+         "detail": "≈2,019 quotes + ≈895 clients → an inert read-only "
+                   "archive (no ledger impact, no AR migrated).",
+         "pips": [{"l": "design", "s": "done"},
+                  {"l": "build 25/25", "s": "done"},
+                  {"l": "install inert", "s": "done"},
+                  {"l": "extractor 11/11", "s": "done"},
+                  {"l": "creds-run", "s": "blocked"}]},
+        {"key": "Crew load (10 technicians)",
+         "badge": "Blocked (APPLY pending)", "state": "blocked",
+         "detail": "Script ready (e2a3e65); dry-run validated — 10 new, "
+                   "no collisions.",
+         "pips": [{"l": "script", "s": "done"},
+                  {"l": "dry-run", "s": "done"},
+                  {"l": "APPLY", "s": "blocked"},
+                  {"l": "verify", "s": "blocked"}]},
+        {"key": "PHP retirement / parallel run",
+         "badge": "Pending", "state": "pending",
+         "detail": "A 2-week parallel run, then the legacy PHP system is "
+                   "retired.",
+         "pips": []},
+        {"key": "Cutover readiness",
+         "badge": "In progress", "state": "progress",
+         "detail": "Zoho read-only post-cutover · Odoo ledger starts clean "
+                   "· VAT 15.5%.",
+         "pips": []},
+    ],
+}
+
 # B11 WhatsApp module breakdown (inside the AI Equipment Module track).
 WA_MODULES = [
     {"key": "WA-0", "title": "Foundation & rails", "pct": 100,
@@ -424,6 +461,7 @@ class NeonStatusController(http.Controller):
         live = request.env["neon.status.live"].collect()
         return {
             "live": live,
+            "active_now": ACTIVE_NOW,
             "overall_pct": OVERALL_PCT,
             "tracks": TRACKS,
             "wa_modules": WA_MODULES,

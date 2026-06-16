@@ -128,7 +128,12 @@
     # approve the open proof); PARKED_BACKLOG adds the Maz/FamCal/Excel
     # data-migration lanes + drops the now-live WA-12 from the build lane.
     # Text/constants only — no functional/data-model change.
-    "version": "17.0.1.0.22",
+    # 17.0.1.0.23 (15 Jun): ADD an "Active now — Phase 11" tile band near the
+    # top (under the header, above the overall block) — 4 tiles (Zoho import,
+    # crew load, PHP retirement, cutover readiness) with colour-coded badges +
+    # step pips. New ACTIVE_NOW constant + template band + CSS; ADDITIVE, all
+    # existing sections/tracks/cards/lists untouched.
+    "version": "17.0.1.0.23",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

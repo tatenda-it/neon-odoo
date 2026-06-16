@@ -151,6 +151,21 @@ section{margin:34px 0;}
 
 .foot{margin-top:48px;padding-top:18px;border-top:1px solid var(--border);
   font-size:12px;color:var(--faint);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+/* ---- active-now band (Phase-11 in-flight surface) ---- */
+.active-now .an-grid{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));}
+.an-tile{background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:16px;}
+.an-tile .ct{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.an-tile .key{font-weight:800;font-size:13.5px;letter-spacing:.3px;color:var(--text);}
+.an-tile .detail{color:var(--muted);font-size:13px;margin:6px 0 12px;}
+.an-pips{display:flex;flex-wrap:wrap;gap:6px;}
+.an-pip{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);
+  color:var(--muted);background:#13131f;}
+.an-pip.done{border-color:rgba(52,211,153,.45);color:var(--green);}
+.an-pip.blocked{border-color:rgba(248,113,113,.5);color:var(--red);}
+.state-blocked{background:rgba(248,113,113,.14);color:var(--red);border-color:rgba(248,113,113,.42);}
+.state-progress{background:rgba(245,165,36,.14);color:var(--amber);border-color:rgba(245,165,36,.4);}
+.state-pending{background:rgba(122,122,150,.14);color:#aeaecb;border-color:rgba(122,122,150,.35);}
             ]]></style>
         </head>
         <body>
@@ -171,6 +186,29 @@ section{margin:34px 0;}
                     </div>
                 </div>
             </div>
+
+            <!-- ============ 1b. ACTIVE NOW (Phase 11 cutover/migration) ============ -->
+            <section class="active-now">
+                <p class="sec-title" t-esc="active_now['title']"/>
+                <div class="grid an-grid">
+                    <t t-foreach="active_now['tiles']" t-as="an">
+                        <div class="an-tile">
+                            <div class="ct">
+                                <span class="key" t-esc="an['key']"/>
+                                <span t-attf-class="pill state-#{an['state']}"
+                                      t-esc="an['badge']"/>
+                            </div>
+                            <div class="detail" t-esc="an['detail']"/>
+                            <div class="an-pips" t-if="an['pips']">
+                                <t t-foreach="an['pips']" t-as="p">
+                                    <span t-attf-class="an-pip #{p['s']}"
+                                          t-esc="('✓ ' if p['s'] == 'done' else ('⛔ ' if p['s'] == 'blocked' else '')) + p['l']"/>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </section>
 
             <!-- ============ 2. OVERALL PROGRESS ============ -->
             <section>
