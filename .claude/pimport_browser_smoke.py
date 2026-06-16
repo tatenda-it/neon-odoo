@@ -22,14 +22,22 @@ DB = "neon_crm"
 
 ARCHIVE_MENU = "neon_migration.menu_quote_archive"
 ARCHIVE_ACTION = "neon_migration.action_quote_archive"
+INVOICE_ACTION = "neon_migration.action_invoice_archive"
+EXPENSE_ACTION = "neon_migration.action_expense_archive"
 
 _SETUP_SCRIPT = """
 env = env(context=dict(env.context, tracking_disable=True))
 P = env['res.partner']
 A = env['neon.finance.quote.archive']
+I = env['neon.finance.invoice.archive']
+X = env['neon.finance.expense.archive']
 # clean any prior smoke residue
 A.with_context(active_test=False).search(
     [('zoho_estimate_number', '=', 'TESTQT-BS-001')]).unlink()
+I.with_context(active_test=False).search(
+    [('zoho_invoice_number', '=', 'TESTINV-BS-001')]).unlink()
+X.with_context(active_test=False).search(
+    [('zoho_expense_id', '=', 'TESTEXP-BS-001')]).unlink()
 P.with_context(active_test=False).search(
     [('zoho_source_id', '=', 'TESTZ-BS')]).unlink()
 partner = P.create({
@@ -48,13 +56,31 @@ arch = A.create({
         'name': 'SMOKE LED PAR', 'unit': 'qty', 'quantity': 4.0,
         'unit_rate': 50.0, 'line_total': 200.0, 'zoho_item_id': 'ZBS1'})],
 }).id
+inv = I.create({
+    'zoho_invoice_number': 'TESTINV-BS-001', 'partner_id': partner,
+    'zoho_customer_source_id': 'TESTZ-BS', 'zoho_estimate_number': 'TESTQT-BS-001',
+    'invoice_date': '2025-04-05', 'status': 'paid', 'status_bucket': 'paid',
+    'currency_code': 'USD', 'amount_untaxed': 200.0, 'amount_tax': 31.0,
+    'amount_total': 231.0,
+    'line_ids': [(0, 0, {'category_prefix': 'LIGHTING', 'name': 'SMOKE INV LINE',
+                         'quantity': 4.0, 'unit_rate': 50.0, 'line_total': 200.0})],
+}).id
+exp = X.create({
+    'zoho_expense_id': 'TESTEXP-BS-001', 'expense_date': '2025-04-06',
+    'account_name': 'Fuel', 'description': 'SMOKE EXPENSE', 'is_billable': True,
+    'partner_id': partner, 'zoho_customer_source_id': 'TESTZ-BS',
+    'currency_code': 'USD', 'amount': 40.0, 'tax': 6.2,
+}).id
 env.cr.commit()
-print('IDS_JSON=' + repr({'partner_id': partner, 'arch_id': arch}))
+print('IDS_JSON=' + repr({'partner_id': partner, 'arch_id': arch,
+                          'inv_id': inv, 'exp_id': exp}))
 """
 
 _TEARDOWN_TEMPLATE = """
 ids = {ids_repr}
-for model, key in [('neon.finance.quote.archive', 'arch_id'),
+for model, key in [('neon.finance.invoice.archive', 'inv_id'),
+                   ('neon.finance.expense.archive', 'exp_id'),
+                   ('neon.finance.quote.archive', 'arch_id'),
                    ('res.partner', 'partner_id')]:
     try:
         env[model].browse(ids[key]).unlink()
@@ -137,6 +163,47 @@ def main() -> int:
                     "tr.o_data_row td:has-text('TESTQT-BS-001')", 1,
                     "smart button opens the partner's archived quote")
                 smoke.screenshot("partner_archived_quotes")
+
+            with smoke.scenario("Finance archives: invoice + expense list -> form"):
+                smoke.login("p2m75_sales")
+                smoke.open_action(INVOICE_ACTION)
+                smoke.assert_visible("table.o_list_table", "invoice list view")
+                smoke.assert_count(
+                    "tr.o_data_row td:has-text('TESTINV-BS-001')", 1,
+                    "fixture invoice row renders")
+                smoke.click("tr.o_data_row td:has-text('TESTINV-BS-001')",
+                            name="open invoice row")
+                smoke.assert_visible(
+                    "td:has-text('SMOKE INV LINE'), div:has-text('SMOKE INV LINE')",
+                    "invoice line renders on the form")
+                smoke.open_action(EXPENSE_ACTION)
+                smoke.assert_visible("table.o_list_table", "expense list view")
+                smoke.assert_count(
+                    "tr.o_data_row td:has-text('SMOKE EXPENSE')", 1,
+                    "fixture expense row renders")
+                smoke.screenshot("finance_archives")
+
+            with smoke.scenario("Partner -> Archived Invoices smart button links"):
+                smoke.login("p2m75_sales")
+                smoke.page.goto(
+                    f"{smoke.base_url}/web#id={ids['partner_id']}"
+                    f"&model=res.partner&view_type=form",
+                    wait_until="networkidle")
+                smoke.assert_visible("div.o_form_view", "partner form view")
+                inv_sel = "button[name='action_view_archived_invoices']"
+                if smoke.page.locator(inv_sel).count() == 0:
+                    smoke.page.locator(
+                        ".o_button_more, "
+                        "button.dropdown-toggle:has-text('More')").first.click()
+                    smoke.page.wait_for_timeout(500)
+                smoke.assert_visible(
+                    inv_sel,
+                    "Archived Invoices smart button renders (inline or via More)")
+                smoke.click(inv_sel, name="click Archived Invoices smart button")
+                smoke.assert_count(
+                    "tr.o_data_row td:has-text('TESTINV-BS-001')", 1,
+                    "smart button opens the partner's archived invoice")
+                smoke.screenshot("partner_archived_invoices")
 
         return smoke.summary()
     finally:

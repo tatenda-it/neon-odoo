@@ -14,6 +14,13 @@
                     <field name="archived_quote_count" widget="statinfo"
                            string="Archived Quotes"/>
                 </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_view_archived_invoices"
+                        icon="fa-file-o"
+                        invisible="archived_invoice_count == 0">
+                    <field name="archived_invoice_count" widget="statinfo"
+                           string="Archived Invoices"/>
+                </button>
             </div>
 
             <notebook position="inside">

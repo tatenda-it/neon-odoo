@@ -140,6 +140,66 @@ def build_invoice_map(invoices):
     return m
 
 
+def map_invoice(d, est_id_to_number):
+    """Books invoice DETAIL -> the invoice-schema dict. OMITS balance/balance_due
+    (Zoho = AR system of record). estimate_id (detail-only) -> estimate NUMBER via
+    the estimates-list map -> links to neon.finance.quote.archive + the won-link."""
+    lines = []
+    for li in (d.get("line_items") or []):
+        nm = li.get("name") or li.get("description") or ""
+        lines.append({
+            "name": nm,
+            "description": li.get("description") or "",
+            "unit": li.get("unit") or "",
+            "quantity": li.get("quantity") or 0,
+            "unit_rate": li.get("rate") or 0,
+            "line_total": li.get("item_total") or 0,
+            "zoho_item_id": str(li.get("item_id") or ""),
+            "category_prefix": _category_prefix(nm),
+        })
+    est_id = str(d.get("estimate_id") or "")
+    return {
+        "zoho_invoice_number": d.get("invoice_number") or "",
+        "zoho_customer_source_id": str(d.get("customer_id") or ""),
+        "zoho_estimate_number": est_id_to_number.get(est_id, "") if est_id else "",
+        "invoice_date": d.get("date") or "",
+        "status": d.get("status") or "",
+        "currency_code": d.get("currency_code") or "USD",
+        "salesperson_name": d.get("salesperson_name") or "",
+        "event_summary": d.get("subject_content") or d.get("custom_subject") or "",
+        "amount_untaxed": d.get("sub_total") or 0,
+        "amount_tax": d.get("tax_total") or 0,
+        "amount_total": d.get("total") or 0,
+        "lines": lines,
+    }
+
+
+def map_expense(d):
+    """Books expense DETAIL -> the expense-schema dict. NO vendor field at all;
+    billable-to CUSTOMER only (customer_id, null if none)."""
+    lines = []
+    for li in (d.get("line_items") or []):
+        lines.append({
+            "description": li.get("description") or "",
+            "account_name": li.get("account_name") or "",
+            "amount": li.get("amount") or li.get("item_total") or 0,
+        })
+    return {
+        "zoho_expense_id": str(d.get("expense_id") or ""),
+        "expense_date": d.get("date") or "",
+        "account_name": d.get("account_name") or "",
+        "description": d.get("description") or "",
+        "reference_number": d.get("reference_number") or "",
+        "status": d.get("status") or "",
+        "is_billable": bool(d.get("is_billable")),
+        "zoho_customer_source_id": str(d.get("customer_id") or ""),
+        "currency_code": d.get("currency_code") or "USD",
+        "amount": d.get("total") or d.get("amount") or 0,
+        "tax": d.get("tax_total") or d.get("tax_amount") or 0,
+        "lines": lines,
+    }
+
+
 # ======================================================================
 # Network (lazy requests) — only exercised on a real run with creds.
 # ======================================================================
@@ -237,6 +297,35 @@ def export_estimates(inv_map):
     return out
 
 
+def export_invoices(est_id_to_number):
+    print("Listing invoices ...")
+    lst = list_all("/books/v3/invoices", "invoices")
+    print("  %d invoices; fetching details (estimate_id + line_items) ..."
+          % len(lst))
+    out = []
+    for i, inv in enumerate(lst, 1):
+        detail = api_get("/books/v3/invoices/%s" % inv.get("invoice_id"))
+        out.append(map_invoice(detail.get("invoice", {}), est_id_to_number))
+        if i % 100 == 0 or i == len(lst):
+            print("  invoices %d/%d" % (i, len(lst)))
+        time.sleep(THROTTLE)
+    return out
+
+
+def export_expenses():
+    print("Listing expenses ...")
+    lst = list_all("/books/v3/expenses", "expenses")
+    print("  %d expenses; fetching details ..." % len(lst))
+    out = []
+    for i, exp in enumerate(lst, 1):
+        detail = api_get("/books/v3/expenses/%s" % exp.get("expense_id"))
+        out.append(map_expense(detail.get("expense", {})))
+        if i % 100 == 0 or i == len(lst):
+            print("  expenses %d/%d" % (i, len(lst)))
+        time.sleep(THROTTLE)
+    return out
+
+
 def _write(name, data):
     path = os.path.join(OUT_DIR, name)
     with open(path, "w", encoding="utf-8") as fh:
@@ -269,11 +358,50 @@ def _self_check(customers, estimates):
     print("=" * 60)
 
 
+def _self_check_finance(invoices, expenses):
+    print("\n" + "=" * 60)
+    print("SELF-CHECK — FINANCE (invoices + expenses)")
+    cur = {}
+    for r in invoices + expenses:
+        c = (r.get("currency_code") or "").upper()
+        cur[c] = cur.get(c, 0) + 1
+    won = sum(1 for inv in invoices if inv.get("zoho_estimate_number"))
+    billable = sum(1 for e in expenses if e.get("is_billable"))
+    print("  invoices: %d (with estimate link: %d)" % (len(invoices), won))
+    print("  expenses: %d (billable: %d)" % (len(expenses), billable))
+    print("  currency mix: %s" % ", ".join(
+        "%s=%d" % kv for kv in sorted(cur.items())))
+    if LIMIT:
+        print("  NB: ZOHO_LIMIT=%d in effect — SMOKE subset, not the full pull."
+              % LIMIT)
+    print("=" * 60)
+
+
 def main():
-    print("Zoho export — org %s, api %s%s" % (
-        ORG_ID, API_DOMAIN, (" (LIMIT=%d smoke)" % LIMIT) if LIMIT else ""))
+    finance = os.environ.get("ZOHO_FINANCE") == "1"
+    print("Zoho export — org %s, api %s%s%s" % (
+        ORG_ID, API_DOMAIN, " [FINANCE]" if finance else "",
+        (" (LIMIT=%d smoke)" % LIMIT) if LIMIT else ""))
     get_token()
     print("auth OK")
+
+    if finance:
+        # invoices + expenses (Option A reference-only). Pull the estimates LIST
+        # (id+number only, no details) to resolve invoice.estimate_id -> number
+        # for the quote.archive won-link.
+        print("Listing estimates (id->number map for the won-link) ...")
+        est_list = list_all("/books/v3/estimates", "estimates")
+        est_id_to_number = {
+            str(e.get("estimate_id")): e.get("estimate_number")
+            for e in est_list if e.get("estimate_id")}
+        invoices = export_invoices(est_id_to_number)
+        expenses = export_expenses()
+        _write("zoho_invoices.json", invoices)
+        _write("zoho_expenses.json", expenses)
+        _self_check_finance(invoices, expenses)
+        print("\nDone. Next: bash scripts/run_zoho_finance_import.sh  (dry-run)")
+        return
+
     invoices = list_all("/books/v3/invoices", "invoices")
     inv_map = build_invoice_map(invoices)
     print("invoices: %d, with estimate link: %d" % (len(invoices), len(inv_map)))

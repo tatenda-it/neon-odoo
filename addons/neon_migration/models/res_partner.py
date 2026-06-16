@@ -31,6 +31,17 @@ class ResPartner(models.Model):
         compute="_compute_archived_quote_count",
         string="Archived Quotes")
 
+    archived_invoice_ids = fields.One2many(
+        "neon.finance.invoice.archive", "partner_id",
+        string="Archived Zoho Invoices")
+    archived_invoice_count = fields.Integer(
+        compute="_compute_archived_invoice_count",
+        string="Archived Invoices")
+    # billable-to-customer expenses (no smart button; o2m for reference)
+    archived_expense_ids = fields.One2many(
+        "neon.finance.expense.archive", "partner_id",
+        string="Billable Zoho Expenses")
+
     @api.depends("archived_quote_ids")
     def _compute_archived_quote_count(self):
         # @api.depends is REQUIRED: a non-stored computed field with no
@@ -51,6 +62,25 @@ class ResPartner(models.Model):
             "type": "ir.actions.act_window",
             "name": _("Archived Zoho Quotes"),
             "res_model": "neon.finance.quote.archive",
+            "view_mode": "tree,form",
+            "domain": [("partner_id", "=", self.id)],
+            "context": {"create": False, "default_partner_id": self.id},
+        }
+
+    @api.depends("archived_invoice_ids")
+    def _compute_archived_invoice_count(self):
+        Archive = self.env["neon.finance.invoice.archive"]
+        for partner in self:
+            partner.archived_invoice_count = (
+                Archive.search_count([("partner_id", "=", partner.id)])
+                if partner.id else 0)
+
+    def action_view_archived_invoices(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Archived Zoho Invoices"),
+            "res_model": "neon.finance.invoice.archive",
             "view_mode": "tree,form",
             "domain": [("partner_id", "=", self.id)],
             "context": {"create": False, "default_partner_id": self.id},

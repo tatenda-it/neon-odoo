@@ -131,6 +131,63 @@ _check("T7-no-currency-constraint-passthrough",
                        {})["currency_code"] == "ZAR",
        "ZAR not passed through")
 
+# ---------------- finance: invoices + expenses (contract vs the loader) ----
+LOADER_INVOICE_KEYS = {"zoho_invoice_number", "zoho_customer_source_id",
+                       "zoho_estimate_number", "invoice_date", "status",
+                       "currency_code", "salesperson_name", "event_summary",
+                       "amount_untaxed", "amount_tax", "amount_total", "lines"}
+LOADER_EXPENSE_KEYS = {"zoho_expense_id", "expense_date", "account_name",
+                       "description", "reference_number", "status",
+                       "is_billable", "zoho_customer_source_id",
+                       "currency_code", "amount", "tax", "lines"}
+LOADER_EXP_LINE_KEYS = {"description", "account_name", "amount"}
+_AR_WORDS = ("balance", "balance_due", "outstanding", "receivable")
+
+INV_DETAIL = {
+    "invoice_id": 9001, "invoice_number": "INV-000327", "customer_id": 460000000123,
+    "estimate_id": 7001, "date": "2025-04-01", "status": "paid",
+    "currency_code": "USD", "salesperson_name": "lisar",
+    "subject_content": "Gala", "sub_total": 100.0, "tax_total": 15.5,
+    "total": 115.5, "balance": 0.0, "balance_due": 0.0,   # MUST NOT leak
+    "line_items": [{"name": "LIGHTING EQUIPMENT - RGB LED CAN", "unit": "qty",
+                    "quantity": 4, "rate": 25.0, "item_total": 100.0,
+                    "item_id": 5001}],
+}
+inv = ex.map_invoice(INV_DETAIL, {"7001": "QT-001234"})
+_check("T8-invoice-keys", set(inv) >= LOADER_INVOICE_KEYS, "keys=%s" % set(inv))
+_check("T8b-invoice-NO-balance-leak",
+       not any(w in k.lower() for k in inv for w in _AR_WORDS),
+       "balance leaked: %s" % set(inv))
+_check("T8c-invoice-mapped+estid->number",
+       inv["zoho_invoice_number"] == "INV-000327"
+       and inv["zoho_estimate_number"] == "QT-001234"   # estimate_id resolved
+       and inv["status"] == "paid" and abs(inv["amount_tax"] - 15.5) < 0.01
+       and inv["lines"][0]["category_prefix"] == "LIGHTING EQUIPMENT",
+       "inv=%s" % {k: inv[k] for k in LOADER_INVOICE_KEYS if k != "lines"})
+_check("T8d-invoice-no-estimate->blank",
+       ex.map_invoice({"invoice_number": "X"}, {})["zoho_estimate_number"] == "",
+       "blank estimate not handled")
+
+EXP_DETAIL = {
+    "expense_id": 8001, "date": "2025-05-02", "account_name": "Fuel",
+    "description": "diesel", "reference_number": "R1", "status": "unbilled",
+    "is_billable": True, "customer_id": 460000000123, "currency_code": "USD",
+    "total": 40.0, "tax_total": 6.2, "vendor_id": 999, "vendor_name": "Shell",
+    "line_items": [{"description": "diesel", "account_name": "Fuel",
+                    "amount": 40.0}],
+}
+exp = ex.map_expense(EXP_DETAIL)
+_check("T9-expense-keys", set(exp) >= LOADER_EXPENSE_KEYS, "keys=%s" % set(exp))
+_check("T9b-expense-NO-vendor-field",
+       not any("vendor" in k.lower() for k in exp)
+       and set(exp["lines"][0]) >= LOADER_EXP_LINE_KEYS,
+       "vendor leaked or line keys off: %s" % set(exp))
+_check("T9c-expense-mapped",
+       exp["zoho_expense_id"] == "8001" and exp["is_billable"] is True
+       and exp["zoho_customer_source_id"] == "460000000123"
+       and abs(exp["amount"] - 40.0) < 0.01 and exp["account_name"] == "Fuel",
+       "exp=%s" % {k: exp[k] for k in LOADER_EXPENSE_KEYS if k != "lines"})
+
 print("=" * 56)
 print("Total: %d/%d passed" % (_passed, _total))
 sys.exit(0 if _passed == _total else 1)

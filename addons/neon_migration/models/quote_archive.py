@@ -56,7 +56,7 @@ class NeonFinanceQuoteArchive(models.Model):
     # the 1 ZAR quote faithfully).
     currency_code = fields.Char(string="Currency", default="USD")
     amount_untaxed = fields.Float(string="Untaxed")
-    amount_tax = fields.Float(string="VAT (15.5% excl.)")
+    amount_tax = fields.Float(string="VAT (reference only)")
     amount_total = fields.Float(string="Total")
 
     salesperson_id = fields.Many2one(

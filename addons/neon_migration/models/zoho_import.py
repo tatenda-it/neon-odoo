@@ -57,6 +57,14 @@ STATUS_MAP = {
     "expired": "lost",
 }
 
+# Zoho invoice status -> simple reference bucket. Unknown -> 'unpaid' (flagged).
+INVOICE_STATUS_MAP = {
+    "paid": "paid",
+    "sent": "unpaid", "overdue": "unpaid", "partially_paid": "unpaid",
+    "draft": "unpaid", "unpaid": "unpaid", "viewed": "unpaid",
+    "void": "void", "voided": "void",
+}
+
 # Zoho salesperson label (lower) -> Odoo user search term. Former reps (Hamu
 # Mutasa / Ruvimbo / Arnold) are deliberately ABSENT -> free-text only. NB:
 # 'arnold' must NOT map to crew user "Arnold M" — different person.
@@ -270,7 +278,10 @@ class ZohoImporter(models.AbstractModel):
                 # + report, so it's never silently dropped.
                 report["quotes"]["no_customer_id"] += 1
 
-            existing = Archive.search(
+            # active_test=False: the unique constraint spans ALL rows incl.
+            # archived ones, so the idempotency search must too (else a re-run
+            # after a row is archived falls through to create -> IntegrityError).
+            existing = Archive.with_context(active_test=False).search(
                 [("zoho_estimate_number", "=", number)], limit=1)
             if existing:
                 report["quotes"]["skipped_existing"] += 1
@@ -364,5 +375,193 @@ class ZohoImporter(models.AbstractModel):
             "salesperson_name": sp_name or False,
             "event_summary": est.get("event_summary") or False,
             "zoho_invoice_number": est.get("zoho_invoice_number") or False,
+            "line_ids": lines,
+        }
+
+    # ===============================================================
+    # FINANCE-HISTORY (invoices + expenses) — same inert discipline.
+    # Partners are LINK-ONLY (already imported); missing -> skip+report,
+    # never created here. apply=False => zero writes.
+    # ===============================================================
+    @api.model
+    def run_finance(self, invoices, expenses, apply=False):
+        Partner = self.env["res.partner"].sudo()
+        Inv = self.env["neon.finance.invoice.archive"].sudo()
+        Exp = self.env["neon.finance.expense.archive"].sudo()
+        Quote = self.env["neon.finance.quote.archive"].sudo()
+
+        report = {
+            "apply": bool(apply),
+            "invoices": {"created": 0, "skipped_existing": 0,
+                         "skipped_unmatched_customer": 0, "no_customer_id": 0,
+                         "paid": 0, "unpaid": 0, "void": 0},
+            "expenses": {"created": 0, "skipped_existing": 0,
+                         "billable": 0, "billable_customer_not_found": 0},
+            "won_links_populated": 0,
+            "currency": {},
+            "unmatched_customers": [],
+            "unmatched_salespeople": set(),
+            "unknown_status": set(),
+            "warnings": [],
+        }
+
+        # Partner LINK map (zoho_source_id -> partner.id). LINK only — the
+        # partners were imported by the quote import; a missing one is reported,
+        # never created here.
+        cust_ids = set()
+        for r in invoices + expenses:
+            cid = (r.get("zoho_customer_source_id") or "").strip()
+            if cid:
+                cust_ids.add(cid)
+        partner_by_zoho = {}
+        if cust_ids:
+            for p in Partner.with_context(active_test=False).search(
+                    [("zoho_source_id", "in", list(cust_ids))]):
+                if p.zoho_source_id:
+                    partner_by_zoho[p.zoho_source_id] = p.id
+
+        est_to_invoice = {}  # won-link: zoho_estimate_number -> invoice number
+
+        # ---- INVOICES ----
+        for inv in invoices:
+            number = (inv.get("zoho_invoice_number") or "").strip()
+            if not number:
+                report["warnings"].append("invoice with no number — skipped")
+                continue
+            raw = (inv.get("status") or "").strip().lower()
+            bucket = INVOICE_STATUS_MAP.get(raw, "unpaid")
+            if raw and raw not in INVOICE_STATUS_MAP:
+                report["unknown_status"].add(inv.get("status"))
+            cur = (inv.get("currency_code") or "USD").strip().upper()
+            report["invoices"][bucket] += 1
+            report["currency"][cur] = report["currency"].get(cur, 0) + 1
+
+            sp_id, sp_name = self._resolve_salesperson(
+                inv.get("salesperson_name"))
+            if inv.get("salesperson_name") and not sp_id:
+                report["unmatched_salespeople"].add(inv.get("salesperson_name"))
+
+            est_no = (inv.get("zoho_estimate_number") or "").strip()
+            if est_no:
+                est_to_invoice[est_no] = number
+
+            cid = (inv.get("zoho_customer_source_id") or "").strip()
+            if not cid:
+                report["invoices"]["no_customer_id"] += 1
+            elif cid not in partner_by_zoho:
+                report["unmatched_customers"].append(number)
+                report["invoices"]["skipped_unmatched_customer"] += 1
+                continue
+
+            if Inv.with_context(active_test=False).search(
+                    [("zoho_invoice_number", "=", number)], limit=1):
+                report["invoices"]["skipped_existing"] += 1
+                continue
+            report["invoices"]["created"] += 1
+            if apply:
+                Inv.create(self._invoice_vals(
+                    inv, number, bucket, cur, sp_id, sp_name,
+                    partner_by_zoho.get(cid)))
+
+        # ---- EXPENSES (no vendor; optional billable-to customer) ----
+        for exp in expenses:
+            eid = (exp.get("zoho_expense_id") or "").strip()
+            if not eid:
+                report["warnings"].append("expense with no id — skipped")
+                continue
+            cur = (exp.get("currency_code") or "USD").strip().upper()
+            report["currency"][cur] = report["currency"].get(cur, 0) + 1
+            billable = bool(exp.get("is_billable"))
+            if billable:
+                report["expenses"]["billable"] += 1
+            cid = (exp.get("zoho_customer_source_id") or "").strip()
+            pid = partner_by_zoho.get(cid) if cid else None
+            if billable and cid and not pid:
+                # keep the expense (unlinked), just report the missing customer
+                report["expenses"]["billable_customer_not_found"] += 1
+
+            if Exp.with_context(active_test=False).search(
+                    [("zoho_expense_id", "=", eid)], limit=1):
+                report["expenses"]["skipped_existing"] += 1
+                continue
+            report["expenses"]["created"] += 1
+            if apply:
+                Exp.create(self._expense_vals(exp, eid, cur, pid))
+
+        # ---- WON-LINK populate: invoice->estimate -> set the inert
+        # quote.archive.zoho_invoice_number (additive char; NEVER touches
+        # status_bucket, so the won count cannot regress). Idempotent.
+        for est_no, inv_no in est_to_invoice.items():
+            q = Quote.with_context(active_test=False).search(
+                [("zoho_estimate_number", "=", est_no)], limit=1)
+            if q and (q.zoho_invoice_number or "") != inv_no:
+                report["won_links_populated"] += 1
+                if apply:
+                    q.zoho_invoice_number = inv_no
+
+        report["unmatched_salespeople"] = sorted(
+            report["unmatched_salespeople"])
+        report["unknown_status"] = sorted(report["unknown_status"])
+        return report
+
+    @api.model
+    def _invoice_vals(self, inv, number, bucket, cur, sp_id, sp_name, partner_id):
+        lines = []
+        for seq, ln in enumerate(inv.get("lines") or [], start=1):
+            lines.append((0, 0, {
+                "sequence": seq * 10,
+                "category_prefix": ln.get("category_prefix") or False,
+                "name": ln.get("name") or "(line)",
+                "description": ln.get("description") or False,
+                "unit": ln.get("unit") or False,
+                "quantity": ln.get("quantity") or 0.0,
+                "unit_rate": ln.get("unit_rate") or 0.0,
+                "line_total": ln.get("line_total") or 0.0,
+                "zoho_item_id": ln.get("zoho_item_id") or False,
+            }))
+        return {
+            "zoho_invoice_number": number,
+            "partner_id": partner_id or False,
+            "zoho_customer_source_id":
+                (inv.get("zoho_customer_source_id") or "").strip() or False,
+            "zoho_estimate_number":
+                (inv.get("zoho_estimate_number") or "").strip() or False,
+            "invoice_date": inv.get("invoice_date") or False,
+            "status": inv.get("status") or False,
+            "status_bucket": bucket,
+            "currency_code": cur,
+            "amount_untaxed": inv.get("amount_untaxed") or 0.0,
+            "amount_tax": inv.get("amount_tax") or 0.0,
+            "amount_total": inv.get("amount_total") or 0.0,
+            "salesperson_id": sp_id or False,
+            "salesperson_name": sp_name or False,
+            "event_summary": inv.get("event_summary") or False,
+            "line_ids": lines,
+        }
+
+    @api.model
+    def _expense_vals(self, exp, eid, cur, partner_id):
+        lines = []
+        for seq, ln in enumerate(exp.get("lines") or [], start=1):
+            lines.append((0, 0, {
+                "sequence": seq * 10,
+                "description": ln.get("description") or False,
+                "account_name": ln.get("account_name") or False,
+                "amount": ln.get("amount") or 0.0,
+            }))
+        return {
+            "zoho_expense_id": eid,
+            "expense_date": exp.get("expense_date") or False,
+            "account_name": exp.get("account_name") or False,
+            "description": exp.get("description") or False,
+            "reference_number": exp.get("reference_number") or False,
+            "status": exp.get("status") or False,
+            "is_billable": bool(exp.get("is_billable")),
+            "partner_id": partner_id or False,
+            "zoho_customer_source_id":
+                (exp.get("zoho_customer_source_id") or "").strip() or False,
+            "currency_code": cur,
+            "amount": exp.get("amount") or 0.0,
+            "tax": exp.get("tax") or 0.0,
             "line_ids": lines,
         }

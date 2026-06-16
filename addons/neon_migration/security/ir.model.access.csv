@@ -3,3 +3,11 @@ access_quote_archive_internal,neon.finance.quote.archive read (all internal),mod
 access_quote_archive_super,neon.finance.quote.archive superuser (write/create/unlink),model_neon_finance_quote_archive,neon_core.group_neon_superuser,1,1,1,1
 access_quote_archive_line_internal,neon.finance.quote.archive.line read (all internal),model_neon_finance_quote_archive_line,base.group_user,1,0,0,0
 access_quote_archive_line_super,neon.finance.quote.archive.line superuser,model_neon_finance_quote_archive_line,neon_core.group_neon_superuser,1,1,1,1
+access_invoice_archive_internal,neon.finance.invoice.archive read (all internal),model_neon_finance_invoice_archive,base.group_user,1,0,0,0
+access_invoice_archive_super,neon.finance.invoice.archive superuser,model_neon_finance_invoice_archive,neon_core.group_neon_superuser,1,1,1,1
+access_invoice_archive_line_internal,neon.finance.invoice.archive.line read (all internal),model_neon_finance_invoice_archive_line,base.group_user,1,0,0,0
+access_invoice_archive_line_super,neon.finance.invoice.archive.line superuser,model_neon_finance_invoice_archive_line,neon_core.group_neon_superuser,1,1,1,1
+access_expense_archive_internal,neon.finance.expense.archive read (all internal),model_neon_finance_expense_archive,base.group_user,1,0,0,0
+access_expense_archive_super,neon.finance.expense.archive superuser,model_neon_finance_expense_archive,neon_core.group_neon_superuser,1,1,1,1
+access_expense_archive_line_internal,neon.finance.expense.archive.line read (all internal),model_neon_finance_expense_archive_line,base.group_user,1,0,0,0
+access_expense_archive_line_super,neon.finance.expense.archive.line superuser,model_neon_finance_expense_archive_line,neon_core.group_neon_superuser,1,1,1,1
