@@ -133,7 +133,11 @@
     # crew load, PHP retirement, cutover readiness) with colour-coded badges +
     # step pips. New ACTIVE_NOW constant + template band + CSS; ADDITIVE, all
     # existing sections/tracks/cards/lists untouched.
-    "version": "17.0.1.0.23",
+    # 17.0.1.0.24 (16 Jun): ACTIVE NOW refresh — Zoho migration tile flips to
+    # COMPLETE (quotes/invoices/expenses/won-links imported inert, creds
+    # revoked); FamCal job-history tile added (queued/next); + a "Done &
+    # verified" entry for the Zoho reference migration. Text/constants only.
+    "version": "17.0.1.0.24",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

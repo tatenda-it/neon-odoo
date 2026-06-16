@@ -63,15 +63,16 @@ OVERALL_PCT = round(sum(t["pct"] for t in TRACKS) / len(TRACKS))
 ACTIVE_NOW = {
     "title": "Active now — Phase 11: cutover & migration",
     "tiles": [
-        {"key": "Zoho reference import",
-         "badge": "In flight · Blocked (creds-run)", "state": "blocked",
-         "detail": "≈2,019 quotes + ≈895 clients → an inert read-only "
-                   "archive (no ledger impact, no AR migrated).",
-         "pips": [{"l": "design", "s": "done"},
-                  {"l": "build 25/25", "s": "done"},
-                  {"l": "install inert", "s": "done"},
-                  {"l": "extractor 11/11", "s": "done"},
-                  {"l": "creds-run", "s": "blocked"}]},
+        {"key": "Zoho migration",
+         "badge": "Complete", "state": "done",
+         "detail": "Quotes + clients + invoices + expenses + won-links imported "
+                   "as inert reference; ledger untouched. Extraction closed; "
+                   "creds revoked.",
+         "pips": [{"l": "quotes 2022", "s": "done"},
+                  {"l": "invoices 301", "s": "done"},
+                  {"l": "expenses 852", "s": "done"},
+                  {"l": "won-links 257", "s": "done"},
+                  {"l": "ledger inert", "s": "done"}]},
         {"key": "Crew load (10 technicians)",
          "badge": "Blocked (APPLY pending)", "state": "blocked",
          "detail": "Script ready (e2a3e65); dry-run validated — 10 new, "
@@ -80,6 +81,13 @@ ACTIVE_NOW = {
                   {"l": "dry-run", "s": "done"},
                   {"l": "APPLY", "s": "blocked"},
                   {"l": "verify", "s": "blocked"}]},
+        {"key": "FamCal job-history",
+         "badge": "Queued (next)", "state": "pending",
+         "detail": "Reference-only inert archive of FamCal event history; "
+                   "discovery pending.",
+         "pips": [{"l": "scoped", "s": "done"},
+                  {"l": "discovery", "s": "blocked"},
+                  {"l": "build", "s": "blocked"}]},
         {"key": "PHP retirement / parallel run",
          "badge": "Pending", "state": "pending",
          "detail": "A 2-week parallel run, then the legacy PHP system is "
@@ -87,7 +95,7 @@ ACTIVE_NOW = {
          "pips": []},
         {"key": "Cutover readiness",
          "badge": "In progress", "state": "progress",
-         "detail": "Zoho read-only post-cutover · Odoo ledger starts clean "
+         "detail": "Zoho read-only & retired for new work · Odoo ledger clean "
                    "· VAT 15.5%.",
          "pips": []},
     ],
@@ -408,6 +416,11 @@ DONE_VERIFIED = [
     "ONLY their eligible jobs → pick → checkout/check-in], movements "
     "actor-audited; narrow per-job gate + two-factor; sales Face 1 "
     "deferred).",
+    "Zoho reference migration — quotes / invoices / expenses / won-links "
+    "(neon_migration; 2022 quotes + 1220 clients + 301 invoices + 852 "
+    "expenses + 257 won-links imported as INERT reference, assistant-"
+    "verified: account.move untouched, zero journal entries, ledger clean; "
+    "Zoho extraction closed + creds revoked).",
 ]
 
 DECIDED_NOT_BUILT = [
