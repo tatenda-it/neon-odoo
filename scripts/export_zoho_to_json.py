@@ -221,7 +221,9 @@ def get_token(force=False):
         sys.exit("Missing ZOHO_CLIENT_ID / ZOHO_CLIENT_SECRET / "
                  "ZOHO_REFRESH_TOKEN env vars.")
     requests = _requests()
-    r = requests.post(ACCOUNTS_DOMAIN + "/oauth/v2/token", params={
+    # creds in the POST BODY (data=), NOT the query string — so they never
+    # appear in a URL and cannot leak via an HTTPError/exception message.
+    r = requests.post(ACCOUNTS_DOMAIN + "/oauth/v2/token", data={
         "refresh_token": refresh, "client_id": cid, "client_secret": secret,
         "grant_type": "refresh_token"}, timeout=30)
     r.raise_for_status()
@@ -400,9 +402,11 @@ def main():
                 str(e.get("estimate_id")): e.get("estimate_number")
                 for e in est_list if e.get("estimate_id")}
         except (SystemExit, Exception) as _e:  # noqa: BLE001
+            # NEVER interpolate the exception (it can carry a URL/creds) — print
+            # only the class name.
             print("  WARN: estimates list unavailable (%s) — won-link map EMPTY "
                   "(add ZohoBooks.estimates.READ to enable); invoices + expenses "
-                  "proceed." % _e)
+                  "proceed." % type(_e).__name__)
         invoices = export_invoices(est_id_to_number)
         expenses = export_expenses()
         _write("zoho_invoices.json", invoices)
