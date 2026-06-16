@@ -93,6 +93,26 @@ def _norm_phone(value):
     return re.sub(r"\D", "", value or "")
 
 
+def _names_agree(a, b):
+    """Conservative name-agreement guard for an email-exact match. A shared
+    email is a strong signal, so name VARIANTS still agree (a real org entered
+    twice -- "Imani Consultants"/"Imani Consulting", "X"/"The X" -- which the
+    Zoho import proved are true dupes). But a WHOLLY different name on the same
+    email (a generic shared inbox like info@) is a likely over-merge -> do NOT
+    silently collapse. Agree when one normalized name contains the other OR
+    token overlap >= 0.5; lean to agree when either name is empty (email already
+    matched, nothing to disprove)."""
+    na, nb = _norm_name(a), _norm_name(b)
+    if not na or not nb:
+        return True
+    if na == nb or na in nb or nb in na:
+        return True
+    ta, tb = set(na.split()), set(nb.split())
+    if not ta or not tb:
+        return True
+    return len(ta & tb) / max(len(ta), len(tb)) >= 0.5
+
+
 class ZohoImporter(models.AbstractModel):
     _name = "neon.zoho.importer"
     _description = "Zoho Reference Import Service"
@@ -133,11 +153,15 @@ class ZohoImporter(models.AbstractModel):
         phone_norm = _norm_phone(cust.get("phone"))
         name_norm = _norm_name(cust.get("name"))
 
-        # Strongest signal: exact email.
+        # Strongest signal: exact email -- but guard against a generic shared
+        # inbox collapsing DISTINCT entities. Name variants still merge; a
+        # wholly different name on the same email -> create_flag (not silent).
         if email:
             by_email = Partner.search([("email", "=ilike", email)])
             if len(by_email) == 1:
-                return "match", by_email
+                if _names_agree(cust.get("name"), by_email.name):
+                    return "match", by_email
+                return "create_flag", None  # same email, disagreeing names
             if len(by_email) > 1:
                 return "create_flag", None  # ambiguous duplicate email
 

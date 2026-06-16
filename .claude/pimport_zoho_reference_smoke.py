@@ -258,6 +258,32 @@ _check("T10c-ledger-invoices-untouched",
        "customer invoice count moved %d -> %d (import must create NO account.move)"
        % (INV_BEFORE, AM.search_count(_INV_DOMAIN)))
 
+# ============================================================ T11 email-match name-agreement guard
+from odoo.addons.neon_migration.models.zoho_import import _names_agree  # noqa: E402
+# fixture keyed on zoho_source_id (so _purge cleans it); name tokens chosen so
+# the "different" case shares NO tokens (avoids the [TEST-ZIMP] prefix polluting
+# the overlap ratio).
+p_shared = P.create({"name": "Zqx Alpha Events Co", "email": "zimp-guard@test",
+                     "zoho_source_id": "TESTZ-GUARD", "company_type": "company"})
+act_v, par_v = IMP._classify_partner(
+    {"email": "zimp-guard@test", "name": "Zqx Alpha Events"})        # variant
+act_d, par_d = IMP._classify_partner(
+    {"email": "zimp-guard@test", "name": "Mediterranean Catering Group"})  # different
+_check("T11-email+variant-name-still-merges",
+       act_v == "match" and par_v == p_shared,
+       "act=%s par=%s" % (act_v, par_v))
+_check("T11b-email+different-name-FLAGS-not-silent-merge",
+       act_d == "create_flag" and not par_d,
+       "act=%s par=%s" % (act_d, par_d))
+_check("T11c-names_agree-real-variants-merge-distinct-flag",
+       _names_agree("Imani Consultants", "Imani Consulting")
+       and _names_agree("The Institute of Bankers of Zimbabwe",
+                        "Institute of Bankers of Zimbabwe")
+       and _names_agree("The National Chamber of Commerce",
+                        "The Zimbabwe National Chamber of Commerce")
+       and not _names_agree("Alpha Events", "Zeta Productions"),
+       "agreement logic off")
+
 # ---- teardown ----
 _purge()
 env.cr.commit()

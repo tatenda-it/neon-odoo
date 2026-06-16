@@ -7,7 +7,12 @@
     # approval / WhatsApp / operational event-job graph. Max isolation: this
     # module depends only on base + neon_core and is NEVER read by live
     # finance aggregates (Cash-Flow tiles read neon.finance.quote, not this).
-    "version": "17.0.1.0.0",
+    # 17.0.1.0.1 — dedup hardening (post first-import review): an email-exact
+    # partner match now requires NAME AGREEMENT (similarity-aware: variants like
+    # "Imani Consultants"/"Imani Consulting" still merge; a wholly different name
+    # on the same email -> create_flag, not a silent over-merge). Future imports
+    # only — does not re-run or alter the committed first import.
+    "version": "17.0.1.0.1",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
