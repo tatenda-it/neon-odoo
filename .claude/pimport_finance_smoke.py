@@ -53,12 +53,22 @@ Q_BEFORE = Q.search_count([])
 _su = Seq.search([("code", "=", "neon.finance.quote.usd")], limit=1)
 SEQ_BEFORE = _su.number_next_actual if _su else -1
 
-# ---- fixtures: a linkable partner + a won-bucket quote.archive (empty inv#) ----
+# ---- fixtures: a directly-linkable partner, a SURVIVOR partner (for the
+#      collapsed-twin fallback), + a won-bucket quote.archive (empty inv#) ----
 p1 = P.create({"name": "[TEST-ZF] Client One", "zoho_source_id": "TESTZF-CUST1",
                "company_type": "company"})
+p_surv = P.create({"name": "[TEST-ZF] Survivor Co", "zoho_source_id": "TESTZF-SURV",
+                   "email": "zf-surv@test", "company_type": "company"})
 qa1 = QA.create({"zoho_estimate_number": "TESTZF-EST1", "status_bucket": "won",
                  "zoho_status": "invoiced", "currency_code": "USD",
                  "amount_total": 115.5})
+
+# customers export feeding the tier-2 fallback: a COLLAPSED twin shares the
+# survivor's name+email but carries its own (non-retained) source_id.
+CUSTOMERS = [
+    {"zoho_source_id": "TESTZF-COLLAPSED", "name": "[TEST-ZF] Survivor Co",
+     "email": "zf-surv@test"},
+]
 
 INVOICES = [
     {"zoho_invoice_number": "TESTZFINV-001", "zoho_customer_source_id": "TESTZF-CUST1",
@@ -75,6 +85,8 @@ INVOICES = [
      "status": "void", "currency_code": "USD", "amount_total": 0.0, "lines": []},
     {"zoho_invoice_number": "TESTZFINV-004", "zoho_customer_source_id": "TESTZF-MISSING",
      "status": "paid", "currency_code": "USD", "amount_total": 10.0, "lines": []},
+    {"zoho_invoice_number": "TESTZFINV-005", "zoho_customer_source_id": "TESTZF-COLLAPSED",
+     "status": "paid", "currency_code": "USD", "amount_total": 30.0, "lines": []},
 ]
 EXPENSES = [
     {"zoho_expense_id": "TESTZFEXP-001", "expense_date": "2025-05-02",
@@ -93,34 +105,35 @@ EXPENSES = [
 
 # ============================================================ T1 dry-run zero writes
 i_before, e_before = INV.search_count([]), EXP.search_count([])
-rep = IMP.run_finance(INVOICES, EXPENSES, apply=False)
+rep = IMP.run_finance(INVOICES, EXPENSES, apply=False, customers=CUSTOMERS)
 _check("T1-dryrun-zero-writes",
        INV.search_count([]) == i_before and EXP.search_count([]) == e_before
        and not qa1.zoho_invoice_number,
        "writes leaked in dry-run")
 _check("T1b-dryrun-counts",
-       rep["invoices"]["created"] == 3
-       and rep["invoices"]["skipped_unmatched_customer"] == 1
+       rep["invoices"]["created"] == 5            # ALL imported — nothing skipped
+       and rep["invoices"]["fallback_linked"] == 1          # 005 -> survivor
+       and rep["invoices"]["unmatched_imported_unlinked"] == 1  # 004 unlinked, not dropped
        and rep["expenses"]["created"] == 3
        and rep["won_links_populated"] == 1,
        "inv=%s exp=%s won=%s" % (rep["invoices"], rep["expenses"],
                                  rep["won_links_populated"]))
 
 # ============================================================ T2 APPLY
-rep2 = IMP.run_finance(INVOICES, EXPENSES, apply=True)
+rep2 = IMP.run_finance(INVOICES, EXPENSES, apply=True, customers=CUSTOMERS)
 env.cr.commit()
 _check("T2-apply-creates",
-       INV.search_count([("zoho_invoice_number", "=like", "TESTZFINV-%")]) == 3
+       INV.search_count([("zoho_invoice_number", "=like", "TESTZFINV-%")]) == 5
        and EXP.search_count([("zoho_expense_id", "=like", "TESTZFEXP-%")]) == 3,
        "inv=%d exp=%d" % (
            INV.search_count([("zoho_invoice_number", "=like", "TESTZFINV-%")]),
            EXP.search_count([("zoho_expense_id", "=like", "TESTZFEXP-%")])))
 
 # ============================================================ T3 idempotent
-rep3 = IMP.run_finance(INVOICES, EXPENSES, apply=True)
+rep3 = IMP.run_finance(INVOICES, EXPENSES, apply=True, customers=CUSTOMERS)
 env.cr.commit()
 _check("T3-idempotent",
-       rep3["invoices"]["created"] == 0 and rep3["invoices"]["skipped_existing"] == 3
+       rep3["invoices"]["created"] == 0 and rep3["invoices"]["skipped_existing"] == 5
        and rep3["expenses"]["created"] == 0 and rep3["expenses"]["skipped_existing"] == 3
        and rep3["won_links_populated"] == 0,   # won-link re-run = zero (already set)
        "inv=%s exp=%s won=%s" % (rep3["invoices"], rep3["expenses"],
@@ -131,19 +144,28 @@ i1 = INV.search([("zoho_invoice_number", "=", "TESTZFINV-001")], limit=1)
 i2 = INV.search([("zoho_invoice_number", "=", "TESTZFINV-002")], limit=1)
 i3 = INV.search([("zoho_invoice_number", "=", "TESTZFINV-003")], limit=1)
 i4 = INV.search([("zoho_invoice_number", "=", "TESTZFINV-004")], limit=1)
+i5 = INV.search([("zoho_invoice_number", "=", "TESTZFINV-005")], limit=1)
 _check("T4-status-buckets",
        i1.status_bucket == "paid" and i2.status_bucket == "unpaid"
-       and i3.status_bucket == "void" and not i4,   # 004 skipped (cust missing)
-       "%s/%s/%s/q4=%s" % (i1.status_bucket, i2.status_bucket,
-                           i3.status_bucket, bool(i4)))
+       and i3.status_bucket == "void"
+       and bool(i4) and bool(i5),   # 004 + 005 imported (NEVER skipped)
+       "%s/%s/%s i4=%s i5=%s" % (i1.status_bucket, i2.status_bucket,
+                                 i3.status_bucket, bool(i4), bool(i5)))
 
-# ============================================================ T5 partner LINK-only
-_check("T5-partner-linked",
+# ============================================================ T5 partner resolve (3 tiers)
+_check("T5-direct-link-by-id",
        i1.partner_id == p1 and i2.partner_id == p1,
        "i1=%s i2=%s" % (i1.partner_id, i2.partner_id))
-_check("T5b-missing-customer-NOT-created",
-       P.search_count([("zoho_source_id", "=", "TESTZF-MISSING")]) == 0
-       and "TESTZFINV-004" in rep2["unmatched_customers"],
+_check("T5b-fallback-links-collapsed-twin-to-survivor",
+       bool(i5) and i5.partner_id == p_surv
+       and rep2["invoices"]["fallback_linked"] == 1,
+       "i5 partner=%s fb=%s" % (i5.partner_id if i5 else None,
+                                rep2["invoices"]["fallback_linked"]))
+_check("T5c-unresolved-imported-UNLINKED-not-dropped",
+       bool(i4) and not i4.partner_id
+       and rep2["invoices"]["unmatched_imported_unlinked"] == 1
+       and "TESTZFINV-004" in rep2["unmatched_customers"]
+       and P.search_count([("zoho_source_id", "=", "TESTZF-MISSING")]) == 0,
        "missing partner created or not reported")
 
 # ============================================================ T6 expense shape
@@ -196,11 +218,11 @@ i1.invalidate_recordset()
 i1.active = False
 env.cr.commit()
 try:
-    rep4 = IMP.run_finance(INVOICES, EXPENSES, apply=True)
+    rep4 = IMP.run_finance(INVOICES, EXPENSES, apply=True, customers=CUSTOMERS)
     env.cr.commit()
     _check("T10-archived-row-rerun-skips-not-errors",
            rep4["invoices"]["created"] == 0
-           and rep4["invoices"]["skipped_existing"] == 3,
+           and rep4["invoices"]["skipped_existing"] == 5,
            "created=%d skipped=%d" % (rep4["invoices"]["created"],
                                       rep4["invoices"]["skipped_existing"]))
 except Exception as _e:  # noqa: BLE001

@@ -44,14 +44,19 @@ def _load(fname):
 
 invoices = _load("zoho_invoices.json")
 expenses = _load("zoho_expenses.json")
+# zoho_customers.json (the quote-import export) feeds the tier-2 name/email
+# fallback for invoices keyed on a collapsed-twin customer id. Optional — if
+# absent, unresolved invoices simply import unlinked (still never dropped).
+customers = _load("zoho_customers.json")
 
 print("=" * 70)
 print("ZOHO FINANCE-HISTORY IMPORT  (APPLY=%s, dir=%s)" % (APPLY, ZOHO_DIR))
-print("source: %d invoices, %d expenses" % (len(invoices), len(expenses)))
+print("source: %d invoices, %d expenses, %d customers (fallback map)"
+      % (len(invoices), len(expenses), len(customers)))
 print("=" * 70)
 
 report = env["neon.zoho.importer"].sudo().run_finance(
-    invoices, expenses, apply=APPLY)
+    invoices, expenses, apply=APPLY, customers=customers)
 
 if APPLY:
     env.cr.commit()
@@ -61,13 +66,16 @@ print("\nINVOICES:  created=%d  skipped-existing=%d" % (
     iv["created"], iv["skipped_existing"]))
 print("  buckets: paid=%d  unpaid=%d  void=%d" % (
     iv["paid"], iv["unpaid"], iv["void"]))
-print("  skipped-UNMATCHED-customer=%d  (the GATE — review before APPLY)"
-      % iv["skipped_unmatched_customer"])
-print("  no-customer-id=%d (imported unlinked)" % iv["no_customer_id"])
+print("  partner link: direct(by id) + fallback(name/email)=%d  "
+      "UNMATCHED-imported-UNLINKED=%d  no-customer-id=%d" % (
+          iv["fallback_linked"], iv["unmatched_imported_unlinked"],
+          iv["no_customer_id"]))
+print("  (GATE: nothing skipped — every invoice imports; unlinked count is the "
+      "residue to review)")
 print("\nEXPENSES:  created=%d  skipped-existing=%d  billable=%d  "
-      "billable-customer-not-found=%d" % (
+      "fallback-linked=%d  billable-customer-not-found=%d" % (
           ex["created"], ex["skipped_existing"], ex["billable"],
-          ex["billable_customer_not_found"]))
+          ex["fallback_linked"], ex["billable_customer_not_found"]))
 print("\nWON-LINK: quote.archive.zoho_invoice_number %s = %d"
       % ("populated" if APPLY else "WOULD populate", report["won_links_populated"]))
 print("currency: %s" % ", ".join(

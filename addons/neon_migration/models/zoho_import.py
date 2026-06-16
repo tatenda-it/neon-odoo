@@ -380,11 +380,16 @@ class ZohoImporter(models.AbstractModel):
 
     # ===============================================================
     # FINANCE-HISTORY (invoices + expenses) — same inert discipline.
-    # Partners are LINK-ONLY (already imported); missing -> skip+report,
-    # never created here. apply=False => zero writes.
+    # Partners are LINK-ONLY (already imported), resolved in 3 tiers:
+    #   1. exact zoho_source_id  2. name+email fallback vs res.partner (the
+    #   hardened matcher — catches invoices keyed on a collapsed-twin id, links
+    #   to the surviving merged partner)  3. still no match -> import UNLINKED +
+    #   report. NEVER skip/drop (all finance history lands). `customers` (the
+    #   zoho_customers.json list) feeds tier 2: collapsed-twin id -> name/email.
+    #   apply=False => zero writes.
     # ===============================================================
     @api.model
-    def run_finance(self, invoices, expenses, apply=False):
+    def run_finance(self, invoices, expenses, apply=False, customers=None):
         Partner = self.env["res.partner"].sudo()
         Inv = self.env["neon.finance.invoice.archive"].sudo()
         Exp = self.env["neon.finance.expense.archive"].sudo()
@@ -393,10 +398,11 @@ class ZohoImporter(models.AbstractModel):
         report = {
             "apply": bool(apply),
             "invoices": {"created": 0, "skipped_existing": 0,
-                         "skipped_unmatched_customer": 0, "no_customer_id": 0,
-                         "paid": 0, "unpaid": 0, "void": 0},
+                         "fallback_linked": 0, "unmatched_imported_unlinked": 0,
+                         "no_customer_id": 0, "paid": 0, "unpaid": 0, "void": 0},
             "expenses": {"created": 0, "skipped_existing": 0,
-                         "billable": 0, "billable_customer_not_found": 0},
+                         "billable": 0, "fallback_linked": 0,
+                         "billable_customer_not_found": 0},
             "won_links_populated": 0,
             "currency": {},
             "unmatched_customers": [],
@@ -419,6 +425,13 @@ class ZohoImporter(models.AbstractModel):
                     [("zoho_source_id", "in", list(cust_ids))]):
                 if p.zoho_source_id:
                     partner_by_zoho[p.zoho_source_id] = p.id
+
+        # tier-2 fallback inputs: collapsed-twin source_id -> its name/email
+        # (from the customers export), + a memo cache for the name/email match.
+        cust_by_id = {(c.get("zoho_source_id") or "").strip(): c
+                      for c in (customers or [])
+                      if (c.get("zoho_source_id") or "").strip()}
+        fb_cache = {}
 
         est_to_invoice = {}  # won-link: zoho_estimate_number -> invoice number
 
@@ -445,13 +458,21 @@ class ZohoImporter(models.AbstractModel):
             if est_no:
                 est_to_invoice[est_no] = number
 
+            # 3-tier partner resolve — NEVER skip; an unresolved invoice
+            # imports UNLINKED (retained + reported), not dropped.
             cid = (inv.get("zoho_customer_source_id") or "").strip()
+            pid = None
             if not cid:
                 report["invoices"]["no_customer_id"] += 1
-            elif cid not in partner_by_zoho:
-                report["unmatched_customers"].append(number)
-                report["invoices"]["skipped_unmatched_customer"] += 1
-                continue
+            elif cid in partner_by_zoho:
+                pid = partner_by_zoho[cid]
+            else:
+                pid = self._fallback_partner(cid, cust_by_id, fb_cache)
+                if pid:
+                    report["invoices"]["fallback_linked"] += 1
+                else:
+                    report["invoices"]["unmatched_imported_unlinked"] += 1
+                    report["unmatched_customers"].append(number)
 
             if Inv.with_context(active_test=False).search(
                     [("zoho_invoice_number", "=", number)], limit=1):
@@ -460,8 +481,7 @@ class ZohoImporter(models.AbstractModel):
             report["invoices"]["created"] += 1
             if apply:
                 Inv.create(self._invoice_vals(
-                    inv, number, bucket, cur, sp_id, sp_name,
-                    partner_by_zoho.get(cid)))
+                    inv, number, bucket, cur, sp_id, sp_name, pid))
 
         # ---- EXPENSES (no vendor; optional billable-to customer) ----
         for exp in expenses:
@@ -475,7 +495,13 @@ class ZohoImporter(models.AbstractModel):
             if billable:
                 report["expenses"]["billable"] += 1
             cid = (exp.get("zoho_customer_source_id") or "").strip()
-            pid = partner_by_zoho.get(cid) if cid else None
+            pid = None
+            if cid:
+                pid = partner_by_zoho.get(cid)
+                if not pid:
+                    pid = self._fallback_partner(cid, cust_by_id, fb_cache)
+                    if pid:
+                        report["expenses"]["fallback_linked"] += 1
             if billable and cid and not pid:
                 # keep the expense (unlinked), just report the missing customer
                 report["expenses"]["billable_customer_not_found"] += 1
@@ -503,6 +529,45 @@ class ZohoImporter(models.AbstractModel):
             report["unmatched_salespeople"])
         report["unknown_status"] = sorted(report["unknown_status"])
         return report
+
+    @api.model
+    def _fallback_partner(self, cid, cust_by_id, cache):
+        """Tier-2 link: a customer source_id absent from res.partner (it
+        collapsed into a merged partner during the quote dedup, so its id wasn't
+        retained). Look up that id's name/email in the customers export and
+        match the SURVIVING partner by the hardened name+email rule. Memoised.
+        Returns a partner id or None."""
+        if cid in cache:
+            return cache[cid]
+        pid = None
+        cust = cust_by_id.get(cid)
+        if cust:
+            pid = self._match_partner_by_name_email(
+                cust.get("name"), cust.get("email"))
+        cache[cid] = pid
+        return pid
+
+    @api.model
+    def _match_partner_by_name_email(self, name, email):
+        """Hardened name/email match against res.partner (same discipline as
+        the quote dedup): email-exact WITH name agreement, OR a unique
+        normalized-name-exact. No wrong-merge — the collapsed twins merged
+        BECAUSE name/email matched + those merges were verified true dupes."""
+        Partner = self.env["res.partner"].sudo()
+        email = (email or "").strip().lower()
+        if email:
+            by_email = Partner.with_context(active_test=False).search(
+                [("email", "=ilike", email)])
+            if len(by_email) == 1 and _names_agree(name, by_email.name):
+                return by_email.id
+        nn = _norm_name(name)
+        if nn:
+            cands = Partner.with_context(active_test=False).search(
+                [("name", "ilike", name or nn)])
+            exact = cands.filtered(lambda p: _norm_name(p.name) == nn)
+            if len(exact) == 1:
+                return exact.id
+        return None
 
     @api.model
     def _invoice_vals(self, inv, number, bucket, cur, sp_id, sp_name, partner_id):

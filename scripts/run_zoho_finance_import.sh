@@ -38,6 +38,15 @@ echo "== stage into the container =="
 docker compose exec -T odoo mkdir -p /tmp/zoho
 docker compose cp "${INV}" odoo:/tmp/zoho/zoho_invoices.json
 docker compose cp "${EXP}" odoo:/tmp/zoho/zoho_expenses.json
+# zoho_customers.json (quote-import export) feeds the name/email fallback for
+# invoices keyed on collapsed-twin ids. Optional — stage if present.
+CUST="${ZOHO_SRC}/zoho_customers.json"
+if [[ -s "${CUST}" ]]; then
+  docker compose cp "${CUST}" odoo:/tmp/zoho/zoho_customers.json
+  echo "  (staged zoho_customers.json for the fallback)"
+else
+  echo "  (no zoho_customers.json — fallback off; unresolved invoices import unlinked)"
+fi
 docker compose exec -T odoo ls -la /tmp/zoho/
 
 if [[ "${MODE}" == "apply" ]]; then
