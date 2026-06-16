@@ -226,7 +226,11 @@ def get_token(force=False):
     r = requests.post(ACCOUNTS_DOMAIN + "/oauth/v2/token", data={
         "refresh_token": refresh, "client_id": cid, "client_secret": secret,
         "grant_type": "refresh_token"}, timeout=30)
-    r.raise_for_status()
+    # Surface the Zoho error BODY (Zoho's reply, no creds) rather than
+    # raise_for_status (whose message includes the URL). Helps tell apart a
+    # rate-limit / invalid-grant / scope problem.
+    if r.status_code != 200:
+        sys.exit("Token request HTTP %s: %s" % (r.status_code, (r.text or "")[:200]))
     data = r.json()
     if not data.get("access_token"):
         sys.exit("Token refresh failed: %s" % data)
@@ -239,20 +243,27 @@ def api_get(path, params=None):
     p = dict(params or {})
     p["organization_id"] = ORG_ID
     url = API_DOMAIN + path
+    refreshed = False
     for attempt in range(6):
         headers = {"Authorization": "Zoho-oauthtoken " + get_token()}
         r = requests.get(url, params=p, headers=headers, timeout=60)
-        if r.status_code == 401:
+        if r.status_code == 401 and not refreshed:
+            # refresh the access token ONCE — a persistent 401 is a scope/perm
+            # problem, NOT token expiry, so do not storm the refresh endpoint
+            # (that burns the refresh rate-limit).
             get_token(force=True)
+            refreshed = True
             continue
         if r.status_code == 429:
             wait = min(60, 2 ** attempt)
             print("  rate-limited (429) — backing off %ds" % wait)
             time.sleep(wait)
             continue
-        r.raise_for_status()
+        if r.status_code != 200:
+            raise RuntimeError("GET %s -> HTTP %s: %s"
+                               % (path, r.status_code, (r.text or "")[:160]))
         return r.json()
-    sys.exit("Repeated failures on GET %s" % path)
+    raise RuntimeError("Repeated failures on GET %s" % path)
 
 
 def list_all(path, key, extra=None):
