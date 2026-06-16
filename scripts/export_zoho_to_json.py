@@ -386,14 +386,23 @@ def main():
     print("auth OK")
 
     if finance:
-        # invoices + expenses (Option A reference-only). Pull the estimates LIST
-        # (id+number only, no details) to resolve invoice.estimate_id -> number
-        # for the quote.archive won-link.
-        print("Listing estimates (id->number map for the won-link) ...")
-        est_list = list_all("/books/v3/estimates", "estimates")
-        est_id_to_number = {
-            str(e.get("estimate_id")): e.get("estimate_number")
-            for e in est_list if e.get("estimate_id")}
+        # invoices + expenses (Option A reference-only). The won-link needs the
+        # estimates LIST (id->number) to resolve invoice.estimate_id. That is
+        # OPTIONAL: a finance self-client scoped to invoices+expenses only will
+        # be DENIED estimates.READ, so degrade to an empty map rather than abort
+        # — invoices + expenses still extract; the won-link just won't populate
+        # (add ZohoBooks.estimates.READ to the self-client to enable it).
+        print("Listing estimates (id->number map for the won-link; OPTIONAL) ...")
+        est_id_to_number = {}
+        try:
+            est_list = list_all("/books/v3/estimates", "estimates")
+            est_id_to_number = {
+                str(e.get("estimate_id")): e.get("estimate_number")
+                for e in est_list if e.get("estimate_id")}
+        except (SystemExit, Exception) as _e:  # noqa: BLE001
+            print("  WARN: estimates list unavailable (%s) — won-link map EMPTY "
+                  "(add ZohoBooks.estimates.READ to enable); invoices + expenses "
+                  "proceed." % _e)
         invoices = export_invoices(est_id_to_number)
         expenses = export_expenses()
         _write("zoho_invoices.json", invoices)
