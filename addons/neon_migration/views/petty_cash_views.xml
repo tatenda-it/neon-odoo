@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Petty-cash reference views. Read-only historical cashbook.
+
+    SENSITIVE: wages / loans / commissions / directors' drawings. The model ACL
+    + this menu are gated to finance (bookkeeper) + director (superuser) ONLY;
+    the sales-rep lens never sees petty cash. Reference data — never the ledger.
+-->
+<odoo>
+
+    <record id="view_petty_cash_statement_tree" model="ir.ui.view">
+        <field name="model">neon.petty.cash.statement</field>
+        <field name="arch" type="xml">
+            <tree string="Petty Cash Statements" create="false" edit="false">
+                <field name="period_month"/>
+                <field name="name"/>
+                <field name="currency_code"/>
+                <field name="opening_balance" sum="Opening"/>
+                <field name="closing_balance" sum="Closing"/>
+                <field name="cr_total" optional="show"/>
+                <field name="line_count"/>
+                <field name="source_tab" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_petty_cash_statement_form" model="ir.ui.view">
+        <field name="model">neon.petty.cash.statement</field>
+        <field name="arch" type="xml">
+            <form string="Petty Cash Statement" create="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="period_month" readonly="1"/>
+                            <field name="currency_code" readonly="1"/>
+                            <field name="source_tab" readonly="1"/>
+                            <field name="active" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="opening_balance" readonly="1"/>
+                            <field name="closing_balance" readonly="1"/>
+                            <field name="cr_total" readonly="1"/>
+                            <field name="line_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines">
+                            <field name="line_ids" readonly="1">
+                                <tree string="Lines" editable="false">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="date_parsed"/>
+                                    <field name="date_raw" optional="show"/>
+                                    <field name="details"/>
+                                    <field name="acc_code" optional="hide"/>
+                                    <field name="debit" sum="Dr"/>
+                                    <field name="credit" sum="Cr"/>
+                                    <field name="balance"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Import Note">
+                            <field name="note" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_petty_cash_statement_search" model="ir.ui.view">
+        <field name="model">neon.petty.cash.statement</field>
+        <field name="arch" type="xml">
+            <search string="Petty Cash">
+                <field name="name"/>
+                <field name="source_tab"/>
+                <filter name="f_archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_month" string="Month"
+                            context="{'group_by': 'period_month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_petty_cash_statement" model="ir.actions.act_window">
+        <field name="name">Petty Cash (Reference)</field>
+        <field name="res_model">neon.petty.cash.statement</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_petty_cash_statement_search"/>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No petty-cash statements
+               imported yet</p>
+            <p>Historical petty-cash cashbook imported from the monthly
+               spreadsheet — reference only, never the live ledger. Finance +
+               director access only.</p>
+        </field>
+    </record>
+
+    <!-- Finance-gated menu under the existing "Zoho Archive" root. Bookkeeper +
+         superuser ONLY (the root is base.group_user, but this child is
+         restricted, so sales reps never see petty cash). -->
+    <menuitem id="menu_petty_cash"
+              name="Petty Cash (Reference)"
+              parent="menu_neon_migration_root"
+              action="action_petty_cash_statement"
+              sequence="80"
+              groups="neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+</odoo>

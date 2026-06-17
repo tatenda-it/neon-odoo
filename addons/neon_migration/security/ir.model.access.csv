@@ -13,3 +13,7 @@ access_expense_archive_line_internal,neon.finance.expense.archive.line read (all
 access_expense_archive_line_super,neon.finance.expense.archive.line superuser,model_neon_finance_expense_archive_line,neon_core.group_neon_superuser,1,1,1,1
 access_quote_line_report_internal,neon.finance.quote.line.report read (all internal),model_neon_finance_quote_line_report,base.group_user,1,0,0,0
 access_realisation_report_internal,neon.finance.realisation.report read (all internal),model_neon_finance_realisation_report,base.group_user,1,0,0,0
+access_petty_cash_statement_book,neon.petty.cash.statement read (bookkeeper),model_neon_petty_cash_statement,neon_core.group_neon_bookkeeper,1,0,0,0
+access_petty_cash_statement_super,neon.petty.cash.statement superuser,model_neon_petty_cash_statement,neon_core.group_neon_superuser,1,1,1,1
+access_petty_cash_line_book,neon.petty.cash.line read (bookkeeper),model_neon_petty_cash_line,neon_core.group_neon_bookkeeper,1,0,0,0
+access_petty_cash_line_super,neon.petty.cash.line superuser,model_neon_petty_cash_line,neon_core.group_neon_superuser,1,1,1,1
