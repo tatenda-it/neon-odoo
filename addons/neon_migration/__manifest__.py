@@ -19,7 +19,14 @@
     # run_finance (link-only partners, idempotent) + the won-link populate
     # (invoice→estimate → quote.archive.zoho_invoice_number). Build + tests only;
     # extraction is a separate creds-gated run.
-    "version": "17.0.1.1.0",
+    # 17.0.1.2.0 — SALESPERSON ROLLUP: a read-only pivot/graph report over the
+    # inert quote archive (count + value per rep × status bucket). Adds ONE
+    # stored computed field quote.archive.salesperson_display (Odoo name /
+    # former-rep Zoho label / 'Unassigned', so former-rep quotes don't collapse
+    # into one empty group) + pivot/graph/search/action/menu. Defaults to
+    # currency_code=USD (never sums across USD/ZWG/ZAR). No new write capability,
+    # no ledger touch.
+    "version": "17.0.1.2.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -52,6 +59,7 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         "security/ir.model.access.csv",
         "views/quote_archive_views.xml",
         "views/finance_archive_views.xml",
+        "views/quote_rollup_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

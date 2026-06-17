@@ -86,6 +86,7 @@ SMOKES=(
   pneon_library
   pimport_zoho_reference
   pimport_finance
+  pimport_rollup
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0

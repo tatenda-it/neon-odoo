@@ -11,7 +11,7 @@ A dedicated, inert model graph. It deliberately does NOT:
 So importing 2,019 historical estimates touches NOTHING in the live finance
 or operational surfaces. Reference / reporting only.
 """
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 # Zoho status -> bucket. The loader maps; unknown statuses fall to 'historical'
@@ -60,13 +60,21 @@ class NeonFinanceQuoteArchive(models.Model):
     amount_total = fields.Float(string="Total")
 
     salesperson_id = fields.Many2one(
-        "res.users", string="Salesperson",
+        "res.users", string="Salesperson (user)",
         help="Mapped Odoo user for current reps (Lisa/Evrill/Munashe/Robin). "
-        "Empty for former reps — see salesperson_name.")
+        "Empty for former reps — see salesperson_name. The rollup groups on "
+        "salesperson_display (labelled 'Salesperson'), not this.")
     salesperson_name = fields.Char(
         string="Salesperson (source)",
         help="Original Zoho salesperson label; the only record for former "
         "reps (Hamu Mutasa / Ruvimbo / Arnold) who are NOT created as users.")
+    # Rollup grouping key: Odoo user name for current reps, raw Zoho label for
+    # former reps, else 'Unassigned'. Stored+indexed so a pivot grouped on it
+    # keeps the ~240 former-rep quotes (salesperson_name only, no id) split out
+    # instead of collapsing into one empty 'None' row.
+    salesperson_display = fields.Char(
+        string="Salesperson", compute="_compute_salesperson_display",
+        store=True, index=True)
 
     event_summary = fields.Char(
         string="Event", help="From the Zoho estimate subject_content "
@@ -84,6 +92,13 @@ class NeonFinanceQuoteArchive(models.Model):
         ("zoho_estimate_number_uniq", "unique(zoho_estimate_number)",
          "This Zoho estimate number has already been imported."),
     ]
+
+    @api.depends("salesperson_id", "salesperson_name")
+    def _compute_salesperson_display(self):
+        for rec in self:
+            rec.salesperson_display = (
+                rec.salesperson_id.name if rec.salesperson_id
+                else (rec.salesperson_name or "Unassigned"))
 
 
 class NeonFinanceQuoteArchiveLine(models.Model):

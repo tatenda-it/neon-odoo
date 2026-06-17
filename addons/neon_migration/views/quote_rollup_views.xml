@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Quote Performance by Rep — read-only analytics over the inert quote
+         archive. Currency is a CHAR (USD/ZWG/ZAR); summing across currencies is
+         meaningless, so the action defaults to currency_code=USD (the ~1,938 of
+         2,022 meaningful book) and exposes currency as a switchable filter /
+         group-by. All 4 status buckets are shown (incl. the 1,445 historical). -->
+
+    <record id="view_quote_archive_pivot" model="ir.ui.view">
+        <field name="model">neon.finance.quote.archive</field>
+        <field name="arch" type="xml">
+            <pivot string="Quote Performance by Rep" sample="0">
+                <field name="salesperson_display" type="row"/>
+                <field name="status_bucket" type="col"/>
+                <field name="amount_total" type="measure"/>
+                <field name="amount_untaxed" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_quote_archive_graph" model="ir.ui.view">
+        <field name="model">neon.finance.quote.archive</field>
+        <field name="arch" type="xml">
+            <graph string="Quote Performance by Rep" type="bar" stacked="1"
+                   sample="0">
+                <field name="salesperson_display"/>
+                <field name="status_bucket"/>
+                <field name="amount_total" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_quote_archive_rollup_search" model="ir.ui.view">
+        <field name="model">neon.finance.quote.archive</field>
+        <field name="arch" type="xml">
+            <search string="Quote Performance">
+                <field name="salesperson_display"/>
+                <field name="partner_id"/>
+                <field name="currency_code"/>
+                <!-- currency: NEVER sum across currencies; the view defaults to
+                     USD and these switch the book. -->
+                <filter name="f_usd" string="USD"
+                        domain="[('currency_code', '=', 'USD')]"/>
+                <filter name="f_zwg" string="ZWG"
+                        domain="[('currency_code', '=', 'ZWG')]"/>
+                <filter name="f_zar" string="ZAR"
+                        domain="[('currency_code', '=', 'ZAR')]"/>
+                <separator/>
+                <filter name="f_open" string="Open"
+                        domain="[('status_bucket', '=', 'open')]"/>
+                <filter name="f_hist" string="Approved-historical"
+                        domain="[('status_bucket', '=', 'historical')]"/>
+                <filter name="f_won" string="Won"
+                        domain="[('status_bucket', '=', 'won')]"/>
+                <filter name="f_lost" string="Lost"
+                        domain="[('status_bucket', '=', 'lost')]"/>
+                <separator/>
+                <filter name="f_date" string="Quotation Date"
+                        date="quotation_date"/>
+                <group expand="1" string="Group By">
+                    <filter name="g_rep" string="Salesperson"
+                            context="{'group_by': 'salesperson_display'}"/>
+                    <filter name="g_bucket" string="Status"
+                            context="{'group_by': 'status_bucket'}"/>
+                    <filter name="g_currency" string="Currency"
+                            context="{'group_by': 'currency_code'}"/>
+                    <filter name="g_date" string="Quotation Date"
+                            context="{'group_by': 'quotation_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_quote_rollup" model="ir.actions.act_window">
+        <field name="name">Quote Performance by Rep</field>
+        <field name="res_model">neon.finance.quote.archive</field>
+        <field name="view_mode">pivot,graph,tree,form</field>
+        <field name="search_view_id" ref="view_quote_archive_rollup_search"/>
+        <!-- open USD-only + grouped by rep AND currency. The USD filter is
+             clearable, so currency as a DEFAULT group-by is the structural
+             guard: every rep row/bar stays split by currency_code even if the
+             filter is removed — no cell ever sums a blended USD+ZWG+ZAR figure
+             (in the pivot OR the graph). -->
+        <field name="context">{'search_default_f_usd': 1,
+                               'search_default_g_rep': 1,
+                               'search_default_g_currency': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No quote data yet</p>
+            <p>Read-only rollup of the imported Zoho quote archive — count +
+               value per salesperson, split by status bucket. Defaults to USD;
+               switch the currency filter for ZWG / ZAR. Never sum across
+               currencies.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_quote_rollup" name="Quote Performance by Rep"
+              parent="menu_neon_migration_root"
+              action="action_quote_rollup" sequence="40"/>
+
+</odoo>

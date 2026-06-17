@@ -24,6 +24,7 @@ ARCHIVE_MENU = "neon_migration.menu_quote_archive"
 ARCHIVE_ACTION = "neon_migration.action_quote_archive"
 INVOICE_ACTION = "neon_migration.action_invoice_archive"
 EXPENSE_ACTION = "neon_migration.action_expense_archive"
+ROLLUP_ACTION = "neon_migration.action_quote_rollup"
 
 _SETUP_SCRIPT = """
 env = env(context=dict(env.context, tracking_disable=True))
@@ -204,6 +205,21 @@ def main() -> int:
                     "tr.o_data_row td:has-text('TESTINV-BS-001')", 1,
                     "smart button opens the partner's archived invoice")
                 smoke.screenshot("partner_archived_invoices")
+
+            with smoke.scenario("Quote Performance pivot: opens, rep x bucket, currency"):
+                smoke.login("p2m75_sales")
+                smoke.open_action(ROLLUP_ACTION)
+                smoke.assert_visible(".o_pivot", "pivot view renders")
+                # the fixture quote (salesperson_name 'lisar', won, USD) groups
+                # by salesperson_display -> 'lisar' row + its 231 total appear
+                # (USD default filter + Salesperson group-by both on).
+                smoke.assert_visible(".o_pivot:has-text('lisar')",
+                                     "rep row 'lisar' appears in the pivot")
+                smoke.assert_visible(".o_pivot:has-text('231')",
+                                     "the fixture's USD total renders (depth)")
+                smoke.assert_visible(".o_searchview, div.o_cp_searchview",
+                                     "search bar present (currency switch)")
+                smoke.screenshot("quote_rollup_pivot")
 
         return smoke.summary()
     finally:
