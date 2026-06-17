@@ -78,12 +78,16 @@ def _data_as(user, requested_type=None):
 
 # ============================================================
 print()
-print("T8200 -- get_dashboard_data returns 7-tile KPI payload")
+print("T8200 -- get_dashboard_data returns the director KPI payload "
+      "(7 live + 3 historical tiles)")
 print("=" * 72)
 data = _data_as(u_director)
 kpi_keys = set((data.get("kpi") or {}).keys())
 expected = {"kpi_cash", "kpi_ar_overdue", "kpi_jobs_today",
-            "kpi_jobs_week", "kpi_pipeline", "kpi_leads", "kpi_forecast"}
+            "kpi_jobs_week", "kpi_pipeline", "kpi_leads", "kpi_forecast",
+            # Sales-Intel Layer-1 historical band (director-only), merged
+            # into the director payload by get_dashboard_data.
+            "kpi_hist_winrate", "kpi_hist_demand", "kpi_hist_quotes"}
 ok = kpi_keys == expected
 print("  kpi keys:", sorted(kpi_keys))
 print("T8200:", "PASS" if ok else "FAIL")

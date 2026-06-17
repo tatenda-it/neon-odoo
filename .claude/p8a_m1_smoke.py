@@ -125,9 +125,10 @@ def _seed_count(dashboard_type):
 
 
 # P8B: sales 9->12, bookkeeper 8->13, lead_tech 7->11 (new variant
-# KPI tiles + blocks). Director (14) + tech (4) unchanged.
+# KPI tiles + blocks). Director 14->18 (Sales-Intel Layer-1 historical
+# band: kpi_hist_winrate/demand/quotes + block_hist_intel). Tech (4) unchanged.
 for tnum, dtype, expected_count in [
-    ("T8102", "director", 14),
+    ("T8102", "director", 18),
     ("T8103", "sales", 12),
     ("T8104", "bookkeeper", 13),
     ("T8105", "lead_tech", 12),  # P-B2 added block_conflicts

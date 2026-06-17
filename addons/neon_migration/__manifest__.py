@@ -26,7 +26,17 @@
     # into one empty group) + pivot/graph/search/action/menu. Defaults to
     # currency_code=USD (never sums across USD/ZWG/ZAR). No new write capability,
     # no ledger touch.
-    "version": "17.0.1.2.0",
+    # 17.0.1.3.0 — HISTORICAL INTELLIGENCE pivots (Sales-Intel Layer-1, pivot
+    # half): two read-only SQL-VIEW report models (_auto=False, sale.report
+    # pattern — zero stored rows, existing archive models byte-unchanged) —
+    # neon.finance.quote.line.report (line flattened with parent currency /
+    # rep / status / date) + neon.finance.realisation.report (quoted/won/
+    # invoiced UNION by category). Three standalone deep-dive pivots (Demand /
+    # Win-Loss / Realisation) under the Zoho Archive menu, all USD-default +
+    # group-by-currency (never blend). Internal-read ACL. Consumed by the
+    # director-dashboard Historical band (neon_dashboard). No ledger touch, no
+    # new write capability; archives stay inert.
+    "version": "17.0.1.3.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -60,6 +70,10 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         "views/quote_archive_views.xml",
         "views/finance_archive_views.xml",
         "views/quote_rollup_views.xml",
+        # 17.0.1.3.0 — historical-intelligence deep-dive pivots over the two
+        # new SQL-view report models. Loads after quote_archive_views.xml so
+        # menu_neon_migration_root (its parent) already exists.
+        "views/historical_pivots_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

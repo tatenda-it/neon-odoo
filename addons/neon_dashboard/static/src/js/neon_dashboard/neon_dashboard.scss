@@ -725,6 +725,70 @@ $neon-bg:            #FAFAFC;
         .o_neon_zig_rate_value { font-weight: 700; color: $neon-purple; }
     }
 
+    // -------- Historical Intelligence (director-only, INERT archive) --------
+    // Deliberately muted / dashed "reference" treatment so the historical
+    // band + tiles read as Zoho-import reference, never live finance cards.
+    .o_neon_kpi_tile_hist {
+        border-left: 3px dashed $neon-muted;
+    }
+    .o_neon_row_historical {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 2px dashed $neon-line;
+        .o_neon_block_hist { width: 100%; }
+    }
+    .o_neon_block_hist {
+        border-left: 4px solid $neon-muted;  // reference accent (not live)
+        .o_neon_hist_header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .o_neon_hist_badge {
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: $neon-muted;
+            border: 1px solid $neon-line;
+            border-radius: 10px;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+        .o_neon_hist_inner {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            @media (max-width: 991.98px) { grid-template-columns: 1fr; }
+            .o_neon_hist_note { grid-column: 1 / -1; display: block; }
+        }
+        .o_neon_hist_part_title {
+            font-weight: 600;
+            font-size: 0.85em;
+            margin-bottom: 6px;
+            color: $neon-purple;
+        }
+        .o_neon_hist_clickable {
+            cursor: pointer;
+            &:hover { background: $neon-purple-pale; }
+        }
+        .o_neon_hist_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82em;
+            th {
+                color: $neon-muted;
+                font-weight: 600;
+                text-align: left;
+                border-bottom: 1px solid $neon-line;
+                padding: 3px 5px;
+            }
+            td {
+                padding: 3px 5px;
+                border-bottom: 1px solid $neon-line;
+            }
+        }
+    }
+
     // -------- P8B.M4 Edit Layout: unified block grid --------
     // Rendered when a user has customised their layout OR is in edit
     // mode. Single container so CSS `order` + useSortable drag work

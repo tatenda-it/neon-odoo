@@ -534,6 +534,14 @@ class NeonDashboard(models.Model):
                 self._compute_hr_licences_expiring_block())
             payload["hr_pending_leaves_block"] = (
                 self._compute_hr_pending_leaves_block())
+        # Historical Intelligence (Sales-Intel Layer-1) -- director lens
+        # ONLY. Merged into the director payload here (NOT into
+        # _compute_kpi_director / the shared block set) so it never bleeds
+        # onto a superuser's Sales / Bookkeeper / Lead-Tech / Tech View-As
+        # lens. Reads the INERT Zoho archive only; live tiles untouched.
+        if resolved_type == "director":
+            payload["kpi"].update(self._compute_kpi_hist())
+            payload["hist_intel_block"] = self._compute_hist_intel_block()
         return payload
 
     # ==================================================================
@@ -2302,6 +2310,274 @@ class NeonDashboard(models.Model):
                 for name, count in ranked
             ],
         }
+
+    # ==================================================================
+    # HISTORICAL INTELLIGENCE (Sales-Intel Layer-1) -- director ONLY.
+    #
+    # Reads the INERT Zoho archive (neon.finance.quote.archive(.line) +
+    # neon.finance.invoice.archive(.line)) and the two SQL-view report
+    # models in neon_migration. NEVER reads / blends the live
+    # neon.finance.quote / account.move (those are the live tiles above).
+    #
+    # ⚠️ DECISION (hist-intel, marker 1): SEPARATE helpers with their OWN
+    # math -- the archive uses a free Char currency_code (USD/ZWG/ZAR), a
+    # status_bucket selection, and quotation_date, none of which match the
+    # live state-machine / res.currency model. So none of _kpi_pipeline /
+    # _compute_win_rate / _compute_sales_block / the live _format_money
+    # USD-filter is reused. A dedicated _fmt_hist formats money.
+    #
+    # ⚠️ DECISION (hist-intel, marker 2): neon_dashboard does NOT depend on
+    # neon_migration (keeps the dashboard decoupled from a migration
+    # module). Every archive read is via self.env.get(...) and degrades to
+    # an honest empty-state if neon_migration is absent / not yet upgraded
+    # -- the same optional-model pattern as _kpi_hr_licences_30's
+    # self.env.get("neon.hr.licence").
+    #
+    # ⚠️ DECISION (hist-intel, marker 3): the never-blend rule is "money
+    # sums are USD-only (non-USD disclosed); COUNTS span the whole book"
+    # (a count is not a currency sum, so it cannot blend money). Labels +
+    # subtitles always say "Historical" + the period span.
+    # ==================================================================
+    @api.model
+    def _hist_period_span(self):
+        """'Mon YYYY-Mon YYYY' span of the archived quotes, or '' if the
+        archive is absent/empty. Computed from real min/max quotation_date
+        (accuracy over a hardcoded label)."""
+        QA = self.env.get("neon.finance.quote.archive")
+        if QA is None:
+            return ""
+        QA = QA.sudo()
+        first = QA.search([("quotation_date", "!=", False)],
+                          order="quotation_date asc", limit=1)
+        last = QA.search([("quotation_date", "!=", False)],
+                         order="quotation_date desc", limit=1)
+        if not first or not last:
+            return ""
+        return "%s–%s" % (first.quotation_date.strftime("%b %Y"),
+                               last.quotation_date.strftime("%b %Y"))
+
+    @api.model
+    def _fmt_hist(self, amount, code="USD"):
+        """Money formatter for the HISTORICAL tiles. Deliberately separate
+        from the live _format_money path. Caller passes a SINGLE-currency
+        total -- this never blends. USD -> '$', ZWG -> 'Z$', else code."""
+        try:
+            amount = float(amount or 0.0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        prefix = ("$" if code == "USD"
+                  else ("Z$" if code == "ZWG" else (code + " ")))
+        if abs(amount) >= 1_000_000:
+            return "%s%.1fM" % (prefix, amount / 1_000_000.0)
+        if abs(amount) >= 1000:
+            return "%s%.1fk" % (prefix, amount / 1000.0)
+        return "%s%s" % (prefix, "{:,.0f}".format(amount))
+
+    @api.model
+    def _rg_count(self, group, groupby_field):
+        """read_group row count, robust across lazy/non-lazy result keys
+        ('<field>_count' on lazy single-groupby, '__count' otherwise)."""
+        return int(group.get(groupby_field + "_count")
+                   or group.get("__count") or 0)
+
+    @api.model
+    def _compute_kpi_hist(self):
+        """Director-only historical KPI tiles (returns 3 tile dicts)."""
+        span = self._hist_period_span()
+        return {
+            "kpi_hist_winrate": self._kpi_hist_winrate(span),
+            "kpi_hist_demand": self._kpi_hist_demand(span),
+            "kpi_hist_quotes": self._kpi_hist_quotes(span),
+        }
+
+    def _kpi_hist_winrate(self, span):
+        """All-time won / (won+lost) over the archive (count ratio across
+        all currencies -- a count never blends money)."""
+        QA = self.env.get("neon.finance.quote.archive")
+        if QA is None:
+            return self._empty_kpi(
+                _("Zoho archive not installed"), value_display="--")
+        QA = QA.sudo()
+        won = QA.search_count([("status_bucket", "=", "won")])
+        lost = QA.search_count([("status_bucket", "=", "lost")])
+        total = won + lost
+        if not total:
+            return self._empty_kpi(
+                _("No closed historical quotes"), value_display="--")
+        rate = round(won / total * 100.0, 1)
+        return {
+            "value": rate,
+            "value_display": "%g%%" % rate,
+            "subtitle": _(
+                "Historical · won %(w)d / lost %(l)d · %(s)s"
+            ) % {"w": won, "l": lost, "s": span or _("all-time")},
+            "empty": False,
+            "deeplink_action": "neon_migration.action_hist_winloss",
+        }
+
+    def _kpi_hist_demand(self, span):
+        """Most-quoted category by archived line count (all currencies)."""
+        QLR = self.env.get("neon.finance.quote.line.report")
+        if QLR is None:
+            return self._empty_kpi(
+                _("Zoho archive not installed"), value_display="--")
+        QLR = QLR.sudo()
+        groups = QLR.read_group([], ["quantity:sum"], ["category_prefix"])
+        if not groups:
+            return self._empty_kpi(
+                _("No historical quote lines"), value_display="--")
+        groups.sort(key=lambda g: self._rg_count(g, "category_prefix"),
+                    reverse=True)
+        top = groups[0]
+        cat = top.get("category_prefix") or _("Uncategorised")
+        cnt = self._rg_count(top, "category_prefix")
+        return {
+            "value": cnt,
+            "value_display": "%s" % cat,
+            "subtitle": _(
+                "Most-quoted category · %(n)s lines · historical"
+            ) % {"n": "{:,}".format(cnt)},
+            "empty": False,
+            "deeplink_action": "neon_migration.action_hist_demand",
+        }
+
+    def _kpi_hist_quotes(self, span):
+        """Total imported quotes (all currencies) + USD value; non-USD
+        disclosed (never blended into the headline figure)."""
+        QA = self.env.get("neon.finance.quote.archive")
+        if QA is None:
+            return self._empty_kpi(
+                _("Zoho archive not installed"), value_display="--")
+        QA = QA.sudo()
+        total_count = QA.search_count([])
+        if not total_count:
+            return self._empty_kpi(
+                _("No imported quotes"), value_display="0")
+        usd = QA.search([("currency_code", "=", "USD")])
+        usd_value = sum(usd.mapped("amount_total"))
+        non_usd = total_count - len(usd)
+        if non_usd:
+            sub = _(
+                "USD value · %(n)d non-USD excluded · %(s)s"
+            ) % {"n": non_usd, "s": span or _("all-time")}
+        else:
+            sub = _("Imported Zoho history · %(s)s") % {
+                "s": span or _("all-time")}
+        return {
+            "value": usd_value,
+            "value_display": "%s · %s" % (
+                "{:,}".format(total_count),
+                self._fmt_hist(usd_value, "USD")),
+            "subtitle": sub,
+            "empty": False,
+            "deeplink_action": "neon_migration.action_quote_rollup",
+        }
+
+    @api.model
+    def _compute_hist_intel_block(self):
+        """Director-only 3-part historical card over the INERT archive.
+
+        Part 1 top-5 categories by demand (line count, all currencies);
+        Part 2 win-rate by category (line-volume basis, all currencies);
+        Part 3 realisation -- quoted vs won vs invoiced VALUE per category
+        (USD only -- money never blends). Each part deep-links its pivot.
+        """
+        span = self._hist_period_span()
+        QLR = self.env.get("neon.finance.quote.line.report")
+        RR = self.env.get("neon.finance.realisation.report")
+        empty_block = {
+            "empty": True,
+            "empty_message": _("Zoho archive not installed"),
+            "period_span": span,
+            "currency_note": "",
+            "top_categories": [], "win_by_category": [], "realisation": [],
+            "deeplink_demand": "neon_migration.action_hist_demand",
+            "deeplink_winloss": "neon_migration.action_hist_winloss",
+            "deeplink_realisation": "neon_migration.action_hist_realisation",
+        }
+        if QLR is None or RR is None:
+            return empty_block
+        QLR = QLR.sudo()
+        RR = RR.sudo()
+        usd = [("currency_code", "=", "USD")]
+
+        # Part 1 -- top 5 categories by demand (line count, all currencies).
+        demand_groups = QLR.read_group(
+            [], ["quantity:sum"], ["category_prefix"])
+        demand_groups.sort(
+            key=lambda g: self._rg_count(g, "category_prefix"), reverse=True)
+        top_categories = [{
+            "category": g.get("category_prefix") or _("Uncategorised"),
+            "line_count": self._rg_count(g, "category_prefix"),
+            "qty": int(g.get("quantity") or 0),
+        } for g in demand_groups[:5]]
+
+        # Part 2 -- win-rate by category (won/(won+lost) line volume, all
+        # currencies). Line-volume basis (a line belongs to exactly one
+        # quote+bucket); labelled as such -- NOT the quote-count headline.
+        wl_groups = QLR.read_group(
+            [], [], ["category_prefix", "status_bucket"], lazy=False)
+        by_cat = {}
+        for g in wl_groups:
+            cat = g.get("category_prefix") or _("Uncategorised")
+            bucket = g.get("status_bucket")
+            cnt = int(g.get("__count") or 0)
+            d = by_cat.setdefault(cat, {"won": 0, "lost": 0})
+            if bucket == "won":
+                d["won"] += cnt
+            elif bucket == "lost":
+                d["lost"] += cnt
+        rated = []
+        for cat, d in by_cat.items():
+            closed = d["won"] + d["lost"]
+            if not closed:
+                continue
+            rated.append({
+                "category": cat, "won": d["won"], "lost": d["lost"],
+                "rate_pct": round(d["won"] / closed * 100.0, 1),
+            })
+        rated.sort(key=lambda r: r["rate_pct"], reverse=True)
+        win_by_category = rated[:3]
+        if len(rated) > 3:
+            seen = {r["category"] for r in win_by_category}
+            win_by_category = win_by_category + [
+                r for r in rated[-3:] if r["category"] not in seen]
+
+        # Part 3 -- realisation: quoted vs won vs invoiced VALUE by category
+        # (USD only; "Realised revenue", NOT margin). Top 5 by quoted value.
+        real_groups = RR.read_group(
+            usd, ["value:sum"], ["category_prefix", "kind"], lazy=False)
+        real_map = {}
+        for g in real_groups:
+            cat = g.get("category_prefix") or _("Uncategorised")
+            kind = g.get("kind")
+            m = real_map.setdefault(
+                cat, {"quoted": 0.0, "won": 0.0, "invoiced": 0.0})
+            if kind in m:
+                m[kind] += (g.get("value") or 0.0)
+        real_sorted = sorted(
+            real_map.items(), key=lambda kv: kv[1]["quoted"],
+            reverse=True)[:5]
+        realisation = [{
+            "category": cat,
+            "quoted_display": self._fmt_hist(v["quoted"], "USD"),
+            "won_display": self._fmt_hist(v["won"], "USD"),
+            "invoiced_display": self._fmt_hist(v["invoiced"], "USD"),
+        } for cat, v in real_sorted]
+
+        block = dict(empty_block)
+        block.update({
+            "empty": not (top_categories or win_by_category or realisation),
+            "empty_message": _("No historical quote / invoice data yet"),
+            "period_span": span,
+            "currency_note": _(
+                "Counts span all currencies; money values USD only "
+                "· Historical (Zoho import)"),
+            "top_categories": top_categories,
+            "win_by_category": win_by_category,
+            "realisation": realisation,
+        })
+        return block
 
     # ==================================================================
     # P8B variant blocks -- assembly + filter over existing models.

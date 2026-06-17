@@ -914,6 +914,121 @@
         </div>
     </t>
 
+    <!-- ====================================================================
+         Historical Intelligence block (director ONLY). Reads the INERT Zoho
+         archive via hist_intel_block; the card is unmistakably labelled
+         "Historical / Zoho import" so it can never be mistaken for a live
+         finance card, even if a director drags it among live blocks in the
+         unified Edit-Layout grid. Each part deep-links its standalone pivot.
+         ==================================================================== -->
+    <t t-name="neon_dashboard.block.block_hist_intel">
+        <div class="o_neon_block o_neon_block_hist widget--block_hist_intel">
+            <div class="o_neon_block_header o_neon_hist_header">
+                <span>Historical Intelligence</span>
+                <span class="o_neon_hist_badge"
+                      title="Reference data imported from Zoho — never the live ledger">
+                    Zoho import
+                </span>
+            </div>
+            <div class="o_neon_block_body">
+                <div t-if="histIntelBlock.empty" class="o_neon_block_empty">
+                    <p class="o_neon_block_empty_msg"
+                       t-esc="histIntelBlock.empty_message"/>
+                </div>
+                <div t-if="!histIntelBlock.empty" class="o_neon_hist_inner">
+                    <small class="text-muted o_neon_hist_note">
+                        <t t-esc="histIntelBlock.currency_note"/>
+                        <t t-if="histIntelBlock.period_span">
+                            · <t t-esc="histIntelBlock.period_span"/>
+                        </t>
+                    </small>
+
+                    <!-- Part 1: top categories by demand (line count) -->
+                    <div class="o_neon_hist_part">
+                        <div class="o_neon_hist_part_title o_neon_hist_clickable"
+                             t-on-click="() => this.onHistDeepLink(histIntelBlock.deeplink_demand)">
+                            Top categories by demand
+                            <i class="fa fa-arrow-circle-right ms-1"/>
+                        </div>
+                        <table class="o_neon_hist_table">
+                            <tbody>
+                                <t t-foreach="histIntelBlock.top_categories"
+                                   t-as="c" t-key="c.category">
+                                    <tr class="o_neon_hist_row o_neon_hist_clickable"
+                                        t-on-click="() => this.onHistDeepLink(histIntelBlock.deeplink_demand)">
+                                        <td t-esc="c.category"/>
+                                        <td class="text-end">
+                                            <t t-esc="c.line_count"/> lines
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Part 2: win-rate by category (line-volume basis) -->
+                    <div class="o_neon_hist_part">
+                        <div class="o_neon_hist_part_title o_neon_hist_clickable"
+                             t-on-click="() => this.onHistDeepLink(histIntelBlock.deeplink_winloss)">
+                            Win-rate by category
+                            <small class="text-muted">(line volume)</small>
+                            <i class="fa fa-arrow-circle-right ms-1"/>
+                        </div>
+                        <table class="o_neon_hist_table">
+                            <tbody>
+                                <t t-foreach="histIntelBlock.win_by_category"
+                                   t-as="w" t-key="w.category">
+                                    <tr class="o_neon_hist_row o_neon_hist_clickable"
+                                        t-on-click="() => this.onHistDeepLink(histIntelBlock.deeplink_winloss)">
+                                        <td t-esc="w.category"/>
+                                        <td class="text-end">
+                                            <t t-esc="w.rate_pct"/>%
+                                            <small class="text-muted">
+                                                (<t t-esc="w.won"/>W / <t t-esc="w.lost"/>L)
+                                            </small>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Part 3: realisation — quoted vs won vs invoiced (USD) -->
+                    <div class="o_neon_hist_part">
+                        <div class="o_neon_hist_part_title o_neon_hist_clickable"
+                             t-on-click="() => this.onHistDeepLink(histIntelBlock.deeplink_realisation)">
+                            Realised revenue by category
+                            <small class="text-muted">(USD)</small>
+                            <i class="fa fa-arrow-circle-right ms-1"/>
+                        </div>
+                        <table class="o_neon_hist_table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th class="text-end">Quoted</th>
+                                    <th class="text-end">Won</th>
+                                    <th class="text-end">Invoiced</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="histIntelBlock.realisation"
+                                   t-as="r" t-key="r.category">
+                                    <tr class="o_neon_hist_row o_neon_hist_clickable"
+                                        t-on-click="() => this.onHistDeepLink(histIntelBlock.deeplink_realisation)">
+                                        <td t-esc="r.category"/>
+                                        <td class="text-end" t-esc="r.quoted_display"/>
+                                        <td class="text-end" t-esc="r.won_display"/>
+                                        <td class="text-end" t-esc="r.invoiced_display"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
     <!-- ==================================================================== -->
 
     <t t-name="neon_dashboard.NeonDashboard">
@@ -1134,6 +1249,46 @@
                              t-esc="kpi.kpi_forecast and kpi.kpi_forecast.value_display"/>
                         <div class="o_neon_kpi_subtitle"
                              t-esc="kpi.kpi_forecast and kpi.kpi_forecast.subtitle"/>
+                    </div>
+
+                    <!-- Historical Intelligence KPI tiles (director ONLY;
+                         seeded into the director layout, isWidgetVisible-gated
+                         so no other lens renders them). Distinct
+                         o_neon_kpi_tile_hist styling marks them as reference. -->
+                    <div class="o_neon_kpi_tile o_neon_kpi_tile_hist widget--kpi_hist_winrate"
+                         t-if="isWidgetVisible('kpi_hist_winrate')"
+                         t-att-class="kpi.kpi_hist_winrate and kpi.kpi_hist_winrate.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hist_winrate)">
+                        <div class="o_neon_kpi_label">Win Rate · Historical</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hist_winrate and kpi.kpi_hist_winrate.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hist_winrate and kpi.kpi_hist_winrate.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hist_winrate and kpi.kpi_hist_winrate.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile o_neon_kpi_tile_hist widget--kpi_hist_demand"
+                         t-if="isWidgetVisible('kpi_hist_demand')"
+                         t-att-class="kpi.kpi_hist_demand and kpi.kpi_hist_demand.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hist_demand)">
+                        <div class="o_neon_kpi_label">Top Demand · Historical</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hist_demand and kpi.kpi_hist_demand.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hist_demand and kpi.kpi_hist_demand.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hist_demand and kpi.kpi_hist_demand.subtitle"/>
+                    </div>
+
+                    <div class="o_neon_kpi_tile o_neon_kpi_tile_hist widget--kpi_hist_quotes"
+                         t-if="isWidgetVisible('kpi_hist_quotes')"
+                         t-att-class="kpi.kpi_hist_quotes and kpi.kpi_hist_quotes.deeplink_action ? 'o_neon_kpi_clickable' : ''"
+                         t-on-click="() => this.onKpiClick(kpi.kpi_hist_quotes)">
+                        <div class="o_neon_kpi_label">Quotes · Historical</div>
+                        <div class="o_neon_kpi_value"
+                             t-att-class="kpi.kpi_hist_quotes and kpi.kpi_hist_quotes.empty ? 'o_neon_kpi_empty' : ''"
+                             t-esc="kpi.kpi_hist_quotes and kpi.kpi_hist_quotes.value_display"/>
+                        <div class="o_neon_kpi_subtitle"
+                             t-esc="kpi.kpi_hist_quotes and kpi.kpi_hist_quotes.subtitle"/>
                     </div>
 
                     <div class="o_neon_kpi_tile widget--kpi_hot_deals"
@@ -1378,6 +1533,16 @@
                            t-call="neon_dashboard.block.block_tasks"/>
                         <t t-if="isWidgetVisible('block_ai_insights')"
                            t-call="neon_dashboard.block.block_ai_insights"/>
+                    </section>
+                    <!-- Historical · Zoho import band (director ONLY). A
+                         DEDICATED section so an Edit-Layout reorder can't slip
+                         a historical card between two live finance cards in the
+                         rich view. The wrapper is guarded so non-director
+                         lenses emit ZERO o_neon_row_historical nodes. The
+                         unified/edit path renders it via orderedBlocks. -->
+                    <section class="o_neon_row_historical"
+                             t-if="isWidgetVisible('block_hist_intel')">
+                        <t t-call="neon_dashboard.block.block_hist_intel"/>
                     </section>
                     <!-- HR variant blocks in the rich (non-customised)
                          path. The section WRAPPER is itself guarded so a

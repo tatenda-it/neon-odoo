@@ -38,6 +38,7 @@ const BLOCK_LABELS = {
     block_hr_contracts: "HR · Contracts Expiring",
     block_hr_licences: "HR · Licences Expiring",
     block_hr_pending_leaves: "HR · Pending Leave",
+    block_hist_intel: "Historical · Zoho Intel",
 };
 
 // block_alerts is the only mandatory CONTENT block (D6); the UI never
@@ -925,6 +926,31 @@ export class NeonDashboard extends Component {
         return (this.state.data && this.state.data.cert_expiry_block) || {
             empty: true, rows: [],
         };
+    }
+
+    // Historical Intelligence block (director ONLY; over the INERT Zoho
+    // archive). Default keeps the empty-state shape so the template never
+    // throws when the payload key is absent (non-director lenses).
+    get histIntelBlock() {
+        return (this.state.data && this.state.data.hist_intel_block) || {
+            empty: true,
+            empty_message: "No historical data",
+            period_span: "",
+            currency_note: "",
+            top_categories: [],
+            win_by_category: [],
+            realisation: [],
+            deeplink_demand: false,
+            deeplink_winloss: false,
+            deeplink_realisation: false,
+        };
+    }
+
+    async onHistDeepLink(xmlid) {
+        // Each historical card part deep-links to its standalone pivot
+        // (neon_migration act_window xmlids). No-op if absent.
+        if (!xmlid) return;
+        await this.action.doAction(xmlid);
     }
 
     // HR variant block getters (P-HR-R3b client render, 2026-06-11).

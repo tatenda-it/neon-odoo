@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Standalone deep-dive pivots over the INERT Zoho archive (reference /
+    historical only — these NEVER read the live neon.finance.quote / ledger).
+
+    Three analytics surfaces, all read-only, all currency-isolated:
+      * Demand        — neon.finance.quote.line.report (category x count/qty)
+      * Win / Loss    — neon.finance.quote.line.report (category x status x value)
+      * Realisation   — neon.finance.realisation.report (quoted/won/invoiced)
+
+    Currency NEVER blended: every action opens USD-filtered AND group-by-currency,
+    so even if the USD filter is cleared every row/cell stays split by
+    currency_code (the structural guard, mirroring action_quote_rollup). USD is
+    the meaningful book (~1,938 of 2,022 quotes); ZWG/ZAR switch the filter.
+
+    Internal-read ACL only (base.group_user) — same posture as the rest of the
+    Zoho Archive menu. Reference data carries NO live balances / ledger.
+-->
+<odoo>
+
+    <!-- ============================================================
+         neon.finance.quote.line.report — shared search + two pivots
+         (Demand + Win/Loss share the model, differ in pivot arch).
+         ============================================================ -->
+    <record id="view_quote_line_report_search" model="ir.ui.view">
+        <field name="model">neon.finance.quote.line.report</field>
+        <field name="arch" type="xml">
+            <search string="Historical Quote Lines">
+                <field name="category_prefix"/>
+                <field name="item_name"/>
+                <field name="salesperson_display"/>
+                <field name="partner_id"/>
+                <field name="currency_code"/>
+                <!-- currency: NEVER sum across currencies; default USD,
+                     these switch the book. -->
+                <filter name="f_usd" string="USD"
+                        domain="[('currency_code', '=', 'USD')]"/>
+                <filter name="f_zwg" string="ZWG"
+                        domain="[('currency_code', '=', 'ZWG')]"/>
+                <filter name="f_zar" string="ZAR"
+                        domain="[('currency_code', '=', 'ZAR')]"/>
+                <separator/>
+                <filter name="f_won" string="Won"
+                        domain="[('status_bucket', '=', 'won')]"/>
+                <filter name="f_lost" string="Lost"
+                        domain="[('status_bucket', '=', 'lost')]"/>
+                <filter name="f_open" string="Open"
+                        domain="[('status_bucket', '=', 'open')]"/>
+                <filter name="f_hist" string="Approved-historical"
+                        domain="[('status_bucket', '=', 'historical')]"/>
+                <separator/>
+                <filter name="f_date" string="Quotation Date"
+                        date="quotation_date"/>
+                <group expand="1" string="Group By">
+                    <filter name="g_category" string="Category"
+                            context="{'group_by': 'category_prefix'}"/>
+                    <filter name="g_item" string="Item"
+                            context="{'group_by': 'item_name'}"/>
+                    <filter name="g_rep" string="Salesperson"
+                            context="{'group_by': 'salesperson_display'}"/>
+                    <filter name="g_status" string="Status"
+                            context="{'group_by': 'status_bucket'}"/>
+                    <filter name="g_currency" string="Currency"
+                            context="{'group_by': 'currency_code'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_quote_line_report_demand_pivot" model="ir.ui.view">
+        <field name="model">neon.finance.quote.line.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Historical Demand by Category" sample="0">
+                <field name="category_prefix" type="row"/>
+                <field name="quantity" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_quote_line_report_winloss_pivot" model="ir.ui.view">
+        <field name="model">neon.finance.quote.line.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Historical Win / Loss by Category" sample="0">
+                <field name="category_prefix" type="row"/>
+                <field name="status_bucket" type="col"/>
+                <field name="line_total" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_quote_line_report_graph" model="ir.ui.view">
+        <field name="model">neon.finance.quote.line.report</field>
+        <field name="arch" type="xml">
+            <graph string="Historical Quote Lines" type="bar" sample="0">
+                <field name="category_prefix"/>
+                <field name="line_total" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- DEMAND pivot: what gets quoted most. Count + summed quantity by
+         category; USD default + group-by-currency guard. -->
+    <record id="action_hist_demand" model="ir.actions.act_window">
+        <field name="name">Historical Demand by Category</field>
+        <field name="res_model">neon.finance.quote.line.report</field>
+        <field name="view_mode">pivot,graph,tree</field>
+        <field name="search_view_id" ref="view_quote_line_report_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'pivot', 'sequence': 1,
+                    'view_id': ref('view_quote_line_report_demand_pivot')}),
+            (0, 0, {'view_mode': 'graph', 'sequence': 2,
+                    'view_id': ref('view_quote_line_report_graph')}),
+            (0, 0, {'view_mode': 'tree', 'sequence': 3})]"/>
+        <field name="context">{'search_default_f_usd': 1,
+                               'search_default_g_category': 1,
+                               'search_default_g_currency': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No historical quote data
+               yet</p>
+            <p><b>Historical (Zoho import)</b> — most-quoted categories by line
+               count and total quantity. Read-only reference over the imported
+               Zoho estimate archive; does NOT touch the live finance ledger.
+               Defaults to USD; switch the currency filter for ZWG / ZAR.
+               Never sum across currencies.</p>
+        </field>
+    </record>
+
+    <!-- WIN/LOSS pivot: quoted value by category x status bucket (all 4
+         buckets). Row can be re-grouped by Salesperson. USD default +
+         group-by-currency guard. -->
+    <record id="action_hist_winloss" model="ir.actions.act_window">
+        <field name="name">Historical Win / Loss by Category</field>
+        <field name="res_model">neon.finance.quote.line.report</field>
+        <field name="view_mode">pivot,graph,tree</field>
+        <field name="search_view_id" ref="view_quote_line_report_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'pivot', 'sequence': 1,
+                    'view_id': ref('view_quote_line_report_winloss_pivot')}),
+            (0, 0, {'view_mode': 'graph', 'sequence': 2,
+                    'view_id': ref('view_quote_line_report_graph')}),
+            (0, 0, {'view_mode': 'tree', 'sequence': 3})]"/>
+        <field name="context">{'search_default_f_usd': 1,
+                               'search_default_g_category': 1,
+                               'search_default_g_currency': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No historical quote data
+               yet</p>
+            <p><b>Historical (Zoho import)</b> — quoted value by category across
+               all four status buckets (Won / Lost / Open / Historical).
+               Re-group by Salesperson from the Group By menu. Read-only
+               reference; never touches the live ledger. USD default; never sum
+               across currencies.</p>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         neon.finance.realisation.report — quoted vs won vs invoiced.
+         ============================================================ -->
+    <record id="view_realisation_report_search" model="ir.ui.view">
+        <field name="model">neon.finance.realisation.report</field>
+        <field name="arch" type="xml">
+            <search string="Quoted vs Realised">
+                <field name="category_prefix"/>
+                <field name="currency_code"/>
+                <filter name="f_usd" string="USD"
+                        domain="[('currency_code', '=', 'USD')]"/>
+                <filter name="f_zwg" string="ZWG"
+                        domain="[('currency_code', '=', 'ZWG')]"/>
+                <filter name="f_zar" string="ZAR"
+                        domain="[('currency_code', '=', 'ZAR')]"/>
+                <separator/>
+                <filter name="f_quoted" string="Quoted"
+                        domain="[('kind', '=', 'quoted')]"/>
+                <filter name="f_won" string="Won"
+                        domain="[('kind', '=', 'won')]"/>
+                <filter name="f_invoiced" string="Invoiced (realised)"
+                        domain="[('kind', '=', 'invoiced')]"/>
+                <group expand="1" string="Group By">
+                    <filter name="g_category" string="Category"
+                            context="{'group_by': 'category_prefix'}"/>
+                    <filter name="g_kind" string="Measure"
+                            context="{'group_by': 'kind'}"/>
+                    <filter name="g_currency" string="Currency"
+                            context="{'group_by': 'currency_code'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_realisation_report_pivot" model="ir.ui.view">
+        <field name="model">neon.finance.realisation.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Quoted vs Realised by Category" sample="0">
+                <field name="category_prefix" type="row"/>
+                <field name="kind" type="col"/>
+                <field name="value" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_realisation_report_graph" model="ir.ui.view">
+        <field name="model">neon.finance.realisation.report</field>
+        <field name="arch" type="xml">
+            <graph string="Quoted vs Realised by Category" type="bar"
+                   sample="0">
+                <field name="category_prefix"/>
+                <field name="kind"/>
+                <field name="value" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_hist_realisation" model="ir.actions.act_window">
+        <field name="name">Quoted vs Realised by Category</field>
+        <field name="res_model">neon.finance.realisation.report</field>
+        <field name="view_mode">pivot,graph,tree</field>
+        <field name="search_view_id" ref="view_realisation_report_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'pivot', 'sequence': 1,
+                    'view_id': ref('view_realisation_report_pivot')}),
+            (0, 0, {'view_mode': 'graph', 'sequence': 2,
+                    'view_id': ref('view_realisation_report_graph')}),
+            (0, 0, {'view_mode': 'tree', 'sequence': 3})]"/>
+        <field name="context">{'search_default_f_usd': 1,
+                               'search_default_g_category': 1,
+                               'search_default_g_currency': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No historical data yet</p>
+            <p><b>Historical (Zoho import)</b> — quoted volume vs won value vs
+               invoiced (realised) value, per category. "Realised revenue" only:
+               Neon expenses are not item-linked, so this is NOT margin.
+               Read-only reference; never touches the live ledger. USD default;
+               never sum across currencies. NB: "Won" lines are a subset of
+               "Quoted" — the columns are independent, do not cross-add.</p>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Menus under the existing "Zoho Archive" root (base.group_user).
+         ============================================================ -->
+    <menuitem id="menu_hist_demand" name="Demand by Category"
+              parent="menu_neon_migration_root"
+              action="action_hist_demand" sequence="50"/>
+    <menuitem id="menu_hist_winloss" name="Win / Loss by Category"
+              parent="menu_neon_migration_root"
+              action="action_hist_winloss" sequence="60"/>
+    <menuitem id="menu_hist_realisation" name="Quoted vs Realised"
+              parent="menu_neon_migration_root"
+              action="action_hist_realisation" sequence="70"/>
+
+</odoo>

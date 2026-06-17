@@ -78,6 +78,13 @@ _WIDGET_KEYS = [
     ("block_hr_contracts", "Block: HR Contracts Expiring"),
     ("block_hr_licences", "Block: HR Licences Expiring"),
     ("block_hr_pending_leaves", "Block: HR Pending Leaves"),
+    # Historical Intelligence (Sales-Intel Layer-1) -- director-only band
+    # over the INERT Zoho archive. Kept in sync with default_layouts.xml +
+    # the OWL widget switch + the 17.0.11.3.0 re-seed migration.
+    ("kpi_hist_winrate", "KPI: Win Rate (Historical)"),
+    ("kpi_hist_demand", "KPI: Top Demand (Historical)"),
+    ("kpi_hist_quotes", "KPI: Quotes (Historical)"),
+    ("block_hist_intel", "Block: Historical Intelligence"),
 ]
 
 # Schema sketch §4.2 -- not hide-able. Set in M1 so the API contract

@@ -62,7 +62,23 @@
     # is guarded by isWidgetVisible('*_hr_*'), false for their layouts).
     # No RBAC change, no new access power. Asset-bundle: -u +
     # delete web.assets_* + force-recreate; users hard-refresh once.
-    "version": "17.0.11.2.0",
+    # 17.0.11.3.0 = HISTORICAL INTELLIGENCE band (Sales-Intel Layer-1,
+    # dashboard half). Director-ONLY tiles + block reading the INERT Zoho
+    # archive (neon.finance.quote.archive(.line)/invoice + the two new SQL-
+    # view report models in neon_migration 17.0.1.3.0) — NEVER the live
+    # neon.finance.quote / account.move, NEVER blended with live tiles.
+    # Adds: 3 KPI tiles (kpi_hist_winrate/demand/quotes) + 1 block
+    # (block_hist_intel: top categories / win-rate-by-category / realisation)
+    # in a DEDICATED "Historical · Zoho import" band; separate _kpi_*_hist /
+    # _compute_hist_intel_block helpers (own currency_code/status_bucket math,
+    # dedicated _fmt_hist); merged into the director payload branch ONLY (not
+    # _compute_kpi_director / shared blocks, so no View-As bleed); env.get()
+    # optional-model reads (no neon_migration dependency); each part deep-links
+    # the standalone neon_migration pivots. Money = USD only (non-USD
+    # disclosed); counts span all currencies. Re-seed via 17.0.11.3.0
+    # post-migrate (director default + user layouts). Asset-bundle: -u +
+    # delete web.assets_* + force-recreate; users hard-refresh once.
+    "version": "17.0.11.3.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

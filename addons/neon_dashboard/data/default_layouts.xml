@@ -54,8 +54,18 @@
                 (0, 0, {'widget_key': 'block_crew_equipment','order_index': 14}),
                 (0, 0, {'widget_key': 'block_tasks',       'order_index': 15}),
                 (0, 0, {'widget_key': 'block_ai_insights', 'order_index': 16, 'size': 'large'}),
+                (0, 0, {'widget_key': 'kpi_hist_winrate',  'order_index': 50}),
+                (0, 0, {'widget_key': 'kpi_hist_demand',   'order_index': 51}),
+                (0, 0, {'widget_key': 'kpi_hist_quotes',   'order_index': 52}),
+                (0, 0, {'widget_key': 'block_hist_intel',  'order_index': 60, 'size': 'large'}),
             ]"/>
         </record>
+        <!-- Director Historical · Zoho import band = order_index 50-52 (KPI
+             tiles, cosmetic) + 60 (block, 'large'). High band keeps it cleanly
+             separate from the live KPI (1-7) + block (10-16) bands. Director
+             ONLY. Existing installs pick these up via the 17.0.11.3.0
+             post-migrate (this file is noupdate=1). -->
+
 
         <!-- ============================================================
              Sales (Lisa / Evrill - Tatenda when overriding via View-as).

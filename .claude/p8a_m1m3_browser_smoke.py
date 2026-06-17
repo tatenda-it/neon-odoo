@@ -128,8 +128,10 @@ def run() -> int:
             smoke.assert_visible(
                 ".o_neon_dashboard_brand h1",
                 "brand h1 visible")
+            # Director strip = 7 live tiles + 3 Sales-Intel Layer-1
+            # historical tiles (kpi_hist_winrate/demand/quotes).
             smoke.assert_count(
-                ".o_neon_kpi_tile", 7, "7 KPI tiles rendered")
+                ".o_neon_kpi_tile", 10, "10 KPI tiles rendered (7 live + 3 historical)")
             smoke.assert_visible(
                 ".o_neon_dashboard_edit_layout",
                 "Edit Layout pencil visible")
