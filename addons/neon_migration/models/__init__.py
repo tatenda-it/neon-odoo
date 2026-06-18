@@ -7,5 +7,6 @@ from . import susp_undep
 from . import job_history
 from . import crew_member
 from . import wages_entry
+from . import collections_item
 from . import zoho_import
 from . import res_partner

@@ -70,7 +70,20 @@
     # crew-roster aliases; conservative job fuzzy-match to neon.job.history
     # (jobs_raw kept verbatim). PAY -> ACL finance(bookkeeper)+director only.
     # NOT live hr.employee/wage/crew. Reversible.
-    "version": "17.0.1.8.0",
+    # 17.0.1.9.0 — COLLECTIONS WORKLIST (the FIRST live, team-editable model in
+    # this module): neon.collections.item (mail.thread + mail.activity.mixin) —
+    # the outstanding-payments sheet worked as a collections board in Odoo
+    # (status / contact / follow-up activities / chatter). A WORKLIST, NOT
+    # general-ledger AR — no account.move, no ledger posting; the Zoho AR pull
+    # is disregarded, this sheet is the only source. Verbatim note is the source
+    # of truth; status is a sortable layer. Seeded ONCE (get-or-create, never
+    # clobbers team edits) via parse_collections.py + import_collections.py
+    # (conservative partner match; Robin/Lisar reps resolve, Mr.G/Mrs.G left
+    # NULL + flagged). SENSITIVE (debtor amounts + contact phones + escalation
+    # notes) -> ACL collections team only (sales RW+create no-unlink, bookkeeper
+    # + director full); crew/operational lens excluded. Kanban-by-status board
+    # under a NEW top-level "Collections" menu (NOT Zoho Archive).
+    "version": "17.0.1.9.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -118,6 +131,10 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         "views/crew_member_views.xml",
         # 17.0.1.8.0 — wages reference (finance/director-gated menu).
         "views/wages_entry_views.xml",
+        # 17.0.1.9.0 — LIVE collections worklist (own top-level Collections
+        # menu, collections-team-gated). Defines its own menu root, so it can
+        # load in any order relative to the Zoho Archive views.
+        "views/collections_item_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

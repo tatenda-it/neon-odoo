@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Collections worklist — the LIVE, team-editable outstanding-payments board.
+    UNLIKE the inert archive views (create/edit false), this is editable: the
+    collections team works items, re-statuses, and logs follow-up activities.
+    Kanban grouped by status is the natural collections board. SENSITIVE
+    (debtor amounts + contact phones + escalation notes) -> menu + ACL gated to
+    the collections team (sales + bookkeeper + director); crew/operational lens
+    never sees it. A WORKLIST, NOT general-ledger AR.
+-->
+<odoo>
+
+    <record id="view_collections_item_kanban" model="ir.ui.view">
+        <field name="model">neon.collections.item</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="status" class="o_kanban_small_column"
+                    quick_create="false">
+                <field name="status"/>
+                <field name="amount_usd"/>
+                <field name="amount_zwg"/>
+                <field name="currency_flag"/>
+                <field name="contact_name"/>
+                <field name="contact_phone"/>
+                <field name="sales_rep_id"/>
+                <field name="period_year"/>
+                <field name="activity_ids"/>
+                <field name="activity_state"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title">
+                                        <field name="client_name"/>
+                                    </strong>
+                                    <small class="o_kanban_record_subtitle text-muted">
+                                        <field name="event_name"/>
+                                    </small>
+                                </div>
+                                <strong>
+                                    <t t-if="record.amount_usd.raw_value">
+                                        $<field name="amount_usd"/>
+                                    </t>
+                                    <t t-if="record.currency_flag.raw_value">
+                                        <span class="badge text-bg-warning">
+                                            <field name="currency_flag"/>
+                                        </span>
+                                    </t>
+                                </strong>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <t t-if="record.contact_name.raw_value">
+                                    <i class="fa fa-user" title="Contact"/>
+                                    <field name="contact_name"/>
+                                    <t t-if="record.contact_phone.raw_value">
+                                        — <field name="contact_phone"/>
+                                    </t>
+                                </t>
+                            </div>
+                            <div class="o_kanban_record_bottom">
+                                <div class="oe_kanban_bottom_left">
+                                    <field name="period_year"/>
+                                    <field name="activity_ids"
+                                           widget="kanban_activity"/>
+                                </div>
+                                <div class="oe_kanban_bottom_right">
+                                    <field name="sales_rep_id"
+                                           widget="many2one_avatar_user"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_collections_item_tree" model="ir.ui.view">
+        <field name="model">neon.collections.item</field>
+        <field name="arch" type="xml">
+            <tree string="Collections Worklist"
+                  decoration-success="status in ('recovered','closed')"
+                  decoration-danger="status == 'unresponsive'"
+                  decoration-muted="status == 'closed'">
+                <field name="client_name"/>
+                <field name="event_name" optional="show"/>
+                <field name="amount_usd" sum="Outstanding USD"/>
+                <field name="amount_zwg" sum="Outstanding ZWG" optional="hide"/>
+                <field name="currency_flag" optional="hide"/>
+                <field name="contact_name" optional="show"/>
+                <field name="contact_phone" optional="show"/>
+                <field name="sales_rep_id" optional="show"/>
+                <field name="status" widget="badge"/>
+                <field name="period_year" optional="show"/>
+                <field name="activity_ids" widget="list_activity" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_collections_item_form" model="ir.ui.view">
+        <field name="model">neon.collections.item</field>
+        <field name="arch" type="xml">
+            <form string="Collections Item">
+                <header>
+                    <field name="status" widget="statusbar"
+                           options="{'clickable': '1'}"
+                           statusbar_visible="chasing,promised,part_paid,recovered,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="client_name"/>
+                        <h1><field name="client_name" placeholder="Client name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Account">
+                            <field name="event_name"/>
+                            <field name="partner_id"/>
+                            <field name="period_year"/>
+                            <field name="sales_rep_id"/>
+                            <field name="sales_rep_raw" readonly="1"/>
+                        </group>
+                        <group string="Outstanding">
+                            <field name="amount_usd"/>
+                            <field name="amount_zwg"/>
+                            <field name="currency_flag"/>
+                            <field name="contact_name"/>
+                            <field name="contact_phone"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes (source of truth)">
+                            <field name="note"
+                                   placeholder="Collection notes — the verbatim status from the sheet, plus your follow-up log."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_collections_item_search" model="ir.ui.view">
+        <field name="model">neon.collections.item</field>
+        <field name="arch" type="xml">
+            <search string="Collections">
+                <field name="client_name"/>
+                <field name="event_name"/>
+                <field name="contact_name"/>
+                <field name="sales_rep_id"/>
+                <filter name="f_open" string="Open (not recovered/closed)"
+                        domain="[('status', 'not in', ('recovered','closed'))]"/>
+                <filter name="f_unresponsive" string="Unresponsive"
+                        domain="[('status', '=', 'unresponsive')]"/>
+                <filter name="f_has_usd" string="Has USD balance"
+                        domain="[('amount_usd', '>', 0)]"/>
+                <separator/>
+                <filter name="f_2025" string="2025"
+                        domain="[('period_year', '=', '2025')]"/>
+                <filter name="f_2026" string="2026"
+                        domain="[('period_year', '=', '2026')]"/>
+                <separator/>
+                <filter name="f_archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <filter name="f_activities" string="My Activities"
+                        domain="[('activity_ids.user_id', '=', uid)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_status" string="Status"
+                            context="{'group_by': 'status'}"/>
+                    <filter name="g_rep" string="Sales Rep"
+                            context="{'group_by': 'sales_rep_id'}"/>
+                    <filter name="g_period" string="Period"
+                            context="{'group_by': 'period_year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_collections_item" model="ir.actions.act_window">
+        <field name="name">Outstanding Payments</field>
+        <field name="res_model">neon.collections.item</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id" ref="view_collections_item_search"/>
+        <field name="context">{'search_default_f_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No outstanding items yet</p>
+            <p>The collections worklist — outstanding client payments the team
+               works in Odoo (status, contact, follow-up activities). Seeded
+               from the outstanding-payments sheet, then owned and edited here.
+               This is a worklist, not the accounting ledger.</p>
+        </field>
+    </record>
+
+    <!-- SEPARATE top-level menu (collections team only), NOT under Zoho
+         Archive. The team lives in this board day-to-day. -->
+    <menuitem id="menu_collections_root"
+              name="Collections"
+              sequence="16"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_collections_item"
+              name="Outstanding Payments"
+              parent="menu_collections_root"
+              action="action_collections_item" sequence="10"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+</odoo>

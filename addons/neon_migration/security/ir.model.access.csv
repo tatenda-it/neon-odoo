@@ -31,3 +31,6 @@ access_crew_member_internal,neon.crew.member read (all internal),model_neon_crew
 access_crew_member_super,neon.crew.member superuser,model_neon_crew_member,neon_core.group_neon_superuser,1,1,1,1
 access_wages_entry_book,neon.wages.entry read (bookkeeper),model_neon_wages_entry,neon_core.group_neon_bookkeeper,1,0,0,0
 access_wages_entry_super,neon.wages.entry superuser,model_neon_wages_entry,neon_core.group_neon_superuser,1,1,1,1
+access_collections_item_sales,neon.collections.item sales (RW+create no unlink),model_neon_collections_item,neon_core.group_neon_sales_rep,1,1,1,0
+access_collections_item_book,neon.collections.item bookkeeper (RW+create+unlink),model_neon_collections_item,neon_core.group_neon_bookkeeper,1,1,1,1
+access_collections_item_super,neon.collections.item superuser (full),model_neon_collections_item,neon_core.group_neon_superuser,1,1,1,1
