@@ -27,3 +27,5 @@ access_undeposited_line_book,neon.undeposited.line read (bookkeeper),model_neon_
 access_undeposited_line_super,neon.undeposited.line superuser,model_neon_undeposited_line,neon_core.group_neon_superuser,1,1,1,1
 access_job_history_internal,neon.job.history read (all internal),model_neon_job_history,base.group_user,1,0,0,0
 access_job_history_super,neon.job.history superuser,model_neon_job_history,neon_core.group_neon_superuser,1,1,1,1
+access_crew_member_internal,neon.crew.member read (all internal),model_neon_crew_member,base.group_user,1,0,0,0
+access_crew_member_super,neon.crew.member superuser,model_neon_crew_member,neon_core.group_neon_superuser,1,1,1,1

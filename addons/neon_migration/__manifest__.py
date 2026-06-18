@@ -58,7 +58,13 @@
     # reminders/admin TAGGED is_job=False + default-hidden (never deleted);
     # conservative high-confidence title->res.partner match (else NULL, raw
     # title always kept). Readable by ALL internal users (no money); reversible.
-    "version": "17.0.1.6.0",
+    # 17.0.1.7.0 — CREW ROSTER reference (op-data step 3a, wages prerequisite):
+    # inert model neon.crew.member — canonical crew list from the wages sheet,
+    # every raw spelling preserved in aliases. De-dup resolved with Tatenda
+    # (KK=Ranganai lead, Biriad=Kudzai Mushore, Anorld=Arnold Mutasa, Kevin=
+    # Kelvin Maibeki, Danny=Kelvin Mushore [distinct], 9 former crew inactive).
+    # NOT live hr.employee/wage/crew. All-internal read; reversible.
+    "version": "17.0.1.7.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -102,6 +108,8 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         "views/susp_undep_views.xml",
         # 17.0.1.6.0 — FamCal job-history reference (all-internal-read menu).
         "views/job_history_views.xml",
+        # 17.0.1.7.0 — crew roster reference (all-internal-read menu).
+        "views/crew_member_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

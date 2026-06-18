@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Crew roster reference views. Read-only canonical crew list (names/roles, no
+    pay). Readable by ALL internal users. Active crew shown by default; former
+    crew are active=False (hidden unless you tick the 'Former' filter).
+-->
+<odoo>
+
+    <record id="view_crew_member_tree" model="ir.ui.view">
+        <field name="model">neon.crew.member</field>
+        <field name="arch" type="xml">
+            <tree string="Crew Roster" create="false" edit="false">
+                <field name="name"/>
+                <field name="role"/>
+                <field name="is_lead"/>
+                <field name="status"/>
+                <field name="alias_count"/>
+                <field name="aliases" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_crew_member_form" model="ir.ui.view">
+        <field name="model">neon.crew.member</field>
+        <field name="arch" type="xml">
+            <form string="Crew Member" create="false">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="role" readonly="1"/>
+                            <field name="is_lead" readonly="1"/>
+                            <field name="status" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="alias_count" readonly="1"/>
+                            <field name="source" readonly="1"/>
+                            <field name="active" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Aliases (raw source spellings)">
+                            <field name="aliases" readonly="1"/>
+                        </page>
+                        <page string="Note"><field name="note" readonly="1"/></page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_crew_member_search" model="ir.ui.view">
+        <field name="model">neon.crew.member</field>
+        <field name="arch" type="xml">
+            <search string="Crew Roster">
+                <field name="name"/>
+                <field name="aliases"/>
+                <filter name="f_lead" string="Leads"
+                        domain="[('is_lead', '=', True)]"/>
+                <filter name="f_active" string="Active"
+                        domain="[('status', '=', 'active')]"/>
+                <separator/>
+                <filter name="f_former" string="Former (archived)"
+                        domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_role" string="Role"
+                            context="{'group_by': 'role'}"/>
+                    <filter name="g_status" string="Status"
+                            context="{'group_by': 'status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_crew_member" model="ir.actions.act_window">
+        <field name="name">Crew Roster (Reference)</field>
+        <field name="res_model">neon.crew.member</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_crew_member_search"/>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No crew roster imported yet</p>
+            <p>Canonical crew list derived from the wages sheet (names/roles
+               only). Active crew shown by default; tick 'Former (archived)' to
+               see past crew. Read-only reference; not the live HR records.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_crew_member"
+              name="Crew Roster (Reference)"
+              parent="menu_neon_migration_root"
+              action="action_crew_member" sequence="20"/>
+
+</odoo>
