@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Wages reference views. Read-only weekly-lump pay. SENSITIVE (pay) -> menu +
+    ACL gated to finance (bookkeeper) + director (superuser); sales/operational
+    lens never sees it. NO per-job split. Never the live ledger/HR.
+-->
+<odoo>
+
+    <record id="view_wages_entry_tree" model="ir.ui.view">
+        <field name="model">neon.wages.entry</field>
+        <field name="arch" type="xml">
+            <tree string="Wages (Weekly)" create="false" edit="false">
+                <field name="week_date"/>
+                <field name="week_label" optional="show"/>
+                <field name="crew_member_id"/>
+                <field name="total" sum="Weekly Pay"/>
+                <field name="currency_code"/>
+                <field name="paid"/>
+                <field name="job_link_count" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_wages_entry_form" model="ir.ui.view">
+        <field name="model">neon.wages.entry</field>
+        <field name="arch" type="xml">
+            <form string="Wages Entry" create="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="week_date" readonly="1"/>
+                            <field name="week_label" readonly="1"/>
+                            <field name="crew_member_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="total" readonly="1"/>
+                            <field name="currency_code" readonly="1"/>
+                            <field name="paid" readonly="1"/>
+                            <field name="active" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Jobs Covered (verbatim)">
+                            <field name="jobs_raw" readonly="1"/>
+                        </page>
+                        <page string="Linked Jobs (conservative)">
+                            <field name="job_ids" readonly="1">
+                                <tree><field name="title"/><field name="date_start"/></tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_wages_entry_search" model="ir.ui.view">
+        <field name="model">neon.wages.entry</field>
+        <field name="arch" type="xml">
+            <search string="Wages">
+                <field name="crew_member_id"/>
+                <field name="week_label"/>
+                <filter name="f_paid" string="Paid"
+                        domain="[('paid', '=', 'paid')]"/>
+                <separator/>
+                <filter name="f_week" string="Week" date="week_date"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_crew" string="Technician"
+                            context="{'group_by': 'crew_member_id'}"/>
+                    <filter name="g_week" string="Week"
+                            context="{'group_by': 'week_date:week'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_wages_entry" model="ir.actions.act_window">
+        <field name="name">Wages (Reference)</field>
+        <field name="res_model">neon.wages.entry</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_wages_entry_search"/>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No wages imported yet</p>
+            <p>Historical weekly-lump technician pay imported from the wages
+               sheet — reference only, never the live ledger / HR. Finance +
+               director access only. No per-job split (weekly lump).</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_wages_entry"
+              name="Wages (Reference)"
+              parent="menu_neon_migration_root"
+              action="action_wages_entry" sequence="85"
+              groups="neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+</odoo>

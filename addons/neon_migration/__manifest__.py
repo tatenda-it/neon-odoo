@@ -64,7 +64,13 @@
     # (KK=Ranganai lead, Biriad=Kudzai Mushore, Anorld=Arnold Mutasa, Kevin=
     # Kelvin Maibeki, Danny=Kelvin Mushore [distinct], 9 former crew inactive).
     # NOT live hr.employee/wage/crew. All-internal read; reversible.
-    "version": "17.0.1.7.0",
+    # 17.0.1.8.0 — WAGES reference (op-data step 3b, final historical-ref lane):
+    # inert model neon.wages.entry — WEEKLY-LUMP pay per technician (NO per-job
+    # split). Loaded from the wages sheet (3 layouts); crew-FK resolved via the
+    # crew-roster aliases; conservative job fuzzy-match to neon.job.history
+    # (jobs_raw kept verbatim). PAY -> ACL finance(bookkeeper)+director only.
+    # NOT live hr.employee/wage/crew. Reversible.
+    "version": "17.0.1.8.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -110,6 +116,8 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         "views/job_history_views.xml",
         # 17.0.1.7.0 — crew roster reference (all-internal-read menu).
         "views/crew_member_views.xml",
+        # 17.0.1.8.0 — wages reference (finance/director-gated menu).
+        "views/wages_entry_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,
