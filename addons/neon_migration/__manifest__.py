@@ -44,7 +44,15 @@
     # loader (idempotent per period_month). SENSITIVE (wages/loans/commissions)
     # -> ACL finance(bookkeeper)+director(superuser) ONLY, OFF the sales-rep
     # lens; reversible (superuser unlink). 18 statements (12x2025 + 6x2026).
-    "version": "17.0.1.4.0",
+    # 17.0.1.5.0 — SUSPENSE + UNDEPOSITED reference archives (op-data plan,
+    # historical-reference): new inert models neon.suspense.statement(+line)
+    # (multi-month clearing account, running-balance reconcile) +
+    # neon.undeposited.statement(+line) (flexible: two_table/dr_cr/amount, ZWG
+    # multi-currency, receipt/expense/statement sections). Same inert posture
+    # (NOT account.move). Loaded from the same local xlsx (the tabs petty-cash
+    # excluded). ACL finance(bookkeeper)+director(superuser) ONLY, off the
+    # sales lens; reversible. 2 suspense + 5 undeposited (July empty skipped).
+    "version": "17.0.1.5.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -84,6 +92,8 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         "views/historical_pivots_views.xml",
         # 17.0.1.4.0 — petty-cash reference (finance/director-gated menu).
         "views/petty_cash_views.xml",
+        # 17.0.1.5.0 — suspense + undeposited reference (finance-gated menus).
+        "views/susp_undep_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

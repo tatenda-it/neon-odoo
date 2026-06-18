@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Suspense + Undeposited reference views. Read-only historical ledgers.
+    SENSITIVE -> menus + ACL gated to finance (bookkeeper) + director
+    (superuser); the sales/operational lens never sees them. Never the ledger.
+-->
+<odoo>
+
+    <!-- ============================== SUSPENSE ============================== -->
+    <record id="view_suspense_statement_tree" model="ir.ui.view">
+        <field name="model">neon.suspense.statement</field>
+        <field name="arch" type="xml">
+            <tree string="Suspense Account" create="false" edit="false">
+                <field name="period_month"/>
+                <field name="name"/>
+                <field name="currency_code"/>
+                <field name="opening_balance"/>
+                <field name="closing_balance"/>
+                <field name="line_count"/>
+                <field name="source_tab" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_suspense_statement_form" model="ir.ui.view">
+        <field name="model">neon.suspense.statement</field>
+        <field name="arch" type="xml">
+            <form string="Suspense Account" create="false">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="period_month" readonly="1"/>
+                            <field name="currency_code" readonly="1"/>
+                            <field name="source_tab" readonly="1"/>
+                            <field name="active" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="opening_balance" readonly="1"/>
+                            <field name="closing_balance" readonly="1"/>
+                            <field name="line_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines">
+                            <field name="line_ids" readonly="1">
+                                <tree editable="false">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="date_parsed"/>
+                                    <field name="date_raw" optional="show"/>
+                                    <field name="details"/>
+                                    <field name="acc_code" optional="hide"/>
+                                    <field name="debit" sum="Dr"/>
+                                    <field name="credit" sum="Cr"/>
+                                    <field name="balance"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Import Note"><field name="note" readonly="1"/></page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_suspense_statement" model="ir.actions.act_window">
+        <field name="name">Suspense Account (Reference)</field>
+        <field name="res_model">neon.suspense.statement</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No suspense data imported yet</p>
+            <p>Historical suspense (clearing) account imported from the
+               spreadsheet — reference only, never the live ledger.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_suspense"
+              name="Suspense Account (Reference)"
+              parent="menu_neon_migration_root"
+              action="action_suspense_statement" sequence="90"
+              groups="neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <!-- ============================ UNDEPOSITED ============================ -->
+    <record id="view_undeposited_statement_tree" model="ir.ui.view">
+        <field name="model">neon.undeposited.statement</field>
+        <field name="arch" type="xml">
+            <tree string="Undeposited Funds" create="false" edit="false">
+                <field name="period_month"/>
+                <field name="name"/>
+                <field name="statement_format"/>
+                <field name="currency_default"/>
+                <field name="line_count"/>
+                <field name="source_tab" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_undeposited_statement_form" model="ir.ui.view">
+        <field name="model">neon.undeposited.statement</field>
+        <field name="arch" type="xml">
+            <form string="Undeposited Funds" create="false">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="period_month" readonly="1"/>
+                            <field name="statement_format" readonly="1"/>
+                            <field name="currency_default" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="source_tab" readonly="1"/>
+                            <field name="line_count" readonly="1"/>
+                            <field name="active" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines">
+                            <field name="line_ids" readonly="1">
+                                <tree editable="false">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="date_parsed"/>
+                                    <field name="date_raw" optional="show"/>
+                                    <field name="section"/>
+                                    <field name="details"/>
+                                    <field name="invoice_no" optional="show"/>
+                                    <field name="debit" optional="hide"/>
+                                    <field name="credit" optional="hide"/>
+                                    <field name="amount" sum="Amount"/>
+                                    <field name="currency"/>
+                                    <field name="note" optional="show"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Import Note"><field name="note" readonly="1"/></page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_undeposited_statement_search" model="ir.ui.view">
+        <field name="model">neon.undeposited.statement</field>
+        <field name="arch" type="xml">
+            <search string="Undeposited">
+                <field name="name"/>
+                <filter name="f_archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_fmt" string="Format"
+                            context="{'group_by': 'statement_format'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_undeposited_statement" model="ir.actions.act_window">
+        <field name="name">Undeposited Funds (Reference)</field>
+        <field name="res_model">neon.undeposited.statement</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_undeposited_statement_search"/>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No undeposited data yet</p>
+            <p>Historical undeposited-funds statements (receipts + expenses)
+               imported from the spreadsheet — reference only.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_undeposited"
+              name="Undeposited Funds (Reference)"
+              parent="menu_neon_migration_root"
+              action="action_undeposited_statement" sequence="100"
+              groups="neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+</odoo>
