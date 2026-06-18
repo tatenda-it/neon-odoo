@@ -52,7 +52,13 @@
     # (NOT account.move). Loaded from the same local xlsx (the tabs petty-cash
     # excluded). ACL finance(bookkeeper)+director(superuser) ONLY, off the
     # sales lens; reversible. 2 suspense + 5 undeposited (July empty skipped).
-    "version": "17.0.1.5.0",
+    # 17.0.1.6.0 — FAMCAL JOB-HISTORY reference (op-data plan step 2, wages
+    # prerequisite/job spine): inert model neon.job.history loaded from the
+    # FamCal scrape (726 events, clean ISO dates). Stores ALL events verbatim;
+    # reminders/admin TAGGED is_job=False + default-hidden (never deleted);
+    # conservative high-confidence title->res.partner match (else NULL, raw
+    # title always kept). Readable by ALL internal users (no money); reversible.
+    "version": "17.0.1.6.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -94,6 +100,8 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         "views/petty_cash_views.xml",
         # 17.0.1.5.0 — suspense + undeposited reference (finance-gated menus).
         "views/susp_undep_views.xml",
+        # 17.0.1.6.0 — FamCal job-history reference (all-internal-read menu).
+        "views/job_history_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

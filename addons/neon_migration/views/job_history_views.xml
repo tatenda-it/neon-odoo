@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FamCal job-history reference views. Read-only historical calendar.
+    Readable by ALL internal users (carries no money). Default view shows
+    JOBS only (is_job=True) via a default search filter that the user can
+    clear to see reminders/admin too (tagged, never deleted).
+-->
+<odoo>
+
+    <record id="view_job_history_tree" model="ir.ui.view">
+        <field name="model">neon.job.history</field>
+        <field name="arch" type="xml">
+            <tree string="Job History" create="false" edit="false">
+                <field name="date_start"/>
+                <field name="title"/>
+                <field name="location" optional="show"/>
+                <field name="partner_id" optional="show"/>
+                <field name="partner_match" optional="hide"/>
+                <field name="category"/>
+                <field name="is_multiday" optional="hide"/>
+                <field name="created_by" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_job_history_form" model="ir.ui.view">
+        <field name="model">neon.job.history</field>
+        <field name="arch" type="xml">
+            <form string="Job History" create="false">
+                <sheet>
+                    <div class="oe_title"><h1><field name="title" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="date_start" readonly="1"/>
+                            <field name="date_end" readonly="1"/>
+                            <field name="all_day" readonly="1"/>
+                            <field name="is_multiday" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="category" readonly="1"/>
+                            <field name="is_job" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="partner_match" readonly="1"/>
+                            <field name="location" readonly="1"/>
+                            <field name="created_by" readonly="1"/>
+                            <field name="event_type" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes (verbatim)">
+                            <field name="notes" readonly="1"/>
+                        </page>
+                        <page string="Participants (verbatim)">
+                            <field name="participants_raw" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_job_history_search" model="ir.ui.view">
+        <field name="model">neon.job.history</field>
+        <field name="arch" type="xml">
+            <search string="Job History">
+                <field name="title"/>
+                <field name="partner_id"/>
+                <field name="location"/>
+                <filter name="f_jobs" string="Jobs"
+                        domain="[('is_job', '=', True)]"/>
+                <filter name="f_admin" string="Reminders / Admin"
+                        domain="[('is_job', '=', False)]"/>
+                <separator/>
+                <filter name="f_matched" string="Client matched"
+                        domain="[('partner_id', '!=', False)]"/>
+                <filter name="f_unmatched" string="Client unmatched"
+                        domain="[('partner_id', '=', False), ('is_job', '=', True)]"/>
+                <separator/>
+                <filter name="f_date" string="Start Date" date="date_start"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_category" string="Category"
+                            context="{'group_by': 'category'}"/>
+                    <filter name="g_partner" string="Client"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="g_month" string="Month"
+                            context="{'group_by': 'date_start:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_job_history" model="ir.actions.act_window">
+        <field name="name">Job History (Reference)</field>
+        <field name="res_model">neon.job.history</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_job_history_search"/>
+        <!-- Default to JOBS only; clearable to reveal reminders/admin. -->
+        <field name="context">{'create': False, 'search_default_f_jobs': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No job history imported yet</p>
+            <p>Historical company calendar (FamCal) imported as reference —
+               jobs shown by default; clear the Jobs filter to see reminders /
+               admin. Read-only; never the live ledger or operational jobs.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_job_history"
+              name="Job History (Reference)"
+              parent="menu_neon_migration_root"
+              action="action_job_history" sequence="30"/>
+
+</odoo>
