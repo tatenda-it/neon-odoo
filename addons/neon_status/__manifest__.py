@@ -137,7 +137,12 @@
     # COMPLETE (quotes/invoices/expenses/won-links imported inert, creds
     # revoked); FamCal job-history tile added (queued/next); + a "Done &
     # verified" entry for the Zoho reference migration. Text/constants only.
-    "version": "17.0.1.0.24",
+    # 17.0.1.0.25 (18 Jun): ADD neon_migration to _REPORTED_MODULES so the
+    # MODULE VERSIONS box reflects the analytics module (collections + L2.x
+    # Sales-Intel) that the board previously did not track. Live read from
+    # ir.module.module; the status smoke reads the same constant, so the
+    # reported-list assertion adapts automatically. Constant only.
+    "version": "17.0.1.0.25",
     "summary": "Authenticated Programme Status board at /neon/status "
                "with a server-side, read-only live-from-prod refresh.",
     "description": """

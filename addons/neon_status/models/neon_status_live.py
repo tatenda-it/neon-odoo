@@ -29,6 +29,12 @@ from odoo import api, fields, models
 # neon_crew_comms (the WA-2/WA-3/WA-6 bridge -- WA-6 equipment face home).
 _REPORTED_MODULES = (
     "neon_ai_core", "neon_channels", "neon_dashboard",
+    # neon_migration -- the data-migration + Sales-Intel analytics module
+    # (collections worklist, L2.1 client intel, L2.2 demand/seasonality).
+    # Added so the board reflects the module that carries the analytics
+    # deploys (the version-visibility gap that made an earlier base read
+    # mistake it for absent).
+    "neon_migration",
     "neon_jobs", "neon_crew_comms",
 )
 
