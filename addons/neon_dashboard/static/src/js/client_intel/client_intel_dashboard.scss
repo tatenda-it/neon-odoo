@@ -1,0 +1,47 @@
+.o_neon_ci {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+
+    .o_neon_ci_main {
+        flex: 1 1 auto;
+        overflow: auto;
+        padding: 16px;
+    }
+
+    .o_neon_ci_header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 12px;
+
+        h2 { margin: 0; }
+        .o_neon_ci_sub { color: #6c757d; font-size: 13px; }
+    }
+
+    .o_neon_ci_msg { padding: 24px; color: #6c757d; }
+
+    .o_neon_ci_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 16px;
+    }
+
+    .o_neon_ci_card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 12px 14px;
+
+        h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0 0 8px;
+        }
+        table { margin-bottom: 0; }
+        td, th { font-size: 13px; }
+    }
+
+    // the embedded chat keeps its own width; mirror the main dashboard rails
+    &.o_neon_ci_chat_rail .o_neon_ci_main { margin-right: 0; }
+}

@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Client / account intelligence (L2.1) — read-only computed rollups.
+    Sensitive fields (outstanding_*, payment_behaviour) carry field-level
+    groups= so plain sales never see them in any view. System-computed:
+    views are create=false/edit=false; refresh is the Recompute action / cron.
+-->
+<odoo>
+
+    <record id="view_client_intel_tree" model="ir.ui.view">
+        <field name="model">neon.client.intel</field>
+        <field name="arch" type="xml">
+            <tree string="Client Intelligence" create="false" edit="false"
+                  default_order="won_value desc">
+                <field name="client_name"/>
+                <field name="segment" widget="badge"/>
+                <field name="quotes_count" sum="Quotes"/>
+                <field name="quotes_value" sum="Quoted (USD)"/>
+                <field name="won_count" sum="Won"/>
+                <field name="won_value" sum="Won (USD)"/>
+                <field name="win_rate" widget="percentage"/>
+                <field name="invoices_count" optional="show"/>
+                <field name="invoiced_value" sum="Invoiced (USD)" optional="show"/>
+                <field name="jobs_count" sum="Jobs"/>
+                <field name="active_years" optional="show"/>
+                <field name="recency_days" optional="show"/>
+                <field name="last_job_date" optional="hide"/>
+                <field name="event_types" optional="hide"/>
+                <!-- sensitive: auto-hidden from non-finance by field groups= -->
+                <field name="outstanding_usd" sum="Outstanding (USD)"
+                       optional="show"/>
+                <field name="payment_behaviour" optional="hide"/>
+                <field name="last_computed" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_client_intel_form" model="ir.ui.view">
+        <field name="model">neon.client.intel</field>
+        <field name="arch" type="xml">
+            <form string="Client Intelligence" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="client_name" readonly="1"/></h1>
+                        <field name="segment" widget="badge" readonly="1"/>
+                    </div>
+                    <group>
+                        <group string="Commercial">
+                            <field name="partner_id" readonly="1"/>
+                            <field name="quotes_count" readonly="1"/>
+                            <field name="quotes_value" readonly="1"/>
+                            <field name="won_count" readonly="1"/>
+                            <field name="won_value" readonly="1"/>
+                            <field name="win_rate" widget="percentage"
+                                   readonly="1"/>
+                            <field name="invoices_count" readonly="1"/>
+                            <field name="invoiced_value" readonly="1"/>
+                        </group>
+                        <group string="Activity">
+                            <field name="jobs_count" readonly="1"/>
+                            <field name="first_job_date" readonly="1"/>
+                            <field name="last_job_date" readonly="1"/>
+                            <field name="active_years" readonly="1"/>
+                            <field name="recency_days" readonly="1"/>
+                            <field name="event_types" readonly="1"/>
+                            <field name="last_computed" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Collections (finance / directors only)">
+                        <field name="outstanding_usd" readonly="1"/>
+                        <field name="outstanding_status" readonly="1"/>
+                        <field name="payment_behaviour" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_client_intel_pivot" model="ir.ui.view">
+        <field name="model">neon.client.intel</field>
+        <field name="arch" type="xml">
+            <pivot string="Client Intelligence">
+                <field name="segment" type="row"/>
+                <field name="quotes_value" type="measure"/>
+                <field name="won_value" type="measure"/>
+                <field name="invoiced_value" type="measure"/>
+                <field name="jobs_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_client_intel_search" model="ir.ui.view">
+        <field name="model">neon.client.intel</field>
+        <field name="arch" type="xml">
+            <search string="Client Intelligence">
+                <field name="client_name"/>
+                <field name="partner_id"/>
+                <field name="segment"/>
+                <filter name="f_repeat" string="Repeat (2+ years)"
+                        domain="[('active_years', '&gt;=', 2)]"/>
+                <filter name="f_won" string="Has wins"
+                        domain="[('won_value', '&gt;', 0)]"/>
+                <filter name="f_dormant" string="Dormant"
+                        domain="[('segment', '=', 'dormant')]"/>
+                <filter name="f_quote_heavy" string="Quote-heavy / low convert"
+                        domain="[('segment', '=', 'quote_heavy_low_convert')]"/>
+                <filter name="f_matched" string="Matched clients only"
+                        domain="[('partner_id', '!=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_segment" string="Segment"
+                            context="{'group_by': 'segment'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_client_intel" model="ir.actions.act_window">
+        <field name="name">Client Intelligence</field>
+        <field name="res_model">neon.client.intel</field>
+        <field name="view_mode">tree,pivot,form</field>
+        <field name="search_view_id" ref="view_client_intel_search"/>
+        <field name="context">{'search_default_f_matched': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No intelligence computed yet</p>
+            <p>Rule-based, retrospective client rollups over the loaded archives
+               + the collections worklist. Read-only; refreshed by the nightly
+               cron or the "Recompute now" action. Money is USD-only.</p>
+        </field>
+    </record>
+
+    <!-- Manual "Recompute now" — gated to finance + directors (NOT plain
+         sales). Bound to the model so it appears in the list Action menu. -->
+    <record id="action_client_intel_recompute" model="ir.actions.server">
+        <field name="name">Recompute now</field>
+        <field name="model_id" ref="model_neon_client_intel"/>
+        <field name="binding_model_id" ref="model_neon_client_intel"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_core.group_neon_bookkeeper'),
+            ref('neon_core.group_neon_superuser')])]"/>
+        <field name="code">model.cron_recompute()</field>
+    </record>
+
+    <!-- Owl ranking dashboard — inline-return server action (NO persisted
+         ir.actions.client; the client tag is registered by neon_dashboard JS).
+         3-layer enforcement: this groups_id + the menu groups + the RPC guard. -->
+    <record id="action_client_intel_board" model="ir.actions.server">
+        <field name="name">Client Intelligence</field>
+        <field name="model_id" ref="model_neon_client_intel"/>
+        <field name="state">code</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_core.group_neon_sales_rep'),
+            ref('neon_core.group_neon_bookkeeper'),
+            ref('neon_core.group_neon_superuser')])]"/>
+        <field name="code">action = {
+    'type': 'ir.actions.client',
+    'tag': 'neon_client_intel_dashboard',
+    'name': 'Client Intelligence',
+}</field>
+    </record>
+
+    <menuitem id="menu_client_intel_root"
+              name="Client Intelligence"
+              sequence="17"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_client_intel_board"
+              name="Intelligence Board"
+              parent="menu_client_intel_root"
+              action="action_client_intel_board" sequence="5"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_client_intel"
+              name="Client Rollups"
+              parent="menu_client_intel_root"
+              action="action_client_intel" sequence="10"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <!-- Nightly recompute. noupdate so manual schedule tweaks survive -u. -->
+    <data noupdate="1">
+        <record id="cron_client_intel_recompute" model="ir.cron">
+            <field name="name">Neon: recompute client intelligence</field>
+            <field name="model_id" ref="model_neon_client_intel"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_recompute()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+
+</odoo>

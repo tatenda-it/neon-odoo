@@ -35,7 +35,7 @@ _check("T12201", field is not None and field.type == "text",
        f"type={field.type if field else 'MISSING'}")
 
 
-# === T12202 -- 14 schemas strict-valid ===
+# === T12202 -- 16 schemas strict-valid (14 + 2 L2.1 client-intel tools) ===
 from odoo.addons.neon_dashboard.models.ai import tool_registry
 schemas = tool_registry.groq_tool_schemas(category="read")
 issues = []
@@ -57,7 +57,7 @@ for s in schemas:
     if "required" in params and not isinstance(
             params["required"], list):
         issues.append(f"{name}: required not list")
-_check("T12202", len(schemas) == 14 and not issues,
+_check("T12202", len(schemas) == 16 and not issues,
        f"count={len(schemas)} issues={issues}")
 
 

@@ -81,6 +81,9 @@ TOOLS_BY_VARIANT: Dict[str, List[str]] = {
         "check_stock_availability", "get_crew_availability",
         "get_pending_deposits", "get_my_pipeline",
         "get_partner_history", "get_dashboard_summary",
+        # L2.1 -- read-only client intelligence (commercial only; the
+        # sensitive collections tool is NOT advertised to sales).
+        "get_client_intel",
         # P12.M2 -- writes
         "log_lead", "move_stage", "update_deal_value",
         "post_chatter_note",
@@ -90,6 +93,8 @@ TOOLS_BY_VARIANT: Dict[str, List[str]] = {
         "get_budget_status", "get_pending_deposits",
         "get_open_quotes", "get_quote_details",
         "get_partner_history", "get_dashboard_summary",
+        # L2.1 -- client intelligence incl. the sensitive collections tool.
+        "get_client_intel", "get_client_outstanding",
         # P12.M2 -- writes (chatter note only on finance surface)
         "post_chatter_note",
     ],

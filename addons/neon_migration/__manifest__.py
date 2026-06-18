@@ -83,7 +83,19 @@
     # notes) -> ACL collections team only (sales RW+create no-unlink, bookkeeper
     # + director full); crew/operational lens excluded. Kanban-by-status board
     # under a NEW top-level "Collections" menu (NOT Zoho Archive).
-    "version": "17.0.1.9.0",
+    # 17.0.1.10.0 — CLIENT INTELLIGENCE (Layer-2.1, analytics layer): new
+    # STORED model neon.client.intel — rule-based, retrospective per-client
+    # rollups computed over the archives (quote/invoice/job) + the collections
+    # worklist. PURE READ feature (computes + displays, never mutates a source).
+    # System-computed (no manual write/create/unlink for any group; rebuilt by
+    # cron_recompute() as sudo via the pure scripts/compute_client_intel.py).
+    # Money USD-only (hist-intel guard); no-partner rows bucket as one
+    # 'unmatched' row (never dropped). Sensitive fields (outstanding_*,
+    # payment_behaviour) field-level gated to bookkeeper+director. Backend
+    # list/pivot/search + "Client Intelligence" menu + nightly cron + gated
+    # "Recompute now". The read-only dashboard chat tools live in neon_dashboard
+    # (reach this model via env.get optional-read, no new dependency).
+    "version": "17.0.1.10.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -135,6 +147,9 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         # menu, collections-team-gated). Defines its own menu root, so it can
         # load in any order relative to the Zoho Archive views.
         "views/collections_item_views.xml",
+        # 17.0.1.10.0 — client intelligence (L2.1): read-only computed rollups,
+        # own top-level menu + nightly cron + gated Recompute action.
+        "views/client_intel_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

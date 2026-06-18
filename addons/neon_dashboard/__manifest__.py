@@ -78,7 +78,13 @@
     # disclosed); counts span all currencies. Re-seed via 17.0.11.3.0
     # post-migrate (director default + user layouts). Asset-bundle: -u +
     # delete web.assets_* + force-recreate; users hard-refresh once.
-    "version": "17.0.11.3.0",
+    # 17.0.11.4.0 = L2.1 client intelligence — two READ-ONLY @ai_tools
+    # (get_client_intel commercial; get_client_outstanding sensitive/finance)
+    # over neon.client.intel, reached via env.get() optional-read (NO new
+    # neon_migration dependency, mirroring the hist-intel band). category="read"
+    # + no executor registered => structurally cannot create/write/unlink.
+    # Advertised per variant via neon_ai_core 17.0.1.3.0 TOOLS_BY_VARIANT.
+    "version": "17.0.11.4.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
@@ -230,6 +236,14 @@ ranganai by login).
             "neon_dashboard/static/src/js/ai_chat/ai_chat.js",
             "neon_dashboard/static/src/js/ai_chat/ai_chat.xml",
             "neon_dashboard/static/src/js/ai_chat/ai_chat.scss",
+            # L2.1 -- client intelligence ranking dashboard (embeds NeonAiChat,
+            # so it loads AFTER ai_chat.js).
+            "neon_dashboard/static/src/js/client_intel/"
+            "client_intel_dashboard.js",
+            "neon_dashboard/static/src/js/client_intel/"
+            "client_intel_dashboard.xml",
+            "neon_dashboard/static/src/js/client_intel/"
+            "client_intel_dashboard.scss",
         ],
     },
     "installable": True,

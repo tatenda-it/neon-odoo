@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_dashboard.NeonClientIntelDashboard">
+        <div t-attf-class="o_neon_ci #{state.data and state.data.can_chat ? (state.chatExpanded ? 'o_neon_ci_chat_expanded' : 'o_neon_ci_chat_rail') : ''}">
+            <div class="o_neon_ci_main">
+                <div class="o_neon_ci_header">
+                    <h2>Client Intelligence</h2>
+                    <span class="o_neon_ci_sub" t-if="state.data">
+                        <t t-esc="state.data.total_clients"/> clients · USD ·
+                        <t t-if="state.data.last_computed">
+                            last computed <t t-esc="state.data.last_computed.slice(0, 16).replace('T', ' ')"/>
+                        </t>
+                        <t t-else="">not computed yet</t>
+                    </span>
+                </div>
+
+                <div t-if="state.loading" class="o_neon_ci_msg">Loading…</div>
+                <div t-elif="state.error" class="o_neon_ci_msg text-danger">
+                    <t t-esc="state.error"/>
+                </div>
+
+                <div t-else="" class="o_neon_ci_grid">
+                    <!-- top by won value -->
+                    <div class="o_neon_ci_card">
+                        <h3>Top clients by won value (USD)</h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Client</th><th class="text-end">Won</th><th class="text-end">Win%</th><th>Segment</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.top_won" t-as="r" t-key="r.id">
+                                    <td t-esc="r.client"/>
+                                    <td class="text-end" t-esc="fmt(r.won_value)"/>
+                                    <td class="text-end" t-esc="r.win_rate_pct + '%'"/>
+                                    <td><span class="badge text-bg-secondary" t-esc="r.segment"/></td>
+                                </tr>
+                                <tr t-if="!state.data.top_won.length"><td colspan="4" class="text-muted">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- top by win rate -->
+                    <div class="o_neon_ci_card">
+                        <h3>Top win rate <small class="text-muted">(≥3 quotes)</small></h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Client</th><th class="text-end">Win%</th><th class="text-end">Won/Quotes</th><th class="text-end">Won USD</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.top_winrate" t-as="r" t-key="r.id">
+                                    <td t-esc="r.client"/>
+                                    <td class="text-end" t-esc="r.win_rate_pct + '%'"/>
+                                    <td class="text-end"><t t-esc="r.won_count"/>/<t t-esc="r.quotes_count"/></td>
+                                    <td class="text-end" t-esc="fmt(r.won_value)"/>
+                                </tr>
+                                <tr t-if="!state.data.top_winrate.length"><td colspan="4" class="text-muted">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- repeat clients -->
+                    <div class="o_neon_ci_card">
+                        <h3>Repeat clients <small class="text-muted">(2+ active years)</small></h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Client</th><th class="text-end">Years</th><th class="text-end">Won USD</th><th class="text-end">Jobs</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.repeat" t-as="r" t-key="r.id">
+                                    <td t-esc="r.client"/>
+                                    <td class="text-end" t-esc="r.active_years"/>
+                                    <td class="text-end" t-esc="fmt(r.won_value)"/>
+                                    <td class="text-end" t-esc="r.jobs_count"/>
+                                </tr>
+                                <tr t-if="!state.data.repeat.length"><td colspan="4" class="text-muted">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- dormant -->
+                    <div class="o_neon_ci_card">
+                        <h3>Dormant <small class="text-muted">(no activity 12m+)</small></h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Client</th><th class="text-end">Won USD</th><th class="text-end">Days idle</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.dormant" t-as="r" t-key="r.id">
+                                    <td t-esc="r.client"/>
+                                    <td class="text-end" t-esc="fmt(r.won_value)"/>
+                                    <td class="text-end" t-esc="r.recency_days"/>
+                                </tr>
+                                <tr t-if="!state.data.dormant.length"><td colspan="3" class="text-muted">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- outstanding (finance/directors only) -->
+                    <div class="o_neon_ci_card" t-if="state.data.is_finance">
+                        <h3>Current outstanding <small class="text-muted">(collections)</small></h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Client</th><th class="text-end">Outstanding USD</th><th>Status</th><th>Behaviour</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.outstanding" t-as="r" t-key="r_index">
+                                    <td t-esc="r.client"/>
+                                    <td class="text-end" t-esc="fmt(r.outstanding_usd)"/>
+                                    <td t-esc="r.status"/>
+                                    <td><span class="badge text-bg-warning" t-esc="r.behaviour"/></td>
+                                </tr>
+                                <tr t-if="!state.data.outstanding.length"><td colspan="4" class="text-muted">Nothing outstanding</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- embedded read-only insight chat (same panel as the main dashboard) -->
+            <NeonAiChat t-if="state.data and state.data.can_chat"
+                        expanded="state.chatExpanded"
+                        activeVariant="activeVariant"
+                        onToggle="(v) => this.onChatToggle(v)"/>
+        </div>
+    </t>
+
+</templates>

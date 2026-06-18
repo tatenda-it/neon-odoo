@@ -24,7 +24,12 @@
     # model fallback WITHOUT touching the shared provider rows the dashboard
     # Copilot uses; Gemini accepts the kwargs for parity, model ignored).
     # None = the provider row's value -> every existing caller unchanged.
-    "version": "17.0.1.2.0",
+    # 17.0.1.3.0 = L2.1 client intelligence -- TOOLS_BY_VARIANT gains the two
+    # read-only client-intel tools (get_client_intel on sales+bookkeeper,
+    # get_client_outstanding on bookkeeper; director gets both via "*"). The
+    # tool BODIES live in neon_dashboard; this is the variant-advertisement
+    # registry only. No new write tool, no executor -- read-only by construction.
+    "version": "17.0.1.3.0",
     "summary": "Shared AI engine -- provider abstraction, tool-calling "
                "chat orchestrator, two-phase write guardrail, chat "
                "audit models. Neutral core for neon_dashboard + "

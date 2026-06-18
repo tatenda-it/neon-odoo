@@ -21,3 +21,6 @@ from . import get_zig_rate
 from . import get_budget_status
 from . import get_jobs_this_week
 from . import get_readiness_gates
+# L2.1 — read-only client/account intelligence (commercial + sensitive).
+from . import get_client_intel
+from . import get_client_outstanding

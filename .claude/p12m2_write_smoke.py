@@ -146,10 +146,10 @@ _check("T12303",
        "sales=all4, bookkeeper+leadtech=note-only")
 
 
-# T12304 -- 18 tools total (14 reads + 4 writes)
+# T12304 -- 20 tools total (16 reads [+2 L2.1 client-intel] + 4 writes)
 total_tools = len(tool_registry.list_tools())
-_check("T12304", total_tools == 18,
-       f"got={total_tools} (14 reads + 4 writes)")
+_check("T12304", total_tools == 20,
+       f"got={total_tools} (16 reads + 4 writes)")
 
 
 # T12305 -- executor registered for every write tool
