@@ -29,7 +29,10 @@
     # get_client_outstanding on bookkeeper; director gets both via "*"). The
     # tool BODIES live in neon_dashboard; this is the variant-advertisement
     # registry only. No new write tool, no executor -- read-only by construction.
-    "version": "17.0.1.3.0",
+    # 17.0.1.4.0 = L2.2 demand & seasonality -- TOOLS_BY_VARIANT gains the
+    # read-only get_demand_intel (sales + bookkeeper; director via "*"). Body in
+    # neon_dashboard; variant-advertisement only. No executor -- read-only.
+    "version": "17.0.1.4.0",
     "summary": "Shared AI engine -- provider abstraction, tool-calling "
                "chat orchestrator, two-phase write guardrail, chat "
                "audit models. Neutral core for neon_dashboard + "

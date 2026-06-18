@@ -95,6 +95,7 @@ SMOKES=(
   pwages
   pcollections
   pclient_intel
+  pdemand_intel
 )
 SCRIPT_DIR="$(dirname "$0")"
 TOTAL_PASSED=0
@@ -147,7 +148,7 @@ echo
 echo "================================================="
 echo "BROWSER SMOKES (Playwright, headless)"
 echo "================================================="
-BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11 p6_predeploy_fixes p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1 p8a_m1m3 p8a_m4m5 p8a_m6 p8a_m7 p8a_m8 p8a_m9 p8a_m10 p8a_m11 p8a_m12 p8b p8b_m4 p9m1 p9m1_1 p9m2_pin_modal p9m3_multi_map p12m1_chat p12m1_1_chat p12m2_write pb1_datamodel pb2_conflict pb13_docgen pb3_deployment_plan pb14c_quantity_on_hand pb14d_maintenance_tile pb4_subhire phr_r1a phr_r1b phr_r2 phr_r3a phr_r3b phr_hr_render p7f p7g p7h p7i p7j p7k p7m p7l pb11_status phist_intel ppetty_cash psusp_undep pfamcal pcrew pwages pcollections pclient_intel)
+BROWSER_SMOKES=(p6m1 p6m2 p6m3 p6m4 p6m5 p6m6 p6m7 p6m8 p6m9 p6m10 p6m11 p6_predeploy_fixes p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1 p8a_m1m3 p8a_m4m5 p8a_m6 p8a_m7 p8a_m8 p8a_m9 p8a_m10 p8a_m11 p8a_m12 p8b p8b_m4 p9m1 p9m1_1 p9m2_pin_modal p9m3_multi_map p12m1_chat p12m1_1_chat p12m2_write pb1_datamodel pb2_conflict pb13_docgen pb3_deployment_plan pb14c_quantity_on_hand pb14d_maintenance_tile pb4_subhire phr_r1a phr_r1b phr_r2 phr_r3a phr_r3b phr_hr_render p7f p7g p7h p7i p7j p7k p7m p7l pb11_status phist_intel ppetty_cash psusp_undep pfamcal pcrew pwages pcollections pclient_intel pdemand_intel)
 
 # P7i: ensure the committed browser fixture (enrolled p7i_blearner +
 # deterministic MC questions on M01 + reset completion) before the

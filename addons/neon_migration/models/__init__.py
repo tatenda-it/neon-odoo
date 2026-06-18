@@ -9,5 +9,6 @@ from . import crew_member
 from . import wages_entry
 from . import collections_item
 from . import client_intel
+from . import demand_intel
 from . import zoho_import
 from . import res_partner

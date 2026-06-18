@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_dashboard.NeonDemandDashboard">
+        <div t-attf-class="o_neon_dmd #{state.data and state.data.can_chat ? (state.chatExpanded ? 'o_neon_dmd_chat_expanded' : 'o_neon_dmd_chat_rail') : ''}">
+            <div class="o_neon_dmd_main">
+                <div class="o_neon_dmd_header">
+                    <h2>Demand &amp; Seasonality</h2>
+                    <span class="o_neon_dmd_sub" t-if="state.data">
+                        <t t-esc="state.data.totals.jobs"/> jobs ·
+                        <t t-esc="state.data.totals.quotes"/> quotes ·
+                        USD <t t-esc="fmt(state.data.totals.quotes_value_usd)"/> quoted
+                        <t t-if="state.data.totals.nonusd_quote_value">
+                            · <span class="text-muted">non-USD <t t-esc="fmt(state.data.totals.nonusd_quote_value)"/> (disclosed, not blended)</span>
+                        </t>
+                    </span>
+                </div>
+
+                <div t-if="state.loading" class="o_neon_dmd_msg">Loading…</div>
+                <div t-elif="state.error" class="o_neon_dmd_msg text-danger">
+                    <t t-esc="state.error"/>
+                </div>
+
+                <div t-else="" class="o_neon_dmd_grid">
+                    <!-- seasonality: avg jobs by calendar month across years -->
+                    <div class="o_neon_dmd_card o_neon_dmd_wide">
+                        <h3>Seasonality — jobs by month <small class="text-muted">(all years)</small></h3>
+                        <div class="o_neon_dmd_bars">
+                            <div t-foreach="state.data.seasonality" t-as="m" t-key="m.month" class="o_neon_dmd_bar_row">
+                                <span class="o_neon_dmd_bar_label" t-esc="m.label"/>
+                                <span class="o_neon_dmd_bar_track">
+                                    <span class="o_neon_dmd_bar_fill" t-attf-style="width: #{barPct(m.jobs_total)}%;"/>
+                                </span>
+                                <span class="o_neon_dmd_bar_val"><t t-esc="m.jobs_total"/> <small class="text-muted">(~<t t-esc="m.jobs_avg"/>/yr)</small></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- year over year -->
+                    <div class="o_neon_dmd_card">
+                        <h3>Year over year</h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Year</th><th class="text-end">Jobs</th><th class="text-end">Quotes</th><th class="text-end">Quoted USD</th><th class="text-end">Won USD</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.yoy" t-as="y" t-key="y.year">
+                                    <td t-esc="y.year"/>
+                                    <td class="text-end" t-esc="y.jobs"/>
+                                    <td class="text-end" t-esc="y.quotes"/>
+                                    <td class="text-end" t-esc="fmt(y.quotes_value_usd)"/>
+                                    <td class="text-end" t-esc="fmt(y.won_value_usd)"/>
+                                </tr>
+                                <tr t-if="!state.data.yoy.length"><td colspan="5" class="text-muted">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- recurring named events -->
+                    <div class="o_neon_dmd_card">
+                        <h3>Recurring named events <small class="text-muted">(descriptive, not a forecast)</small></h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Event</th><th class="text-end">Years</th><th>Seen</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.recurring" t-as="r" t-key="r_index">
+                                    <td t-esc="r.title"/>
+                                    <td class="text-end" t-esc="r.distinct_years"/>
+                                    <td t-esc="r.years"/>
+                                </tr>
+                                <tr t-if="!state.data.recurring.length"><td colspan="3" class="text-muted">No recurring events detected</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- monthly demand curve (time series) -->
+                    <div class="o_neon_dmd_card o_neon_dmd_wide">
+                        <h3>Monthly demand <small class="text-muted">(jobs + quotes over time)</small></h3>
+                        <table class="table table-sm">
+                            <thead><tr><th>Month</th><th class="text-end">Jobs</th><th class="text-end">Quotes</th><th class="text-end">Quoted USD</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.data.series" t-as="s" t-key="s.label">
+                                    <td t-esc="s.label"/>
+                                    <td class="text-end" t-esc="s.jobs"/>
+                                    <td class="text-end" t-esc="s.quotes"/>
+                                    <td class="text-end" t-esc="fmt(s.quotes_value_usd)"/>
+                                </tr>
+                                <tr t-if="!state.data.series.length"><td colspan="4" class="text-muted">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <NeonAiChat t-if="state.data and state.data.can_chat"
+                        expanded="state.chatExpanded"
+                        activeVariant="activeVariant"
+                        onToggle="(v) => this.onChatToggle(v)"/>
+        </div>
+    </t>
+
+</templates>

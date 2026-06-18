@@ -1,0 +1,66 @@
+.o_neon_dmd {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+
+    .o_neon_dmd_main {
+        flex: 1 1 auto;
+        overflow: auto;
+        padding: 16px;
+    }
+
+    .o_neon_dmd_header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+
+        h2 { margin: 0; }
+        .o_neon_dmd_sub { color: #6c757d; font-size: 13px; }
+    }
+
+    .o_neon_dmd_msg { padding: 24px; color: #6c757d; }
+
+    .o_neon_dmd_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 16px;
+    }
+
+    .o_neon_dmd_card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 12px 14px;
+
+        h3 { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+        table { margin-bottom: 0; }
+        td, th { font-size: 13px; }
+    }
+    .o_neon_dmd_wide { grid-column: 1 / -1; }
+
+    .o_neon_dmd_bars { display: flex; flex-direction: column; gap: 4px; }
+    .o_neon_dmd_bar_row {
+        display: grid;
+        grid-template-columns: 40px 1fr 140px;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+    }
+    .o_neon_dmd_bar_label { color: #495057; }
+    .o_neon_dmd_bar_track {
+        background: #f0f0f0;
+        border-radius: 3px;
+        height: 14px;
+        overflow: hidden;
+    }
+    .o_neon_dmd_bar_fill {
+        display: block;
+        height: 100%;
+        background: #6750a4;
+        border-radius: 3px;
+        min-width: 1px;
+    }
+    .o_neon_dmd_bar_val { text-align: right; }
+}

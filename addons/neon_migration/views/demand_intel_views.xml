@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Demand & seasonality (L2.2) — read-only computed aggregates by (year, month)
+    + recurring named events. Not sensitive (no debtor/payment data) -> all
+    commercial read. System-computed: views create=false/edit=false; refresh is
+    the Recompute action / nightly cron.
+-->
+<odoo>
+
+    <!-- ===== neon.demand.intel (by month) ===== -->
+    <record id="view_demand_intel_tree" model="ir.ui.view">
+        <field name="model">neon.demand.intel</field>
+        <field name="arch" type="xml">
+            <tree string="Monthly Demand" create="false" edit="false"
+                  default_order="year desc, month desc">
+                <field name="period"/>
+                <field name="year"/>
+                <field name="month"/>
+                <field name="jobs_count" sum="Jobs"/>
+                <field name="quotes_count" sum="Quotes"/>
+                <field name="quotes_value_usd" sum="Quoted (USD)"/>
+                <field name="won_count" sum="Won"/>
+                <field name="won_value_usd" sum="Won (USD)"/>
+                <field name="nonusd_quote_value" optional="hide"/>
+                <field name="last_computed" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_demand_intel_pivot" model="ir.ui.view">
+        <field name="model">neon.demand.intel</field>
+        <field name="arch" type="xml">
+            <pivot string="Demand &amp; Seasonality">
+                <field name="month" type="row"/>
+                <field name="year" type="col"/>
+                <field name="jobs_count" type="measure"/>
+                <field name="quotes_count" type="measure"/>
+                <field name="quotes_value_usd" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_demand_intel_graph" model="ir.ui.view">
+        <field name="model">neon.demand.intel</field>
+        <field name="arch" type="xml">
+            <graph string="Demand curve" type="line">
+                <field name="period"/>
+                <field name="jobs_count" type="measure"/>
+                <field name="quotes_count" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_demand_intel_search" model="ir.ui.view">
+        <field name="model">neon.demand.intel</field>
+        <field name="arch" type="xml">
+            <search string="Demand">
+                <field name="year"/>
+                <field name="period"/>
+                <filter name="f_has_jobs" string="Has jobs"
+                        domain="[('jobs_count', '&gt;', 0)]"/>
+                <filter name="f_has_quotes" string="Has quotes"
+                        domain="[('quotes_count', '&gt;', 0)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_year" string="Year"
+                            context="{'group_by': 'year'}"/>
+                    <filter name="g_month" string="Month"
+                            context="{'group_by': 'month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_demand_intel" model="ir.actions.act_window">
+        <field name="name">Monthly Demand</field>
+        <field name="res_model">neon.demand.intel</field>
+        <field name="view_mode">tree,graph,pivot</field>
+        <field name="search_view_id" ref="view_demand_intel_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No demand computed yet</p>
+            <p>Jobs + quotes aggregated by month (the seasonality view).
+               Read-only; refreshed by the nightly cron or "Recompute now".
+               Money is USD-only (non-USD disclosed).</p>
+        </field>
+    </record>
+
+    <!-- ===== neon.demand.recurring (descriptive) ===== -->
+    <record id="view_demand_recurring_tree" model="ir.ui.view">
+        <field name="model">neon.demand.recurring</field>
+        <field name="arch" type="xml">
+            <tree string="Recurring Events" create="false" edit="false"
+                  default_order="distinct_years desc, total_occurrences desc">
+                <field name="sample_raw_title"/>
+                <field name="distinct_years"/>
+                <field name="year_list"/>
+                <field name="total_occurrences"/>
+                <field name="first_seen"/>
+                <field name="last_seen"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_demand_recurring_search" model="ir.ui.view">
+        <field name="model">neon.demand.recurring</field>
+        <field name="arch" type="xml">
+            <search string="Recurring Events">
+                <field name="sample_raw_title"/>
+                <field name="normalised_title"/>
+                <filter name="f_3y" string="3+ years"
+                        domain="[('distinct_years', '&gt;=', 3)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_demand_recurring" model="ir.actions.act_window">
+        <field name="name">Recurring Events</field>
+        <field name="res_model">neon.demand.recurring</field>
+        <field name="view_mode">tree</field>
+        <field name="search_view_id" ref="view_demand_recurring_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No recurring events yet</p>
+            <p>Named events whose title recurred across 2+ years — DESCRIPTIVE
+               cadence only, not a forecast.</p>
+        </field>
+    </record>
+
+    <!-- Recompute (gated) -->
+    <record id="action_demand_intel_recompute" model="ir.actions.server">
+        <field name="name">Recompute now</field>
+        <field name="model_id" ref="model_neon_demand_intel"/>
+        <field name="binding_model_id" ref="model_neon_demand_intel"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_core.group_neon_bookkeeper'),
+            ref('neon_core.group_neon_superuser')])]"/>
+        <field name="code">model.cron_recompute()</field>
+    </record>
+
+    <!-- Owl seasonality board — inline-return server action (client tag from
+         neon_dashboard JS). 3-layer enforced. -->
+    <record id="action_demand_board" model="ir.actions.server">
+        <field name="name">Demand &amp; Seasonality</field>
+        <field name="model_id" ref="model_neon_demand_intel"/>
+        <field name="state">code</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_core.group_neon_sales_rep'),
+            ref('neon_core.group_neon_bookkeeper'),
+            ref('neon_core.group_neon_superuser')])]"/>
+        <field name="code">action = {
+    'type': 'ir.actions.client',
+    'tag': 'neon_demand_dashboard',
+    'name': 'Demand &amp; Seasonality',
+}</field>
+    </record>
+
+    <menuitem id="menu_demand_root"
+              name="Demand &amp; Seasonality"
+              sequence="18"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_demand_board"
+              name="Seasonality Board"
+              parent="menu_demand_root"
+              action="action_demand_board" sequence="5"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_demand_intel"
+              name="Monthly Demand"
+              parent="menu_demand_root"
+              action="action_demand_intel" sequence="10"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_demand_recurring"
+              name="Recurring Events"
+              parent="menu_demand_root"
+              action="action_demand_recurring" sequence="20"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <data noupdate="1">
+        <record id="cron_demand_intel_recompute" model="ir.cron">
+            <field name="name">Neon: recompute demand &amp; seasonality</field>
+            <field name="model_id" ref="model_neon_demand_intel"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_recompute()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+
+</odoo>

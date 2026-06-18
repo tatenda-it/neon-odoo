@@ -95,7 +95,17 @@
     # list/pivot/search + "Client Intelligence" menu + nightly cron + gated
     # "Recompute now". The read-only dashboard chat tools live in neon_dashboard
     # (reach this model via env.get optional-read, no new dependency).
-    "version": "17.0.1.10.0",
+    # 17.0.1.11.0 — DEMAND & SEASONALITY (Layer-2.2): STORED models
+    # neon.demand.intel (one row per year×month — jobs+quotes volume, USD-only
+    # value) + neon.demand.recurring (descriptive recurring NAMED events, title
+    # recurring across >=2 years). STEP-0 found NO event-type taxonomy
+    # (job event_type uniformly 'event', quotes carry none) -> Tatenda ruling:
+    # time-only, NO fabricated type dimension, NO title-keyword typing. PURE
+    # READ; system-computed (read-only ACL, rebuilt sudo via the pure
+    # scripts/compute_demand_intel.py). USD-guard (ZWG/ZAR disclosed). Backend
+    # list/graph/pivot + "Demand & Seasonality" menu + nightly cron + gated
+    # Recompute + Owl seasonality board RPC. All-commercial read (not sensitive).
+    "version": "17.0.1.11.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -150,6 +160,9 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         # 17.0.1.10.0 — client intelligence (L2.1): read-only computed rollups,
         # own top-level menu + nightly cron + gated Recompute action.
         "views/client_intel_views.xml",
+        # 17.0.1.11.0 — demand & seasonality (L2.2): by-month rollups +
+        # recurring named events, own top-level menu + cron + board action.
+        "views/demand_intel_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

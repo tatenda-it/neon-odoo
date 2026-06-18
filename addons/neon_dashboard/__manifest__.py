@@ -84,7 +84,12 @@
     # neon_migration dependency, mirroring the hist-intel band). category="read"
     # + no executor registered => structurally cannot create/write/unlink.
     # Advertised per variant via neon_ai_core 17.0.1.3.0 TOOLS_BY_VARIANT.
-    "version": "17.0.11.4.0",
+    # 17.0.11.5.0 = L2.2 demand & seasonality — get_demand_intel READ @ai_tool
+    # over neon.demand.intel/.recurring (env.get optional-read, no new dep;
+    # category=read + no executor => read-only) + the Owl seasonality board
+    # (tag neon_demand_dashboard) embedding the AI chat. Commercial (not
+    # sensitive). Advertised via neon_ai_core 17.0.1.4.0.
+    "version": "17.0.11.5.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
@@ -244,6 +249,10 @@ ranganai by login).
             "client_intel_dashboard.xml",
             "neon_dashboard/static/src/js/client_intel/"
             "client_intel_dashboard.scss",
+            # L2.2 -- demand & seasonality board (embeds NeonAiChat -> after it).
+            "neon_dashboard/static/src/js/demand/demand_dashboard.js",
+            "neon_dashboard/static/src/js/demand/demand_dashboard.xml",
+            "neon_dashboard/static/src/js/demand/demand_dashboard.scss",
         ],
     },
     "installable": True,
