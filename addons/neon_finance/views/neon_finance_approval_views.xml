@@ -65,6 +65,36 @@
                             <field name="requested_at"/>
                         </group>
                     </group>
+                    <!-- D (QUOTE-UX-1): the full quote ON the approval record:
+                         every line + rate + qty + duration + VAT + total,
+                         read-only, so the approver never actions contents they
+                         can't see (no click-through to the quote form). -->
+                    <separator string="Quote line items"/>
+                    <field name="quote_currency_id" invisible="1"/>
+                    <field name="quote_line_ids" readonly="1">
+                        <tree string="Quote Lines"
+                              create="false" edit="false" delete="false">
+                            <field name="line_type"/>
+                            <field name="product_template_id"/>
+                            <field name="name"/>
+                            <field name="quantity"/>
+                            <field name="duration_days"/>
+                            <field name="unit_rate" widget="monetary"/>
+                            <field name="line_subtotal" widget="monetary"
+                                   sum="Subtotal"/>
+                            <field name="tax_id"/>
+                            <field name="line_total_taxed" widget="monetary"
+                                   sum="Total"/>
+                            <field name="pricing_status" widget="badge"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </tree>
+                    </field>
+                    <group class="oe_subtotal_footer oe_right">
+                        <field name="quote_amount_untaxed" widget="monetary"/>
+                        <field name="quote_amount_tax" widget="monetary"/>
+                        <field name="quote_amount_total" widget="monetary"
+                               class="oe_subtotal_footer_separator"/>
+                    </group>
                     <group string="Resolution"
                            invisible="state == 'pending'">
                         <group>

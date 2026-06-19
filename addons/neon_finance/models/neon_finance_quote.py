@@ -372,6 +372,34 @@ class NeonFinanceQuote(models.Model):
     # ============================================================
     # === State machine actions
     # ============================================================
+    def action_preview_quote(self):
+        """C (QUOTE-UX-1): a read-only PREVIEW of the full quote for the rep
+        to review BEFORE submitting -- prints the existing DRAFT-stamped quote
+        PDF (the exact client-facing document: lines, rates, qty, duration,
+        VAT, total). Reuses action_report_neon_quote; no new view."""
+        self.ensure_one()
+        return self.env.ref(
+            "neon_finance.action_report_neon_quote").report_action(self)
+
+    def _neon_quote_itemised_text(self):
+        """A plain-text itemised summary of the quote (numbered lines with
+        per-day rate x duration, then a VAT-labelled total). Shared by the
+        approval activity NOTE so an approver sees WHAT they are approving in
+        their Odoo inbox, not just a reference. WhatsApp-agnostic (pure Odoo);
+        the WhatsApp ping composes its own summary in neon_crew_comms."""
+        self.ensure_one()
+        cur = self.currency_id.name or ""
+        rows = []
+        for i, line in enumerate(self.line_ids, 1):
+            rows.append("%d. %s x%g - %s %.2f/day x %dd" % (
+                i, line.name, line.quantity, cur, line.unit_rate or 0.0,
+                line.duration_days))
+        vat = _("incl. VAT") if (self.amount_tax or 0.0) else _("no VAT")
+        return _("%(lines)s\nTotal: %(cur)s %(total).2f (%(vat)s)") % {
+            "lines": "\n".join(rows) or _("(no lines)"),
+            "cur": cur, "total": self.amount_total or 0.0, "vat": vat,
+        }
+
     def action_submit_for_approval(self):
         """Draft -> pending_approval (standard branch) or directly to
         approved (config-flag relaxation).
@@ -477,15 +505,14 @@ class NeonFinanceQuote(models.Model):
                     user_id=user.id,
                     summary=_("Quote approval requested: %s") % rec.name,
                     note=_(
-                        "Quote %(name)s for %(partner)s "
-                        "(%(total)s %(currency)s). Submitted by %(user)s. "
-                        "Review in the Approval Queue."
+                        "Quote %(name)s for %(partner)s. Submitted by "
+                        "%(user)s.\n\n%(items)s\n\nReview in the Approval "
+                        "Queue -- the full line items are on the form."
                     ) % {
                         "name": rec.name,
                         "partner": rec.partner_id.display_name,
-                        "total": rec.amount_total,
-                        "currency": rec.currency_id.name,
                         "user": self.env.user.name,
+                        "items": rec._neon_quote_itemised_text(),
                     },
                 )
 

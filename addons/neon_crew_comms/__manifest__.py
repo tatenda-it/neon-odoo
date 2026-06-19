@@ -404,7 +404,19 @@
     # creation paths (add-custom / price-implied add / build_lines) AND the add-
     # confirmation echo, so custom lines read uniformly with the UPPERCASE
     # catalogue names on the draft + client PDF (e.g. "decor" -> "DECOR").
-    "version": "17.0.1.20.4",
+    # 17.0.1.21.0 = QUOTE-UX-1 routing unification + D-WhatsApp content. New
+    # _inherit="neon.finance.quote" (neon_finance_quote_wa.py) fires the WA
+    # approval ping from the SHARED action_submit_for_approval, so the Odoo form
+    # button AND the WA submit both ping the approver EXACTLY ONCE (the explicit
+    # _wa12_send_approval_ping in _wa12_submit is removed; a read-only
+    # _wa12_count_reachable_approvers drives the 'no approver reachable' reply).
+    # Ping CONTENT upgraded: in-window uses the rich _wa12_draft_summary, the
+    # cold Meta param a rates-bearing newline-free _wa12_item_summary ({{summary}}
+    # placeholder unchanged -> no Meta re-approval); a failed rich summary
+    # degrades to View-PDF-only (no blind Approve). Adds neon_finance to depends
+    # (the _inherit needs it). WA internals (taps/HMAC/lock/audience/window/
+    # template/intents) byte-unchanged; neon_channels untouched. Minor bump.
+    "version": "17.0.1.21.0",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "
@@ -423,6 +435,12 @@
         # neon.whatsapp.message.send_template + wa_payload + phone_utils
         # + res.partner.wa_opt_out.
         "neon_channels",
+        # QUOTE-UX-1: neon_finance owns neon.finance.quote + the WA-12 quote
+        # provisioning/lifecycle this module already reads. The dependency was
+        # latent (used via env[] without being declared); the new
+        # _inherit="neon.finance.quote" override (neon_finance_quote_wa.py)
+        # makes it REQUIRED for load order + model existence.
+        "neon_finance",
     ],
     "data": [
         "security/ir.model.access.csv",

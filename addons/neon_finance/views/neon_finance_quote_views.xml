@@ -35,6 +35,14 @@
         <field name="arch" type="xml">
             <form string="Quote">
                 <header>
+                    <!-- C (QUOTE-UX-1): review-before-submit. Prints the
+                         DRAFT-stamped quote PDF (the exact client-facing
+                         document) so the rep confirms what they built. -->
+                    <button name="action_preview_quote"
+                            type="object"
+                            string="Preview"
+                            invisible="state != 'draft'"
+                            help="Review the full quote (lines, rates, qty, duration, VAT, total) as the client-facing PDF before submitting for approval."/>
                     <button name="action_submit_for_approval"
                             type="object"
                             string="Submit for Approval"

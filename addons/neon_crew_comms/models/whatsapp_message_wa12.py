@@ -4035,8 +4035,13 @@ class WhatsAppMessageWA12(models.Model):
                                 with_send_button=True)
             return self._wa6_reply(raw_from, from_e164, _(
                 "%s was auto-approved — the PDF is on its way.") % quote.name)
-        pinged = self._wa12_send_approval_ping(quote, requester)
-        if not pinged:
+        # QUOTE-UX-1: the WA approval ping now fires from the SHARED
+        # action_submit_for_approval (the neon.finance.quote override in
+        # neon_finance_quote_wa.py), so it is sent EXACTLY ONCE for BOTH origins
+        # -- the explicit ping that used to live here is REMOVED (no double-
+        # ping). Here we only craft the WA requester's reply from a READ-ONLY
+        # reachable-approver count (no second send).
+        if not self._wa12_count_reachable_approvers():
             return self._wa6_reply(raw_from, from_e164, _(
                 "Submitted %s, but no approver is reachable on WhatsApp right "
                 "now — please follow it up in Odoo.") % quote.name)
@@ -4484,8 +4489,20 @@ class WhatsAppMessageWA12(models.Model):
         tap); in window -> interactive HMAC buttons. Returns the number
         actually pinged so the caller can surface an empty audience instead of
         a silent stuck quote."""
-        summary = self._wa12_item_summary(quote)
+        # QUOTE-UX-1 D: the approver sees the SAME itemised content the rep saw.
+        # In-window -> the RICH _wa12_draft_summary (numbered lines, cur rate/day
+        # x Nd, discounts, VAT, total). Cold (Meta param, NEWLINE-FREE) -> the
+        # rates-bearing _wa12_item_summary ({{summary}} placeholder unchanged ->
+        # no Meta re-approval). Contentless guard: if the rich summary fails to
+        # compose, NEVER present a live blind [Approve] in-window -- View PDF
+        # only (content + the Approve affordance are one payload).
+        try:
+            rich = self._wa12_draft_summary(quote, [])
+        except Exception:  # noqa: BLE001 -- contentless guard, never blind-approve
+            rich = None
+        concise = self._wa12_item_summary(quote)
         total = "%s %.2f" % (quote.currency_id.name, quote.amount_total or 0.0)
+        rname = requester.name if requester else _("A rep")
         approvers = self.env["res.users"].sudo().browse(
             list(_WA12_APPROVER_UIDS))
         sent = 0
@@ -4494,12 +4511,23 @@ class WhatsAppMessageWA12(models.Model):
             phone = self._wa6_user_phone(appr)
             if not phone:
                 continue
-            body_params = [requester.name, quote.partner_id.name, summary, total]
             if self._wa5_window_open(phone):
-                res = self.sudo().send_buttons(
-                    phone, self._wa12_ping_body(body_params),
-                    self._wa12_inwindow_buttons(quote))
+                if not rich:
+                    res = self.sudo().send_buttons(
+                        phone,
+                        _("🧾 Quote approval needed — %(q)s (%(t)s). Open the "
+                          "PDF to review, then approve in Odoo.") % {
+                            "q": quote.name, "t": total},
+                        [self._wa12_inwindow_buttons(quote)[2]])  # View PDF only
+                else:
+                    body = _("🧾 *Approval needed* — %(who)s drafted this for "
+                             "your review:\n\n%(summary)s\n\nApprove or reject "
+                             "below.") % {
+                        "who": rname, "summary": self._wa12_cap(rich)}
+                    res = self.sudo().send_buttons(
+                        phone, body, self._wa12_inwindow_buttons(quote))
             else:
+                body_params = [rname, quote.partner_id.name, concise, total]
                 res = self.sudo().send_template(
                     phone, _WA12_TEMPLATE, body_params=body_params)
             # only count a ping Meta actually ACCEPTED. A rejected cold template
@@ -4518,20 +4546,49 @@ class WhatsAppMessageWA12(models.Model):
         return sent
 
     @api.model
+    def _wa12_count_reachable_approvers(self):
+        """READ-ONLY count of approver-audience users who currently hold the
+        approver group AND have a sendable WhatsApp number. Basis for the WA
+        requester's 'no approver reachable' reply (the actual ping fires from
+        action_submit_for_approval's override) -- no message is sent here."""
+        n = 0
+        approvers = self.env["res.users"].sudo().browse(
+            list(_WA12_APPROVER_UIDS))
+        for appr in approvers.exists().filtered(
+                lambda u: u.active and self._wa12_is_approver(u)):
+            if self._wa6_user_phone(appr):
+                n += 1
+        return n
+
+    @api.model
+    def _wa12_cap(self, text, limit=950):
+        """Cap an interactive body to WhatsApp's 1024-char limit; a long
+        quote's full lines stay reachable via the View PDF button."""
+        text = text or ""
+        if len(text) <= limit:
+            return text
+        return text[:limit].rsplit("\n", 1)[0] + _(
+            "\n… (full lines on the PDF — tap View PDF)")
+
+    @api.model
     def _wa12_item_summary(self, quote):
-        names = []
+        """Concise, NEWLINE-FREE itemised summary WITH rates for the COLD Meta
+        template {{summary}} param (Meta rejects newlines/tabs in template
+        params). In-window pings use the rich multi-line _wa12_draft_summary.
+        Custom / rep-priced flags preserved so the approver still sees them."""
+        cur = quote.currency_id.name or ""
+        parts = []
         for l in quote.line_ids[:4]:
             flag = ""
             if l.line_type == "custom":
-                # INTERNAL custom marker on the approval ping (the client PDF no
-                # longer badges custom lines, so the approver still sees them here).
                 flag = _(" (custom)")
             elif l.pricing_status == "manual" and not l.equipment_line_id:
-                # F8: the approver sees exactly which rates came from the rep.
                 flag = _(" (rep-priced)")
-            names.append("%s×%g%s" % (l.name, l.quantity, flag))
-        more = "…" if len(quote.line_ids) > 4 else ""
-        return ", ".join(names) + more
+            parts.append("%s x%g @ %s %.2f/day%s" % (
+                l.name, l.quantity, cur, l.unit_rate or 0.0, flag))
+        more = (_(" + %d more") % (len(quote.line_ids) - 4)
+                if len(quote.line_ids) > 4 else "")
+        return "; ".join(parts) + more
 
     @api.model
     def _wa12_ping_body(self, params):

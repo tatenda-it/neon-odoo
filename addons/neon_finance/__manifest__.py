@@ -57,7 +57,17 @@
     # engine rate AND no rep rate) -- the safety check against the silent $0/$1
     # class the stock sale.order door produced. _find_pricing_rule falls back
     # to the related currency_id for onchange-safety. New feature/wiring->minor.
-    'version': '17.0.7.13.0',
+    # 17.0.7.14.0 = QUOTE-UX-1 (C + D-Odoo): (C) a "Preview" button on the draft
+    # quote form (action_preview_quote) that prints the existing quote PDF so a
+    # rep reviews the full quote before submitting. (D-Odoo) the Approval Queue
+    # FORM now shows the LIVE quote line items + untaxed/VAT/total (related,
+    # read-only quote_line_ids/quote_amount_* on neon.finance.approval) so the
+    # approver sees the full quote on the record they action -- no click-through;
+    # + the submit activity NOTE is enriched with an itemised text summary
+    # (_neon_quote_itemised_text). neon_finance stays WhatsApp-agnostic (the WA
+    # ping fires from neon_crew_comms' override of action_submit_for_approval).
+    # New feature -> minor bump.
+    'version': '17.0.7.14.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

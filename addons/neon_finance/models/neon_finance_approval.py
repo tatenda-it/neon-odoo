@@ -124,6 +124,28 @@ class NeonFinanceApproval(models.Model):
     )
 
     # ============================================================
+    # === D (QUOTE-UX-1): LIVE read-only view of the quote the
+    # === approver is actioning -- the full line items + totals on
+    # === the approval form itself, so they never approve a quote
+    # === whose contents they can't see (no click-through needed).
+    # === All related/readonly: the approval record never mutates
+    # === the quote; the audit snapshot above is unchanged.
+    # ============================================================
+    quote_currency_id = fields.Many2one(
+        related="quote_id.currency_id", string="Currency", readonly=True)
+    quote_line_ids = fields.One2many(
+        related="quote_id.line_ids", string="Quote Lines", readonly=True)
+    quote_amount_untaxed = fields.Monetary(
+        related="quote_id.amount_untaxed", string="Untaxed",
+        currency_field="quote_currency_id", readonly=True)
+    quote_amount_tax = fields.Monetary(
+        related="quote_id.amount_tax", string="VAT",
+        currency_field="quote_currency_id", readonly=True)
+    quote_amount_total = fields.Monetary(
+        related="quote_id.amount_total", string="Total",
+        currency_field="quote_currency_id", readonly=True)
+
+    # ============================================================
     # === Phase 9 prep (WhatsApp dispatcher) -- declared now,
     # === wired by Phase 9.
     # ============================================================

@@ -32,3 +32,8 @@ from . import whatsapp_message_wa12
 from . import whatsapp_message_wa13
 # Resolver v2 -- team-slang alias store (matcher normalise step).
 from . import neon_equipment_alias
+# QUOTE-UX-1 -- routing unification: _inherit neon.finance.quote to fire the
+# WhatsApp approval ping from the SHARED action_submit_for_approval, so both
+# the Odoo form button and the WA submit ping the approver exactly once. The
+# ping itself lives on neon.whatsapp.message (whatsapp_message_wa12, above).
+from . import neon_finance_quote_wa
