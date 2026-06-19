@@ -67,7 +67,13 @@
     # (_neon_quote_itemised_text). neon_finance stays WhatsApp-agnostic (the WA
     # ping fires from neon_crew_comms' override of action_submit_for_approval).
     # New feature -> minor bump.
-    'version': '17.0.7.14.0',
+    # 17.0.7.14.1 = QUOTE-UX-1 post-deploy fix: action_preview_quote calls
+    # report_action(config=False) so the Preview button returns the PDF for
+    # ALL tiers -- with the default config=True an admin/superuser (the
+    # directors) got the 'Configure Document Layout' wizard instead of the PDF
+    # because prod has no company.external_report_layout_id (Neon uses a custom
+    # QWeb external layout). Surfaced in post-deploy verify. Patch.
+    'version': '17.0.7.14.1',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

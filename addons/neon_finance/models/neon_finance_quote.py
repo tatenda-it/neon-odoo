@@ -376,10 +376,18 @@ class NeonFinanceQuote(models.Model):
         """C (QUOTE-UX-1): a read-only PREVIEW of the full quote for the rep
         to review BEFORE submitting -- prints the existing DRAFT-stamped quote
         PDF (the exact client-facing document: lines, rates, qty, duration,
-        VAT, total). Reuses action_report_neon_quote; no new view."""
+        VAT, total). Reuses action_report_neon_quote; no new view.
+
+        config=False: skip the report-layout configurator detour. With the
+        default config=True, an ADMIN/superuser (the directors) gets the
+        'Configure Document Layout' wizard instead of the PDF when the company
+        has no external_report_layout_id set (the prod state -- Neon uses a
+        custom QWeb external layout, not the standard selector). config=False
+        returns the report action directly for every tier."""
         self.ensure_one()
         return self.env.ref(
-            "neon_finance.action_report_neon_quote").report_action(self)
+            "neon_finance.action_report_neon_quote").report_action(
+                self, config=False)
 
     def _neon_quote_itemised_text(self):
         """A plain-text itemised summary of the quote (numbered lines with
