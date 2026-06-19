@@ -89,7 +89,12 @@
     # category=read + no executor => read-only) + the Owl seasonality board
     # (tag neon_demand_dashboard) embedding the AI chat. Commercial (not
     # sensitive). Advertised via neon_ai_core 17.0.1.4.0.
-    "version": "17.0.11.5.0",
+    # 17.0.11.6.0 = L2.3 realisation & win/loss — get_winloss_intel READ @ai_tool
+    # over neon.winloss.intel (env.get optional-read, no new dep; category=read +
+    # no executor => read-only) + the Owl Realisation & Win/Loss board (tag
+    # neon_winloss_dashboard) embedding the AI chat. Advertised via neon_ai_core
+    # 17.0.1.5.0.
+    "version": "17.0.11.6.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
@@ -253,6 +258,10 @@ ranganai by login).
             "neon_dashboard/static/src/js/demand/demand_dashboard.js",
             "neon_dashboard/static/src/js/demand/demand_dashboard.xml",
             "neon_dashboard/static/src/js/demand/demand_dashboard.scss",
+            # L2.3 -- realisation & win/loss board (embeds NeonAiChat).
+            "neon_dashboard/static/src/js/winloss/winloss_dashboard.js",
+            "neon_dashboard/static/src/js/winloss/winloss_dashboard.xml",
+            "neon_dashboard/static/src/js/winloss/winloss_dashboard.scss",
         ],
     },
     "installable": True,

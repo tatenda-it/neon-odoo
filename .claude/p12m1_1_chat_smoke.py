@@ -83,10 +83,10 @@ director_user = _gom("p12m1_director_v2", [
 
 # === Tool registry ===
 
-# T12150 -- 17 read tools registered total (14 + L2.1 get_client_intel,
-# get_client_outstanding + L2.2 get_demand_intel)
+# T12150 -- 18 read tools registered total (14 + L2.1 get_client_intel,
+# get_client_outstanding + L2.2 get_demand_intel + L2.3 get_winloss_intel)
 all_tools = tool_registry.tool_names(category="read")
-_check("T12150", len(all_tools) == 17,
+_check("T12150", len(all_tools) == 18,
        f"got={len(all_tools)} tools={sorted(all_tools)}")
 
 

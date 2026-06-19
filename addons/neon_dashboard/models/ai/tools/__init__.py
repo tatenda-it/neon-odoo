@@ -26,3 +26,5 @@ from . import get_client_intel
 from . import get_client_outstanding
 # L2.2 — read-only demand & seasonality (commercial, not sensitive).
 from . import get_demand_intel
+# L2.3 — read-only win/loss + realisation (commercial, not sensitive).
+from . import get_winloss_intel

@@ -43,3 +43,6 @@ access_demand_intel_super,neon.demand.intel superuser (read-only; computed via s
 access_demand_recurring_sales,neon.demand.recurring sales (read-only; computed),model_neon_demand_recurring,neon_core.group_neon_sales_rep,1,0,0,0
 access_demand_recurring_book,neon.demand.recurring bookkeeper (read-only; computed),model_neon_demand_recurring,neon_core.group_neon_bookkeeper,1,0,0,0
 access_demand_recurring_super,neon.demand.recurring superuser (read-only; computed via sudo),model_neon_demand_recurring,neon_core.group_neon_superuser,1,0,0,0
+access_winloss_intel_sales,neon.winloss.intel sales (read-only; computed),model_neon_winloss_intel,neon_core.group_neon_sales_rep,1,0,0,0
+access_winloss_intel_book,neon.winloss.intel bookkeeper (read-only; computed),model_neon_winloss_intel,neon_core.group_neon_bookkeeper,1,0,0,0
+access_winloss_intel_super,neon.winloss.intel superuser (read-only; computed via sudo),model_neon_winloss_intel,neon_core.group_neon_superuser,1,0,0,0

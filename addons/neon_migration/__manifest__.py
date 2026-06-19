@@ -105,7 +105,20 @@
     # scripts/compute_demand_intel.py). USD-guard (ZWG/ZAR disclosed). Backend
     # list/graph/pivot + "Demand & Seasonality" menu + nightly cron + gated
     # Recompute + Owl seasonality board RPC. All-commercial read (not sensitive).
-    "version": "17.0.1.11.0",
+    # 17.0.1.12.0 — REALISATION & WIN/LOSS (Layer-2.3): STORED long-format model
+    # neon.winloss.intel (one row per dimension×key; dims client/rep/period/
+    # category) carrying BOTH halves — WIN/LOSS (win_rate = won/total, matches
+    # L2.1 + the live client board; decided = won/(won+lost); real lost=117, NO
+    # fabricated lost-reason — forward-only WA-12.3) AND REALISATION (quoted→won→
+    # invoiced value flow, UNTAXED, reconciles to the live L1 Realisation pivot:
+    # quoted 7,216,819 / won 413,646 / invoiced 444,044). Invoiced sourced from
+    # invoice.archive by segment; honest note: zoho_invoice_number ≡ won (link
+    # 100% by construction, NOT a funnel). category cut = win-rate counts only
+    # (value would double-count). PURE READ; system-computed (read-only ACL,
+    # rebuilt sudo via scripts/compute_winloss_intel.py). USD-guard. Backend
+    # list/graph/pivot + "Realisation & Win/Loss" menu + nightly cron + gated
+    # Recompute + Owl board RPC. Margin & cost is L2.4 (later, NOT here).
+    "version": "17.0.1.12.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -163,6 +176,9 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         # 17.0.1.11.0 — demand & seasonality (L2.2): by-month rollups +
         # recurring named events, own top-level menu + cron + board action.
         "views/demand_intel_views.xml",
+        # 17.0.1.12.0 — realisation & win/loss (L2.3): long-format rollups +
+        # "Realisation & Win/Loss" menu + nightly cron + gated Recompute + board.
+        "views/winloss_intel_views.xml",
         "views/res_partner_views.xml",
     ],
     "installable": True,

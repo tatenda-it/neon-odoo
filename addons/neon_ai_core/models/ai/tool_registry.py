@@ -86,6 +86,8 @@ TOOLS_BY_VARIANT: Dict[str, List[str]] = {
         "get_client_intel",
         # L2.2 -- read-only demand & seasonality (commercial, not sensitive).
         "get_demand_intel",
+        # L2.3 -- read-only win/loss + realisation (commercial, not sensitive).
+        "get_winloss_intel",
         # P12.M2 -- writes
         "log_lead", "move_stage", "update_deal_value",
         "post_chatter_note",
@@ -99,6 +101,8 @@ TOOLS_BY_VARIANT: Dict[str, List[str]] = {
         "get_client_intel", "get_client_outstanding",
         # L2.2 -- read-only demand & seasonality.
         "get_demand_intel",
+        # L2.3 -- read-only win/loss + realisation.
+        "get_winloss_intel",
         # P12.M2 -- writes (chatter note only on finance surface)
         "post_chatter_note",
     ],

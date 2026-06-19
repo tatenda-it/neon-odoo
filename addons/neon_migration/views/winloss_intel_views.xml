@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Win/Loss intelligence (L2.3) — read-only computed win-rate, long-format
+    (one row per dimension×key: client / rep / period / category). Not sensitive
+    -> all commercial read. System-computed: views create=false/edit=false;
+    refresh is the Recompute action / nightly cron. win_rate = won/total (matches
+    L2.1); decided_win_rate = won/(won+lost). Money USD-only (non-USD disclosed).
+-->
+<odoo>
+
+    <record id="view_winloss_intel_tree" model="ir.ui.view">
+        <field name="model">neon.winloss.intel</field>
+        <field name="arch" type="xml">
+            <tree string="Win/Loss" create="false" edit="false"
+                  default_order="win_rate desc">
+                <field name="dimension"/>
+                <field name="key_label"/>
+                <field name="quotes_count" sum="Quotes"/>
+                <field name="won_count" sum="Won"/>
+                <field name="lost_count" sum="Lost"/>
+                <field name="open_count" optional="show"/>
+                <field name="historical_count" optional="hide"/>
+                <field name="win_rate" widget="percentage"/>
+                <field name="decided_win_rate" widget="percentage"
+                       optional="show"/>
+                <field name="quoted_value_usd" sum="Quoted (USD)"
+                       optional="show"/>
+                <field name="won_value_usd" sum="Won (USD)"/>
+                <field name="invoiced_count" optional="hide"/>
+                <field name="invoiced_value_usd" sum="Invoiced (USD)"
+                       optional="show"/>
+                <field name="win_value_rate" widget="percentage"
+                       optional="hide"/>
+                <field name="realisation_rate" widget="percentage"
+                       optional="show"/>
+                <field name="nonusd_quote_value" optional="hide"/>
+                <field name="last_computed" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_winloss_intel_pivot" model="ir.ui.view">
+        <field name="model">neon.winloss.intel</field>
+        <field name="arch" type="xml">
+            <pivot string="Realisation &amp; Win/Loss">
+                <field name="dimension" type="row"/>
+                <field name="quotes_count" type="measure"/>
+                <field name="won_count" type="measure"/>
+                <field name="quoted_value_usd" type="measure"/>
+                <field name="won_value_usd" type="measure"/>
+                <field name="invoiced_value_usd" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_winloss_intel_graph" model="ir.ui.view">
+        <field name="model">neon.winloss.intel</field>
+        <field name="arch" type="xml">
+            <graph string="Win rate" type="bar">
+                <field name="key_label"/>
+                <field name="win_rate" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_winloss_intel_search" model="ir.ui.view">
+        <field name="model">neon.winloss.intel</field>
+        <field name="arch" type="xml">
+            <search string="Win/Loss">
+                <field name="key_label"/>
+                <field name="partner_id"/>
+                <filter name="f_client" string="By client"
+                        domain="[('dimension', '=', 'client')]"/>
+                <filter name="f_rep" string="By rep"
+                        domain="[('dimension', '=', 'rep')]"/>
+                <filter name="f_period" string="By period"
+                        domain="[('dimension', '=', 'period')]"/>
+                <filter name="f_category" string="By category"
+                        domain="[('dimension', '=', 'category')]"/>
+                <separator/>
+                <filter name="f_min3" string="3+ quotes"
+                        domain="[('quotes_count', '&gt;=', 3)]"/>
+                <filter name="f_haswon" string="Has wins"
+                        domain="[('won_count', '&gt;', 0)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_dim" string="Dimension"
+                            context="{'group_by': 'dimension'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_winloss_intel" model="ir.actions.act_window">
+        <field name="name">Win/Loss Detail</field>
+        <field name="res_model">neon.winloss.intel</field>
+        <field name="view_mode">tree,graph,pivot</field>
+        <field name="search_view_id" ref="view_winloss_intel_search"/>
+        <field name="context">{'search_default_f_rep': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No win/loss computed yet</p>
+            <p>Win-rate over the quote archive, cut by client / rep / period /
+               category. win_rate = won / total quotes (matches Client Intel);
+               decided = won/(won+lost). Read-only; refreshed by the nightly
+               cron or "Recompute now". Money is USD-only (non-USD disclosed).</p>
+        </field>
+    </record>
+
+    <!-- Recompute (gated) -->
+    <record id="action_winloss_intel_recompute" model="ir.actions.server">
+        <field name="name">Recompute now</field>
+        <field name="model_id" ref="model_neon_winloss_intel"/>
+        <field name="binding_model_id" ref="model_neon_winloss_intel"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_core.group_neon_bookkeeper'),
+            ref('neon_core.group_neon_superuser')])]"/>
+        <field name="code">model.cron_recompute()</field>
+    </record>
+
+    <!-- Owl win/loss board — inline-return server action (client tag from
+         neon_dashboard JS). 3-layer enforced. -->
+    <record id="action_winloss_board" model="ir.actions.server">
+        <field name="name">Win/Loss</field>
+        <field name="model_id" ref="model_neon_winloss_intel"/>
+        <field name="state">code</field>
+        <field name="groups_id" eval="[(6, 0, [
+            ref('neon_core.group_neon_sales_rep'),
+            ref('neon_core.group_neon_bookkeeper'),
+            ref('neon_core.group_neon_superuser')])]"/>
+        <field name="code">action = {
+    'type': 'ir.actions.client',
+    'tag': 'neon_winloss_dashboard',
+    'name': 'Realisation &amp; Win/Loss',
+}</field>
+    </record>
+
+    <menuitem id="menu_winloss_root"
+              name="Realisation &amp; Win/Loss"
+              sequence="19"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_winloss_board"
+              name="Realisation &amp; Win/Loss Board"
+              parent="menu_winloss_root"
+              action="action_winloss_board" sequence="5"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_winloss_intel"
+              name="Detail"
+              parent="menu_winloss_root"
+              action="action_winloss_intel" sequence="10"
+              groups="neon_core.group_neon_sales_rep,neon_core.group_neon_bookkeeper,neon_core.group_neon_superuser"/>
+
+    <data noupdate="1">
+        <record id="cron_winloss_intel_recompute" model="ir.cron">
+            <field name="name">Neon: recompute win/loss intelligence</field>
+            <field name="model_id" ref="model_neon_winloss_intel"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_recompute()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+
+</odoo>

@@ -32,7 +32,10 @@
     # 17.0.1.4.0 = L2.2 demand & seasonality -- TOOLS_BY_VARIANT gains the
     # read-only get_demand_intel (sales + bookkeeper; director via "*"). Body in
     # neon_dashboard; variant-advertisement only. No executor -- read-only.
-    "version": "17.0.1.4.0",
+    # 17.0.1.5.0 = L2.3 win/loss + realisation -- TOOLS_BY_VARIANT gains the
+    # read-only get_winloss_intel (sales + bookkeeper; director via "*"). Body in
+    # neon_dashboard; variant-advertisement only. No executor -- read-only.
+    "version": "17.0.1.5.0",
     "summary": "Shared AI engine -- provider abstraction, tool-calling "
                "chat orchestrator, two-phase write guardrail, chat "
                "audit models. Neutral core for neon_dashboard + "
