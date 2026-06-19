@@ -399,6 +399,21 @@ class NeonFinanceQuote(models.Model):
                     "Cannot submit %s -- set payment terms first "
                     "(use the 'Set Payment Terms' button)."
                 ) % rec.name)
+            # FIX-S1: block submit when any line carries no price -- neither
+            # an engine rate (catalogued item) nor a hand-typed rep rate.
+            # This is the safety guard that prevents the silent $0/$1 class
+            # the stock sale.order door produced.
+            unpriced = rec.line_ids.filtered(lambda l: l.unit_rate <= 0)
+            if unpriced:
+                raise UserError(_(
+                    "Cannot submit %(q)s -- %(n)d line(s) have no price: "
+                    "%(names)s. Pick a catalogued item (engine rate) or "
+                    "type a rate before submitting."
+                ) % {
+                    "q": rec.name,
+                    "n": len(unpriced),
+                    "names": ", ".join(unpriced.mapped("name")[:5]),
+                })
 
             require_all = (self.env["ir.config_parameter"].sudo().get_param(
                 "neon_finance.approval_required_for_all", "True"

@@ -439,3 +439,42 @@ on a constraint-free column doesn't fail in practice, and a full tx
 rollback would also roll back the notify's DB side-effects (chatter /
 activity), keeping state consistent. Revisit only if a constraint/trigger
 is later added to `last_notify`. Owner: WA-5 maintenance.
+
+## Update 2026-06-19 (FIX-S1 quote-form picker) — regression 3380/3405
+
+First FULL regression since the WA-7…WA-13 / neon_library / neon_migration
+(L1, L2.1–L2.3) milestones all landed on `feat/wa6-equipment-face`. 19 Python
+suites non-green; **ALL pre-existing dev-DB drift, ZERO new from FIX-S1.**
+FIX-S1's diff is exclusively `addons/neon_finance/` (quote form picker +
+`_onchange_product_template_id` + the `action_submit_for_approval` unpriced-line
+guard + `_find_pricing_rule` currency fallback) and `.claude/` tests — it touches
+NO neon_channels / neon_crew_comms / neon_jobs / neon_hr / p12-chat code.
+
+* FIX-S1 + every exercised family GREEN: **fixs1_quote_picker 12/12**, p6m2 39/39,
+  p6m4 34/34, p6m7 40/40, pwa12_quote 61/61, pwa12_6_structured 17/17,
+  fixs1 browser 3/3 (picker renders, engine rate 300 not $1, no_rule badge,
+  submit blocked).
+* 14 of 19 already documented above: p2m2, p2m4, p2m5, p2m7_7 (6/8),
+  p6m1 (20/21), p6m3 (18/28), pb1_datamodel (29/30), pb2_conflict (34/35),
+  pb14c_quantity_on_hand (23/24), phr_r1a, phr_r1b_1 (17/18),
+  phr_r3b_c4_housekeeping (5/6), pwa1_interactive (28/29), pwa12_7_template (32/33).
+
+### NEW baselined entries (the 5 previously-undocumented — off-by-one drift)
+Each is a SINGLE-test failure in a WhatsApp / chat subsystem FIX-S1 does not
+touch, **identical standalone and in-batch** (so NOT batch-pollution — genuine
+dev-DB fixture/assertion drift accumulated via the WA-7…WA-13 milestones
+committed since the last green full run on 2026-06-10). All were GREEN at the
+2026-06-10 P5.M11 capture; the +1 failure each drifted in afterward, none from
+FIX-S1 (which postdates them all and is neon_finance-only):
+
+* **pwa2_crew_ops — 26/27** (was 27/27 @ 2026-06-10)
+* **pwa3_readiness — 17/18** (was 18/18 @ 2026-06-10)
+* **pwa4_dual_role — 28/29** (was 29/29 @ 2026-06-10)
+* **pwa5_client_lane — 125/126** (was 125/125 @ 2026-06-10)
+* **p12m1_1_1_chat — 6/7** (chat-session family, same class as the 2026-06-07
+  p12m1 in-chunk note; here also fails standalone = dev-DB chat residue)
+
+> FOLLOW-UP (queued, NON-blocking): a dev-DB refresh from clean seed to clear
+> the ~19 accumulated fixture-drift failures, so the next gate can be tight
+> again. Its own task, not part of the FIX-S1 deploy. Logged per Tatenda
+> 2026-06-19.

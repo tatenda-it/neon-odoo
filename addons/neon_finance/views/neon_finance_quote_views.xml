@@ -116,6 +116,16 @@
                                     <field name="sequence"
                                            widget="handle"/>
                                     <field name="line_type"/>
+                                    <!-- FIX-S1: catalogue picker. Selecting a
+                                         product fires the pricing engine via
+                                         the line's _onchange_product_template_id
+                                         (sets line_type='equipment', stamps
+                                         unit_rate from rule x bracket x day-
+                                         multiplier). no_create: a rep picks
+                                         existing catalogue items, never mints a
+                                         product from the quote line. -->
+                                    <field name="product_template_id"
+                                           options="{'no_create': True, 'no_open': True}"/>
                                     <field name="name"/>
                                     <field name="quantity"/>
                                     <field name="duration_days"/>

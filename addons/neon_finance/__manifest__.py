@@ -46,7 +46,18 @@
     # as a normal item (name + rate). The custom marker stays INTERNAL (WhatsApp
     # draft ✍️ + the approval summary + the backend line_type). REP-PRICED badge
     # (manual equipment, distinct from line_type=custom) is unchanged.
-    'version': '17.0.7.12.1',
+    # 17.0.7.13.0 = FIX-S1 (rep-facing quote surface): the neon.finance.quote
+    # FORM gains a product_template_id catalogue picker on the inline line tree
+    # + an _onchange_product_template_id that fires the pricing engine live
+    # (sets line_type='equipment', stamps unit_rate from rule x bracket x day-
+    # multiplier) -- so a rep building a quote in Odoo gets engine pricing,
+    # parity with the WA-12 path (previously the form had no product column, so
+    # only WhatsApp produced engine-priced quotes). + a SUBMIT GUARD in
+    # action_submit_for_approval that blocks any line with unit_rate<=0 (no
+    # engine rate AND no rep rate) -- the safety check against the silent $0/$1
+    # class the stock sale.order door produced. _find_pricing_rule falls back
+    # to the related currency_id for onchange-safety. New feature/wiring->minor.
+    'version': '17.0.7.13.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

@@ -227,6 +227,30 @@ class NeonFinanceQuoteLine(models.Model):
                     "-- that's a markup, not a discount.") % (
                         rec.name or rec.id, rec.discount_amount, rec.unit_rate))
 
+    @api.onchange("product_template_id")
+    def _onchange_product_template_id(self):
+        """FIX-S1: picking a catalogued product turns the line into an
+        equipment line and fires the pricing engine LIVE (rule x bracket
+        x day-multiplier), so a rep on the Odoo quote form sees the engine
+        rate instead of a free-text / $1 line -- parity with the WA-12
+        create() path. No rule -> pricing_status='no_rule' (unit_rate stays
+        0) and the submit guard blocks until the rep types a rate
+        (-> 'manual'). Skips when a rate is already hand-set (preserves a
+        manual override)."""
+        for line in self:
+            if not line.product_template_id:
+                continue
+            if line.line_type != "equipment":
+                line.line_type = "equipment"
+            if not line.name:
+                line.name = line.product_template_id.name
+            if not line.unit_rate:
+                # _compute_line_pricing resolves the per-product rule first
+                # (WA-12.1 PRIMARY); no_rule -> stamps 'no_rule', never a
+                # silent rate. write() on the in-memory onchange record is
+                # cache-only; create() sees snapshot_taken and won't re-price.
+                line._compute_line_pricing()
+
     @api.onchange("discount_pct")
     def _onchange_discount_pct(self):
         if self.discount_pct:
@@ -395,7 +419,10 @@ class NeonFinanceQuoteLine(models.Model):
         sudo so the salesperson's read-only ACL on pricing.rule still resolves
         (P6.M1 CSV grants Sales read-only)."""
         self.ensure_one()
-        currency = self.quote_id.currency_id
+        # FIX-S1: fall back to the related currency_id so the engine resolves
+        # inside an onchange on a not-yet-saved line (quote_id may be a NewId
+        # whose M2O hasn't bound, but the related currency_id is populated).
+        currency = self.quote_id.currency_id or self.currency_id
         if not currency:
             return self.env["neon.finance.pricing.rule"]
         Rule = self.env["neon.finance.pricing.rule"].sudo()
