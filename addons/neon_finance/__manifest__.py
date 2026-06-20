@@ -73,7 +73,16 @@
     # directors) got the 'Configure Document Layout' wizard instead of the PDF
     # because prod has no company.external_report_layout_id (Neon uses a custom
     # QWeb external layout). Surfaced in post-deploy verify. Patch.
-    'version': '17.0.7.14.1',
+    # 17.0.7.14.2 = QUOTE-UX-1b: the quote-form Preview button is now
+    # PERSISTENT across every active pipeline stage (draft / pending_approval
+    # / approved / sent / accepted), not draft-only -- mirroring the stock
+    # sale.order always-visible btn-secondary Preview adjacent to the action
+    # cluster, so the rep can eyeball the state-correct PDF (DRAFT-stamped
+    # while draft/pending, final document once approved/sent/accepted) one
+    # click left of the stage's primary action before sending. View-only:
+    # reuses action_preview_quote unchanged (config=False inherited). Hidden
+    # only in terminal states. No model/schema/RBAC change. Patch.
+    'version': '17.0.7.14.2',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

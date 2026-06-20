@@ -35,14 +35,30 @@
         <field name="arch" type="xml">
             <form string="Quote">
                 <header>
-                    <!-- C (QUOTE-UX-1): review-before-submit. Prints the
-                         DRAFT-stamped quote PDF (the exact client-facing
-                         document) so the rep confirms what they built. -->
+                    <!-- QUOTE-UX-1b: the Preview is PERSISTENT across every
+                         ACTIVE pipeline stage (draft through accepted), not
+                         just draft &#8212; mirroring the stock sale.order
+                         always-visible btn-secondary Preview that sits next to
+                         the action cluster. It stays leftmost in the header, so
+                         at every stage "see the document" is one click left of
+                         the stage's primary action (Submit / Approve / Send).
+                         ONE button: action_preview_quote renders the
+                         state-correct face of the SAME report &#8212; the DRAFT
+                         banner shows while draft/pending_approval, and the
+                         final client document once approved/sent/accepted (the
+                         report is already state-aware, report lines 57-62).
+                         Hidden only in the terminal states (rejected /
+                         expired / cancelled) where there is no client document
+                         to show. Not a forced gate &#8212; always available,
+                         never mandatory. config=False is inherited from the
+                         method so admins/directors get the PDF, not the layout
+                         wizard. -->
                     <button name="action_preview_quote"
                             type="object"
                             string="Preview"
-                            invisible="state != 'draft'"
-                            help="Review the full quote (lines, rates, qty, duration, VAT, total) as the client-facing PDF before submitting for approval."/>
+                            class="btn-secondary"
+                            invisible="state not in ('draft','pending_approval','approved','sent','accepted')"
+                            help="Review the full quote (lines, rates, qty, duration, VAT, total) as the client-facing PDF. Available at every active stage: shows the DRAFT-stamped document while the quote is a draft or pending approval, and the final client document once it is approved, sent, or accepted."/>
                     <button name="action_submit_for_approval"
                             type="object"
                             string="Submit for Approval"
