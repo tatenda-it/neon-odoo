@@ -416,7 +416,15 @@
     # degrades to View-PDF-only (no blind Approve). Adds neon_finance to depends
     # (the _inherit needs it). WA internals (taps/HMAC/lock/audience/window/
     # template/intents) byte-unchanged; neon_channels untouched. Minor bump.
-    "version": "17.0.1.21.0",
+    # 17.0.1.21.1 = FIX-FORWARD #1: cold-template approval taps carry no
+    # quote_id (Meta-static QR); with >1 pending, _wa12_handle_tap dead-ended
+    # "can't tell which". Now the >1 branch sends an interactive LIST
+    # (_wa12_send_approval_pick_list) -- each row HMAC-encodes (intent,
+    # quote_id) so a row tap resolves THAT quote and applies the original
+    # action via the unchanged len==1 path. Reuses _wa6_send_list + the
+    # existing wa12_approve/reject/view_pdf intents (neon_channels untouched);
+    # in-window HMAC + len==1 paths byte-unchanged. Patch.
+    "version": "17.0.1.21.1",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

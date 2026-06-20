@@ -4052,6 +4052,37 @@ class WhatsAppMessageWA12(models.Model):
     # ================================================================
     # Approval dispatch (dual-payload, first-tap-wins lock).
     # ================================================================
+    def _wa12_send_approval_pick_list(self, intent, quotes, from_e164, raw_from):
+        """FIX-FORWARD #1: when a cold-template approval tap can't identify the
+        quote (>1 pending, the static QR carries no quote_id), present the
+        pending quotes as an interactive list. Each row id HMAC-encodes the SAME
+        ``intent`` (wa12_approve / wa12_reject / wa12_view_pdf) + that quote's
+        id, so the row tap -- an in-window list_reply (the cold tap re-opened the
+        window) -- routes back through _wa12_extract_tap -> _wa12_handle_tap on
+        the len==1 path and applies the original action to the chosen quote.
+        Reuses the existing HMAC payloads + _wa6_send_list; NO new intent (the
+        three are already in wa_payload.INTENTS) -> neon_channels untouched."""
+        secret = self.env["ir.config_parameter"].sudo().get_param(
+            "database.secret") or ""
+        act = {"wa12_approve": _("approve"), "wa12_reject": _("reject"),
+               "wa12_view_pdf": _("view")}.get(intent, _("action"))
+        rows = []
+        for q in quotes[:self._WA12_LIST_MAX]:
+            rows.append({
+                "id": wa_payload.encode(secret, intent, q.id),
+                "title": (q.name or "")[:self._WA12_LIST_TITLE],
+                "description": ("%s · %s %.2f" % (
+                    q.partner_id.name or "", q.currency_id.name or "",
+                    q.amount_total or 0.0))[:72],
+            })
+        body = _("%(n)d quotes are awaiting your approval — tap the one to "
+                 "%(act)s:") % {"n": len(quotes), "act": act}
+        if len(quotes) > self._WA12_LIST_MAX:
+            body += _("\n(showing the %d most recent — action the rest in "
+                      "Odoo)") % self._WA12_LIST_MAX
+        return self._wa6_send_list(
+            raw_from, from_e164, body, _("Pick a quote"), rows)
+
     def _wa12_handle_tap(self, intent, quote, from_e164, raw_from, message):
         self._wa6_audit_in(from_e164, message, "wa12-tap")
         tapper = self._wa6_resolve_user(from_e164)
@@ -4061,13 +4092,16 @@ class WhatsAppMessageWA12(models.Model):
             return self._wa6_reply(raw_from, from_e164, _(
                 "That quote is no longer available."))
         if len(quote) > 1:
-            # a payload-less template-QR tap with several quotes pending at once
-            # -- we can't tell which the button was for. REFUSE rather than act
-            # on the wrong quote (money surface); the in-window HMAC buttons or
-            # Odoo resolve it unambiguously.
-            return self._wa6_reply(raw_from, from_e164, _(
-                "Several quotes are awaiting approval — I can't tell which this "
-                "is for. Please action it in Odoo."))
+            # FIX-FORWARD #1: a payload-less cold-template-QR tap with >1 quote
+            # pending -- the QR carries no quote_id, so we can't tell which the
+            # button was for. The cold tap just RE-OPENED the 24h window, so
+            # reply with an interactive LIST of the pending quotes; each row
+            # HMAC-encodes (THIS intent, quote_id), so the row tap routes back
+            # through _wa12_extract_tap -> _wa12_handle_tap on the unchanged
+            # len==1 path and applies the original action to the chosen quote.
+            # (Was a dead-end "action it in Odoo" refusal.)
+            return self._wa12_send_approval_pick_list(
+                intent, quote, from_e164, raw_from)
         if intent == "wa12_view_pdf":
             # the HMAC payload binds only to quote_id; gate the document send
             # on the tapper's role (approver / the salesperson / an initiator)

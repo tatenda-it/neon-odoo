@@ -667,8 +667,10 @@ _check("T-WA12-16",
        and D_sales._wa12_can_quote(u_sales) is True,
        "approver(group) gate distinct from creation gate")
 
-# ---- T-WA12-17 cold template-QR is AMBIGUOUS with 2+ pending -> refuse (never
-# approve the wrong quote). dp (T09) is still pending; add a 2nd pending quote.
+# ---- T-WA12-17 (FIX-FORWARD #1): cold template-QR is AMBIGUOUS with 2+ pending
+# -- the static QR carries no quote_id. It now sends an interactive PICK-LIST
+# (was a "can't tell which" dead-end refusal); neither quote is approved until
+# the approver taps a row. dp (T09) is still pending; add a 2nd pending quote.
 dp2 = Q._wa12_provision_chain(client, "2026-09-04", env.ref("base.USD"), u_sales)
 M.sudo()._wa12_build_lines(dp2, [{"product_id": prod_ok.id, "qty": 1}], 1)
 dp2.action_recalculate_pricing(); M.sudo()._wa12_ensure_payment_term(dp2, client)
@@ -681,10 +683,12 @@ _amb_out = M.search([("phone_number", "=", APPR_PH), ("direction", "=", "outboun
                     order="id desc", limit=1)
 _check("T-WA12-17",
        len(_btap[1]) >= 2
-       and "can't tell which" in (_amb_out.message_body or "").lower()
+       and "awaiting your approval" in (_amb_out.message_body or "").lower()
+       and "can't tell which" not in (_amb_out.message_body or "").lower()
        and dp.state == "pending_approval" and dp2.state == "pending_approval",
-       "2 pending -> template-QR Approve refused, neither approved (dp=%s dp2=%s)"
-       % (dp.state, dp2.state))
+       "2 pending -> template-QR Approve sends a pick-LIST, neither approved "
+       "(dp=%s dp2=%s body=%r)"
+       % (dp.state, dp2.state, (_amb_out.message_body or "")[:50]))
 
 # ---- T-WA12-18 (review-fix c) REGRESSION: a hand-set rate on a categorized
 # product with NO equipment_line_id stays 'manual' -- the engine widening
