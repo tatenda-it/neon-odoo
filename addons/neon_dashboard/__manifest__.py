@@ -108,7 +108,16 @@
     # the new >=2 View-As set on dual-role users doesn't surface a no-op button.
     # Server-only data path; asset-bundle touched (JS) so -u + delete web.assets_*
     # + force-recreate; users hard-refresh once.
-    "version": "17.0.11.6.1",
+    # 17.0.11.6.2 = DASH-SCROLL-FIX. The dashboard root .o_neon_dashboard had
+    # `min-height: 100vh` with no overflow-y and no bounded height, so it grew to
+    # fit its content and overflowed its clipped parent (.o_action_manager) ->
+    # content below the fold was unreachable with no scrollbar (ALL lenses; worst
+    # on the tall Bookkeeper/Director lenses). Fix = `height:100%` +
+    # `overflow-y:auto` on the root (SCSS only) so it scrolls within the bounded
+    # action area; card grid + fixed chat rail + inner block scroll unaffected.
+    # Asset-bundle (SCSS) change -> -u + delete web.assets_* + force-recreate;
+    # users hard-refresh once. No Python / model / RBAC change.
+    "version": "17.0.11.6.2",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "
