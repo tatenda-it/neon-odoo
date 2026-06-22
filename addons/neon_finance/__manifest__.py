@@ -89,7 +89,13 @@
     # fields, mutual-exclusion constraint/onchanges, and _compute_subtotal ->
     # totals chain already exist (used by the WA flow + PDF). No model/compute/
     # onchange change. Patch.
-    'version': '17.0.7.14.3',
+    # 17.0.7.15.0 = QUOTE-UX-3b: whole-quote discount on the Odoo form. New
+    # shared neon.finance.quote.apply_whole_quote_discount (extracted from the
+    # WA _wa12_whole_quote_discount: clear -> recalc -> base -> validate (raise
+    # UserError) -> uniform per-line discount_pct -> recalc -> wa12_discount_note
+    # = achieved drop) + a TransientModel wizard + a draft-only form button. The
+    # WA path now calls the shared method. New wizard layer -> minor bump.
+    'version': '17.0.7.15.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -176,6 +182,9 @@ and cost-line behaviour downstream.
         'wizard/neon_finance_payment_term_wizard_views.xml',
         # P6.M11 -- cost recovery wizard (TransientModel + form view).
         'wizard/neon_finance_cost_recovery_wizard_views.xml',
+        # QUOTE-UX-3b -- whole-quote discount wizard (form face of the shared
+        # apply_whole_quote_discount, the same method WhatsApp uses).
+        'wizard/neon_finance_whole_quote_discount_wizard_views.xml',
         # P6.M9 -- res.partner credit hold flag + clear action button.
         # Bookkeeper/Approver groups gate visibility in the form view.
         'views/res_partner_views.xml',

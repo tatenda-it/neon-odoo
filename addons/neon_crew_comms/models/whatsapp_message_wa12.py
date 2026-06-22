@@ -3679,70 +3679,30 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_whole_quote_discount(self, quote, value, ex_vat, is_target,
                                    from_e164, raw_from):
-        """Apply a WHOLE-QUOTE discount (review WA12-FLEX). ``value`` is the $
-        discount (is_target=False) or the desired total (is_target=True).
-        ``ex_vat`` picks the basis: default (False) operates on the VAT-INCLUSIVE
-        Total so it lands EXACTLY on target; ex_vat=True operates on the ex-VAT
-        goods subtotal (VAT then applies on top). Mechanism: clear existing
-        discounts -> recalc to read the true BASE -> set a uniform per-line
-        discount_pct = D/base -> recalc. The reduction lands on the chosen base
-        exactly (per-line rounding aside). Sets wa12_discount_note for the
-        summary/PDF label; the parity gate reads the BASE unit_rate so a discount
-        never trips it; confirm-before-draft is intact (the draft is re-shown,
-        nothing is submitted)."""
+        """Apply a WHOLE-QUOTE discount over WhatsApp (review WA12-FLEX).
+        ``value`` is the $ discount (is_target=False) or the desired total
+        (is_target=True); ``ex_vat`` picks the basis (default: the VAT-INCLUSIVE
+        Total so the drop lands exactly on target; ex_vat=True: the ex-VAT goods
+        subtotal).
+
+        QUOTE-UX-3b: the distribution algorithm now lives on the quote model
+        (neon.finance.quote.apply_whole_quote_discount) so the Odoo form wizard
+        and this WhatsApp path share ONE implementation. This wrapper keeps the
+        WA I/O ONLY: it resolves the rep actor, runs the shared method as that
+        actor under sudo (cross-tier ACL), turns the shared method's UserError
+        into a WA reply, and re-shows the draft via _wa12_after_edit
+        (keep_note=True so the label survives). Behaviour is byte-identical to
+        the pre-extraction path -- the clear-then-validate ordering, the actor
+        context, the error/success reply text, and the achieved-drop label are
+        all preserved; pwa12_6 S13/S14 are the parity gate."""
         actor = quote.salesperson_id.id or self.env.uid
         cur = quote.currency_id.name
-        lines = quote.line_ids
-        if not lines:
-            return self._wa6_reply(raw_from, from_e164,
-                                   _("This quote has no lines yet."))
-        # BASE = undiscounted totals: clear discounts, recalc, read.
-        lines.with_user(actor).sudo().write(
-            {"discount_pct": 0.0, "discount_amount": 0.0})
         try:
-            quote.with_user(actor).sudo().action_recalculate_pricing()
+            realized = quote.with_user(actor).sudo().apply_whole_quote_discount(
+                value, ex_vat=ex_vat, is_target=is_target)
         except (UserError, AccessError) as e:
             return self._wa6_reply(raw_from, from_e164, str(e))
-        base = (quote.amount_untaxed or 0.0) if ex_vat else (
-            quote.amount_total or 0.0)
-        label = _("subtotal") if ex_vat else _("total")
-        if base <= _WA12_PLACEHOLDER_RATE:
-            return self._wa6_reply(raw_from, from_e164, _(
-                "No priced lines to discount yet — set a rate first."))
-        if is_target:
-            if value <= 0:
-                return self._wa6_reply(raw_from, from_e164, _(
-                    "The target %s must be a positive amount.") % label)
-            if value >= base:
-                return self._wa6_reply(raw_from, from_e164, _(
-                    "That target (%s %.2f) is at or above the current %s "
-                    "(%s %.2f) — that's not a discount.")
-                    % (cur, value, label, cur, base))
-            disc = base - value
-        else:
-            disc = value
-            if disc >= base:
-                return self._wa6_reply(raw_from, from_e164, _(
-                    "%s %.2f is the whole %s (%s %.2f) or more — can't discount "
-                    "to zero.") % (cur, disc, label, cur, base))
-        frac = disc / base
-        lines.with_user(actor).sudo().write(
-            {"discount_pct": round(frac * 100.0, 6), "discount_amount": 0.0})
-        # Label the note with the ACHIEVED drop (read AFTER recalc), not the
-        # requested figure: per-line cent rounding means the realized total can
-        # differ by a few cents, and the label must TIE OUT with the Subtotal/
-        # VAT/Total on the client-facing PDF (review WA12-FLEX, money lens).
-        try:
-            quote.with_user(actor).sudo().action_recalculate_pricing()
-        except (UserError, AccessError) as e:
-            return self._wa6_reply(raw_from, from_e164, str(e))
-        quote.invalidate_recordset()
-        realized = ((base - (quote.amount_untaxed or 0.0)) if ex_vat
-                    else (base - (quote.amount_total or 0.0)))
         basis = _("ex VAT") if ex_vat else _("incl. VAT")
-        quote.with_user(actor).sudo().write(
-            {"wa12_discount_note": _("Discount %s %.2f (%s)")
-             % (cur, realized, basis)})
         return self._wa12_after_edit(
             quote, from_e164, raw_from,
             _("Whole-quote discount: %s %.2f off (%s)") % (cur, realized, basis),

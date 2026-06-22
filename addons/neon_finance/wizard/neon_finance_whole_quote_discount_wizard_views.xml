@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="neon_finance_whole_quote_discount_wizard_view_form"
+            model="ir.ui.view">
+        <field name="name">neon.finance.whole.quote.discount.wizard.form</field>
+        <field name="model">neon.finance.whole.quote.discount.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Apply Whole-Quote Discount">
+                <group>
+                    <field name="quote_id" readonly="1"/>
+                    <field name="current_total" widget="monetary"/>
+                    <field name="currency_id" invisible="1"/>
+                </group>
+                <group>
+                    <field name="mode" widget="radio"/>
+                    <field name="basis" widget="radio"/>
+                    <field name="amount" widget="monetary"/>
+                </group>
+                <p class="text-muted">
+                    The discount is distributed uniformly across the per-line
+                    discount % (the engine has no single quote-level discount
+                    field). The achieved drop is labelled on the quote summary
+                    and the client PDF. This is the engine discount, not the
+                    stock account global discount.
+                </p>
+                <footer>
+                    <button name="action_apply"
+                            type="object"
+                            string="Apply"
+                            class="btn-primary"/>
+                    <button special="cancel"
+                            string="Cancel"
+                            class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

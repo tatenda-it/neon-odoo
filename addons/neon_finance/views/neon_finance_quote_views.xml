@@ -95,6 +95,16 @@
                             type="object"
                             string="Set Payment Terms"
                             invisible="state != 'draft'"/>
+                    <!-- QUOTE-UX-3b: whole-quote discount, the form face of the
+                         shared neon.finance.quote.apply_whole_quote_discount
+                         (same method WhatsApp uses). Distributes a uniform
+                         per-line discount_pct + sets wa12_discount_note.
+                         Draft-only. NOT the stock account global discount. -->
+                    <button name="action_open_whole_quote_discount_wizard"
+                            type="object"
+                            string="Apply Whole-Quote Discount"
+                            invisible="state != 'draft'"
+                            help="Take a single discount off the whole quote (a fixed amount or a target total, VAT-inclusive or ex-VAT). It is distributed across the line discounts; the achieved drop is labelled on the summary and the PDF."/>
                     <button name="action_recalculate_pricing"
                             type="object"
                             string="Recalculate Pricing"

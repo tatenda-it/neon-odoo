@@ -424,7 +424,13 @@
     # action via the unchanged len==1 path. Reuses _wa6_send_list + the
     # existing wa12_approve/reject/view_pdf intents (neon_channels untouched);
     # in-window HMAC + len==1 paths byte-unchanged. Patch.
-    "version": "17.0.1.21.1",
+    # 17.0.1.21.2 = QUOTE-UX-3b: _wa12_whole_quote_discount refactored to a thin
+    # wrapper calling the new shared neon.finance.quote.apply_whole_quote_discount
+    # (the distribution algorithm moved to the quote model so the Odoo form
+    # wizard shares it). WA I/O (actor resolve, sudo, UserError->reply,
+    # _wa12_after_edit) preserved; behaviour byte-identical (pwa12_6 S13/S14 the
+    # parity gate). Internal refactor, no new feature -> patch.
+    "version": "17.0.1.21.2",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

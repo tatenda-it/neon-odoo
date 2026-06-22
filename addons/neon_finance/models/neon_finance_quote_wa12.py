@@ -34,6 +34,11 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
+# Mirror of neon_crew_comms _WA12_PLACEHOLDER_RATE: the $1 sentinel an unpriced
+# line carries. A whole-quote discount can't operate at/below it. Defined here
+# (not imported) because neon_finance must not depend on neon_crew_comms.
+_WHOLE_QUOTE_PLACEHOLDER_RATE = 1.0
+
 
 class NeonFinanceQuoteWA12(models.Model):
     _inherit = "neon.finance.quote"
@@ -170,3 +175,86 @@ class NeonFinanceQuoteWA12(models.Model):
         if expired:
             expired._wa12_maybe_archive_provisional()
         return n
+
+    # ============================================================
+    # === QUOTE-UX-3b — whole-quote discount (shared WA + form)
+    # ============================================================
+    def apply_whole_quote_discount(self, value, ex_vat=False,
+                                   is_target=False):
+        """Apply a WHOLE-QUOTE discount, distributing it uniformly across the
+        per-line discount_pct (the engine has no quote-level discount field).
+        SHARED by the WhatsApp flow (neon_crew_comms _wa12_whole_quote_discount)
+        and the Odoo form wizard, so both surfaces behave identically.
+
+        :param value: the discount amount to take off (is_target=False) OR the
+            desired final amount (is_target=True), in the quote currency.
+        :param ex_vat: basis. False (default) operates on the VAT-INCLUSIVE
+            total so the drop lands EXACTLY on the client total; True operates
+            on the ex-VAT goods subtotal (VAT then applies on top).
+        :param is_target: interpret ``value`` as the desired final amount.
+        :returns: the realized (achieved) drop, in the quote currency.
+
+        Mechanism: clear line discounts -> action_recalculate_pricing() -> read
+        the true BASE -> validate -> set a uniform per-line discount_pct =
+        drop/base -> recalc -> set wa12_discount_note to the ACHIEVED drop (read
+        AFTER recalc so the label ties out with the PDF to the cent).
+
+        Raises UserError (NOT WhatsApp replies) on: no lines; base at/below the
+        placeholder; target <= 0 or >= base; discount >= base. Operates on self;
+        the CALLER sets the user context (WA: with_user(actor).sudo(); the form
+        wizard: env.user). The two action_recalculate_pricing() calls each post
+        an audit chatter line, exactly as the WhatsApp path always has.
+        """
+        self.ensure_one()
+        cur = self.currency_id.name
+        if not self.line_ids:
+            raise UserError(_("This quote has no lines yet."))
+        # BASE = undiscounted totals: clear discounts, recalc, read.
+        self.line_ids.write({"discount_pct": 0.0, "discount_amount": 0.0})
+        self.action_recalculate_pricing()
+        base = (self.amount_untaxed or 0.0) if ex_vat else (
+            self.amount_total or 0.0)
+        label = _("subtotal") if ex_vat else _("total")
+        if base <= _WHOLE_QUOTE_PLACEHOLDER_RATE:
+            raise UserError(_(
+                "No priced lines to discount yet — set a rate first."))
+        if is_target:
+            if value <= 0:
+                raise UserError(_(
+                    "The target %s must be a positive amount.") % label)
+            if value >= base:
+                raise UserError(_(
+                    "That target (%s %.2f) is at or above the current %s "
+                    "(%s %.2f) — that's not a discount.")
+                    % (cur, value, label, cur, base))
+            disc = base - value
+        else:
+            disc = value
+            if disc >= base:
+                raise UserError(_(
+                    "%s %.2f is the whole %s (%s %.2f) or more — can't discount "
+                    "to zero.") % (cur, disc, label, cur, base))
+        frac = disc / base
+        self.line_ids.write(
+            {"discount_pct": round(frac * 100.0, 6), "discount_amount": 0.0})
+        self.action_recalculate_pricing()
+        self.invalidate_recordset()
+        realized = ((base - (self.amount_untaxed or 0.0)) if ex_vat
+                    else (base - (self.amount_total or 0.0)))
+        basis = _("ex VAT") if ex_vat else _("incl. VAT")
+        self.write({"wa12_discount_note": _("Discount %s %.2f (%s)")
+                    % (cur, realized, basis)})
+        return realized
+
+    def action_open_whole_quote_discount_wizard(self):
+        """Open the whole-quote discount wizard (draft-only; the form button is
+        hidden outside draft). Mirrors action_open_payment_term_wizard."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Apply Whole-Quote Discount"),
+            "res_model": "neon.finance.whole.quote.discount.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_quote_id": self.id},
+        }
