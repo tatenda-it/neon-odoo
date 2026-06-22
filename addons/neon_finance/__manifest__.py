@@ -82,7 +82,14 @@
     # click left of the stage's primary action before sending. View-only:
     # reuses action_preview_quote unchanged (config=False inherited). Hidden
     # only in terminal states. No model/schema/RBAC change. Patch.
-    'version': '17.0.7.14.2',
+    # 17.0.7.14.3 = QUOTE-UX-3: surface the ENGINE line discount on the Odoo
+    # quote form. discount_pct + discount_amount added as default-visible
+    # (optional="show") columns on the editable line tree adjacent to unit_rate,
+    # + wa12_discount_note read-only in the totals footer. View-only: the
+    # fields, mutual-exclusion constraint/onchanges, and _compute_subtotal ->
+    # totals chain already exist (used by the WA flow + PDF). No model/compute/
+    # onchange change. Patch.
+    'version': '17.0.7.14.3',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '

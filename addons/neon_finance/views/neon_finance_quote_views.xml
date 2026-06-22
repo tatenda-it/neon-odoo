@@ -155,6 +155,22 @@
                                     <field name="duration_days"/>
                                     <field name="unit_rate"
                                            widget="monetary"/>
+                                    <!-- QUOTE-UX-3: the ENGINE line discount.
+                                         discount_pct / discount_amount fold into
+                                         line_subtotal via _compute_subtotal (the
+                                         engine unit_rate is never overwritten);
+                                         they are mutually exclusive (the sibling
+                                         auto-clears on edit, _check_discount
+                                         blocks both/over-base). Default-VISIBLE
+                                         (optional="show": shown, user may hide)
+                                         so a WA-originated discount is never
+                                         silently off-screen. This is NOT the
+                                         stock account global discount. -->
+                                    <field name="discount_pct"
+                                           optional="show"/>
+                                    <field name="discount_amount"
+                                           widget="monetary"
+                                           optional="show"/>
                                     <field name="line_subtotal"
                                            widget="monetary"
                                            sum="Subtotal"/>
@@ -177,6 +193,14 @@
                             </field>
                             <group class="oe_subtotal_footer
                                           oe_right">
+                                <!-- QUOTE-UX-3: read-only label for a whole-
+                                     quote WhatsApp discount (the amount itself is
+                                     distributed across the per-line discounts
+                                     above; this just names the basis the rep
+                                     chose). Shown only when set; display-only,
+                                     mirrors the PDF summary label. -->
+                                <field name="wa12_discount_note" readonly="1"
+                                       invisible="not wa12_discount_note"/>
                                 <field name="amount_untaxed"
                                        widget="monetary"/>
                                 <field name="amount_tax"
