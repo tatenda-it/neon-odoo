@@ -143,8 +143,20 @@
                                              catalogue rule, no reservation) is flagged
                                              so the approver sees exactly which numbers
                                              came from the rep. (A custom line is
-                                             excluded by the t-if below.) -->
-                                        <span t-if="l.line_type != 'custom' and l.pricing_status == 'manual' and not l.equipment_line_id"
+                                             excluded by the t-if below.)
+                                             REP-PRICED-PDF-FIX: REP-PRICED is an
+                                             INTERNAL rep-vs-engine provenance tag, so
+                                             gate it to the working states only
+                                             (draft / pending_approval) and HIDE it once
+                                             the quote is client-facing (approved / sent
+                                             / accepted), mirroring the DRAFT-banner
+                                             state-gating above (report:57-62). The
+                                             director still sees it while reviewing a
+                                             pending quote; the client's quotation never
+                                             does. Display-only: pricing_status, the
+                                             write-flip, the WA approver marker and the
+                                             internal badges are all untouched. -->
+                                        <span t-if="o.state in ('draft', 'pending_approval') and l.line_type != 'custom' and l.pricing_status == 'manual' and not l.equipment_line_id"
                                               style="color:#B05A00;font-weight:bold;">REP-PRICED </span>
                                         <span t-field="l.name"/>
                                     </td>

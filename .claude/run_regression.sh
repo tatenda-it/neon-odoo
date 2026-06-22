@@ -113,6 +113,7 @@ SMOKES=(
   quoteux2
   quoteux3
   quoteux3b
+  reppriced_pdf
   wa12cold_pick
   p7a_m1 p7a_m2 p7a_m3 p7a_m4 p7a_m5 p7a_m6 p7a_m7 p7a_m8 p7a_m9 p7a_m10 p7a_m11 p7a_m12 p7a_m12_1
   p7b_m1 p7b_m2 p7b_m3 p7b_m4 p7b_m5 p7b_m6 p7b_m7 p7b_m8 p7b_m9 p7b_m10 p7b_m11 p7b_m12

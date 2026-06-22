@@ -95,7 +95,12 @@
     # UserError) -> uniform per-line discount_pct -> recalc -> wa12_discount_note
     # = achieved drop) + a TransientModel wizard + a draft-only form button. The
     # WA path now calls the shared method. New wizard layer -> minor bump.
-    'version': '17.0.7.15.0',
+    # 17.0.7.15.1 = REP-PRICED-PDF-FIX: the internal REP-PRICED rep-vs-engine
+    # provenance tag on the quote report is now state-gated to draft /
+    # pending_approval (working states) and HIDDEN on the client-facing faces
+    # (approved / sent / accepted), mirroring the DRAFT-banner gating. Report
+    # template display-only -- no model / flag / compute change. Patch.
+    'version': '17.0.7.15.1',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
