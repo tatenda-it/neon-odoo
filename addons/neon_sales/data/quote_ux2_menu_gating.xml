@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        QUOTE-UX-2 (Solution A) — retire the stock sale.order quote/order doors
+        and make the engine quote (neon.finance.quote) the single quote door.
+
+        The engine quote is now fully usable (FIX-S1 picker + QUOTE-UX-1 routing
+        + QUOTE-UX-1b persistent preview), so the legacy stock Sales quote
+        surface can be hidden. No noupdate wrapper, so these overrides re-apply
+        on every -u of neon_sales (defensive against an upstream sale/sale_crm
+        upgrade resetting groups_id / action).
+    -->
+
+    <!-- HIDE the stock Quotations / Orders / To-Invoice doors from ALL tiers:
+         REPLACE groups_id with the legacy group (held by nobody). This drops
+         group_sale_salesman / public visibility WITHOUT touching sales_team.*
+         membership, sale_management, or the neon_sales sale.order inherit
+         (which needs the MODEL, not the menus). -->
+    <record id="sale.menu_sale_quotations" model="ir.ui.menu">
+        <field name="groups_id"
+               eval="[(6, 0, [ref('neon_sales.group_neon_legacy_stock_sales')])]"/>
+    </record>
+    <record id="sale.menu_sale_order" model="ir.ui.menu">
+        <field name="groups_id"
+               eval="[(6, 0, [ref('neon_sales.group_neon_legacy_stock_sales')])]"/>
+    </record>
+    <record id="sale.menu_sale_invoicing" model="ir.ui.menu">
+        <field name="groups_id"
+               eval="[(6, 0, [ref('neon_sales.group_neon_legacy_stock_sales')])]"/>
+    </record>
+    <record id="sale.menu_sale_order_invoice" model="ir.ui.menu">
+        <field name="groups_id"
+               eval="[(6, 0, [ref('neon_sales.group_neon_legacy_stock_sales')])]"/>
+    </record>
+    <record id="sale.menu_sale_order_upselling" model="ir.ui.menu">
+        <field name="groups_id"
+               eval="[(6, 0, [ref('neon_sales.group_neon_legacy_stock_sales')])]"/>
+    </record>
+
+    <!-- REDIRECT the CRM "My Quotations" path (sale_crm) onto the ENGINE quote
+         list, and gate it to the quoting tiers so only quote-capable users land
+         on the engine action (plain CRM users no longer see a stale stock
+         door). The menuitem form sets the Reference 'action' field correctly;
+         266 is groupless, so the additive groups become exactly these three.
+         Superuser implies group_neon_finance_approver, so directors are
+         covered. Name/parent/sequence are left unchanged. -->
+    <menuitem id="sale_crm.sale_order_menu_quotations_crm"
+              action="neon_finance.neon_finance_quote_action"
+              groups="neon_finance.group_neon_finance_sales,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+
+    <!-- ADD a findable, top-level "My Quotation" door -> the engine quote list
+         (parentless top-level menu, mirroring the live Collections menu
+         pattern). Same quoting groups; superuser reaches it via implied
+         approver. -->
+    <menuitem id="menu_neon_quotes_toplevel"
+              name="My Quotation"
+              action="neon_finance.neon_finance_quote_action"
+              sequence="15"
+              groups="neon_finance.group_neon_finance_sales,neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
+</odoo>

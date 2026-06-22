@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        QUOTE-UX-2 (Solution A) — a hidden group held by NOBODY by default.
+
+        The retired stock sale.order quote/order/to-invoice menus are gated to
+        this group (groups_id REPLACE), so they are invisible to every tier
+        without touching sales_team.* membership or removing sale_management.
+        To restore a legacy stock door for a specific user later (e.g. a
+        director handling old orders), add them to this group — a one-membership
+        edit, no code change. Category 'hidden' keeps it out of the normal user
+        form's group list (it is plumbing, not a role).
+    -->
+    <record id="group_neon_legacy_stock_sales" model="res.groups">
+        <field name="name">Neon Legacy Stock Sales (hidden door)</field>
+        <field name="category_id" ref="base.module_category_hidden"/>
+    </record>
+</odoo>

@@ -10,7 +10,16 @@
         <field name="name">Neon ZWG Pricelist</field>
         <field name="currency_id"
                ref="neon_finance.currency_zwg"/>
-        <field name="active" eval="True"/>
+        <!-- QUOTE-UX-2 (Solution A): DEACTIVATED. This pricelist's catch-all
+             rule used base=list_price, so a $1 list_price product could
+             convert to a $1-equivalent ZWG quote on the (now-retired) stock
+             sale.order door. With the stock quote door hidden and the engine
+             quote (neon.finance.quote) the single door (engine-priced, not
+             pricelist-driven), this pricelist is unused for new quotes.
+             Deactivating does NOT alter the 3 existing draft stock orders that
+             reference it (their line prices are already stored); it only
+             removes it as a selectable base. noupdate=0 -> durable across -u. -->
+        <field name="active" eval="False"/>
         <field name="company_id" ref="base.main_company"/>
         <field name="discount_policy">without_discount</field>
         <field name="sequence">10</field>
