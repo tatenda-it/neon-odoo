@@ -86,6 +86,33 @@ _DASHBOARD_TYPES = [
 ]
 _DASHBOARD_TYPE_VALUES = {t[0] for t in _DASHBOARD_TYPES}
 
+# DASH-DUALROLE-1 -- tier-group -> dashboard lens, in LANDING-PRIORITY
+# order (first matching entry wins for the default landing lens).
+# Bookkeeper ranks ABOVE HR so a dual-role Bookkeeper+HR user (e.g.
+# Kudzai, uid 10) lands on Bookkeeper -- her primary role -- with HR one
+# View-As switch away. Single-tier users are unaffected (only one entry
+# matches them). Superuser is handled separately (all lenses). Both
+# group_neon_hr_admin and hr.group_hr_manager grant the 'hr' lens; the
+# dedup in _entitled_lenses_for_user keeps 'hr' once. 'tech' (crew) keeps
+# its prior position below lead_tech.
+#
+# ⚠️ DECISION (DASH-DUALROLE-1): the prior resolver ranked HR ABOVE
+# Bookkeeper and returned a SINGLE tier per user, so a dual-role
+# Bookkeeper+HR user landed on HR and the View-As switcher only ever
+# offered HR -- Bookkeeper was unreachable. This table +
+# _entitled_lenses_for_user generalise the resolver to the UNION of a
+# user's entitled lenses. Only the Bookkeeper/HR order is swapped vs the
+# old ladder; every other tier keeps its relative position, so the
+# single-tier landing lens is byte-identical to before.
+_TIER_LENS_PRIORITY = [
+    (_GROUP_BOOKKEEPER, "bookkeeper"),
+    (_GROUP_NEON_HR_ADMIN, "hr"),
+    (_GROUP_HR_MANAGER, "hr"),
+    (_GROUP_LEAD_TECH, "lead_tech"),
+    (_GROUP_CREW, "tech"),
+    (_GROUP_SALES_REP, "sales"),
+]
+
 # ⚠️ DECISION (M3, marker 5): event-state -> mockup badge mapping.
 # commercial.event.job has a 12-state machine (draft / planning /
 # prep / ready_for_dispatch / dispatched / in_progress / strike /
@@ -231,13 +258,51 @@ class NeonDashboard(models.Model):
         return dashboard
 
     @api.model
+    def _entitled_lenses_for_user(self, user=None):
+        """Ordered list of dashboard lenses a user is entitled to,
+        derived from their ACTUAL tier groups -- the single source of
+        truth for BOTH the landing default (first entry) and the
+        View-As switch set.
+
+        Superuser -> all six lenses (unchanged: _DASHBOARD_TYPES order,
+        headed by 'director'). Every other user -> the UNION of lenses
+        their tier groups grant, deduped, in _TIER_LENS_PRIORITY landing
+        order. A dual-role Bookkeeper+HR user therefore returns
+        ['bookkeeper', 'hr']; a single-tier user returns one entry; a
+        user in no tier returns [] (callers fall back to 'sales').
+
+        ⚠️ DECISION (DASH-DUALROLE-1): replaces the old one-tier-per-user
+        assumption that ranked HR above Bookkeeper and only ever returned
+        a single tier. has_group() is evaluated on the passed user record
+        (checks THAT user, not env.user) and uses XML ids, never numeric
+        group ids, per the project hard rule.
+        """
+        user = user or self.env.user
+        if self._is_superuser(user):
+            return [v for v, _label in _DASHBOARD_TYPES]
+        lenses = []
+        for group_xmlid, lens in _TIER_LENS_PRIORITY:
+            if lens not in lenses and user.has_group(group_xmlid):
+                lenses.append(lens)
+        return lenses
+
+    @api.model
     def _default_dashboard_type_for_user(self, user_id):
         """Map a user to their default landing dashboard.
 
-        Walks the five neon_core tier meta-groups in priority order.
-        ⚠️ DECISION (M1, marker 2 cont'd): superuser takes precedence
-        over bookkeeper -- on dev DB Tatenda is sales + superuser and
-        should land on Director per schema sketch §6.2.
+        ``preferred_dashboard_type`` wins first (unchanged). Otherwise
+        the landing lens is the highest-priority entry in the user's
+        entitled lens set (``_entitled_lenses_for_user``, ordered by
+        ``_TIER_LENS_PRIORITY``).
+
+        ⚠️ DECISION (M1, marker 2 cont'd): superuser takes precedence and
+        lands on Director -- handled inside ``_entitled_lenses_for_user``
+        (it returns the full set headed by 'director').
+        ⚠️ DECISION (DASH-DUALROLE-1): Bookkeeper now ranks ABOVE HR, so a
+        dual-role Bookkeeper+HR user lands on Bookkeeper (was: HR) with HR
+        one View-As switch away. Single-tier landing is byte-identical to
+        the old ladder (only the Bookkeeper/HR order swapped). See
+        ``_TIER_LENS_PRIORITY``.
         """
         user = self.env["res.users"].browse(user_id)
         if not user or not user.exists():
@@ -245,28 +310,12 @@ class NeonDashboard(models.Model):
         # Honor explicit preference first.
         if user.preferred_dashboard_type:
             return user.preferred_dashboard_type
-        # Then walk tier groups in priority order.
-        # ⚠️ DECISION (R3b C1, marker 3): Superuser still trumps --
-        # OD/MD lands on Director by default; if they want HR they
-        # use the View-As selector. HR-tier-only users land on 'hr'
-        # (they have no other tier). HR sits BELOW superuser but
-        # ABOVE the operational tiers in priority.
-        if user.has_group(_GROUP_SUPERUSER):
-            return "director"
-        if (user.has_group(_GROUP_NEON_HR_ADMIN)
-                or user.has_group(_GROUP_HR_MANAGER)):
-            return "hr"
-        if user.has_group(_GROUP_BOOKKEEPER):
-            return "bookkeeper"
-        if user.has_group(_GROUP_LEAD_TECH):
-            return "lead_tech"
-        if user.has_group(_GROUP_CREW):
-            return "tech"
-        if user.has_group(_GROUP_SALES_REP):
-            return "sales"
-        # Fallback for users with no tier group -- treat as sales so
-        # they get a constrained but non-empty dashboard rather than
-        # an AccessError. M5 will tighten this.
+        lenses = self._entitled_lenses_for_user(user)
+        if lenses:
+            return lenses[0]
+        # Fallback for users with no tier group -- treat as sales so they
+        # get a constrained but non-empty dashboard rather than an
+        # AccessError. (Unchanged behaviour.)
         return "sales"
 
     def _seed_default_layout(self):
@@ -348,16 +397,33 @@ class NeonDashboard(models.Model):
 
     @api.model
     def _available_types_for_user(self, user=None):
-        """View-as dropdown options. Superusers see all six tier
-        labels (incl. HR); HR-tier users see only HR (they have no
-        other tier; the dropdown will show one option so they can
-        confirm their landing). Everyone else gets an empty list
-        (dropdown hidden by the OWL template)."""
+        """View-As switcher options.
+
+        Superusers see all six tier labels (incl. HR) -- unchanged. A
+        user with TWO OR MORE entitled lenses (e.g. a dual-role
+        Bookkeeper+HR user) sees the full switchable set so they can move
+        between their lenses and back. A single-lens user keeps the exact
+        legacy contract: an HR-only user still confirms its one HR option
+        (R3b), and every other single tier returns [] so the OWL template
+        keeps the switcher hidden -- nothing changes for them.
+
+        ⚠️ DECISION (DASH-DUALROLE-1): the >=2 gate keeps single-tier
+        behaviour byte-identical to before (sales / bookkeeper /
+        lead_tech / crew -> []; hr-only -> ['hr']); only multi-lens users
+        gain the union. No OWL change is needed: the existing
+        ``availableTypes.length`` template gate shows the switcher once
+        the server ships >=2 options, so the dual-role Bookkeeper<->HR
+        round-trip works client-side as-is."""
         user = user or self.env.user
         if self._is_superuser(user):
             return [{"value": v, "label": label}
                      for v, label in _DASHBOARD_TYPES]
-        if self._is_hr_user(user):
+        lenses = self._entitled_lenses_for_user(user)
+        if len(lenses) >= 2:
+            label_map = dict(_DASHBOARD_TYPES)
+            return [{"value": v, "label": label_map[v]} for v in lenses]
+        # Single-lens users -- preserve the exact legacy contract.
+        if lenses == ["hr"]:
             return [{"value": "hr", "label": "HR"}]
         return []
 
@@ -367,21 +433,26 @@ class NeonDashboard(models.Model):
         (their default + only allowed lens). Everyone else's
         requested_type is ignored and they get their default.
 
-        ⚠️ DECISION (R3b C1, marker 2): a non-HR / non-superuser
-        requesting 'hr' is downgraded to their default lens
-        (NOT raised AccessError) -- the OWL component might cache
-        a stale value across a role downgrade; silently coercing
-        to the user's real tier is safer than 403'ing. The data
-        methods still re-check (no data leak)."""
+        ⚠️ DECISION (R3b C1, marker 2): a non-entitled / non-superuser
+        request is downgraded to their default lens (NOT raised
+        AccessError) -- the OWL component might cache a stale value
+        across a role downgrade; silently coercing to the user's real
+        tier is safer than 403'ing. The data methods still re-check
+        (no data leak).
+        ⚠️ DECISION (DASH-DUALROLE-1): generalised from the old HR-only
+        special case ("requested == 'hr' and is_hr_user") to "any lens
+        the user is ENTITLED to", so a dual-role Bookkeeper+HR user can
+        switch to BOTH 'bookkeeper' and 'hr' (and back). A request for a
+        lens the user does not hold still coerces to their default."""
         user = self.env.user
         if requested_type and self._is_superuser(user):
             if requested_type not in _DASHBOARD_TYPE_VALUES:
                 raise ValidationError(
                     _("Unknown dashboard_type: %s") % requested_type)
             return requested_type
-        if (requested_type == "hr"
-                and self._is_hr_user(user)):
-            return "hr"
+        if (requested_type
+                and requested_type in self._entitled_lenses_for_user(user)):
+            return requested_type
         return self._default_dashboard_type_for_user(user.id)
 
     # ------------------------------------------------------------------

@@ -94,7 +94,21 @@
     # no executor => read-only) + the Owl Realisation & Win/Loss board (tag
     # neon_winloss_dashboard) embedding the AI chat. Advertised via neon_ai_core
     # 17.0.1.5.0.
-    "version": "17.0.11.6.0",
+    # 17.0.11.6.1 = DASH-DUALROLE-1 lens-resolution fix (pre-existing bug; the
+    # resolver landed at b9cf2af assuming one tier per user). A dual-role
+    # Bookkeeper+HR non-superuser (Kudzai, uid 10) landed on HR (HR ranked >
+    # Bookkeeper) AND the View-As switcher only ever offered HR -> Bookkeeper was
+    # unreachable. Fix is LENS SELECTION ONLY (no group / ACL / menu / access
+    # change): new _entitled_lenses_for_user + _TIER_LENS_PRIORITY derive the
+    # UNION of a user's entitled lenses; _default_dashboard_type_for_user now
+    # ranks Bookkeeper ABOVE HR (dual-role lands on Bookkeeper); _available_types_
+    # for_user ships the full set when >=2 lenses (single-tier byte-identical);
+    # _resolve_dashboard_type allows any ENTITLED lens (not just 'hr'). One client
+    # tweak: canApplyToAll re-gated to superuser-only (its documented intent) so
+    # the new >=2 View-As set on dual-role users doesn't surface a no-op button.
+    # Server-only data path; asset-bundle touched (JS) so -u + delete web.assets_*
+    # + force-recreate; users hard-refresh once.
+    "version": "17.0.11.6.1",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

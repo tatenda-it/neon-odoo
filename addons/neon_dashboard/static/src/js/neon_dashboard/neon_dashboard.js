@@ -452,7 +452,18 @@ export class NeonDashboard extends Component {
         // Only meaningful for multi-variant users (superusers). Mirror
         // the server's _accessible_dashboard_types >= 2 rule via the
         // View-as option list the payload already ships.
-        return this.availableTypes.length >= 2;
+        //
+        // DASH-DUALROLE-1: a dual-role (e.g. Bookkeeper+HR) user now also
+        // has >=2 View-as options, but _accessible_dashboard_types still
+        // returns only their single default for personalisation -- so the
+        // apply-to-all action would be a near no-op for them. Re-gate on
+        // the is_superuser flag the payload already ships to keep this
+        // button superuser-only (its documented intent) and avoid
+        // surfacing a confusing no-op for dual-role users.
+        return (
+            !!(this.state.data && this.state.data.is_superuser) &&
+            this.availableTypes.length >= 2
+        );
     }
 
     async onExportPdf() {
