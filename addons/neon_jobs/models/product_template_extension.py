@@ -87,6 +87,40 @@ class ProductTemplate(models.Model):
         "and not reserved). P5.M4+ refines this with the reservation "
         "model.",
     )
+    # ============================================================
+    # === UX-B-RATE — catalogue hire rate (display-only)
+    # The engine prices quote lines via neon.finance.pricing.rule
+    # (base_rate, the "Day-1 Base Rate"); product.list_price is the
+    # misleading $1 default the engine ignores (Solution B hides it for
+    # workshop items). This surfaces the REAL day-1 USD rate on the
+    # catalogue, resolved through the SAME product-rule -> category-
+    # fallback path the quote line uses. Display-only: no engine / quote
+    # / list_price change; the quote line still computes the exact per-
+    # line unit_rate on product pick.
+    # ============================================================
+    neon_unit_rate_currency_id = fields.Many2one(
+        "res.currency",
+        compute="_compute_neon_unit_rate",
+        help="USD -- the catalogue hire-rate display currency.",
+    )
+    neon_unit_rate = fields.Monetary(
+        string="Hire rate (USD/day)",
+        compute="_compute_neon_unit_rate",
+        currency_field="neon_unit_rate_currency_id",
+        help="The standard day-1 hire rate (USD) resolved from the "
+        "pricing rules -- the per-product rule first, else the "
+        "equipment category rule. This is the per-day rate a 1-day USD "
+        "quote line populates; multi-day hires taper via the bracket "
+        "multipliers and non-USD quotes resolve a different rule, so the "
+        "quote line shows the exact rate. Blank when no pricing rule "
+        "covers this product yet.",
+    )
+    neon_unit_rate_has_rule = fields.Boolean(
+        compute="_compute_neon_unit_rate",
+        help="True when a USD pricing rule (product or category) "
+        "resolves -- drives whether the catalogue shows the rate or the "
+        "'set via Pricing Rules' hint.",
+    )
 
     @api.depends("equipment_category_id",
                  "equipment_category_id.default_tracking")
@@ -104,6 +138,40 @@ class ProductTemplate(models.Model):
             rec.total_units = len(rec.equipment_unit_ids)
             rec.available_units = len(rec.equipment_unit_ids.filtered(
                 lambda u: u.state == "active"))
+
+    @api.depends("equipment_category_id")
+    def _compute_neon_unit_rate(self):
+        """Resolve the day-1 USD hire rate for the catalogue, mirroring the
+        line engine's _find_pricing_rule tiers: PRIMARY per-product rule, then
+        the CATEGORY fallback (via equipment_category_id), USD, latest
+        effective_date <= today. Display-only. sudo so a Sales user (read-only
+        ACL on pricing.rule, per P6.M1) still resolves. NON-STORED -> recomputed
+        live so it never goes stale as rules / the effective date roll."""
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        Rule = self.env["neon.finance.pricing.rule"].sudo()
+        today = fields.Date.context_today(self)
+        for rec in self:
+            rec.neon_unit_rate_currency_id = usd
+            rule = self.env["neon.finance.pricing.rule"]
+            if usd and rec.id:
+                # 1) per-product rule (PRIMARY)
+                rule = Rule.search([
+                    ("product_template_id", "=", rec.id),
+                    ("currency_id", "=", usd.id),
+                    ("active", "=", True),
+                    ("effective_date", "<=", today),
+                ], order="effective_date desc, id desc", limit=1)
+                # 2) category rule (fallback) via equipment_category_id
+                if not rule and rec.equipment_category_id:
+                    rule = Rule.search([
+                        ("product_template_id", "=", False),
+                        ("category_id", "=", rec.equipment_category_id.id),
+                        ("currency_id", "=", usd.id),
+                        ("active", "=", True),
+                        ("effective_date", "<=", today),
+                    ], order="effective_date desc, id desc", limit=1)
+            rec.neon_unit_rate = rule.base_rate if rule else 0.0
+            rec.neon_unit_rate_has_rule = bool(rule)
 
     # ============================================================
     # === P5.M3 — tracking_mode change validation (D5)

@@ -63,8 +63,18 @@
             <xpath expr="//label[@for='list_price']" position="attributes">
                 <attribute name="invisible">is_workshop_item</attribute>
             </xpath>
+            <!-- UX-B-RATE: show the engine-resolved day-1 USD hire rate where
+                 the misleading $1 list_price is hidden. Field shows for a
+                 workshop item with a resolvable rule; the hint shows when no
+                 rule covers the product yet. Display-only. -->
             <xpath expr="//field[@name='list_price']" position="after">
-                <div class="text-muted" invisible="not is_workshop_item"
+                <field name="neon_unit_rate_currency_id" invisible="1"/>
+                <field name="neon_unit_rate_has_rule" invisible="1"/>
+                <field name="neon_unit_rate" widget="monetary"
+                       options="{'currency_field': 'neon_unit_rate_currency_id'}"
+                       invisible="not is_workshop_item or not neon_unit_rate_has_rule"/>
+                <div class="text-muted"
+                     invisible="not is_workshop_item or neon_unit_rate_has_rule"
                      style="font-size:0.85em;">
                     Hire rate is set in Finance &#8594; Pricing Rules.
                 </div>
@@ -84,9 +94,21 @@
         <field name="arch" type="xml">
             <xpath expr="//templates" position="before">
                 <field name="is_workshop_item"/>
+                <field name="neon_unit_rate_currency_id"/>
+                <field name="neon_unit_rate_has_rule"/>
             </xpath>
             <xpath expr="//div[@name='product_lst_price']" position="attributes">
                 <attribute name="invisible">is_workshop_item</attribute>
+            </xpath>
+            <!-- UX-B-RATE: show the resolved hire rate on the card for workshop
+                 items that have a rule (where the $1 list_price block is now
+                 hidden). -->
+            <xpath expr="//div[@name='product_lst_price']" position="after">
+                <div name="neon_unit_rate_kanban" class="mt-1"
+                     invisible="not is_workshop_item or not neon_unit_rate_has_rule">
+                    Hire rate: <field name="neon_unit_rate" widget="monetary"
+                        options="{'currency_field': 'neon_unit_rate_currency_id'}"/>/day
+                </div>
             </xpath>
         </field>
     </record>
@@ -103,6 +125,15 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='list_price']" position="attributes">
                 <attribute name="optional">hide</attribute>
+            </xpath>
+            <!-- UX-B-RATE: the real day-1 USD hire rate as a (default-visible)
+                 column in place of the hidden $1 Sales Price. Non-stored, so
+                 not sortable; a display column. -->
+            <xpath expr="//field[@name='list_price']" position="after">
+                <field name="neon_unit_rate_currency_id" column_invisible="1"/>
+                <field name="neon_unit_rate" widget="monetary"
+                       options="{'currency_field': 'neon_unit_rate_currency_id'}"
+                       optional="show"/>
             </xpath>
         </field>
     </record>

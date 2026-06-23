@@ -119,7 +119,14 @@
     # (gated on is_workshop_item; non-workshop SKUs keep it) + list column
     # optional=hide + a "rate set in Finance > Pricing Rules" hint. View-only
     # display change -- no model/compute/list_price write. Patch.
-    "version": "17.0.8.5.1",
+    # 17.0.8.6.0 = UX-B-RATE: SHOW the real day-1 USD hire rate on the product
+    # catalogue (supersedes Solution B's hide-only). New NON-STORED computed
+    # neon_unit_rate on product.template resolving the engine path (per-product
+    # rule -> category fallback, USD, effective<=today, base_rate; blank ->
+    # "set via Pricing Rules"); displayed on form/kanban/list for workshop
+    # items where list_price is hidden. Display-only, engine untouched. New
+    # computed field + resolver = minor.
+    "version": "17.0.8.6.0",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema
