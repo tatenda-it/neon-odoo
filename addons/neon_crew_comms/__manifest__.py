@@ -436,7 +436,13 @@
     # the engine-line price-markup rejection reworded to a clear rep-facing
     # message (names the item + catalogue rate + custom-line alternative). No
     # handler / guard / model change -- translator prompt + one message. Patch.
-    "version": "17.0.1.21.3",
+    # 17.0.1.21.4 = WA-INTAKE-1: an AMBIGUOUS client in the one-shot quote
+    # template now opens the EXISTING qc_pick pick-list (carrying the parsed
+    # items/date/extras via an additive buffer + a 'template' resume branch)
+    # instead of the "send the template again" dead-end -> rep picks -> the
+    # quote resumes with nothing re-typed. Reuses _wa12_start_client_intake; the
+    # structured lane is byte-identical (defaults). No model/money-guard change.
+    "version": "17.0.1.21.4",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

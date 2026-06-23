@@ -858,26 +858,9 @@ class WhatsAppMessageWA12(models.Model):
         if not client_txt:
             return self._wa6_reply(raw_from, from_e164, _(
                 "I need the client — fill in the *Quote:* line and send again."))
-        partner, candidates = self._wa12_client_candidates(client_txt)
-        if not partner:
-            if candidates:
-                # ⚠️ DECISION: an AMBIGUOUS client in the one-shot template
-                # RE-PROMPTS for the exact name (not a pick-resume) so the
-                # template stays one message and never lands the wrong client.
-                rows = "\n".join("• %s" % p.name for p in candidates)
-                return self._wa6_reply(raw_from, from_e164, _(
-                    "More than one client matches \"%s\":\n%s\n\nSend the "
-                    "template again with the exact company name on the "
-                    "*Quote:* line.") % (client_txt, rows))
-            # NEW client: the Contact/Phone/Email lines ARE the intake (company
-            # + child contact in this one message). Blank lines -> none created.
-            ph = (fields.get("phone") or "").strip()
-            partner = self._wa12_create_client(
-                sender.id,
-                {"name": client_txt, "kind": "company",
-                 "contact": (fields.get("contact") or "").strip(),
-                 "phone": ph, "phone_e164": to_e164(ph) or ""},
-                (fields.get("email") or "").strip())
+        # WA-INTAKE-1: match items + parse the date/extras BEFORE resolving the
+        # client, so an AMBIGUOUS client can hand the FULLY-PARSED draft to the
+        # qc_pick pick-list and resume without re-typing.
         # items -> the EXISTING confidence-gated matcher (matched + unmatched).
         matched, unmatched = self._wa12_match_slot_items(
             fields.get("items") or [])
@@ -896,6 +879,26 @@ class WhatsAppMessageWA12(models.Model):
             extras["venue"] = fields["venue"].strip()
         if end_date_txt:
             extras["event_end_date_txt"] = end_date_txt
+        partner, candidates = self._wa12_client_candidates(client_txt)
+        if not partner:
+            if candidates:
+                # WA-INTAKE-1: an AMBIGUOUS client opens the qc_pick pick-list
+                # carrying the parsed draft (was a dead-end re-prompt) -> the rep
+                # picks -> the quote resumes with the SAME items/date/extras and
+                # the chosen client, nothing re-typed.
+                return self._wa12_start_client_intake(
+                    sender, client_txt, candidates, matched, date_txt, days,
+                    from_e164, raw_from, extras=extras, unmatched=unmatched,
+                    template=True)
+            # NEW client: the Contact/Phone/Email lines ARE the intake (company
+            # + child contact in this one message). Blank lines -> none created.
+            ph = (fields.get("phone") or "").strip()
+            partner = self._wa12_create_client(
+                sender.id,
+                {"name": client_txt, "kind": "company",
+                 "contact": (fields.get("contact") or "").strip(),
+                 "phone": ph, "phone_e164": to_e164(ph) or ""},
+                (fields.get("email") or "").strip())
         return self._wa12_quote_from_slots(
             sender, partner, matched, date_txt, days, from_e164, raw_from,
             extras=extras, unmatched=unmatched)
@@ -940,9 +943,14 @@ class WhatsAppMessageWA12(models.Model):
 
     def _wa12_start_client_intake(self, sender, client_txt, candidates, matched,
                                   date_txt, days, from_e164, raw_from,
-                                  prefills=None, structured=False):
+                                  prefills=None, structured=False,
+                                  extras=None, unmatched=None, template=False):
         """Open the qc_pick session: list any existing matches + offer *new*.
         Buffers the matched items + date so the quote resumes without re-entry.
+        WA-INTAKE-1: ``extras`` (event/venue/end-date), ``unmatched`` (flagged
+        items) and ``template`` ride along for the one-shot template lane, so a
+        resumed template quote is identical to a directly-resolved one (the
+        structured lane passes none -> defaults -> its behaviour is unchanged).
         ``prefills`` (M3): phone/email/contact already present in the rep's
         brief — pre-fill the capture so only MISSING slots get asked.
         WA-12.6: ``structured`` -> on intake completion resume into the EVENT
@@ -951,7 +959,9 @@ class WhatsAppMessageWA12(models.Model):
         buf = {"matched": matched, "date_txt": date_txt or "",
                "days": days or 1, "client_txt": client_txt,
                "candidate_ids": candidates.ids[:8],
-               "prefills": prefills or {}, "structured": structured}
+               "prefills": prefills or {}, "structured": structured,
+               "extras": extras or {}, "unmatched": unmatched or [],
+               "template": template}
         self.env["neon.wa.equip.session"]._start_quote(
             from_e164, sender, "qc_pick", buf)
         if candidates:
@@ -998,6 +1008,16 @@ class WhatsAppMessageWA12(models.Model):
 
         def resume(partner):
             sess.sudo().write({"step": "done", "active": False})
+            # WA-INTAKE-1: a TEMPLATE-lane pick resumes the ONE-REPLY draft
+            # directly (NOT the item stepper) with the buffered slots + the
+            # picked client, so a resumed template quote == a directly-resolved
+            # one (same items/date/extras/unmatched, nothing re-typed).
+            if buf.get("template"):
+                return self._wa12_quote_from_slots(
+                    sender, partner, buf.get("matched") or [],
+                    buf.get("date_txt") or "", buf.get("days") or 1,
+                    from_e164, raw_from, extras=buf.get("extras") or {},
+                    unmatched=buf.get("unmatched") or [])
             # WA-12.6: a STRUCTURED intake resumes into the EVENT step (the
             # new spine: client -> event -> items), reusing the same session row.
             if buf.get("structured"):
