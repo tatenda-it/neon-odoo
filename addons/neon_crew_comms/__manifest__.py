@@ -430,7 +430,13 @@
     # wizard shares it). WA I/O (actor resolve, sudo, UserError->reply,
     # _wa12_after_edit) preserved; behaviour byte-identical (pwa12_6 S13/S14 the
     # parity gate). Internal refactor, no new feature -> patch.
-    "version": "17.0.1.21.2",
+    # 17.0.1.21.3 = QUOTE-UX-4: _wa12_llm_translate_edit allowed-commands prompt
+    # now lists per-line 'days <item> <n>' (was only global 'days <n>') so NL
+    # ("item 2 should be 1 day") routes to the EXISTING per-line days handler;
+    # the engine-line price-markup rejection reworded to a clear rep-facing
+    # message (names the item + catalogue rate + custom-line alternative). No
+    # handler / guard / model change -- translator prompt + one message. Patch.
+    "version": "17.0.1.21.3",
     "summary": "B11/WA-2 WhatsApp-to-ops: human-triggered crew "
                "assignment confirmations + reminders, two-way tap-back "
                "(Confirm / Can't make it) reusing the crew workflow. "

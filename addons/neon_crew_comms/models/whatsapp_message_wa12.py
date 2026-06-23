@@ -3171,7 +3171,8 @@ class WhatsAppMessageWA12(models.Model):
             "You map a sales rep's WhatsApp message to EXACTLY ONE quote-edit "
             "command, output as plain text on one line, no quotes, no prose. "
             "Allowed commands: 'price <item> <amount>', 'discount <item> "
-            "<n>%', 'qty <item> <n>', 'days <n>', 'add <item> x<n>', 'add "
+            "<n>%', 'qty <item> <n>', 'days <item> <n>' (set ONE line's hire "
+            "days) or 'days <n>' (set ALL lines), 'add <item> x<n>', 'add "
             "custom <description> at <amount>', 'remove <item>', 'no tax', "
             "'with tax', 'client <name>', 'terms <text>', a date "
             "(YYYY-MM-DD), 'yes' (submit), or 'cancel'. Current line items: "
@@ -3875,9 +3876,10 @@ class WhatsAppMessageWA12(models.Model):
                 return err(_("%s has no rate set yet — can't set a price on it.")
                            % line.name)
             if amt > line.unit_rate:
-                return err(_("%s %.2f is above the base rate (%s %.2f) — that's "
-                             "a markup, not a discount.")
-                           % (cur, amt, cur, line.unit_rate))
+                return err(_("I can't set %s above its catalogue rate "
+                             "(%s %.2f/day) — that would be a markup. To charge "
+                             "more, add it as a custom line instead.")
+                           % (line.name, cur, line.unit_rate))
             line.with_user(actor).sudo().write(
                 {"discount_amount": line.unit_rate - amt, "discount_pct": 0.0})
             return self._wa12_after_edit(quote, from_e164, raw_from,
