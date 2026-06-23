@@ -114,7 +114,12 @@
     # (flips the marker + replays those effects on quote-accept so a graduated
     # job is operationally identical to a normal one). New nullable column only
     # -> no row migration. The WA-12 finance/orchestration live elsewhere.
-    "version": "17.0.8.5.0",
+    # 17.0.8.5.1 = SOLUTION B (a): hide the misleading $1 "Sales Price"
+    # (list_price) on the product form + kanban for workshop (hire) items
+    # (gated on is_workshop_item; non-workshop SKUs keep it) + list column
+    # optional=hide + a "rate set in Finance > Pricing Rules" hint. View-only
+    # display change -- no model/compute/list_price write. Patch.
+    "version": "17.0.8.5.1",
     "summary": "Phase 2 — Commercial Job Record + Calendar / Capacity",
     "description": """
 Neon Events Elements — Phase 2 — P2.M1 Schema

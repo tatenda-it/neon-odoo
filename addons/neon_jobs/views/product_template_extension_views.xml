@@ -48,6 +48,62 @@
                     </field>
                 </page>
             </xpath>
+
+            <!-- SOLUTION B (a): the engine prices hire items via the pricing
+                 rules (base_rate), NOT product.list_price, which sits at the
+                 misleading default $1 on workshop items. Hide the stock "Sales
+                 Price" for workshop items (gated on is_workshop_item so genuine
+                 non-workshop SKUs keep their price) and point users at where the
+                 real rate lives. Display-only: list_price values and the engine
+                 are untouched; nothing functionally reads list_price (the only
+                 reader, the ZWG pricelist, was deactivated in QUOTE-UX-2). -->
+            <xpath expr="//field[@name='list_price']" position="attributes">
+                <attribute name="invisible">is_workshop_item</attribute>
+            </xpath>
+            <xpath expr="//label[@for='list_price']" position="attributes">
+                <attribute name="invisible">is_workshop_item</attribute>
+            </xpath>
+            <xpath expr="//field[@name='list_price']" position="after">
+                <div class="text-muted" invisible="not is_workshop_item"
+                     style="font-size:0.85em;">
+                    Hire rate is set in Finance &#8594; Pricing Rules.
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- SOLUTION B (a): hide the misleading $1 "Price:" block on the product
+         KANBAN card for workshop (hire) items; non-workshop SKUs keep it.
+         is_workshop_item is not in the stock kanban field-list, so declare it
+         (invisible) to make the per-card condition evaluable. -->
+    <record id="product_template_view_kanban_hide_saleprice_workshop"
+            model="ir.ui.view">
+        <field name="name">product.template.kanban.hide-saleprice-workshop</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_kanban_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//templates" position="before">
+                <field name="is_workshop_item"/>
+            </xpath>
+            <xpath expr="//div[@name='product_lst_price']" position="attributes">
+                <attribute name="invisible">is_workshop_item</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- SOLUTION B (a): the $1 "Sales Price" column is misleading on the
+         workshop-dominated products LIST, and a list column cannot be hidden
+         per-row, so make it optional + hidden-by-default (recoverable via the
+         column toggle). Non-workshop prices remain on the form + kanban. -->
+    <record id="product_template_view_tree_hide_saleprice"
+            model="ir.ui.view">
+        <field name="name">product.template.tree.hide-saleprice</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='list_price']" position="attributes">
+                <attribute name="optional">hide</attribute>
+            </xpath>
         </field>
     </record>
 
