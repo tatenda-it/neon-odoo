@@ -100,7 +100,19 @@
     # pending_approval (working states) and HIDDEN on the client-facing faces
     # (approved / sent / accepted), mirroring the DRAFT-banner gating. Report
     # template display-only -- no model / flag / compute change. Patch.
-    'version': '17.0.7.15.1',
+    # 17.0.7.16.0 = P-A/BUILD-1 (accounting as-is): seed the operating-expense
+    # accounts Odoo's generic 47-account chart lacks. ADDS 13 new
+    # account_type='expense' records in the gap-filled 6xxxxx band
+    # (account_account_seed_data.xml, noupdate=1) -- the existing 47 (which the
+    # invoice engine posts to) are untouched, and the already-present
+    # 611000/612000/620000/630000 are reused, not recreated. New
+    # account.account.neon_source Char origin-tag field (models/
+    # account_account.py) stamps every seeded account 'seed_accounting' so the
+    # Neon-seeded set is distinguishable from the generic chart and from future
+    # Zoho-reconciled accounts. No opening balances / no posting / no engine
+    # change. Config-as-data layer -> minor bump. (Additive nullable column +
+    # additive data rows; no existing-row migration.)
+    'version': '17.0.7.16.0',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -150,6 +162,12 @@ and cost-line behaviour downstream.
         'data/res_company_logo.xml',
         'data/res_company_banks.xml',
         'data/account_journal_data.xml',
+        # P-A/BUILD-1 — operating-expense chart seed (13 account_type=expense
+        # records, neon_source-tagged, noupdate=1). No ref deps beyond
+        # base.main_company; the neon_source field is registered at model load
+        # so ordering among data files is free. Grouped with the account.*
+        # config data above.
+        'data/account_account_seed_data.xml',
         # P6.M1 sequences must load before the pricing-rule seed
         # data so the default `next_by_code` lookup succeeds when
         # each rule is created. P6.M2 adds two more sequences (QUO-

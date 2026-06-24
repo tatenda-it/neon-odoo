@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  P-A / BUILD-1 — Seed missing operating-expense accounts.
+
+  "Odoo accounting as-is": the 47 accounts of Odoo's generic chart are
+  load-bearing (the invoice engine posts to them) and are NOT touched here.
+  This file ADDS only the operating-expense accounts that chart lacks for a
+  Zimbabwe event-production business — a sensible STARTER set, NOT a copy of
+  Zoho's 33 (drifted) categories, which stay in the read-only neon_migration
+  archive.
+
+  REUSED (existing — deliberately NOT recreated, no duplicate):
+    611000 Purchase of Equipments · 612000 Rent · 620000 Bank Fees
+    630000 Salary Expenses
+  NON-EXPENSE items map to existing accounts (created here: none):
+    Fixed assets (Computer Equipment / Plant & Machinery / Furniture)
+        -> 151000 Fixed Asset (asset_fixed)
+    VAT -> 131000 Tax Paid (input) / 251000 Tax Received (output)
+           (+ 132000 Tax Receivable / 252000 Tax Payable)
+    Employee advance (staff receivable, current asset)
+        -> NO dedicated account exists today; surfaced for Robin's review,
+           NOT built in this expense-only round.
+
+  CODES: gap-filled in the 6xxxxx expense band, avoiding the occupied
+  600000/611000/612000/620000/630000/641000/642000/643000. Grouped by theme
+  (premises -> motor/travel -> office -> people -> professional/marketing).
+
+  ⚠️ DECISION (noupdate="1"): chart-of-accounts seed is config-as-data the
+  bookkeeper then owns. noupdate keeps later UI edits (rename/reparent/
+  archive) from being clobbered by a future -u. Records load once on first
+  install of this data file; codes are unique so re-running -u is a no-op.
+-->
+<odoo noupdate="1">
+
+    <!-- ═══ Premises & utilities ═══ -->
+    <record id="account_op_electricity_utilities" model="account.account">
+        <field name="code">613000</field>
+        <field name="name">Electricity &amp; Utilities</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_security" model="account.account">
+        <field name="code">614000</field>
+        <field name="name">Security</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_repairs_maintenance" model="account.account">
+        <field name="code">615000</field>
+        <field name="name">Repairs &amp; Maintenance</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <!-- ═══ Motor vehicle & travel ═══ -->
+    <record id="account_op_fuel_oils" model="account.account">
+        <field name="code">616000</field>
+        <field name="name">Fuel &amp; Oils</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_motor_vehicle" model="account.account">
+        <field name="code">617000</field>
+        <field name="name">Motor Vehicle (Licences &amp; Repairs)</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_travel_accommodation" model="account.account">
+        <field name="code">618000</field>
+        <field name="name">Travel &amp; Accommodation</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <!-- ═══ Communication & office ═══ -->
+    <record id="account_op_internet_phone" model="account.account">
+        <field name="code">619000</field>
+        <field name="name">Internet &amp; Phone</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_printing_stationery" model="account.account">
+        <field name="code">621000</field>
+        <field name="name">Printing &amp; Stationery</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_office_supplies" model="account.account">
+        <field name="code">622000</field>
+        <field name="name">Office Supplies</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <!-- ═══ People ═══ -->
+    <record id="account_op_protective_clothing" model="account.account">
+        <field name="code">623000</field>
+        <field name="name">Protective Clothing</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_staff_welfare" model="account.account">
+        <field name="code">624000</field>
+        <field name="name">Staff Welfare</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <!-- ═══ Professional & marketing ═══ -->
+    <record id="account_op_professional_fees" model="account.account">
+        <field name="code">625000</field>
+        <field name="name">Professional Fees</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+    <record id="account_op_marketing_advertising" model="account.account">
+        <field name="code">626000</field>
+        <field name="name">Marketing &amp; Advertising</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_accounting</field>
+    </record>
+
+</odoo>

@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 from . import res_partner_bank
+# P-A/BUILD-1 — account.account origin tag (neon_source) for the
+# operating-expense chart seed.
+from . import account_account
 # P6.M1 — pricing engine foundation
 from . import neon_equipment_category
 from . import neon_finance_pricing_rule
