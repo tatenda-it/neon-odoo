@@ -112,7 +112,7 @@
     # Zoho-reconciled accounts. No opening balances / no posting / no engine
     # change. Config-as-data layer -> minor bump. (Additive nullable column +
     # additive data rows; no existing-row migration.)
-    'version': '17.0.7.16.0',
+    'version': '17.0.7.17.1',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
@@ -168,6 +168,9 @@ and cost-line behaviour downstream.
         # so ordering among data files is free. Grouped with the account.*
         # config data above.
         'data/account_account_seed_data.xml',
+        # BANKING-SETUP -- after the account seed + res_company_banks (refs the
+        # CABS ZWG bank account) + security (refs the finance groups).
+        'data/banking_setup_data.xml',
         # P6.M1 sequences must load before the pricing-rule seed
         # data so the default `next_by_code` lookup succeeds when
         # each rule is created. P6.M2 adds two more sequences (QUO-

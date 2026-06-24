@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BANKING-SETUP — mirror Neon's Zoho banking view as four Odoo journal cards:
+  CABS (USD) · CABS (ZWG) · Petty Cash · Undeposited Funds, plus a top-level
+  "Banking" shortcut to the journal-cards dashboard.
+
+  This file ADDS the two NEW accounts, the two NEW journals, and the Banking
+  menu. The two EXISTING journals (BNK1 "Bank", CSH1 "Cash") are RENAMED by the
+  17.0.7.17.0 post-migrate (they are auto-created records with no xml-id).
+
+  STRUCTURE ONLY — no opening balances, no transactions, no chart change beyond
+  the one ZWG bank account + the dedicated Undeposited Funds account. Balances
+  stay empty until P-B + real transactions.
+
+  ⚠️ Conflict-safety: all four journals stay at sequence 10. account.journal
+  _order is (sequence, type, code), and 'bank' < 'cash', so the two bank
+  journals sort before the two cash journals -> CABS (USD) (BNK1) remains the
+  global Register-Payment default for a company-currency (USD) payment, leaving
+  the neon_finance SCH- payment path UNCHANGED. The Undeposited Funds cash
+  journal takes code "CASH" (< "CSH1") so it leads the CASH group without ever
+  undercutting the banks.
+
+  ⚠️ noupdate="1": accounts + journals are config-as-data the bookkeeper then
+  owns; the Banking menu is left adjustable by a later menu-reorg. Records load
+  once; codes/xml-ids are unique so re-running -u is a no-op.
+-->
+<odoo noupdate="1">
+
+    <!-- ═══ New accounts (gap-filled in the 1014xx band; 401-404 occupied) ═══ -->
+    <record id="account_bank_cabs_zwg" model="account.account">
+        <field name="code">101405</field>
+        <field name="name">CABS (ZWG) Bank</field>
+        <field name="account_type">asset_cash</field>
+        <field name="currency_id" ref="neon_finance.currency_zwg"/>
+        <field name="neon_source">banking_setup</field>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+
+    <record id="account_undeposited_funds" model="account.account">
+        <field name="code">101406</field>
+        <field name="name">Undeposited Funds</field>
+        <field name="account_type">asset_cash</field>
+        <!-- reconcilable: it is the clearing account cash-in-hand sits in until
+             deposited (an internal transfer to the bank later clears it). -->
+        <field name="reconcile">1</field>
+        <field name="neon_source">banking_setup</field>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+
+    <!-- ═══ New journals ═══ -->
+    <!-- CABS (ZWG): a second BANK journal, ZWG currency. A ZWG payment matches
+         it by currency_domain; a USD payment never does, so it does not steal
+         the USD default. -->
+    <record id="journal_cabs_zwg" model="account.journal">
+        <field name="name">CABS (ZWG) - Neon Events Elements</field>
+        <field name="code">BNK2</field>
+        <field name="type">bank</field>
+        <field name="sequence">10</field>
+        <field name="currency_id" ref="neon_finance.currency_zwg"/>
+        <field name="default_account_id" ref="account_bank_cabs_zwg"/>
+        <!-- ⚠️ DECISION: do NOT link a res.partner.bank here. Linking the
+             company CABS accounts to the journals makes an out_invoice default
+             its partner_bank_id to a company account, which routes the
+             Register-Payment default journal by partner-bank match, so a USD
+             SCH- invoice then defaulted to this ZWG journal (regression). The
+             masked account number on the card is informational; the SCH- bank
+             default takes precedence, so the link is omitted. -->
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+
+    <!-- Undeposited Funds: the CASH journal a cash receipt lands in (Zoho's
+         "Deposit To: Undeposited"). Code "CASH" leads the cash group so it is
+         the first cash option, while the banks still precede it overall. -->
+    <record id="journal_undeposited_funds" model="account.journal">
+        <field name="name">Undeposited Funds</field>
+        <field name="code">CASH</field>
+        <field name="type">cash</field>
+        <field name="sequence">10</field>
+        <field name="default_account_id" ref="account_undeposited_funds"/>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+
+    <!-- ═══ "Banking" launcher shortcut -> the journal-cards dashboard ═══
+         Top-level menu (shows in the launcher + the neon_web_sidebar rail).
+         Gated to finance roles (NOT base.group_user) — a convenience shortcut,
+         NOT a security boundary; the dashboard's own ACLs still apply. -->
+    <menuitem id="menu_neon_banking_root"
+              name="Banking"
+              action="account.open_account_journal_dashboard_kanban"
+              web_icon="account,static/description/icon.png"
+              sequence="16"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver,account.group_account_manager,neon_core.group_neon_superuser"/>
+
+</odoo>
