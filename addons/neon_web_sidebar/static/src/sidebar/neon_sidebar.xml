@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_web_sidebar.NeonSidebar">
+        <div class="o_neon_sidebar">
+            <div class="o_neon_sidebar_apps">
+                <t t-foreach="apps" t-as="app" t-key="app.id">
+                    <a class="o_neon_sidebar_app"
+                       t-att-class="{ 'o_neon_sidebar_app_active': isActive(app) }"
+                       t-att-title="app.name"
+                       t-on-click="() => this.onAppClick(app)">
+                        <span class="o_neon_sidebar_icon">
+                            <img t-if="appIcon(app)" t-att-src="appIcon(app)"
+                                 t-att-alt="app.name" loading="lazy"/>
+                            <span t-else="" class="o_neon_sidebar_initial"
+                                  t-esc="appInitial(app)"/>
+                        </span>
+                        <span class="o_neon_sidebar_label" t-esc="app.name"/>
+                    </a>
+                </t>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="neon_web_sidebar.Toggle">
+        <div class="o_neon_sidebar_toggle">
+            <button type="button" class="btn o_neon_sidebar_toggle_btn"
+                    t-on-click="onClick"
+                    t-att-title="state.open ? 'Hide module sidebar' : 'Show module sidebar'"
+                    aria-label="Toggle module sidebar">
+                <i class="fa fa-columns" role="img"/>
+            </button>
+        </div>
+    </t>
+
+</templates>

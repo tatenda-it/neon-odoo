@@ -1,0 +1,126 @@
+// Neon Web Sidebar -- a persistent Zoho-style left module rail.
+// All selectors live under a NEON-SCOPED namespace (.o_neon_sidebar* and the
+// body.o_neon_sidebar_open gate). We deliberately do NOT touch web_responsive's
+// surface: no .o_main_navbar, no .o_grid_apps_menu, no .o_apps_menu_opened.
+
+$o-neon-sidebar-width: 224px;
+$o-neon-sidebar-navbar-h: 46px;        // stock Odoo 17 backend navbar height
+$o-neon-sidebar-bg: #1e2430;           // dark slate
+$o-neon-sidebar-bg-hover: #2a3242;
+$o-neon-sidebar-bg-active: #313c52;
+$o-neon-sidebar-fg: #c3cad8;
+$o-neon-sidebar-fg-active: #ffffff;
+$o-neon-sidebar-accent: #3b82f6;       // active accent bar
+$o-neon-sidebar-z: 90;                 // below navbar dropdowns/palette/modals
+
+// Hidden by default; shown only when the user has the rail open.
+.o_neon_sidebar {
+    display: none;
+}
+
+body.o_neon_sidebar_open {
+
+    .o_neon_sidebar {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: $o-neon-sidebar-navbar-h;     // sit BELOW the (web_responsive) navbar
+        left: 0;
+        bottom: 0;
+        width: $o-neon-sidebar-width;
+        z-index: $o-neon-sidebar-z;
+        background: $o-neon-sidebar-bg;
+        color: $o-neon-sidebar-fg;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 8px 0;
+        box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+
+        // slim, unobtrusive scrollbar
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+        &::-webkit-scrollbar { width: 8px; }
+        &::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 4px;
+        }
+    }
+
+    .o_neon_sidebar_apps {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .o_neon_sidebar_app {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 14px 9px 12px;
+        margin: 0 6px;
+        border-radius: 8px;
+        color: $o-neon-sidebar-fg;
+        text-decoration: none;
+        cursor: pointer;
+        white-space: nowrap;
+        border-left: 3px solid transparent;
+        transition: background-color 0.12s ease, color 0.12s ease;
+
+        &:hover {
+            background: $o-neon-sidebar-bg-hover;
+            color: $o-neon-sidebar-fg-active;
+        }
+
+        &.o_neon_sidebar_app_active {
+            background: $o-neon-sidebar-bg-active;
+            color: $o-neon-sidebar-fg-active;
+            border-left-color: $o-neon-sidebar-accent;
+            font-weight: 500;
+        }
+    }
+
+    .o_neon_sidebar_icon {
+        flex: 0 0 26px;
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        overflow: hidden;
+
+        img {
+            width: 22px;
+            height: 22px;
+            object-fit: contain;
+        }
+    }
+
+    .o_neon_sidebar_initial {
+        font-size: 13px;
+        font-weight: 600;
+        color: $o-neon-sidebar-fg-active;
+    }
+
+    .o_neon_sidebar_label {
+        flex: 1 1 auto;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    // Shift the action area right to make room for the rail. The top navbar
+    // (web_responsive's) stays full-width and untouched. web_responsive's
+    // full-screen grid launcher opens as an overlay above this, so it is
+    // unaffected by the offset.
+    .o_action_manager {
+        margin-left: $o-neon-sidebar-width;
+    }
+}
+
+// The systray toggle button -- inherit navbar styling, just a subtle icon.
+.o_neon_sidebar_toggle .o_neon_sidebar_toggle_btn {
+    color: inherit;
+    padding: 0 8px;
+}
