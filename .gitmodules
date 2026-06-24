@@ -22,3 +22,19 @@
 	path = oca/server-backend
 	url = https://github.com/OCA/server-backend.git
 	branch = 17.0
+[submodule "oca/reporting-engine"]
+	path = oca/reporting-engine
+	url = https://github.com/OCA/reporting-engine.git
+	branch = 17.0
+[submodule "oca/server-ux"]
+	path = oca/server-ux
+	url = https://github.com/OCA/server-ux.git
+	branch = 17.0
+[submodule "oca/account-financial-reporting"]
+	path = oca/account-financial-reporting
+	url = https://github.com/OCA/account-financial-reporting.git
+	branch = 17.0
+[submodule "oca/account-reconcile"]
+	path = oca/account-reconcile
+	url = https://github.com/OCA/account-reconcile.git
+	branch = 17.0
