@@ -118,7 +118,7 @@
     # rebuilt sudo via scripts/compute_winloss_intel.py). USD-guard. Backend
     # list/graph/pivot + "Realisation & Win/Loss" menu + nightly cron + gated
     # Recompute + Owl board RPC. Margin & cost is L2.4 (later, NOT here).
-    "version": "17.0.1.12.0",
+    "version": "17.0.1.13.0",
     "summary": "Read-only reference import of Zoho Books estimates + customers "
                "(historical), isolated from the live finance models.",
     "description": """
@@ -180,6 +180,9 @@ quotes) and scripts/import_zoho_finance.py (invoices + expenses, reference-only)
         # "Realisation & Win/Loss" menu + nightly cron + gated Recompute + board.
         "views/winloss_intel_views.xml",
         "views/res_partner_views.xml",
+        # MENU-VISIBILITY (Kudzai declutter): re-gate the 3 intel apps off the
+        # bookkeeper role. LOADS LAST so its groups_id (6,0) replace wins.
+        "data/menu_visibility_kudzai_intel.xml",
     ],
     "installable": True,
     "application": False,

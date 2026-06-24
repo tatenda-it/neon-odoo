@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MENU-VISIBILITY (Kudzai declutter) — re-gate the three intel apps off the
+  bookkeeper role so they drop out of the bookkeeper's launcher.
+
+  Why a separate override (not editing the menuitems' groups= attr): the
+  <menuitem groups="..."> shorthand is ADDITIVE on -u — removing a group from
+  the attribute does NOT strip it from groups_id. An explicit groups_id (6,0)
+  REPLACE is the only reliable way to remove a group. Loaded LAST (after the
+  intel view files) so it wins.
+
+  Effect: Client Intelligence / Demand & Seasonality / Realisation & Win-Loss
+  become visible to neon_sales_rep + neon_superuser ONLY (was + neon_bookkeeper).
+  Among real users this hides them from Kudzai (sole bookkeeper); Lisa/Evy keep
+  them via sales_rep, Robin/Munashe/Tatenda via superuser. Collections is
+  deliberately NOT re-gated (Kudzai keeps it). This is a LAUNCHER declutter, not
+  a security change — the boards' action/model ACLs (incl. bookkeeper read) are
+  untouched. ⚠️ Role-level: a future bookkeeper would also not see these.
+  Reversible: delete this file (and -u) to restore the bookkeeper gate.
+-->
+<odoo>
+    <record id="menu_client_intel_root" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+    <record id="menu_client_intel_board" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+    <record id="menu_client_intel" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+
+    <record id="menu_demand_root" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+    <record id="menu_demand_board" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+    <record id="menu_demand_intel" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+    <record id="menu_demand_recurring" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+
+    <record id="menu_winloss_root" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+    <record id="menu_winloss_board" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+    <record id="menu_winloss_intel" model="ir.ui.menu">
+        <field name="groups_id" eval="[(6, 0, [ref('neon_core.group_neon_sales_rep'), ref('neon_core.group_neon_superuser')])]"/>
+    </record>
+</odoo>
