@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Per-account running-ledger statement (Neon's spreadsheet layout).
+  READ-ONLY: create/edit off; reads existing account.move.line. Per-account
+  actions share one tree view + the running-balance compute.
+-->
+<odoo>
+
+    <!-- Shared statement tree: Date | Details | Acc Code | Dr | Cr | Balance -->
+    <record id="view_neon_statement_tree" model="ir.ui.view">
+        <field name="name">neon.banking.statement.tree</field>
+        <field name="model">account.move.line</field>
+        <field name="arch" type="xml">
+            <tree string="Statement" create="0" edit="0" delete="0"
+                  default_order="date, id">
+                <field name="company_currency_id" column_invisible="1"/>
+                <field name="date" string="Date"/>
+                <field name="name" string="Details"/>
+                <field name="neon_counterpart_code" string="Acc Code"/>
+                <field name="debit" string="Dr" sum="Total Dr"/>
+                <field name="credit" string="Cr" sum="Total Cr"/>
+                <field name="neon_running_balance" string="Balance"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Minimal search view: the DEFAULT account.move.line search has an
+         account.root-based searchpanel/groupby that a plain bookkeeper (no
+         Billing Administrator) cannot read -> Access Error. This minimal search
+         (no searchpanel, no account.root groupby) avoids that entirely. -->
+    <record id="view_neon_statement_search" model="ir.ui.view">
+        <field name="name">neon.banking.statement.search</field>
+        <field name="model">account.move.line</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Details"/>
+                <field name="date"/>
+                <filter name="posted" string="Posted"
+                        domain="[('parent_state','=','posted')]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Per-account actions (domain by account code -> no numeric/xml-id dep) -->
+    <record id="action_statement_petty_cash" model="ir.actions.act_window">
+        <field name="name">Petty Cash Statement</field>
+        <field name="res_model">account.move.line</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="view_neon_statement_tree"/>
+        <field name="search_view_id" ref="view_neon_statement_search"/>
+        <field name="domain">[('account_id.code','=','101501'),('parent_state','=','posted')]</field>
+        <field name="context">{'search_default_posted': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">No transactions yet</p>
+            <p>This is the Petty Cash running ledger. It fills as entries post.</p>
+        </field>
+    </record>
+
+    <record id="action_statement_cabs_usd" model="ir.actions.act_window">
+        <field name="name">CABS (USD) Statement</field>
+        <field name="res_model">account.move.line</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="view_neon_statement_tree"/>
+        <field name="search_view_id" ref="view_neon_statement_search"/>
+        <field name="domain">[('account_id.code','=','101401'),('parent_state','=','posted')]</field>
+    </record>
+
+    <record id="action_statement_cabs_zwg" model="ir.actions.act_window">
+        <field name="name">CABS (ZWG) Statement</field>
+        <field name="res_model">account.move.line</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="view_neon_statement_tree"/>
+        <field name="search_view_id" ref="view_neon_statement_search"/>
+        <field name="domain">[('account_id.code','=','101405'),('parent_state','=','posted')]</field>
+    </record>
+
+    <record id="action_statement_suspense" model="ir.actions.act_window">
+        <field name="name">Suspense Statement</field>
+        <field name="res_model">account.move.line</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="view_neon_statement_tree"/>
+        <field name="search_view_id" ref="view_neon_statement_search"/>
+        <field name="domain">[('account_id.code','=','101402'),('parent_state','=','posted')]</field>
+    </record>
+
+    <!-- Nest under the existing finance-gated "Statements" menu (Stage 0.5) -->
+    <menuitem id="menu_neon_account_ledgers"
+              name="Account Ledgers"
+              parent="neon_banking_labels.menu_neon_statements_root"
+              sequence="40"/>
+
+    <menuitem id="menu_statement_petty_cash" name="Petty Cash"
+              parent="menu_neon_account_ledgers"
+              action="action_statement_petty_cash" sequence="10"/>
+    <menuitem id="menu_statement_cabs_usd" name="CABS (USD)"
+              parent="menu_neon_account_ledgers"
+              action="action_statement_cabs_usd" sequence="20"/>
+    <menuitem id="menu_statement_cabs_zwg" name="CABS (ZWG)"
+              parent="menu_neon_account_ledgers"
+              action="action_statement_cabs_zwg" sequence="30"/>
+    <menuitem id="menu_statement_suspense" name="Suspense"
+              parent="menu_neon_account_ledgers"
+              action="action_statement_suspense" sequence="40"/>
+
+</odoo>
