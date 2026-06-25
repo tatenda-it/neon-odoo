@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cash_expense_wiz_bookkeeper,cash.expense.wiz.bookkeeper,model_neon_cash_expense_wizard,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_cash_expense_wiz_approver,cash.expense.wiz.approver,model_neon_cash_expense_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
+access_cash_expense_wiz_acct_mgr,cash.expense.wiz.acct.mgr,model_neon_cash_expense_wizard,account.group_account_manager,1,1,1,1
+access_cash_expense_wiz_superuser,cash.expense.wiz.superuser,model_neon_cash_expense_wizard,neon_core.group_neon_superuser,1,1,1,1
+access_cash_replen_wiz_bookkeeper,cash.replen.wiz.bookkeeper,model_neon_cash_replenishment_wizard,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_cash_replen_wiz_approver,cash.replen.wiz.approver,model_neon_cash_replenishment_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
+access_cash_replen_wiz_acct_mgr,cash.replen.wiz.acct.mgr,model_neon_cash_replenishment_wizard,account.group_account_manager,1,1,1,1
+access_cash_replen_wiz_superuser,cash.replen.wiz.superuser,model_neon_cash_replenishment_wizard,neon_core.group_neon_superuser,1,1,1,1

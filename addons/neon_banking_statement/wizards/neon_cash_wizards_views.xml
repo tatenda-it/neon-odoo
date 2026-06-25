@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  "Add Transaction" quick-entry wizards (Zoho-style). Short forms, Neon's words,
+  NO debit/credit/journal/suspense jargon. Open as dialogs (target=new).
+
+  The on-view launcher is a native list <header> button with display="always"
+  (renders in the statement's control panel with no row selection needed) whose
+  context defaults the cash account to the statement being viewed. Pure XML, no
+  JS, no asset bundle; robust over a custom OWL controller patch.
+-->
+<odoo>
+
+    <!-- ===== EXPENSE (money out) ===== -->
+    <record id="view_cash_expense_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.expense.wizard.form</field>
+        <field name="model">neon.cash.expense.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Add Expense">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="expense_account_id"
+                                   options="{'no_create': True}"/>
+                            <field name="date"/>
+                            <field name="amount"/>
+                            <field name="tax_treatment" widget="radio"
+                                   options="{'horizontal': True}"/>
+                            <field name="tax_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="cash_account_id"
+                                   options="{'no_create': True}"/>
+                            <field name="vendor_id"/>
+                            <field name="customer_id"/>
+                            <field name="reference"/>
+                            <field name="receipt" filename="receipt_filename"
+                                   widget="binary"/>
+                            <field name="receipt_filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="What was this for? (e.g. Fuel - crew run)"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_expense_wizard" model="ir.actions.act_window">
+        <field name="name">Add Expense</field>
+        <field name="res_model">neon.cash.expense.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_expense_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===== PETTY CASH REPLENISHMENT (money in) ===== -->
+    <record id="view_cash_replenishment_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.replenishment.wizard.form</field>
+        <field name="model">neon.cash.replenishment.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Add Replenishment">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="source_account_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="date"/>
+                            <field name="amount"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="e.g. Replenish petty cash from CABS"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_replenishment_wizard" model="ir.actions.act_window">
+        <field name="name">Add Replenishment</field>
+        <field name="res_model">neon.cash.replenishment.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_replenishment_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ============================================================
+         On-view "Add Transaction" launchers: per-account statement tree
+         variants that inject a <header> with display="always" buttons.
+         The button context defaults the cash account to the one being
+         viewed, so the bookkeeper never re-picks it.
+         ============================================================ -->
+
+    <!-- Petty Cash (101501): Add Expense + Add Replenishment -->
+    <record id="view_neon_statement_tree_petty" model="ir.ui.view">
+        <field name="name">neon.banking.statement.tree.petty</field>
+        <field name="model">account.move.line</field>
+        <field name="inherit_id" ref="view_neon_statement_tree"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <header>
+                    <button name="%(action_cash_expense_wizard)d" type="action"
+                            display="always" class="btn-primary"
+                            string="Add Expense"
+                            context="{'default_cash_account_code': '101501'}"/>
+                    <button name="%(action_cash_replenishment_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Add Replenishment"
+                            context="{'default_cash_account_code': '101501'}"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- CABS (USD) 101401: Add Expense (bank payment) -->
+    <record id="view_neon_statement_tree_cabs_usd" model="ir.ui.view">
+        <field name="name">neon.banking.statement.tree.cabs.usd</field>
+        <field name="model">account.move.line</field>
+        <field name="inherit_id" ref="view_neon_statement_tree"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <header>
+                    <button name="%(action_cash_expense_wizard)d" type="action"
+                            display="always" class="btn-primary"
+                            string="Add Expense"
+                            context="{'default_cash_account_code': '101401'}"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- CABS (ZWG) 101405: Add Expense (bank payment) -->
+    <record id="view_neon_statement_tree_cabs_zwg" model="ir.ui.view">
+        <field name="name">neon.banking.statement.tree.cabs.zwg</field>
+        <field name="model">account.move.line</field>
+        <field name="inherit_id" ref="view_neon_statement_tree"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <header>
+                    <button name="%(action_cash_expense_wizard)d" type="action"
+                            display="always" class="btn-primary"
+                            string="Add Expense"
+                            context="{'default_cash_account_code': '101405'}"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Repoint the Stage-1 statement actions at the header-bearing variants.
+         (Same module + same id => updates the existing action records. Defined
+         here, after the wizard actions + variants they reference, so all refs
+         are backward.) Suspense keeps the plain base tree (no cash journal). -->
+    <record id="action_statement_petty_cash" model="ir.actions.act_window">
+        <field name="view_id" ref="view_neon_statement_tree_petty"/>
+    </record>
+    <record id="action_statement_cabs_usd" model="ir.actions.act_window">
+        <field name="view_id" ref="view_neon_statement_tree_cabs_usd"/>
+    </record>
+    <record id="action_statement_cabs_zwg" model="ir.actions.act_window">
+        <field name="view_id" ref="view_neon_statement_tree_cabs_zwg"/>
+    </record>
+
+</odoo>
