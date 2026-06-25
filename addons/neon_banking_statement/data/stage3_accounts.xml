@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Stage-3 "Add Transaction" — dedicated target accounts for two new entry types
+  that the live chart lacked (discovery: no 'drawings' or 'commission' account
+  existed). Codes gap-filled cleanly: 303000 sits after 301000 Capital / 302000
+  Dividends in the equity band; 627000 sits after 626000 Marketing in the
+  operating-expense band. Tagged neon_source='seed_banking_addtxn' (distinct
+  from the P-A/BUILD-1 'seed_accounting' expense-seed set, which the
+  accounting_seed smoke counts exactly) so the two seed sets stay separable.
+
+  The wizards default to these accounts but expose an editable picker, so Robin
+  can redirect to a different/existing account at GATE-HOLD without code change.
+
+  noupdate="1": chart-of-accounts seed the bookkeeper then owns — later UI
+  renames/reparents/archives are not clobbered by a future -u. Codes are unique,
+  so re-running -u is a no-op.
+-->
+<odoo noupdate="1">
+
+    <record id="account_eq_directors_drawings" model="account.account">
+        <field name="code">303000</field>
+        <field name="name">Owner / Directors Drawings</field>
+        <field name="account_type">equity</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_banking_addtxn</field>
+    </record>
+
+    <record id="account_exp_commission" model="account.account">
+        <field name="code">627000</field>
+        <field name="name">Commission</field>
+        <field name="account_type">expense</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="neon_source">seed_banking_addtxn</field>
+    </record>
+
+</odoo>

@@ -104,6 +104,298 @@
         <field name="target">new</field>
     </record>
 
+    <!-- ================= STAGE 3 quick-entry types ================= -->
+
+    <!-- ===== VENDOR PAYMENT (pay a supplier bill via Odoo's register) ===== -->
+    <record id="view_cash_vendor_payment_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.vendor.payment.wizard.form</field>
+        <field name="model">neon.cash.vendor.payment.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Pay a Bill">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="bill_id" options="{'no_create': True}"/>
+                            <field name="vendor_id"/>
+                            <field name="amount"/>
+                        </group>
+                        <group>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="date"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_vendor_payment_wizard" model="ir.actions.act_window">
+        <field name="name">Pay a Bill</field>
+        <field name="res_model">neon.cash.vendor.payment.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_vendor_payment_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===== CUSTOMER RECEIPT (receive on a customer invoice via register) ===== -->
+    <record id="view_cash_customer_receipt_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.customer.receipt.wizard.form</field>
+        <field name="model">neon.cash.customer.receipt.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Receive a Payment">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="invoice_id" options="{'no_create': True}"/>
+                            <field name="partner_id"/>
+                            <field name="amount"/>
+                        </group>
+                        <group>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="date"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_customer_receipt_wizard" model="ir.actions.act_window">
+        <field name="name">Receive a Payment</field>
+        <field name="res_model">neon.cash.customer.receipt.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_customer_receipt_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===== VENDOR ADVANCE (pay a supplier, no bill yet) ===== -->
+    <record id="view_cash_vendor_advance_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.vendor.advance.wizard.form</field>
+        <field name="model">neon.cash.vendor.advance.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Pay a Supplier in Advance">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="vendor_id"/>
+                            <field name="amount"/>
+                        </group>
+                        <group>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="date"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="e.g. Advance for stage hire - deposit"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_vendor_advance_wizard" model="ir.actions.act_window">
+        <field name="name">Pay a Supplier in Advance</field>
+        <field name="res_model">neon.cash.vendor.advance.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_vendor_advance_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===== OWNER / DIRECTORS DRAWINGS (money out) ===== -->
+    <record id="view_cash_drawings_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.drawings.wizard.form</field>
+        <field name="model">neon.cash.drawings.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Owner / Directors Drawings">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="drawings_account_id" options="{'no_create': True}"/>
+                            <field name="amount"/>
+                            <field name="payee_id"/>
+                        </group>
+                        <group>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="date"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="e.g. Director drawings - R. Goneso"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_drawings_wizard" model="ir.actions.act_window">
+        <field name="name">Owner / Directors Drawings</field>
+        <field name="res_model">neon.cash.drawings.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_drawings_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===== COMMISSION (money out) ===== -->
+    <record id="view_cash_commission_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.commission.wizard.form</field>
+        <field name="model">neon.cash.commission.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Commission">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="commission_account_id" options="{'no_create': True}"/>
+                            <field name="amount"/>
+                            <field name="payee_id"/>
+                        </group>
+                        <group>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="date"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="e.g. Referral commission - ABC Events"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_commission_wizard" model="ir.actions.act_window">
+        <field name="name">Commission</field>
+        <field name="res_model">neon.cash.commission.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_commission_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===== OWNER CONTRIBUTION / OTHER MONEY-IN ===== -->
+    <record id="view_cash_contribution_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.contribution.wizard.form</field>
+        <field name="model">neon.cash.contribution.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Owner Contribution / Money In">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="credit_account_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="date"/>
+                            <field name="amount"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="e.g. Owner capital injection"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_contribution_wizard" model="ir.actions.act_window">
+        <field name="name">Owner Contribution / Money In</field>
+        <field name="res_model">neon.cash.contribution.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_contribution_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===== TRANSFER / DEPOSIT (between cash/bank accounts) ===== -->
+    <record id="view_cash_transfer_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.transfer.wizard.form</field>
+        <field name="model">neon.cash.transfer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Transfer / Deposit">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="cash_account_id" options="{'no_create': True}"/>
+                            <field name="dest_account_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="date"/>
+                            <field name="amount"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="e.g. Move cash to CABS - banking"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" name="action_save" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_transfer_wizard" model="ir.actions.act_window">
+        <field name="name">Transfer / Deposit</field>
+        <field name="res_model">neon.cash.transfer.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cash_transfer_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
     <!-- ============================================================
          On-view "Add Transaction" launchers: per-account statement tree
          variants that inject a <header> with display="always" buttons.
@@ -128,6 +420,22 @@
                             display="always" class="btn-secondary"
                             string="Add Replenishment"
                             context="{'default_cash_account_code': '101501'}"/>
+                    <button name="%(action_cash_drawings_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Drawings"
+                            context="{'default_cash_account_code': '101501'}"/>
+                    <button name="%(action_cash_commission_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Commission"
+                            context="{'default_cash_account_code': '101501'}"/>
+                    <button name="%(action_cash_contribution_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Money In"
+                            context="{'default_cash_account_code': '101501'}"/>
+                    <button name="%(action_cash_transfer_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Transfer / Deposit"
+                            context="{'default_cash_account_code': '101501'}"/>
                 </header>
             </xpath>
         </field>
@@ -146,6 +454,34 @@
                             display="always" class="btn-primary"
                             string="Add Expense"
                             context="{'default_cash_account_code': '101401'}"/>
+                    <button name="%(action_cash_vendor_payment_wizard)d" type="action"
+                            display="always" class="btn-primary"
+                            string="Pay a Bill"
+                            context="{'default_cash_account_code': '101401'}"/>
+                    <button name="%(action_cash_customer_receipt_wizard)d" type="action"
+                            display="always" class="btn-primary"
+                            string="Receive a Payment"
+                            context="{'default_cash_account_code': '101401'}"/>
+                    <button name="%(action_cash_vendor_advance_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Vendor Advance"
+                            context="{'default_cash_account_code': '101401'}"/>
+                    <button name="%(action_cash_contribution_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Money In"
+                            context="{'default_cash_account_code': '101401'}"/>
+                    <button name="%(action_cash_drawings_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Drawings"
+                            context="{'default_cash_account_code': '101401'}"/>
+                    <button name="%(action_cash_commission_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Commission"
+                            context="{'default_cash_account_code': '101401'}"/>
+                    <button name="%(action_cash_transfer_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Transfer / Deposit"
+                            context="{'default_cash_account_code': '101401'}"/>
                 </header>
             </xpath>
         </field>
@@ -163,6 +499,18 @@
                     <button name="%(action_cash_expense_wizard)d" type="action"
                             display="always" class="btn-primary"
                             string="Add Expense"
+                            context="{'default_cash_account_code': '101405'}"/>
+                    <button name="%(action_cash_vendor_payment_wizard)d" type="action"
+                            display="always" class="btn-primary"
+                            string="Pay a Bill"
+                            context="{'default_cash_account_code': '101405'}"/>
+                    <button name="%(action_cash_customer_receipt_wizard)d" type="action"
+                            display="always" class="btn-primary"
+                            string="Receive a Payment"
+                            context="{'default_cash_account_code': '101405'}"/>
+                    <button name="%(action_cash_vendor_advance_wizard)d" type="action"
+                            display="always" class="btn-secondary"
+                            string="Vendor Advance"
                             context="{'default_cash_account_code': '101405'}"/>
                 </header>
             </xpath>
