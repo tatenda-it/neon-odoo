@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_weekly_budget_bookkeeper,weekly.budget.bookkeeper,model_neon_weekly_budget,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_weekly_budget_approver,weekly.budget.approver,model_neon_weekly_budget,neon_finance.group_neon_finance_approver,1,1,1,1
+access_weekly_budget_acct_mgr,weekly.budget.acct.mgr,model_neon_weekly_budget,account.group_account_manager,1,1,1,1
+access_weekly_budget_superuser,weekly.budget.superuser,model_neon_weekly_budget,neon_core.group_neon_superuser,1,1,1,1
+access_weekly_budget_line_bookkeeper,weekly.budget.line.bookkeeper,model_neon_weekly_budget_line,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_weekly_budget_line_approver,weekly.budget.line.approver,model_neon_weekly_budget_line,neon_finance.group_neon_finance_approver,1,1,1,1
+access_weekly_budget_line_acct_mgr,weekly.budget.line.acct.mgr,model_neon_weekly_budget_line,account.group_account_manager,1,1,1,1
+access_weekly_budget_line_superuser,weekly.budget.line.superuser,model_neon_weekly_budget_line,neon_core.group_neon_superuser,1,1,1,1
