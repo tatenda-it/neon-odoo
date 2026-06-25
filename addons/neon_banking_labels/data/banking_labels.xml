@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  STAGE 0 cosmetic relabels (labels only; no logic/model/routing change).
+  Each override is the lowest-blast-radius lever for that label.
+-->
+<odoo>
+
+    <!-- A. "Bank Statements" register (what cash/bank "New Transaction" opens)
+            -> "Transactions". Action-name override (title/breadcrumb only). -->
+    <record id="account.action_bank_statement_tree" model="ir.actions.act_window">
+        <field name="name">Transactions</field>
+    </record>
+
+    <!-- B. account.payment form: "Internal Transfer" -> "Transfer / Deposit".
+            Scoped field-label override on the payment form only. -->
+    <record id="neon_payment_form_relabel" model="ir.ui.view">
+        <field name="name">neon.account.payment.form.relabel</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <field name="is_internal_transfer" position="attributes">
+                <attribute name="string">Transfer / Deposit</attribute>
+            </field>
+        </field>
+    </record>
+
+    <!-- C. account.move form: "Register Payment" button -> "Record Payment".
+            Single targeted button-string override. -->
+    <record id="neon_move_form_relabel" model="ir.ui.view">
+        <field name="name">neon.account.move.form.relabel</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_register_payment']" position="attributes">
+                <attribute name="string">Record Payment</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- D. Bank-statement-line register (the entry surface): "Partner" -> a
+            statement line is either a customer or a vendor, so the safe word is
+            "Contact". Scoped to the account_statement_base line views. -->
+    <record id="neon_bsl_form_relabel" model="ir.ui.view">
+        <field name="name">neon.bank.statement.line.form.relabel</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="inherit_id" ref="account_statement_base.account_bank_statement_line_form"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="attributes">
+                <attribute name="string">Contact</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="neon_bsl_tree_relabel" model="ir.ui.view">
+        <field name="name">neon.bank.statement.line.tree.relabel</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="inherit_id" ref="account_statement_base.account_bank_statement_line_tree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="attributes">
+                <attribute name="string">Contact</attribute>
+            </field>
+        </field>
+    </record>
+
+</odoo>
