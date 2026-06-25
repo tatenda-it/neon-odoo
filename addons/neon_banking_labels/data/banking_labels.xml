@@ -37,9 +37,10 @@
         </field>
     </record>
 
-    <!-- D. Bank-statement-line register (the entry surface): "Partner" -> a
-            statement line is either a customer or a vendor, so the safe word is
-            "Contact". Scoped to the account_statement_base line views. -->
+    <!-- D. Bank-statement-line register (the entry surface): "Partner" ->
+            "Contact" (a line is either a customer or a vendor), and "Journal" ->
+            "Account" (the bookkeeper's word; the journal IS the cash/bank
+            account here). Scoped to the account_statement_base line views. -->
     <record id="neon_bsl_form_relabel" model="ir.ui.view">
         <field name="name">neon.bank.statement.line.form.relabel</field>
         <field name="model">account.bank.statement.line</field>
@@ -47,6 +48,9 @@
         <field name="arch" type="xml">
             <field name="partner_id" position="attributes">
                 <attribute name="string">Contact</attribute>
+            </field>
+            <field name="journal_id" position="attributes">
+                <attribute name="string">Account</attribute>
             </field>
         </field>
     </record>
@@ -58,6 +62,64 @@
         <field name="arch" type="xml">
             <field name="partner_id" position="attributes">
                 <attribute name="string">Contact</attribute>
+            </field>
+            <field name="journal_id" position="attributes">
+                <attribute name="string">Account</attribute>
+            </field>
+        </field>
+    </record>
+
+    <!-- E. "Journal" -> "Account" on the Transactions register + statement form
+            (NARROW: the banking views where the bookkeeper sees it; NOT a global
+            ir.model.fields relabel, NOT the general Journal Entries action). -->
+    <record id="neon_bst_tree_relabel" model="ir.ui.view">
+        <field name="name">neon.bank.statement.tree.relabel</field>
+        <field name="model">account.bank.statement</field>
+        <field name="inherit_id" ref="account.view_bank_statement_tree"/>
+        <field name="arch" type="xml">
+            <field name="journal_id" position="attributes">
+                <attribute name="string">Account</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="neon_bst_form_relabel" model="ir.ui.view">
+        <field name="name">neon.bank.statement.form.relabel</field>
+        <field name="model">account.bank.statement</field>
+        <field name="inherit_id" ref="account_statement_base.view_bank_statement_form"/>
+        <field name="arch" type="xml">
+            <field name="journal_id" position="attributes">
+                <attribute name="string">Account</attribute>
+            </field>
+        </field>
+    </record>
+
+    <!-- F. Extend "Partner" -> "Contact" (+ "Journal" -> "Account") to the
+            account_reconcile_oca reconcile-widget line views (consistency). -->
+    <record id="neon_reconcile_form_relabel" model="ir.ui.view">
+        <field name="name">neon.reconcile.line.form.relabel</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="inherit_id" ref="account_reconcile_oca.bank_statement_line_form_reconcile_view"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="attributes">
+                <attribute name="string">Contact</attribute>
+            </field>
+            <field name="journal_id" position="attributes">
+                <attribute name="string">Account</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="neon_reconcile_add_relabel" model="ir.ui.view">
+        <field name="name">neon.reconcile.line.add.relabel</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="inherit_id" ref="account_reconcile_oca.bank_statement_line_form_add_view"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="attributes">
+                <attribute name="string">Contact</attribute>
+            </field>
+            <field name="journal_id" position="attributes">
+                <attribute name="string">Account</attribute>
             </field>
         </field>
     </record>

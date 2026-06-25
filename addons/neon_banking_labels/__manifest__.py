@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Banking Labels",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "Cosmetic relabels of Odoo accounting jargon to Neon's words (labels only)",
     "description": """
 STAGE 0 of the Zoho-banking-UX project: relabel Odoo accounting/banking
@@ -19,7 +19,7 @@ later `-u account`.) xml-id based, additive.
     "license": "LGPL-3",
     # account_statement_base owns the bank-statement-line views (the register
     # entry surface) -> depend on it so our inheriting views load after.
-    "depends": ["account", "account_statement_base"],
+    "depends": ["account", "account_statement_base", "account_reconcile_oca"],
     "data": [
         "data/banking_labels.xml",
     ],
