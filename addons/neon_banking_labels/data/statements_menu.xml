@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  STAGE 0.5: give the installed partner_statement wizard actions a home.
+  Menu records ONLY: they point at EXISTING actions by xml-id (never numeric
+  id). No new models/reports/logic; the wizards are untouched.
+  Top-level "Statements" menu, sibling to "Banking", gated to finance roles
+  (NOT base.group_user).
+-->
+<odoo>
+
+    <menuitem id="menu_neon_statements_root"
+              name="Statements"
+              web_icon="account,static/description/icon.png"
+              sequence="18"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver,account.group_account_manager,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_neon_statements_activity"
+              name="Customer/Supplier Activity"
+              parent="menu_neon_statements_root"
+              action="partner_statement.activity_statement_wizard_action"
+              sequence="10"/>
+
+    <menuitem id="menu_neon_statements_outstanding"
+              name="Outstanding Balances"
+              parent="menu_neon_statements_root"
+              action="partner_statement.outstanding_statement_wizard_action"
+              sequence="20"/>
+
+    <menuitem id="menu_neon_statements_detailed"
+              name="Detailed Activity"
+              parent="menu_neon_statements_root"
+              action="partner_statement.detailed_activity_statement_wizard_action"
+              sequence="30"/>
+
+</odoo>
