@@ -112,7 +112,7 @@
     # Zoho-reconciled accounts. No opening balances / no posting / no engine
     # change. Config-as-data layer -> minor bump. (Additive nullable column +
     # additive data rows; no existing-row migration.)
-    'version': '17.0.7.17.1',
+    'version': '17.0.7.17.2',
     'summary': 'Zimbabwe finance configuration + Phase 6 pricing engine '
                '(rule lookup + bracket compute + day multipliers) + quote '
                'model + OD/MD approval workflow + cost lines + per-event '
