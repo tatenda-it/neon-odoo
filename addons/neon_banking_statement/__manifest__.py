@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Banking Statement",
-    "version": "17.0.1.4.0",
+    "version": "17.0.1.5.0",
     "summary": "Per-account running-ledger statement view + Add-Transaction quick entry",
     "description": """
 A READ/VIEW over the existing ledger (account.move.line) presenting a per-

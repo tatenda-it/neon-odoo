@@ -85,26 +85,82 @@
         <field name="domain">[('account_id.code','=','101402'),('parent_state','=','posted')]</field>
     </record>
 
-    <!-- Nest under the existing finance-gated "Statements" menu (Stage 0.5).
-         sequence=5 so Account Ledgers LEADS the Statements tree (ahead of the
-         partner_statement wizards): the daily-cash front door (front-door
-         reorder; see views/neon_banking_frontdoor.xml). -->
+    <!-- ============================================================
+         ACCOUNT LEDGERS LANDING INDEX (Build 2 + Build-1 Part 4 Option A).
+         A parent action the statements DRILL FROM, so the breadcrumb reads
+         "Account Ledgers > <X> Statement" with a clickable way back. Lists the
+         three CASH statements; Suspense is NOT listed (its account 101402 stays
+         for payments/reconcile + the cross-currency guard, only the statement
+         view is dropped from the menu). Read-only; no posting/context change to
+         the statement actions (each still carries its own default_cash_account_
+         code, so the Add-Transaction dropdown works when drilled into).
+         ============================================================ -->
+    <record id="view_account_ledgers_index_search" model="ir.ui.view">
+        <field name="name">neon.account.ledgers.index.search</field>
+        <field name="model">account.account</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="code"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_account_ledgers_index_kanban" model="ir.ui.view">
+        <field name="name">neon.account.ledgers.index.kanban</field>
+        <field name="model">account.account</field>
+        <field name="arch" type="xml">
+            <kanban create="false" edit="false" delete="false" default_order="code">
+                <field name="code"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <!-- Friendly per-account label (the raw account names are
+                             "Cash"/"Bank"/"CABS (ZWG) Bank"; show the bookkeeper's
+                             statement names instead, matched by code). -->
+                        <div class="oe_kanban_card p-3 m-2 text-center">
+                            <t t-if="record.code.raw_value == '101501'">
+                                <div class="h5 mb-2">Petty Cash</div>
+                                <button name="%(action_statement_petty_cash)d" type="action"
+                                        class="btn btn-primary"><i class="fa fa-book me-1"/>Open Statement</button>
+                            </t>
+                            <t t-if="record.code.raw_value == '101401'">
+                                <div class="h5 mb-2">CABS (USD)</div>
+                                <button name="%(action_statement_cabs_usd)d" type="action"
+                                        class="btn btn-primary"><i class="fa fa-book me-1"/>Open Statement</button>
+                            </t>
+                            <t t-if="record.code.raw_value == '101405'">
+                                <div class="h5 mb-2">CABS (ZWG)</div>
+                                <button name="%(action_statement_cabs_zwg)d" type="action"
+                                        class="btn btn-primary"><i class="fa fa-book me-1"/>Open Statement</button>
+                            </t>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_account_ledgers_index" model="ir.actions.act_window">
+        <field name="name">Account Ledgers</field>
+        <field name="res_model">account.account</field>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_account_ledgers_index_kanban"/>
+        <field name="search_view_id" ref="view_account_ledgers_index_search"/>
+        <field name="domain">[('code','in',['101501','101401','101405'])]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Your cash &amp; bank statements</p>
+            <p>Open a statement to view its running ledger and add transactions.</p>
+        </field>
+    </record>
+
+    <!-- Nest under the finance-gated "Statements" menu; sequence=5 so Account
+         Ledgers LEADS the Statements tree (front-door reorder, #3). The menu now
+         opens the landing index above (no child leaf menuitems; statements are
+         reached by drilling from the landing, which gives the clickable crumb). -->
     <menuitem id="menu_neon_account_ledgers"
               name="Account Ledgers"
               parent="neon_banking_labels.menu_neon_statements_root"
+              action="action_account_ledgers_index"
               sequence="5"/>
-
-    <menuitem id="menu_statement_petty_cash" name="Petty Cash"
-              parent="menu_neon_account_ledgers"
-              action="action_statement_petty_cash" sequence="10"/>
-    <menuitem id="menu_statement_cabs_usd" name="CABS (USD)"
-              parent="menu_neon_account_ledgers"
-              action="action_statement_cabs_usd" sequence="20"/>
-    <menuitem id="menu_statement_cabs_zwg" name="CABS (ZWG)"
-              parent="menu_neon_account_ledgers"
-              action="action_statement_cabs_zwg" sequence="30"/>
-    <menuitem id="menu_statement_suspense" name="Suspense"
-              parent="menu_neon_account_ledgers"
-              action="action_statement_suspense" sequence="40"/>
 
 </odoo>
