@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  "Correct this entry": contextual action on the statement lines that opens the
+  correction wizard (reverse + re-enter). Finance-gated server action; no Dr/Cr/
+  journal jargon on the form.
+-->
+<odoo>
+
+    <record id="view_cash_correct_wizard_form" model="ir.ui.view">
+        <field name="name">neon.cash.correct.wizard.form</field>
+        <field name="model">neon.cash.correct.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Correct this Entry">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        This reverses the original entry (it stays, with an
+                        offsetting reversal) and posts the corrected version.
+                        Nothing is deleted.
+                    </div>
+                    <group>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="is_outflow" invisible="1"/>
+                        <field name="original_move_id" invisible="1"/>
+                        <field name="original_summary"/>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="counterpart_account_id" options="{'no_create': True}"/>
+                            <field name="amount"/>
+                            <field name="tax_treatment" widget="radio" options="{'horizontal': True}"/>
+                            <field name="tax_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="cash_account_id"/>
+                            <field name="date"/>
+                            <field name="reversal_date"/>
+                            <field name="reference"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description" placeholder="Corrected details"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Post Correction" name="action_post_correction" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Contextual "Correct this entry" on statement lines (account.move.line). -->
+    <record id="action_correct_cash_entry" model="ir.actions.server">
+        <field name="name">Correct this entry</field>
+        <field name="model_id" ref="account.model_account_move_line"/>
+        <field name="binding_model_id" ref="account.model_account_move_line"/>
+        <field name="binding_view_types">list</field>
+        <field name="groups_id" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper')), (4, ref('neon_finance.group_neon_finance_approver')), (4, ref('account.group_account_manager')), (4, ref('neon_core.group_neon_superuser'))]"/>
+        <field name="state">code</field>
+        <field name="code">
+if records:
+    action = {
+        "type": "ir.actions.act_window",
+        "name": "Correct this entry",
+        "res_model": "neon.cash.correct.wizard",
+        "view_mode": "form",
+        "target": "new",
+        "context": {"default_original_move_id": records[0].move_id.id},
+    }
+        </field>
+    </record>
+
+</odoo>

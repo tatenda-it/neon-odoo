@@ -35,3 +35,7 @@ access_cash_transfer_wiz_bookkeeper,cash.transfer.wiz.bookkeeper,model_neon_cash
 access_cash_transfer_wiz_approver,cash.transfer.wiz.approver,model_neon_cash_transfer_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
 access_cash_transfer_wiz_acct_mgr,cash.transfer.wiz.acct.mgr,model_neon_cash_transfer_wizard,account.group_account_manager,1,1,1,1
 access_cash_transfer_wiz_superuser,cash.transfer.wiz.superuser,model_neon_cash_transfer_wizard,neon_core.group_neon_superuser,1,1,1,1
+access_cash_correct_wiz_bookkeeper,cash.correct.wiz.bookkeeper,model_neon_cash_correct_wizard,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_cash_correct_wiz_approver,cash.correct.wiz.approver,model_neon_cash_correct_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
+access_cash_correct_wiz_acct_mgr,cash.correct.wiz.acct.mgr,model_neon_cash_correct_wizard,account.group_account_manager,1,1,1,1
+access_cash_correct_wiz_superuser,cash.correct.wiz.superuser,model_neon_cash_correct_wizard,neon_core.group_neon_superuser,1,1,1,1
