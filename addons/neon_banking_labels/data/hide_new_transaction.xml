@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hide the native "New Transaction" quick-link on cash/bank journal kanban cards.
+
+  WHY: native "New Transaction" (action_new_transaction) opens the manual
+  bank-statement-line entry / suspense+reconcile flow, which is NOT how Neon
+  records cash. The correct path is the Add-Transaction buttons on the per-account
+  statements (neon_banking_statement Stage 2/3). This removes the wrong door.
+
+  SCOPE: removes ONLY the four action_new_transaction nodes on bank/cash cards
+  (card-face bank link, card-face cash button + link, dropdown bank link). It does
+  NOT touch reconciliation (OCA "Reconcile N Items", a different element) nor the
+  bank-statement import / Statements/Cash-Registers links nor Customer/Vendor
+  Payment in the dropdown. View-layer only, reversible (uninstall reverts).
+
+  Each xpath is uniquely targeted (verified against the account source) so it
+  matches exactly one node and cannot touch sale/purchase/misc cards.
+-->
+<odoo>
+
+    <record id="view_journal_dashboard_hide_new_transaction" model="ir.ui.view">
+        <field name="name">account.journal.dashboard.kanban.neon.hide.new.transaction</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.account_journal_dashboard_kanban_view"/>
+        <field name="arch" type="xml">
+            <!-- bank card face (unique id) -->
+            <xpath expr="//a[@id='create_transaction']" position="replace"/>
+            <!-- cash card face button (number_to_reconcile == 0) -->
+            <xpath expr="//t[@t-name='JournalBodyBankCash']//button[@name='action_new_transaction']"
+                   position="replace"/>
+            <!-- cash card face link (number_to_reconcile > 0) -->
+            <xpath expr="//t[@t-name='JournalBodyBankCash']//a[@name='action_new_transaction' and not(@id)]"
+                   position="replace"/>
+            <!-- dropdown (bank kanban menu) -->
+            <xpath expr="//div[@name='bank_new_actions']/a[@name='action_new_transaction']"
+                   position="replace"/>
+        </field>
+    </record>
+
+</odoo>

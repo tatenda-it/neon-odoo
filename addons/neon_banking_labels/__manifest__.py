@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Banking Labels",
-    "version": "17.0.1.2.0",
+    "version": "17.0.1.3.0",
     "summary": "Cosmetic relabels of Odoo accounting jargon to Neon's words (labels only)",
     "description": """
 STAGE 0 of the Zoho-banking-UX project: relabel Odoo accounting/banking
@@ -23,6 +23,7 @@ later `-u account`.) xml-id based, additive.
     "data": [
         "data/banking_labels.xml",
         "data/statements_menu.xml",
+        "data/hide_new_transaction.xml",
     ],
     "installable": True,
     "application": False,
