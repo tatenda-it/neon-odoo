@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_bank_import_wiz_bookkeeper,bank.import.wiz.bookkeeper,model_neon_bank_statement_import_wizard,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_bank_import_wiz_approver,bank.import.wiz.approver,model_neon_bank_statement_import_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
+access_bank_import_wiz_acct_mgr,bank.import.wiz.acct.mgr,model_neon_bank_statement_import_wizard,account.group_account_manager,1,1,1,1
+access_bank_import_wiz_superuser,bank.import.wiz.superuser,model_neon_bank_statement_import_wizard,neon_core.group_neon_superuser,1,1,1,1

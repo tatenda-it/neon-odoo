@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="view_bank_statement_import_wizard_form" model="ir.ui.view">
+        <field name="name">neon.bank.statement.import.wizard.form</field>
+        <field name="model">neon.bank.statement.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Bank Statement">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Upload a CABS bank statement saved as <b>CSV</b> (USD or ZWG).
+                        The currency in the file routes it to the matching CABS
+                        journal; the lines then appear in Reconciliation.
+                    </div>
+                    <group>
+                        <field name="statement_file" filename="filename" widget="binary"/>
+                        <field name="filename" invisible="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Import" name="action_import" type="object"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_bank_statement_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Bank Statement</field>
+        <field name="res_model">neon.bank.statement.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_bank_statement_import_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Under the finance-gated Statements menu, after Account Ledgers (seq 5). -->
+    <menuitem id="menu_neon_bank_import"
+              name="Import Bank Statement"
+              parent="neon_banking_labels.menu_neon_statements_root"
+              action="action_bank_statement_import_wizard"
+              sequence="8"/>
+
+</odoo>
