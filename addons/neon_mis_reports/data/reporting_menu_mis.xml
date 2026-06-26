@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Surface the MIS financial reports under the neon "Reporting" launcher (Build 1
+  Part 3), leading the working-papers. Opens the MIS report list where Profit &
+  Loss, Balance Sheet and Cash Flow are listed and run (Preview).
+-->
+<odoo>
+
+    <menuitem id="menu_neon_report_mis_financial"
+              name="Financial Reports (P&amp;L / BS / Cash Flow)"
+              parent="neon_banking_labels.menu_neon_reporting_root"
+              action="mis_builder.mis_report_instance_view_action"
+              sequence="5"/>
+
+</odoo>

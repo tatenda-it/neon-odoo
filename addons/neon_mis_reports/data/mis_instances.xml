@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Report INSTANCES for the OCA P&L + Balance Sheet templates (the Cash Flow
+  instance ships with mis_builder_cash_flow). Period configs are a sensible
+  default (current year / year-to-date); Robin/the bookkeeper review the period
+  choice + the template line mappings at GATE-HOLD.
+-->
+<odoo noupdate="1">
+
+    <!-- Profit & Loss: current year to date (income/expense flows Jan 1 -> now) -->
+    <record id="mis_instance_pl" model="mis.report.instance">
+        <field name="name">Profit &amp; Loss</field>
+        <field name="report_id" ref="mis_template_financial_report.report_pl"/>
+        <field name="comparison_mode" eval="False"/>
+    </record>
+    <record id="mis_period_pl_ytd" model="mis.report.instance.period">
+        <field name="name">Year to date</field>
+        <field name="report_instance_id" ref="mis_instance_pl"/>
+        <field name="source">actuals</field>
+        <field name="mode">relative</field>
+        <field name="type">y</field>
+        <field name="offset">0</field>
+        <field name="duration">1</field>
+        <field name="is_ytd" eval="True"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- Balance Sheet: balances as at the current year end (cumulative position) -->
+    <record id="mis_instance_bs" model="mis.report.instance">
+        <field name="name">Balance Sheet</field>
+        <field name="report_id" ref="mis_template_financial_report.report_bs"/>
+        <field name="comparison_mode" eval="False"/>
+    </record>
+    <record id="mis_period_bs_current" model="mis.report.instance.period">
+        <field name="name">As at</field>
+        <field name="report_instance_id" ref="mis_instance_bs"/>
+        <field name="source">actuals</field>
+        <field name="mode">relative</field>
+        <field name="type">y</field>
+        <field name="offset">0</field>
+        <field name="duration">1</field>
+        <field name="sequence">10</field>
+    </record>
+
+</odoo>

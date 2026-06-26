@@ -53,6 +53,8 @@ services:
       - ./oca/server-ux:/mnt/oca-server-ux
       - ./oca/account-financial-reporting:/mnt/oca-account-financial-reporting
       - ./oca/account-reconcile:/mnt/oca-account-reconcile
+      # MIS Builder (P&L / Balance Sheet / Cash Flow financial reports)
+      - ./oca/mis-builder:/mnt/oca-mis-builder
     restart: unless-stopped
     networks:
       - neon-net
