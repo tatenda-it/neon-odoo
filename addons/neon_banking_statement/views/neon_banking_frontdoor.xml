@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BANKING FRONT-DOOR (navigation/label only, reversible, xml-id based).
+
+  Goal: the bookkeeper lives in the per-account statement ledgers day-to-day;
+  the native journal-cards dashboard becomes an occasional "Reconciliation"
+  back-room tool.
+
+  This module already depends on neon_finance + neon_banking_labels, so it can
+  override their menu records here (loaded last) without touching those modules.
+  ONLY ir.ui.menu display fields (name / sequence) change; every menu's action
+  field is left untouched, so behaviour (the kanban, the wizards, the
+  statements) is unchanged. No security/group change, no logic.
+
+  Resulting top-level order: Statements (12, front door) ... Reconciliation (32,
+  demoted). Within Statements, Account Ledgers leads (sequence 5, set in
+  neon_banking_statement_views.xml).
+-->
+<odoo>
+
+    <!-- Promote the Statements launcher ahead of the (demoted) dashboard. -->
+    <record id="neon_banking_labels.menu_neon_statements_root" model="ir.ui.menu">
+        <field name="sequence">12</field>
+    </record>
+
+    <!-- NOTE: the neon_finance "Banking" launcher (menu_neon_banking_root) is
+         demoted + relabelled to "Reconciliation" via the post-migrate script
+         (migrations/17.0.1.3.0/post-migrate.py), NOT here: that record is
+         noupdate=1, so a data override is silently skipped on existing installs.
+         The migration force-writes name/sequence (action untouched). -->
+
+    <!-- Relabel the native in-app Dashboard tab to "Reconciliation" too, so the
+         same kanban reads consistently wherever it is reached. Action untouched. -->
+    <record id="account.menu_board_journal_1" model="ir.ui.menu">
+        <field name="name">Reconciliation</field>
+    </record>
+
+</odoo>

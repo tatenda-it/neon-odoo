@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Banking Statement",
-    "version": "17.0.1.2.0",
+    "version": "17.0.1.3.0",
     "summary": "Per-account running-ledger statement view + Add-Transaction quick entry",
     "description": """
 A READ/VIEW over the existing ledger (account.move.line) presenting a per-
@@ -34,6 +34,7 @@ account.payment.register so the SCH- cross-currency guard stays active.
         "security/ir.model.access.csv",
         "data/stage3_accounts.xml",
         "views/neon_banking_statement_views.xml",
+        "views/neon_banking_frontdoor.xml",
         "wizards/neon_cash_wizards_views.xml",
     ],
     "installable": True,

@@ -83,11 +83,14 @@
         <field name="domain">[('account_id.code','=','101402'),('parent_state','=','posted')]</field>
     </record>
 
-    <!-- Nest under the existing finance-gated "Statements" menu (Stage 0.5) -->
+    <!-- Nest under the existing finance-gated "Statements" menu (Stage 0.5).
+         sequence=5 so Account Ledgers LEADS the Statements tree (ahead of the
+         partner_statement wizards): the daily-cash front door (front-door
+         reorder; see views/neon_banking_frontdoor.xml). -->
     <menuitem id="menu_neon_account_ledgers"
               name="Account Ledgers"
               parent="neon_banking_labels.menu_neon_statements_root"
-              sequence="40"/>
+              sequence="5"/>
 
     <menuitem id="menu_statement_petty_cash" name="Petty Cash"
               parent="menu_neon_account_ledgers"
