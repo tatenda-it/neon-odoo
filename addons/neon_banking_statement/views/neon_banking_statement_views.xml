@@ -49,7 +49,7 @@
         <field name="view_id" ref="view_neon_statement_tree"/>
         <field name="search_view_id" ref="view_neon_statement_search"/>
         <field name="domain">[('account_id.code','=','101501'),('parent_state','=','posted')]</field>
-        <field name="context">{'search_default_posted': 1}</field>
+        <field name="context">{'search_default_posted': 1, 'default_cash_account_code': '101501'}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiley_face">No transactions yet</p>
             <p>This is the Petty Cash running ledger. It fills as entries post.</p>
@@ -63,6 +63,7 @@
         <field name="view_id" ref="view_neon_statement_tree"/>
         <field name="search_view_id" ref="view_neon_statement_search"/>
         <field name="domain">[('account_id.code','=','101401'),('parent_state','=','posted')]</field>
+        <field name="context">{'search_default_posted': 1, 'default_cash_account_code': '101401'}</field>
     </record>
 
     <record id="action_statement_cabs_zwg" model="ir.actions.act_window">
@@ -72,6 +73,7 @@
         <field name="view_id" ref="view_neon_statement_tree"/>
         <field name="search_view_id" ref="view_neon_statement_search"/>
         <field name="domain">[('account_id.code','=','101405'),('parent_state','=','posted')]</field>
+        <field name="context">{'search_default_posted': 1, 'default_cash_account_code': '101405'}</field>
     </record>
 
     <record id="action_statement_suspense" model="ir.actions.act_window">

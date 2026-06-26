@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+  <!-- Inherit the stock list view template and add ONE "Add Transaction"
+       dropdown into the control-panel always-buttons slot. The old per-account
+       <header> button rows are gone; this single control replaces them. -->
+  <t t-name="neon_banking_statement.AddTxnListView"
+     t-inherit="web.ListView" t-inherit-mode="primary">
+    <xpath expr="//t[@t-set-slot='control-panel-always-buttons']" position="inside">
+      <Dropdown togglerClass="'btn btn-primary o_neon_add_txn'" position="'bottom-start'">
+        <t t-set-slot="toggler">
+          <i class="fa fa-plus me-1"/>Add Transaction
+        </t>
+
+        <!-- Money out / general (all cash statements) -->
+        <DropdownItem onSelected="() => this.openWizard('neon_banking_statement.action_cash_expense_wizard')">
+          Add Expense
+        </DropdownItem>
+
+        <!-- Petty Cash only -->
+        <DropdownItem t-if="cashAccountCode === '101501'"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_replenishment_wizard')">
+          Add Replenishment
+        </DropdownItem>
+
+        <!-- Bank accounts (CABS USD / ZWG): payments via the native register -->
+        <DropdownItem t-if="['101401','101405'].includes(cashAccountCode)"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_vendor_payment_wizard')">
+          Pay a Bill
+        </DropdownItem>
+        <DropdownItem t-if="['101401','101405'].includes(cashAccountCode)"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_customer_receipt_wizard')">
+          Receive a Payment
+        </DropdownItem>
+        <DropdownItem t-if="['101401','101405'].includes(cashAccountCode)"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_vendor_advance_wizard')">
+          Vendor Advance
+        </DropdownItem>
+
+        <!-- Company-currency cash (Petty Cash / CABS USD) -->
+        <DropdownItem t-if="['101501','101401'].includes(cashAccountCode)"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_contribution_wizard')">
+          Money In
+        </DropdownItem>
+        <DropdownItem t-if="['101501','101401'].includes(cashAccountCode)"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_drawings_wizard')">
+          Drawings
+        </DropdownItem>
+        <DropdownItem t-if="['101501','101401'].includes(cashAccountCode)"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_commission_wizard')">
+          Commission
+        </DropdownItem>
+        <DropdownItem t-if="['101501','101401'].includes(cashAccountCode)"
+                      onSelected="() => this.openWizard('neon_banking_statement.action_cash_transfer_wizard')">
+          Transfer / Deposit
+        </DropdownItem>
+      </Dropdown>
+    </xpath>
+  </t>
+
+</templates>

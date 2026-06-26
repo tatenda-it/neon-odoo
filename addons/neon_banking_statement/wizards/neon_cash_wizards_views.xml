@@ -397,138 +397,38 @@
     </record>
 
     <!-- ============================================================
-         On-view "Add Transaction" launchers: per-account statement tree
-         variants that inject a <header> with display="always" buttons.
-         The button context defaults the cash account to the one being
-         viewed, so the bookkeeper never re-picks it.
+         On-view "Add Transaction" launcher (Build 1): ONE consolidated OWL
+         dropdown in the statement control panel (replaces the old row of
+         <header display="always"> buttons, which collided with the search box).
+         A single primary tree variant adds js_class="neon_statement_addtxn";
+         the OWL controller (static/src/views/neon_statement_addtxn.js) reads
+         default_cash_account_code off the action context and lists the
+         applicable wizards per account. Per-account default now lives on each
+         statement ACTION's context (neon_banking_statement_views.xml), not per
+         button, so all three cash statements share this one variant.
          ============================================================ -->
-
-    <!-- Petty Cash (101501): Add Expense + Add Replenishment -->
-    <record id="view_neon_statement_tree_petty" model="ir.ui.view">
-        <field name="name">neon.banking.statement.tree.petty</field>
+    <record id="view_neon_statement_tree_addtxn" model="ir.ui.view">
+        <field name="name">neon.banking.statement.tree.addtxn</field>
         <field name="model">account.move.line</field>
         <field name="inherit_id" ref="view_neon_statement_tree"/>
         <field name="mode">primary</field>
         <field name="arch" type="xml">
-            <xpath expr="//tree" position="inside">
-                <header>
-                    <button name="%(action_cash_expense_wizard)d" type="action"
-                            display="always" class="btn-primary"
-                            string="Add Expense"
-                            context="{'default_cash_account_code': '101501'}"/>
-                    <button name="%(action_cash_replenishment_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Add Replenishment"
-                            context="{'default_cash_account_code': '101501'}"/>
-                    <button name="%(action_cash_drawings_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Drawings"
-                            context="{'default_cash_account_code': '101501'}"/>
-                    <button name="%(action_cash_commission_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Commission"
-                            context="{'default_cash_account_code': '101501'}"/>
-                    <button name="%(action_cash_contribution_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Money In"
-                            context="{'default_cash_account_code': '101501'}"/>
-                    <button name="%(action_cash_transfer_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Transfer / Deposit"
-                            context="{'default_cash_account_code': '101501'}"/>
-                </header>
+            <xpath expr="//tree" position="attributes">
+                <attribute name="js_class">neon_statement_addtxn</attribute>
             </xpath>
         </field>
     </record>
 
-    <!-- CABS (USD) 101401: Add Expense (bank payment) -->
-    <record id="view_neon_statement_tree_cabs_usd" model="ir.ui.view">
-        <field name="name">neon.banking.statement.tree.cabs.usd</field>
-        <field name="model">account.move.line</field>
-        <field name="inherit_id" ref="view_neon_statement_tree"/>
-        <field name="mode">primary</field>
-        <field name="arch" type="xml">
-            <xpath expr="//tree" position="inside">
-                <header>
-                    <button name="%(action_cash_expense_wizard)d" type="action"
-                            display="always" class="btn-primary"
-                            string="Add Expense"
-                            context="{'default_cash_account_code': '101401'}"/>
-                    <button name="%(action_cash_vendor_payment_wizard)d" type="action"
-                            display="always" class="btn-primary"
-                            string="Pay a Bill"
-                            context="{'default_cash_account_code': '101401'}"/>
-                    <button name="%(action_cash_customer_receipt_wizard)d" type="action"
-                            display="always" class="btn-primary"
-                            string="Receive a Payment"
-                            context="{'default_cash_account_code': '101401'}"/>
-                    <button name="%(action_cash_vendor_advance_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Vendor Advance"
-                            context="{'default_cash_account_code': '101401'}"/>
-                    <button name="%(action_cash_contribution_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Money In"
-                            context="{'default_cash_account_code': '101401'}"/>
-                    <button name="%(action_cash_drawings_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Drawings"
-                            context="{'default_cash_account_code': '101401'}"/>
-                    <button name="%(action_cash_commission_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Commission"
-                            context="{'default_cash_account_code': '101401'}"/>
-                    <button name="%(action_cash_transfer_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Transfer / Deposit"
-                            context="{'default_cash_account_code': '101401'}"/>
-                </header>
-            </xpath>
-        </field>
-    </record>
-
-    <!-- CABS (ZWG) 101405: Add Expense (bank payment) -->
-    <record id="view_neon_statement_tree_cabs_zwg" model="ir.ui.view">
-        <field name="name">neon.banking.statement.tree.cabs.zwg</field>
-        <field name="model">account.move.line</field>
-        <field name="inherit_id" ref="view_neon_statement_tree"/>
-        <field name="mode">primary</field>
-        <field name="arch" type="xml">
-            <xpath expr="//tree" position="inside">
-                <header>
-                    <button name="%(action_cash_expense_wizard)d" type="action"
-                            display="always" class="btn-primary"
-                            string="Add Expense"
-                            context="{'default_cash_account_code': '101405'}"/>
-                    <button name="%(action_cash_vendor_payment_wizard)d" type="action"
-                            display="always" class="btn-primary"
-                            string="Pay a Bill"
-                            context="{'default_cash_account_code': '101405'}"/>
-                    <button name="%(action_cash_customer_receipt_wizard)d" type="action"
-                            display="always" class="btn-primary"
-                            string="Receive a Payment"
-                            context="{'default_cash_account_code': '101405'}"/>
-                    <button name="%(action_cash_vendor_advance_wizard)d" type="action"
-                            display="always" class="btn-secondary"
-                            string="Vendor Advance"
-                            context="{'default_cash_account_code': '101405'}"/>
-                </header>
-            </xpath>
-        </field>
-    </record>
-
-    <!-- Repoint the Stage-1 statement actions at the header-bearing variants.
-         (Same module + same id => updates the existing action records. Defined
-         here, after the wizard actions + variants they reference, so all refs
-         are backward.) Suspense keeps the plain base tree (no cash journal). -->
+    <!-- Repoint the three CASH statement actions at the dropdown variant.
+         Suspense keeps the plain base tree (no cash journal => no Add). -->
     <record id="action_statement_petty_cash" model="ir.actions.act_window">
-        <field name="view_id" ref="view_neon_statement_tree_petty"/>
+        <field name="view_id" ref="view_neon_statement_tree_addtxn"/>
     </record>
     <record id="action_statement_cabs_usd" model="ir.actions.act_window">
-        <field name="view_id" ref="view_neon_statement_tree_cabs_usd"/>
+        <field name="view_id" ref="view_neon_statement_tree_addtxn"/>
     </record>
     <record id="action_statement_cabs_zwg" model="ir.actions.act_window">
-        <field name="view_id" ref="view_neon_statement_tree_cabs_zwg"/>
+        <field name="view_id" ref="view_neon_statement_tree_addtxn"/>
     </record>
 
 </odoo>

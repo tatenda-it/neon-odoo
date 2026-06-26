@@ -11,6 +11,15 @@
         <field name="name">Transactions</field>
     </record>
 
+    <!-- G. Invoicing app root -> "Accounting" (Build 1 / Part 2). LABEL ONLY.
+            account.menu_finance is noupdate=0, so this data override applies on
+            -u (no migration needed, unlike the noupdate Banking menu in #3).
+            Action / web_icon / sequence / groups untouched. The Configuration >
+            Invoicing sub-section (account.account_invoicing_menu) is left as-is. -->
+    <record id="account.menu_finance" model="ir.ui.menu">
+        <field name="name">Accounting</field>
+    </record>
+
     <!-- B. account.payment form: "Internal Transfer" -> "Transfer / Deposit".
             Scoped field-label override on the payment form only. -->
     <record id="neon_payment_form_relabel" model="ir.ui.view">

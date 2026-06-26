@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BUILD 1 / PART 3: a top-level "Reporting" launcher that opens the accounting
+  financial reports directly (the neon_web_sidebar rail surfaces top-level,
+  web_icon-bearing menus, so a parentless menuitem appears as its own rail icon).
+
+  Surfaces the EXISTING OCA account_financial_report wizards (build no new
+  reports). web_icon borrows account's icon (same idiom as the Statements menu).
+
+  ⚠️ SCOPE NOTE for GATE-HOLD: of the four reports named in the brief, only
+  Trial Balance ships with account_financial_report on this install. Profit &
+  Loss, Balance Sheet and Cash Flow require mis_builder (+ the MIS templates),
+  which is NOT installed here (a separate prerequisite, not a sidebar task).
+  This menu therefore lists the six account_financial_report wizards that ARE
+  installed (General Ledger, Journal Ledger, Trial Balance, Open Items, Aged
+  Partner Balance, VAT). P&L/BS/Cash Flow can be added once mis_builder is in.
+-->
+<odoo>
+
+    <menuitem id="menu_neon_reporting_root"
+              name="Reporting"
+              web_icon="account,static/description/icon.png"
+              sequence="34"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver,account.group_account_manager,neon_core.group_neon_superuser"/>
+
+    <menuitem id="menu_neon_report_trial_balance" name="Trial Balance"
+              parent="menu_neon_reporting_root"
+              action="account_financial_report.action_trial_balance_wizard" sequence="10"/>
+    <menuitem id="menu_neon_report_general_ledger" name="General Ledger"
+              parent="menu_neon_reporting_root"
+              action="account_financial_report.action_general_ledger_wizard" sequence="20"/>
+    <menuitem id="menu_neon_report_journal_ledger" name="Journal Ledger"
+              parent="menu_neon_reporting_root"
+              action="account_financial_report.action_journal_ledger_wizard" sequence="30"/>
+    <menuitem id="menu_neon_report_open_items" name="Open Items"
+              parent="menu_neon_reporting_root"
+              action="account_financial_report.action_open_items_wizard" sequence="40"/>
+    <menuitem id="menu_neon_report_aged_partner" name="Aged Partner Balance"
+              parent="menu_neon_reporting_root"
+              action="account_financial_report.action_aged_partner_balance_wizard" sequence="50"/>
+    <menuitem id="menu_neon_report_vat" name="VAT Report"
+              parent="menu_neon_reporting_root"
+              action="account_financial_report.action_vat_report_wizard" sequence="60"/>
+
+</odoo>
