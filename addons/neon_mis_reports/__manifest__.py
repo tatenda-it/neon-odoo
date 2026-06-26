@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon MIS Reports",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "P&L / Balance Sheet / Cash Flow (OCA mis_builder) under the Reporting launcher",
     "description": """
 Surfaces the three OCA mis_builder financial reports under Neon's "Reporting"
@@ -31,6 +31,7 @@ not accounting-correctness for Neon).
         "data/mis_instances.xml",
         "data/reporting_menu_mis.xml",
     ],
+    "post_init_hook": "post_init_hook",
     "installable": True,
     "application": False,
 }
