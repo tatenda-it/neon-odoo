@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_set_rate_wiz_bookkeeper,neon.set.exchange.rate.wizard.bookkeeper,model_neon_set_exchange_rate_wizard,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_neon_set_rate_wiz_approver,neon.set.exchange.rate.wizard.approver,model_neon_set_exchange_rate_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
+access_neon_set_rate_wiz_acct_mgr,neon.set.exchange.rate.wizard.acct.mgr,model_neon_set_exchange_rate_wizard,account.group_account_manager,1,1,1,1
+access_neon_set_rate_wiz_superuser,neon.set.exchange.rate.wizard.superuser,model_neon_set_exchange_rate_wizard,neon_core.group_neon_superuser,1,1,1,1

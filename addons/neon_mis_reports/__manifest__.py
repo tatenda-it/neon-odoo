@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon MIS Reports",
-    "version": "17.0.1.1.0",
-    "summary": "P&L / Balance Sheet / Cash Flow (OCA mis_builder) under the Reporting launcher",
+    "version": "17.0.1.2.0",
+    "summary": "P&L / Balance Sheet / Cash Flow (OCA mis_builder) under the Reporting launcher -- per-currency (USD/ZWG) + run-time rate entry",
     "description": """
 Surfaces the three OCA mis_builder financial reports under Neon's "Reporting"
 launcher (Build 1 Part 3) alongside the account_financial_report working-papers:
@@ -28,8 +28,10 @@ not accounting-correctness for Neon).
         "neon_banking_labels",
     ],
     "data": [
+        "security/ir.model.access.csv",
         "data/mis_instances.xml",
         "data/reporting_menu_mis.xml",
+        "wizards/neon_set_rate_views.xml",
     ],
     "post_init_hook": "post_init_hook",
     "installable": True,

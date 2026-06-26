@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  "Set Exchange Rate" wizard: finance-gated entry of today's USD/ZWG rate. The
+  direction is spelled out on the form ("1 USD = ___ ZWG") so an inverted entry
+  cannot silently corrupt every converted figure.
+-->
+<odoo>
+
+    <record id="view_neon_set_rate_wizard_form" model="ir.ui.view">
+        <field name="name">neon.set.exchange.rate.wizard.form</field>
+        <field name="model">neon.set.exchange.rate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Set Exchange Rate">
+                <div class="alert alert-warning" role="alert">
+                    Enter <b>how many ZWG equal ONE US Dollar</b> on the effective
+                    date. This becomes the company's <b>official</b> rate for that
+                    date and is used for every USD/ZWG conversion system-wide on
+                    that date (not only the reports). No ledger entry is posted.
+                </div>
+                <group>
+                    <group>
+                        <label for="usd_to_zwg" string="1 USD ="/>
+                        <div class="o_row">
+                            <field name="usd_to_zwg" class="oe_inline" nolabel="1"/>
+                            <span>ZWG</span>
+                        </div>
+                        <field name="rate_date"/>
+                    </group>
+                    <group>
+                        <label for="current_rate" string="Currently: 1 USD ="/>
+                        <div class="o_row">
+                            <field name="current_rate" class="oe_inline" nolabel="1"/>
+                            <span>ZWG</span>
+                        </div>
+                    </group>
+                </group>
+                <footer>
+                    <button string="Set Official Rate" name="action_set_rate"
+                            type="object" class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"
+                            data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_set_exchange_rate" model="ir.actions.act_window">
+        <field name="name">Set Exchange Rate</field>
+        <field name="res_model">neon.set.exchange.rate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_neon_set_exchange_rate"
+              name="Set Exchange Rate (USD/ZWG)"
+              parent="neon_banking_labels.menu_neon_reporting_root"
+              action="action_neon_set_exchange_rate"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver,account.group_account_manager,neon_core.group_neon_superuser"
+              sequence="20"/>
+
+</odoo>
