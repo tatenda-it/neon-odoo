@@ -54,7 +54,7 @@
             <field name="requires_external_trainer" eval="True"/>
             <field name="skill_level_mode">binary</field>
             <field name="expiry_required" eval="True"/>
-            <field name="validity_months">24</field>
+            <field name="default_validity_months">24</field>
             <field name="icon">fa-shield</field>
         </record>
 
