@@ -35,7 +35,21 @@ Working record between deploys. The polished programme narrative lives on the li
 3. **`neon_training` carries cold-install debt** beyond the one typo fixed: a menu load-order forward-reference (wizard view at manifest pos 25 references `menu_neon_training_root` defined at pos 26). Masked on warm upgrades; breaks cold installs / disaster recovery / clean rebuilds. Worth a proper cold-install hardening pass on the module.
 4. **`neon_crew_comms` manifest version (17.0.1.21.4) lags its actual WA-12/13 feature set** — version-bump audit before its next deploy.
 5. **Prod chart of accounts not confirmed.** The dev sandbox uses the generic v17 chart; prod uses whatever was applied at original install. Confirm before any tax/VAT/fiscal-bridge work.
-6. **Future build — "logistics confirmed before quote sent" system gate + AI reminder.** Make confirming and adding the LOGISTICS line a real gate in the quote flow (a quote can't be sent without logistics confirmed), backed by an AI reminder bot that tracks and nudges. Currently a discipline that's sometimes missed; wanted as enforced. Separate `neon_finance` / AI build, scoped later. (Surfaced by the Sales cutover course B4a.)
+6. **Future build — "logistics confirmed before quote sent" system gate + AI reminder.** Make confirming and adding the LOGISTICS line a real gate in the quote flow (a quote can't be sent without logistics confirmed), backed by an AI reminder bot that tracks and nudges. Currently a discipline that's sometimes missed; wanted as enforced. Separate `neon_finance` / AI build, scoped later. (Surfaced by the Sales cutover course B4a.) **Also needs a WhatsApp connection** to manage/surface the gate and reminders over WhatsApp (not just in-app).
+
+---
+
+## Sales-management build backlog
+
+From the read-only sales-management oversight discovery (what a sales line-manager needs to oversee a team and coach off data — gaps the system does not surface today). For the Director (MD) onboarding track and post-cutover builds.
+
+1. **Live per-rep performance dashboard** — pipeline / win rate / conversion / activity **by rep, side-by-side, on LIVE post-cutover data**. Today the only per-rep cut is historical (from the Zoho archive). **Biggest gap for a coaching manager.**
+2. **Rebuild the per-rep intelligence boards on LIVE data** — Win/Loss, Client Intel, Demand are currently **archive-only / historical**; they won't reflect post-July performance until rebuilt on live Odoo records.
+3. **First-response SLA fixes** — align to the agreed **2-hour** standard (already 2h in system — confirm); make it **forward-looking** (flag still-open, unanswered leads, not just retroactive once a late response lands); and add a **manager rollup / per-rep breach view** (none today — breach is a per-lead ribbon only).
+4. **"Copy Munashe on all client emails" compliance** — currently **unmonitored / honour-system**; needs a tracking mechanism, **likely including a WhatsApp connection** to manage/surface it.
+5. **Team follow-up compliance rollup** — the follow-up/stuck-deal crons nudge individuals, but there's **no per-rep manager view** of who's behind on follow-ups / breached SLA / stale quotes.
+
+*(Item 6 — the logistics-confirmed-before-quote gate + AI reminder — is open-issue #6 above, now noted to also need the WhatsApp connection.)*
 
 ---
 
