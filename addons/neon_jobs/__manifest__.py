@@ -155,6 +155,12 @@ capacity gate, calendar UI, and capacity warnings come in P2.M2-M9.
     "license": "LGPL-3",
     "depends": [
         "base",
+        # Cold-install shim: pre-declares neon_core.group_neon_superuser
+        # (referenced by this module's ACL rows + action/menu groups=) so a
+        # cold install resolves it before neon_core loads. neon_core depends
+        # on neon_jobs, so it cannot define the group early enough itself.
+        # Option 3 of the circular-dependency fix; see addons/neon_base.
+        "neon_base",
         "mail",
         "sale",
         "crm",
