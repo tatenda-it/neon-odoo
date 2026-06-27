@@ -154,7 +154,7 @@
         <field name="sequence">31</field>
         <field name="html_content" type="html">
             <ul>
-                <li>Respond to clients within <strong>1 hour</strong> during business hours.</li>
+                <li>Respond to clients within <strong>2 hours</strong> during business hours.</li>
                 <li><strong>Formal English</strong> in all written client communication.</li>
                 <li><strong>Never quote verbally</strong> — all pricing goes through an official Neon quote.</li>
                 <li>Send a proposal within <strong>24 hours</strong> of a client meeting.</li>
@@ -305,9 +305,9 @@
     <record id="sales_q5_b" model="slide.answer">
         <field name="question_id" ref="sales_q5"/>
         <field name="sequence">2</field>
-        <field name="text_value">1 hour</field>
+        <field name="text_value">2 hours</field>
         <field name="is_correct" eval="True"/>
-        <field name="comment">Correct — respond within 1 hour in business hours.</field>
+        <field name="comment">Correct — respond within 2 hours in business hours.</field>
     </record>
     <record id="sales_q5_c" model="slide.answer">
         <field name="question_id" ref="sales_q5"/>

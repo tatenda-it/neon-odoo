@@ -60,7 +60,7 @@ Both cutover courses (`neon_cutover_courses`) are built and seeded **UNPUBLISHED
 **Cutover — Sales — pre-publish items (all must clear first):**
 1. **Rep-screen verification** — confirm A2 + B1–B6 against a real sales-rep session (Lisa/Evril or screen-share). Drafted from the director/superuser view, so the actual rep-facing screens are unconfirmed.
 2. **Munashe's discount threshold** — confirm the live figure, then fill it into B6 / C2 / Q4 (currently "above the threshold", no number).
-3. **Response standard 1h → 2h** — the built Sales seed (`data/cutover_sales_course.xml`) currently says **"1 hour"** in C1 and Q5; change to **"2 hours"** to match the system's actual SLA (2h) and the agreed standard. *(Seed not yet edited — logged here as a pre-publish fix only.)*
+3. ✅ **DONE — Response standard 1h → 2h** — the Sales seed (`data/cutover_sales_course.xml`) now reads **"2 hours"** in C1 + Q5 (matches the system SLA). Verified clean/unpublished/idempotent in the throwaway DB. **Remaining Sales pre-publish gates: rep-screen verification + Munashe's discount threshold.**
 
 **Cutover — Finance:** verified against the live walkthrough; deploy-ready pending the gated deploy + director review/publish.
 

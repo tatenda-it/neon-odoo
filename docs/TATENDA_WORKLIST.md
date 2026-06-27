@@ -89,9 +89,9 @@ Recommended internal sequence **#3 → #1 → #5 → #2 → #4**.
 
 ## 5. Cutover-course pre-publish fixes  (module `neon_cutover_courses` — all three courses seeded UNPUBLISHED)
 
-**F1 · Sales course 1h → 2h** 🟢
-- **What:** the built Sales seed says "1 hour" in C1 + Q5; change to "2 hours" (matches system SLA + agreed standard).
-- **Where:** `neon_cutover_courses/data/cutover_sales_course.xml`. **Testable in isolation** (website_slides-only — no cold-install needed). **Dependency:** none. *(Currently logged as a pre-publish item; not yet edited.)*
+**F1 · Sales course 1h → 2h** ✅ DONE
+- **What:** the Sales seed now reads "2 hours" in C1 + Q5 (matches system SLA + agreed standard) — applied + verified (clean/unpublished/idempotent) this session.
+- **Where:** `neon_cutover_courses/data/cutover_sales_course.xml`. **Remaining Sales pre-publish gates: rep-screen verification + Munashe's discount threshold.**
 
 **F2 · Discount-figure sync coupling (Sales + Director)** 🔴(blocked on Munashe)
 - **What:** when Munashe confirms the discount threshold figure, fill it into the Sales seed (B6/C2/Q4) **and** the Director seed (Section 3) — they're separate copies (plain website_slides can't share slides across channels).
