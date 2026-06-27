@@ -35,6 +35,7 @@ Working record between deploys. The polished programme narrative lives on the li
 3. **`neon_training` carries cold-install debt** beyond the one typo fixed: a menu load-order forward-reference (wizard view at manifest pos 25 references `menu_neon_training_root` defined at pos 26). Masked on warm upgrades; breaks cold installs / disaster recovery / clean rebuilds. Worth a proper cold-install hardening pass on the module.
 4. **`neon_crew_comms` manifest version (17.0.1.21.4) lags its actual WA-12/13 feature set** — version-bump audit before its next deploy.
 5. **Prod chart of accounts not confirmed.** The dev sandbox uses the generic v17 chart; prod uses whatever was applied at original install. Confirm before any tax/VAT/fiscal-bridge work.
+6. **Future build — "logistics confirmed before quote sent" system gate + AI reminder.** Make confirming and adding the LOGISTICS line a real gate in the quote flow (a quote can't be sent without logistics confirmed), backed by an AI reminder bot that tracks and nudges. Currently a discipline that's sometimes missed; wanted as enforced. Separate `neon_finance` / AI build, scoped later. (Surfaced by the Sales cutover course B4a.)
 
 ---
 
