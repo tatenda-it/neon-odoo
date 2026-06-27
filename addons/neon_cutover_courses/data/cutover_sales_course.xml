@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Cutover - Sales : plain website_slides course, seeded as data.
+        Source of truth: docs/CUTOVER_SALES_COURSE_SPEC.md
+        noupdate=0 so -u re-applies and reverts UI drift.
+        Seeded UNPUBLISHED. DO NOT PUBLISH until BOTH gates clear:
+          (1) rep-screen verification of A2 + B1-B6 vs a real sales-rep session;
+          (2) Munashe confirms the discount threshold (then add the figure to
+              B6 / C2 / Q4).
+        Authoring QA annotations from the spec ((verify), (threshold pending
+        Munashe), etc.) are intentionally NOT in the learner-facing bodies.
+    -->
+
+    <!-- ===================== COURSE ===================== -->
+    <record id="course_cutover_sales" model="slide.channel">
+        <field name="name">Cutover — Sales</field>
+        <field name="channel_type">training</field>
+        <field name="enroll">invite</field>
+        <field name="is_published" eval="False"/>
+        <field name="description">Your get-ready guide for the 1 July cutover. Work through each step against the live system — every item is "can you actually do this," not "did you read it." When you and a director have signed off, you're cleared to operate.</field>
+    </record>
+
+    <!-- ===================== SECTION A ===================== -->
+    <record id="sec_sales_a" model="slide.slide">
+        <field name="name">A — Get in &amp; oriented</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="sales_a1" model="slide.slide">
+        <field name="name">A1 · Log in &amp; set your password</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">11</field>
+        <field name="html_content" type="html">
+            <p>Go to <strong>crm.neonhiring.com</strong>, log in with the address IT gave you, set a strong password on first login, and confirm you reach your home screen. If you can't get in, flag Robin or Tatenda before cutover.</p>
+            <p>✅ <strong>Done when:</strong> logged in, password set, apps visible.</p>
+        </field>
+    </record>
+
+    <record id="sales_a2" model="slide.slide">
+        <field name="name">A2 · Your Sales Dashboard</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">12</field>
+        <field name="html_content" type="html">
+            <p>When you log in you land on your <strong>Sales Dashboard</strong> — your daily command centre. It shows your sales picture at a glance: pipeline value and deals by stage, leads, hot deals worth pushing, quotes that are aging (sitting too long without movement), what you've won, and your win rate — plus a tasks list and alerts. Start each morning here: it tells you what needs chasing today.</p>
+            <p><em>Your exact tiles adapt to your role.</em></p>
+            <p>✅ <strong>Done when:</strong> you can open your Sales Dashboard and know it's your daily starting point.</p>
+        </field>
+    </record>
+
+    <!-- ===================== SECTION B ===================== -->
+    <record id="sec_sales_b" model="slide.slide">
+        <field name="name">B — Core daily sales tasks</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="sales_b1" model="slide.slide">
+        <field name="name">B1 · Capturing leads</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">21</field>
+        <field name="html_content" type="html">
+            <p>Every enquiry becomes a lead — if it's not in the CRM, it doesn't exist. Leads reach you two ways: <strong>WhatsApp enquiries auto-create a lead</strong>, and you <strong>manually create</strong> leads for enquiries by phone, email, or in person. Capture the client, contact, and what they need.</p>
+            <p>✅ <strong>Done when:</strong> you can create a lead manually, and know WhatsApp enquiries arrive as leads automatically.</p>
+        </field>
+    </record>
+
+    <record id="sales_b2" model="slide.slide">
+        <field name="name">B2 · Working the pipeline</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">22</field>
+        <field name="html_content" type="html">
+            <p>Your deals live on the <strong>Pipeline</strong> as cards. Keep each deal in the stage that reflects reality — the stages are <strong>New → Proposal Sent → Negotiation → Closed Won / Lost</strong>, plus <strong>Payment Pending Verification</strong>. Accurate stages keep the pipeline honest and trigger the right follow-ups. Move cards by drag-and-drop on the kanban, or via the status bar inside the deal.</p>
+            <p>✅ <strong>Done when:</strong> you can move a deal between stages both ways and know what each stage means.</p>
+        </field>
+    </record>
+
+    <record id="sales_b3" model="slide.slide">
+        <field name="name">B3 · Logging client interactions</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">23</field>
+        <field name="html_content" type="html">
+            <p>Open a deal and log what happened — a call summary, a meeting note, a scheduled follow-up activity. Same-day, every time. This is how the system and your manager see a deal is being worked.</p>
+            <p>✅ <strong>Done when:</strong> you've logged a note and scheduled a follow-up activity on a deal.</p>
+        </field>
+    </record>
+
+    <record id="sales_b4" model="slide.slide">
+        <field name="name">B4 · Raising a quote</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">24</field>
+        <field name="html_content" type="html">
+            <p>Raise a quote through the Neon quote flow. It prices from the <strong>live catalogue / pricing rules</strong> — not guesswork. Build the quote with line items and watch it price; it carries a currency (USD or ZWG, locked per quote) and moves through its states (Draft → Pending Approval → Approved → Sent to Client → Accepted).</p>
+            <p><strong>Get the quote right before it goes out — when a client accepts, it sets BOTH operations and finance in motion at once</strong> (the event starts being planned and finance picks up invoicing). A wrong quote becomes everyone's problem the moment it's accepted.</p>
+            <p>✅ <strong>Done when:</strong> you've produced a quote priced from the catalogue and understand acceptance triggers ops + finance together.</p>
+        </field>
+    </record>
+
+    <record id="sales_b4a" model="slide.slide">
+        <field name="name">B4a · Confirm logistics before sending a quote</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">25</field>
+        <field name="html_content" type="html">
+            <p>Before any quote goes to a client, you must confirm the <strong>logistics cost</strong> and include it. Logistics is a quotable line (the <strong>LOGISTICS</strong> product). You don't estimate it yourself — <strong>get the figure from Operations (currently Robin)</strong> and add it as the logistics line. <strong>A quote does not go out without logistics confirmed.</strong> This matters because acceptance triggers operations and finance at once (B4) — a quote missing logistics becomes a margin problem instantly.</p>
+            <p>This is a firm rule now and will become a built-in system check; until then, it's on you to confirm logistics every time before sending.</p>
+            <p>✅ <strong>Done when:</strong> you know to get the logistics figure from Ops and add the LOGISTICS line before any quote is sent, and that no quote goes out without it.</p>
+        </field>
+    </record>
+
+    <record id="sales_b5" model="slide.slide">
+        <field name="name">B5 · Finding your quotes</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">26</field>
+        <field name="html_content" type="html">
+            <p>Your quotes live under <strong>My Quotation</strong> — the Neon quote list, where you find, reopen, and track your own (QUO-USD / QUO-ZIG numbered, with state and total).</p>
+            <p>✅ <strong>Done when:</strong> you can list and open your own quotes.</p>
+        </field>
+    </record>
+
+    <record id="sales_b6" model="slide.slide">
+        <field name="name">B6 · Discounts &amp; the approval threshold</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">27</field>
+        <field name="html_content" type="html">
+            <p>A custom discount above the threshold needs <strong>MD approval</strong> — you can't apply it yourself. Know the rule before you promise a client a price.</p>
+            <p>✅ <strong>Done when:</strong> you can state the discount threshold and how approval is requested.</p>
+        </field>
+    </record>
+
+    <!-- ===================== SECTION C ===================== -->
+    <record id="sec_sales_c" model="slide.slide">
+        <field name="name">C — Culture &amp; expectations</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="sales_c1" model="slide.slide">
+        <field name="name">C1 · Communication &amp; response standards</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">31</field>
+        <field name="html_content" type="html">
+            <ul>
+                <li>Respond to clients within <strong>1 hour</strong> during business hours.</li>
+                <li><strong>Formal English</strong> in all written client communication.</li>
+                <li><strong>Never quote verbally</strong> — all pricing goes through an official Neon quote.</li>
+                <li>Send a proposal within <strong>24 hours</strong> of a client meeting.</li>
+                <li><strong>Follow up</strong> every proposal within <strong>3 business days</strong> if no response.</li>
+                <li><strong>Log every client interaction same-day</strong> in the CRM.</li>
+            </ul>
+            <p>✅ <strong>Done when:</strong> you can recite these without looking.</p>
+        </field>
+    </record>
+
+    <record id="sales_c2" model="slide.slide">
+        <field name="name">C2 · Escalation &amp; the client promise</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">32</field>
+        <field name="html_content" type="html">
+            <ul>
+                <li><strong>Copy Munashe on all client email correspondence</strong> — not just proposals, regardless of value.</li>
+                <li>A custom discount above the threshold goes to the <strong>MD</strong> for approval.</li>
+                <li>The promise every client should feel from Neon: <strong>Confidence, Clarity, Pride.</strong></li>
+            </ul>
+            <p>✅ <strong>Done when:</strong> you know to copy Munashe on all client emails, what to escalate, and what we promise clients.</p>
+        </field>
+    </record>
+
+    <!-- ============== SECTION D: CHECK & SIGN-OFF ============== -->
+    <record id="sec_sales_d" model="slide.slide">
+        <field name="name">Knowledge Check &amp; Director Sign-off</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="sales_quiz" model="slide.slide">
+        <field name="name">Knowledge Check — Sales</field>
+        <field name="slide_category">quiz</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">41</field>
+    </record>
+
+    <!-- Q1 -->
+    <record id="sales_q1" model="slide.question">
+        <field name="question">An enquiry comes in by phone. First action?</field>
+        <field name="sequence">1</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q1_a" model="slide.answer">
+        <field name="question_id" ref="sales_q1"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Quote a rough price to move fast</field>
+    </record>
+    <record id="sales_q1_b" model="slide.answer">
+        <field name="question_id" ref="sales_q1"/>
+        <field name="sequence">2</field>
+        <field name="text_value">Create a lead in the CRM — if it's not in the CRM, it doesn't exist</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — every enquiry becomes a lead first.</field>
+    </record>
+    <record id="sales_q1_c" model="slide.answer">
+        <field name="question_id" ref="sales_q1"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Wait until you've met them</field>
+    </record>
+
+    <!-- Q2 -->
+    <record id="sales_q2" model="slide.question">
+        <field name="question">A WhatsApp enquiry arrives. What happens?</field>
+        <field name="sequence">2</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q2_a" model="slide.answer">
+        <field name="question_id" ref="sales_q2"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Nothing until you manually enter it</field>
+    </record>
+    <record id="sales_q2_b" model="slide.answer">
+        <field name="question_id" ref="sales_q2"/>
+        <field name="sequence">2</field>
+        <field name="text_value">It auto-creates a lead — WhatsApp enquiries are captured automatically</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — WhatsApp enquiries arrive as leads automatically.</field>
+    </record>
+    <record id="sales_q2_c" model="slide.answer">
+        <field name="question_id" ref="sales_q2"/>
+        <field name="sequence">3</field>
+        <field name="text_value">It goes straight to a quote</field>
+    </record>
+
+    <!-- Q3 -->
+    <record id="sales_q3" model="slide.question">
+        <field name="question">How is pricing given to a client?</field>
+        <field name="sequence">3</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q3_a" model="slide.answer">
+        <field name="question_id" ref="sales_q3"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Verbally, to be quick</field>
+    </record>
+    <record id="sales_q3_b" model="slide.answer">
+        <field name="question_id" ref="sales_q3"/>
+        <field name="sequence">2</field>
+        <field name="text_value">A rough estimate by email</field>
+    </record>
+    <record id="sales_q3_c" model="slide.answer">
+        <field name="question_id" ref="sales_q3"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Only through an official Neon quote, priced from the catalogue</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — pricing only ever goes out as an official Neon quote.</field>
+    </record>
+
+    <!-- Q4 -->
+    <record id="sales_q4" model="slide.question">
+        <field name="question">A client asks for a discount above the threshold. Can you grant it yourself?</field>
+        <field name="sequence">4</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q4_a" model="slide.answer">
+        <field name="question_id" ref="sales_q4"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Yes, if it wins the deal</field>
+    </record>
+    <record id="sales_q4_b" model="slide.answer">
+        <field name="question_id" ref="sales_q4"/>
+        <field name="sequence">2</field>
+        <field name="text_value">No — a discount above the threshold needs MD approval</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — above the threshold it's the MD's call.</field>
+    </record>
+    <record id="sales_q4_c" model="slide.answer">
+        <field name="question_id" ref="sales_q4"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Yes, up to any amount</field>
+    </record>
+
+    <!-- Q5 -->
+    <record id="sales_q5" model="slide.question">
+        <field name="question">Maximum response time to a client during business hours?</field>
+        <field name="sequence">5</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q5_a" model="slide.answer">
+        <field name="question_id" ref="sales_q5"/>
+        <field name="sequence">1</field>
+        <field name="text_value">4 hours</field>
+    </record>
+    <record id="sales_q5_b" model="slide.answer">
+        <field name="question_id" ref="sales_q5"/>
+        <field name="sequence">2</field>
+        <field name="text_value">1 hour</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — respond within 1 hour in business hours.</field>
+    </record>
+    <record id="sales_q5_c" model="slide.answer">
+        <field name="question_id" ref="sales_q5"/>
+        <field name="sequence">3</field>
+        <field name="text_value">End of day</field>
+    </record>
+
+    <!-- Q6 -->
+    <record id="sales_q6" model="slide.question">
+        <field name="question">A proposal you sent 3 business days ago has had no reply. What do you do?</field>
+        <field name="sequence">6</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q6_a" model="slide.answer">
+        <field name="question_id" ref="sales_q6"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Wait for the client</field>
+    </record>
+    <record id="sales_q6_b" model="slide.answer">
+        <field name="question_id" ref="sales_q6"/>
+        <field name="sequence">2</field>
+        <field name="text_value">Follow up — every proposal is followed up within 3 business days</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — proactive follow-up within 3 business days.</field>
+    </record>
+    <record id="sales_q6_c" model="slide.answer">
+        <field name="question_id" ref="sales_q6"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Close it as lost</field>
+    </record>
+
+    <!-- Q7 -->
+    <record id="sales_q7" model="slide.question">
+        <field name="question">Which client emails must copy Munashe?</field>
+        <field name="sequence">7</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q7_a" model="slide.answer">
+        <field name="question_id" ref="sales_q7"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Only proposals over $5,000</field>
+    </record>
+    <record id="sales_q7_b" model="slide.answer">
+        <field name="question_id" ref="sales_q7"/>
+        <field name="sequence">2</field>
+        <field name="text_value">All client email correspondence</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — copy Munashe on all client email, regardless of value.</field>
+    </record>
+    <record id="sales_q7_c" model="slide.answer">
+        <field name="question_id" ref="sales_q7"/>
+        <field name="sequence">3</field>
+        <field name="text_value">None</field>
+    </record>
+
+    <!-- Q8 -->
+    <record id="sales_q8" model="slide.question">
+        <field name="question">Before you send a quote, what must you confirm?</field>
+        <field name="sequence">8</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q8_a" model="slide.answer">
+        <field name="question_id" ref="sales_q8"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Nothing — send it straight away</field>
+    </record>
+    <record id="sales_q8_b" model="slide.answer">
+        <field name="question_id" ref="sales_q8"/>
+        <field name="sequence">2</field>
+        <field name="text_value">The logistics cost — get the figure from Ops and add the LOGISTICS line; a quote doesn't go out without it</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — logistics confirmed and added before any quote is sent.</field>
+    </record>
+    <record id="sales_q8_c" model="slide.answer">
+        <field name="question_id" ref="sales_q8"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Only the client's email address</field>
+    </record>
+
+    <!-- Q9 -->
+    <record id="sales_q9" model="slide.question">
+        <field name="question">A client accepts a quote. What happens next?</field>
+        <field name="sequence">9</field>
+        <field name="slide_id" ref="sales_quiz"/>
+    </record>
+    <record id="sales_q9_a" model="slide.answer">
+        <field name="question_id" ref="sales_q9"/>
+        <field name="sequence">1</field>
+        <field name="text_value">You raise the invoice yourself</field>
+    </record>
+    <record id="sales_q9_b" model="slide.answer">
+        <field name="question_id" ref="sales_q9"/>
+        <field name="sequence">2</field>
+        <field name="text_value">It triggers both sides at once — operations begins planning the event, and finance picks up invoicing from the accepted quote</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — acceptance sets ops and finance in motion together.</field>
+    </record>
+    <record id="sales_q9_c" model="slide.answer">
+        <field name="question_id" ref="sales_q9"/>
+        <field name="sequence">3</field>
+        <field name="text_value">The deal is closed, nothing more to do</field>
+    </record>
+
+    <!-- ===================== DIRECTOR SIGN-OFF ===================== -->
+    <record id="sales_signoff" model="slide.slide">
+        <field name="name">Director Sign-off — Sales</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_sales"/>
+        <field name="sequence">42</field>
+        <field name="html_content" type="html">
+            <p>Completed by a director (Robin or Munashe), confirming the rep can independently capture a lead, work the pipeline, log interactions, raise a catalogue-priced quote with logistics confirmed, find their quotes, and that they know the response/follow-up/escalation/discount rules and what quote acceptance sets in motion.</p>
+            <p>When a director marks this slide complete, Sales cutover onboarding is signed off and recorded. The rep is cleared to operate.</p>
+        </field>
+    </record>
+
+</odoo>
