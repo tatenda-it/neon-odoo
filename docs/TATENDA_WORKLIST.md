@@ -8,12 +8,16 @@
 
 ## 0. Prerequisite that unblocks almost everything
 
-**P0 · Cold-install / sandbox unblock** 🟢
-- **What:** harden `neon_training` so the foundation chain installs cold on a fresh DB (PROGRESS #3 — a menu load-order forward-reference: a wizard view at manifest pos 25 references `menu_neon_training_root` defined at pos 26). The `validity_months` typo + the `neon_base` Option-3 shim are already committed locally; this is the remaining blocker.
-- **Where:** `neon_training` (manifest data order) ⚠️ co-owned.
-- **Why it matters:** **almost every build below needs the chain (`neon_base→neon_jobs→neon_finance→neon_training→neon_core`) installed to test locally.** Until this is cleared (or you test on a warm DB), the dashboard / finance / crm builds can't be exercised on the sandbox.
+> **Two distinct tasks — don't conflate them:**
+> - **Local sandbox unblock — ✅ DONE (Robin, this session).** `neon_db` has all 30 neon modules installed and a working login (`robin@neonhiring.co.zw`), achieved via **DB-only menu seeds** (scratchpad scripts, *outside the repo* — no source edits). **These seeds must be re-run on any fresh rebuild** until the source is hardened. This unblocks development/testing *now*.
+> - **P0 below — the permanent source fix — STILL PENDING (Tatenda).** The seeds work around the bug; they don't remove it.
+
+**P0 · Cold-install hardening (multi-module manifest load-order)** 🟢
+- **What:** harden manifest data load-order so **menus are defined before they're referenced**, across **every affected module — not just `neon_training`**. Confirmed in `neon_training` (`menu_neon_training_root` referenced by a wizard view at manifest pos 25, defined at pos 26) **and `neon_hr`** (`menu_neon_hr_root` referenced by `neon_hr_review_views.xml` before definition). A generic local pre-seed pass had to create **52 menu xmlids across multiple neon modules** to get a cold install through — so treat this as a **suite-wide load-order audit**, not a single-module fix. The `validity_months` typo + the `neon_base` Option-3 shim are already committed locally.
+- **Where:** `neon_training`, `neon_hr`, and any other module surfaced by the audit (each module's manifest `data` order — define the menu file before view/wizard files that reference its menus) ⚠️ co-owned, multi-module.
+- **Why it matters:** these forward-refs only bite on a **cold/fresh install** (masked by warm `-u`). Affects disaster recovery / clean rebuilds / any new dev box. The local sandbox is already working via the DB seeds above, so this is **no longer blocking development** — but it is the real fix.
 - **Also fold in:** the held, uncommitted `neon_banking_labels/__manifest__.py` dep edit (adds `neon_finance`+`neon_core`) — decide commit vs the proper structural fix.
-- **Dependency:** none. **Do first.**
+- **Dependency:** none. High value (every fresh install), but **not blocking** now that the sandbox is seeded.
 
 ---
 
