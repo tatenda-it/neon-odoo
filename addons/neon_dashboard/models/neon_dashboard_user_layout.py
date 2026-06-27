@@ -89,6 +89,9 @@ _WIDGET_KEYS = [
     # performance block. getBlockTemplate is generic, so only this key +
     # the rich-path t-call + the default_layouts.xml director row are needed.
     ("block_per_rep", "Block: Per-Rep Performance (DRAFT)"),
+    # DRAFT (item #5, paired with #1) -- director-only follow-up compliance
+    # rollup. Same generic-getBlockTemplate additive pattern.
+    ("block_followup_compliance", "Block: Follow-up Compliance (DRAFT)"),
 ]
 
 # Schema sketch §4.2 -- not hide-able. Set in M1 so the API contract

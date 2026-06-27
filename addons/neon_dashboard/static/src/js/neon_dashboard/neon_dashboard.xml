@@ -191,6 +191,40 @@
         </div>
     </t>
 
+    <!-- DRAFT (item #5, paired with #1): director-only team follow-up
+         compliance rollup. -->
+    <t t-name="neon_dashboard.block.block_followup_compliance">
+        <div class="o_neon_block o_neon_block_followup_compliance widget--block_followup_compliance">
+            <div class="o_neon_block_header">
+                <h3>Follow-up Compliance <small class="text-muted">(DRAFT — pending review)</small></h3>
+            </div>
+            <div t-if="followupComplianceBlock.empty" class="o_neon_block_empty">
+                <span t-esc="followupComplianceBlock.empty_message"/>
+            </div>
+            <table t-if="!followupComplianceBlock.empty" class="o_neon_followup_table table table-sm">
+                <thead>
+                    <tr>
+                        <th>Rep</th>
+                        <th class="text-end">Overdue follow-ups</th>
+                        <th class="text-end">SLA breaches</th>
+                        <th class="text-end">Stale quotes</th>
+                        <th class="text-end">Total flags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="followupComplianceBlock.rows" t-as="row" t-key="row.rep_id">
+                        <td t-esc="row.rep_name"/>
+                        <td class="text-end" t-esc="row.overdue_followups"/>
+                        <td class="text-end" t-esc="row.sla_breaches"/>
+                        <td class="text-end" t-esc="row.stale_quotes"/>
+                        <td class="text-end"><strong t-esc="row.total_flags"/></td>
+                    </tr>
+                </tbody>
+            </table>
+            <small t-if="!followupComplianceBlock.empty" class="text-muted" t-esc="followupComplianceBlock.note"/>
+        </div>
+    </t>
+
     <t t-name="neon_dashboard.block.block_finance">
         <div class="o_neon_block o_neon_block_finance widget--block_finance">
             <div class="o_neon_block_header">
@@ -1538,6 +1572,8 @@
                            t-call="neon_dashboard.block.block_sales"/>
                         <t t-if="isWidgetVisible('block_per_rep')"
                            t-call="neon_dashboard.block.block_per_rep"/>
+                        <t t-if="isWidgetVisible('block_followup_compliance')"
+                           t-call="neon_dashboard.block.block_followup_compliance"/>
                     </section>
                     <section class="o_neon_row_b">
                         <t t-if="isWidgetVisible('block_finance')"

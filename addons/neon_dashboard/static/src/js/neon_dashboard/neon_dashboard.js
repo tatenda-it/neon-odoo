@@ -909,6 +909,13 @@ export class NeonDashboard extends Component {
         };
     }
 
+    // DRAFT (item #5, paired with #1): director-only follow-up compliance.
+    get followupComplianceBlock() {
+        return (this.state.data && this.state.data.followup_compliance_block) || {
+            empty: true, rows: [],
+        };
+    }
+
     get agingQuotesBlock() {
         return (this.state.data && this.state.data.aging_quotes_block) || {
             empty: true, rows: [],

@@ -618,6 +618,10 @@ class NeonDashboard(models.Model):
             # here in the existing director branch so it never bleeds onto a
             # View-As of another lens -- same containment as hist_intel_block.
             payload["per_rep_block"] = self._compute_per_rep_block()
+            # DRAFT item #5 (paired with #1, reuses _per_rep_aggregate):
+            # director-only team follow-up compliance rollup.
+            payload["followup_compliance_block"] = (
+                self._compute_followup_compliance_block())
         return payload
 
     # ==================================================================
@@ -2331,6 +2335,61 @@ class NeonDashboard(models.Model):
             "empty_message": _("No per-rep activity yet"),
             "rows": rows,
             "currency_note": _("Pipeline + win/loss are USD-only (v1 DRAFT)"),
+        }
+
+    # ==================================================================
+    # DRAFT (item #5, PAIRED with #1 -- reuses _per_rep_aggregate from the
+    # cd33125 draft): team follow-up compliance rollup. Director-only.
+    # ADDITIVE -- new method + a payload key in the EXISTING director branch
+    # + a new block widget. No existing compute / dispatch / scope / record
+    # rule modified. If #1's helper changes on review, this shifts too.
+    # ==================================================================
+    def _compute_followup_compliance_block(self):
+        """Director-only per-rep compliance rollup: who is behind on
+        follow-ups / has breached SLA / has stale quotes -- the manager
+        VISIBILITY layer over what the rule-3/4/5 crons flag per-lead.
+        Read-only sudo aggregate; per-rep attribution -> director-scoped.
+
+        Columns (v1 DRAFT, a review point):
+        - overdue follow-ups = overdue mail.activity (date_deadline < today)
+        - SLA breaches       = crm.lead.x_sla_breached (retroactive 2h today;
+                               richer once item #3 lands its forward signal)
+        - stale quotes       = neon.finance.quote draft/sent, write_date >7d
+        """
+        today_str = fields.Date.to_string(self._today_harare())
+        quote_cutoff = self._harare_date_to_utc_string(
+            self._today_harare() - timedelta(days=7))
+        overdue = self._per_rep_aggregate(
+            "mail.activity", "user_id",
+            [("date_deadline", "<", today_str)], [])
+        sla = self._per_rep_aggregate(
+            "crm.lead", "user_id", [("x_sla_breached", "=", True)], [])
+        stale = self._per_rep_aggregate(
+            "neon.finance.quote", "salesperson_id",
+            [("state", "in", ("draft", "sent")),
+             ("write_date", "<", quote_cutoff)], [])
+        rep_ids = set(overdue) | set(sla) | set(stale)
+        Users = self.env["res.users"].sudo()
+        rows = []
+        for rid in rep_ids:
+            o = overdue.get(rid, {}).get("__count", 0)
+            s = sla.get(rid, {}).get("__count", 0)
+            q = stale.get(rid, {}).get("__count", 0)
+            rows.append({
+                "rep_id": rid,
+                "rep_name": Users.browse(rid).name or _("(unknown)"),
+                "overdue_followups": o,
+                "sla_breaches": s,
+                "stale_quotes": q,
+                "total_flags": o + s + q,
+            })
+        rows.sort(key=lambda r: r["total_flags"], reverse=True)
+        return {
+            "empty": not rows,
+            "empty_message": _("No follow-up compliance flags"),
+            "rows": rows,
+            "note": _("SLA = retroactive 2h flag today; richer after item #3 "
+                      "(v1 DRAFT)"),
         }
 
     @api.model
