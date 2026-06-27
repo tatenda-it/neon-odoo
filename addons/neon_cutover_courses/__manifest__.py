@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Cutover Courses",
-    "version": "17.0.1.1.0",
+    "version": "17.0.1.2.0",
     "summary": "1 July cutover onboarding courses seeded as website_slides "
                "data (Finance first; Sales pending verification).",
     "description": """
@@ -31,6 +31,7 @@ Cutover -- Sales is deliberately NOT included until its content is verified.
     "data": [
         "data/cutover_finance_course.xml",
         "data/cutover_sales_course.xml",
+        "data/cutover_director_course.xml",
     ],
     "installable": True,
     "application": False,

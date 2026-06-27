@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Cutover - Director (MD) : plain website_slides course, seeded as data.
+        Source of truth: docs/CUTOVER_DIRECTOR_COURSE_SPEC.md
+        noupdate=0; seeded UNPUBLISHED. Not July-1-critical (Munashe follows
+        Finance + Sales cutover). Section 3 REPLICATES the verified Sales
+        selling-steps (B1-B6, B4a, C1-C2) at the 2-hour standard — plain
+        slides can't be shared across channels, so this is a deliberate copy;
+        keep it in sync with cutover_sales_course.xml (esp. the discount figure
+        once Munashe confirms it). Sales-A2 (dashboard) is covered by Section 2.
+        No former-team-member names. D5.4 "does NOT track" items kept honest.
+    -->
+
+    <!-- ===================== COURSE ===================== -->
+    <record id="course_cutover_director" model="slide.channel">
+        <field name="name">Cutover — Director</field>
+        <field name="channel_type">training</field>
+        <field name="enroll">invite</field>
+        <field name="is_published" eval="False"/>
+        <field name="description">Your orientation to the whole Neon ERP as Managing Director — how to see the business, approve what needs your sign-off, sell within the system as our top salesperson, and oversee and coach the sales team. Work each part against the live system.</field>
+    </record>
+
+    <!-- ============ SECTION 1 — whole-system map ============ -->
+    <record id="sec_dir_1" model="slide.slide">
+        <field name="name">1 — The whole-system map (your MD orientation)</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">10</field>
+    </record>
+    <record id="dir_s1" model="slide.slide">
+        <field name="name">The areas of the system</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">11</field>
+        <field name="html_content" type="html">
+            <p>Orient to what exists and where it lives. You don't operate every area, but as MD you should know the shape of the system:</p>
+            <ul>
+                <li><strong>CRM / Sales</strong> — leads, pipeline, quotes (where you and the team sell).</li>
+                <li><strong>Finance</strong> — quotes→invoicing, payments, bank statements, reports (Kudzaiishe's domain; you oversee disbursements).</li>
+                <li><strong>Operations / Jobs</strong> — events, crew, equipment, the workshop (you're not involved in crew/equipment selection — this runs without you).</li>
+                <li><strong>WhatsApp arm</strong> — the business runs a lot through WhatsApp: client intake, crew coordination, quote-by-WhatsApp, approvals (incl. yours).</li>
+                <li><strong>Dashboards &amp; Intelligence</strong> — your command centre + the sales-intelligence boards (Section 5).</li>
+            </ul>
+            <p>✅ <strong>Done when:</strong> you can name the major areas and what each is for.</p>
+        </field>
+    </record>
+
+    <!-- ============ SECTION 2 — Director Dashboard ============ -->
+    <record id="sec_dir_2" model="slide.slide">
+        <field name="name">2 — Your Director Dashboard (your command centre)</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">20</field>
+    </record>
+    <record id="dir_s2" model="slide.slide">
+        <field name="name">Reading your Director Dashboard</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">21</field>
+        <field name="html_content" type="html">
+            <p>Your dashboard is your daily business-at-a-glance.</p>
+            <ul>
+                <li><strong>KPI tiles:</strong> Pipeline Value, New Leads, Hot Deals, Aging Quotes, Won This Month, Win Rate (90d). <strong>These tiles are team-wide</strong> — they show the whole company's numbers, not just yours.</li>
+                <li><strong>Filter chips:</strong> All / Hot / Aging / Won.</li>
+                <li><strong>Pipeline by Stage</strong>, <strong>Win Rate</strong>, <strong>Lead Sources</strong>.</li>
+                <li><strong>Alerts</strong> — as a director, shows <strong>all reps'</strong> overdue invoices and stale quotes (a rep sees only their own). Your team-wide warning feed.</li>
+                <li><strong>Hot Deals Watch</strong>, <strong>Aging Quotes</strong> — deals needing a push.</li>
+                <li><strong>Tasks</strong> — your to-dos, including escalations routed to you (Section 5).</li>
+                <li><strong>AI Insights</strong> + <strong>AI Copilot</strong> (chat) — ask questions, get narrative insights; the Copilot can log leads, move stages, update values (with a confirm step).</li>
+            </ul>
+            <p>✅ <strong>Done when:</strong> you can read your dashboard and know the tiles are team-wide.</p>
+        </field>
+    </record>
+
+    <!-- ====== SECTION 3 — Selling in the system (sales mastery) ====== -->
+    <!-- Replicates verified Sales course steps (B1-B6, B4a, C1-C2) @ 2h. -->
+    <record id="sec_dir_3" model="slide.slide">
+        <field name="name">3 — Selling in the system (sales mastery)</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">30</field>
+    </record>
+    <record id="dir_s3_intro" model="slide.slide">
+        <field name="name">You sell at mastery level — same workflow as the team</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">31</field>
+        <field name="html_content" type="html">
+            <p>As our top salesperson you use the full sales workflow at mastery level — the <strong>same content the team learns</strong>. The steps below mirror the Sales course: capture leads, work the pipeline, log interactions, raise catalogue-priced quotes, confirm logistics before sending, find your quotes, the discount rule, and the culture standards.</p>
+            <p>✅ <strong>Done when:</strong> you can run the full sales workflow independently.</p>
+        </field>
+    </record>
+    <record id="dir_b1" model="slide.slide">
+        <field name="name">Capturing leads</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">32</field>
+        <field name="html_content" type="html">
+            <p>Every enquiry becomes a lead — if it's not in the CRM, it doesn't exist. Leads reach you two ways: <strong>WhatsApp enquiries auto-create a lead</strong>, and you <strong>manually create</strong> leads for enquiries by phone, email, or in person. Capture the client, contact, and what they need.</p>
+        </field>
+    </record>
+    <record id="dir_b2" model="slide.slide">
+        <field name="name">Working the pipeline</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">33</field>
+        <field name="html_content" type="html">
+            <p>Your deals live on the <strong>Pipeline</strong> as cards. Keep each deal in the stage that reflects reality — the stages are <strong>New → Proposal Sent → Negotiation → Closed Won / Lost</strong>, plus <strong>Payment Pending Verification</strong>. Move cards by drag-and-drop on the kanban, or via the status bar inside the deal.</p>
+        </field>
+    </record>
+    <record id="dir_b3" model="slide.slide">
+        <field name="name">Logging client interactions</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">34</field>
+        <field name="html_content" type="html">
+            <p>Open a deal and log what happened — a call summary, a meeting note, a scheduled follow-up activity. Same-day, every time. This is how the system and your team see a deal is being worked.</p>
+        </field>
+    </record>
+    <record id="dir_b4" model="slide.slide">
+        <field name="name">Raising a quote</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">35</field>
+        <field name="html_content" type="html">
+            <p>Raise a quote through the Neon quote flow. It prices from the <strong>live catalogue / pricing rules</strong> — not guesswork. It carries a currency (USD or ZWG, locked per quote) and moves through its states (Draft → Pending Approval → Approved → Sent to Client → Accepted). <strong>When a client accepts, it sets BOTH operations and finance in motion at once</strong> (the event starts being planned and finance picks up invoicing).</p>
+        </field>
+    </record>
+    <record id="dir_b4a" model="slide.slide">
+        <field name="name">Confirm logistics before sending a quote</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">36</field>
+        <field name="html_content" type="html">
+            <p>Before any quote goes to a client, confirm the <strong>logistics cost</strong> and include it (the <strong>LOGISTICS</strong> line). Get the figure from Operations and add it. <strong>A quote does not go out without logistics confirmed</strong> — acceptance triggers operations and finance at once, so a quote missing logistics becomes a margin problem instantly. This is a firm rule now and will become a built-in system check.</p>
+        </field>
+    </record>
+    <record id="dir_b5" model="slide.slide">
+        <field name="name">Finding your quotes</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">37</field>
+        <field name="html_content" type="html">
+            <p>Your quotes live under <strong>My Quotation</strong> — the Neon quote list, where you find, reopen, and track your own (QUO-USD / QUO-ZIG numbered, with state and total).</p>
+        </field>
+    </record>
+    <record id="dir_b6" model="slide.slide">
+        <field name="name">Discounts &amp; the approval threshold</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">38</field>
+        <field name="html_content" type="html">
+            <p>A custom discount above the threshold needs <strong>MD approval</strong> — and as MD that sign-off is yours (see Section 4). Know the rule: reps can't apply an over-threshold discount without it.</p>
+        </field>
+    </record>
+    <record id="dir_c1" model="slide.slide">
+        <field name="name">Communication &amp; response standards</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">39</field>
+        <field name="html_content" type="html">
+            <ul>
+                <li>Respond to clients within <strong>2 hours</strong> during business hours.</li>
+                <li><strong>Formal English</strong> in all written client communication.</li>
+                <li><strong>Never quote verbally</strong> — all pricing goes through an official Neon quote.</li>
+                <li>Send a proposal within <strong>24 hours</strong> of a client meeting.</li>
+                <li><strong>Follow up</strong> every proposal within <strong>3 business days</strong> if no response.</li>
+                <li><strong>Log every client interaction same-day</strong> in the CRM.</li>
+            </ul>
+        </field>
+    </record>
+    <record id="dir_c2" model="slide.slide">
+        <field name="name">Escalation &amp; the client promise</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">40</field>
+        <field name="html_content" type="html">
+            <ul>
+                <li><strong>All client email correspondence copies the MD</strong> — the standard you set and uphold for the team (and model yourself).</li>
+                <li>Over-threshold discounts come to the <strong>MD</strong> for approval — that's you.</li>
+                <li>The promise every client should feel from Neon: <strong>Confidence, Clarity, Pride.</strong></li>
+            </ul>
+        </field>
+    </record>
+
+    <!-- ============ SECTION 4 — approvals & oversight ============ -->
+    <record id="sec_dir_4" model="slide.slide">
+        <field name="name">4 — Your approvals &amp; oversight</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">50</field>
+    </record>
+    <record id="dir_d1" model="slide.slide">
+        <field name="name">D1 · Approving quotes</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">51</field>
+        <field name="html_content" type="html">
+            <p>When a rep submits a quote you're notified by <strong>email or WhatsApp</strong>.</p>
+            <ul>
+                <li><strong>Email:</strong> the notification links to the quote; review and <strong>approve/decline</strong> there.</li>
+                <li><strong>WhatsApp (live):</strong> ask for a view of the quote, get a prompt to approve/decline, type your response.</li>
+            </ul>
+            <p>Your approval is the gate between a drafted quote and one the client sees.</p>
+        </field>
+    </record>
+    <record id="dir_d2" model="slide.slide">
+        <field name="name">D2 · Discount sign-off</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">52</field>
+        <field name="html_content" type="html">
+            <p>Over-threshold discounts come to you the same way (email or WhatsApp); reps can't apply them without your sign-off.</p>
+        </field>
+    </record>
+    <record id="dir_d3" model="slide.slide">
+        <field name="name">D3 · Money oversight (disbursements / UF)</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">53</field>
+        <field name="html_content" type="html">
+            <p>Disbursements flow from you. <strong>The full Undeposited-Funds module isn't in Odoo yet</strong> — you continue overseeing disbursements as you do now until it's built; when UF lands, this is where you'll do it.</p>
+            <p>✅ <strong>Done when:</strong> you can approve/decline a quote (email + WhatsApp) and a discount, and you understand your disbursement-oversight role.</p>
+        </field>
+    </record>
+
+    <!-- ============ SECTION 5 — overseeing & coaching ============ -->
+    <record id="sec_dir_5" model="slide.slide">
+        <field name="name">5 — Overseeing &amp; coaching your team</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">60</field>
+    </record>
+    <record id="dir_d51" model="slide.slide">
+        <field name="name">D5.1 · Live oversight (real-time, today)</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">61</field>
+        <field name="html_content" type="html">
+            <p>Know which tools show <strong>live</strong> activity and which show <strong>historical</strong> patterns — the most important distinction in your oversight. Live tools, today:</p>
+            <ul>
+                <li><strong>Native CRM grouped by Salesperson</strong> — open Pipeline / quote lists, group by salesperson → a live per-rep view of who's working what. Generic Odoo, but real and live. <em>This is your live per-rep tool — there isn't a bespoke per-rep scoreboard yet.</em></li>
+                <li><strong>Director dashboard</strong> — team-wide totals + the <strong>alert feed</strong> (all reps' overdue invoices &amp; stale quotes).</li>
+                <li><strong>Your escalation queue (Tasks)</strong> — deals 7 days with no movement, and un-followed-up quotes, escalate as to-dos <strong>to you</strong>. Your early-warning queue.</li>
+                <li><strong>Feedback Insights</strong> (/neon/insights, manager-only) — <strong>live</strong> client-satisfaction timelines, sentiment, recurring-concern flags. Your client-health coaching tool.</li>
+            </ul>
+            <p><em>Live data grows from cutover — as the team works post-1-July, these views fill with real activity.</em></p>
+        </field>
+    </record>
+    <record id="dir_d52" model="slide.slide">
+        <field name="name">D5.2 · Historical coaching material (pattern-spotting, NOT live scorekeeping)</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">62</field>
+        <field name="html_content" type="html">
+            <ul>
+                <li><strong>Win/Loss &amp; Realisation by rep</strong> — historical win rates / realisation per salesperson.</li>
+                <li><strong>Client Intelligence</strong> — per-client value, win rate, segment.</li>
+                <li><strong>Demand &amp; Seasonality</strong> — when business comes, recurring events.</li>
+            </ul>
+            <p><em>These read the pre-cutover archive. They won't reflect live post-July performance until rebuilt on live data — a planned build. Use them to coach on patterns and learn from history.</em></p>
+        </field>
+    </record>
+    <record id="dir_d53" model="slide.slide">
+        <field name="name">D5.3 · Your approval controls</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">63</field>
+        <field name="html_content" type="html">
+            <p>Quote sign-off and discount sign-off (Section 4) are real, live manager controls — your levers on what reaches a client and at what price.</p>
+        </field>
+    </record>
+    <record id="dir_d54" model="slide.slide">
+        <field name="name">D5.4 · What the system does NOT yet track — coach these directly</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">64</field>
+        <field name="html_content" type="html">
+            <ul>
+                <li><strong>First-response time</strong> — the system flags first response at <strong>2 hours</strong> (matching the standard), but per-lead only, retroactively, with <strong>no manager rollup / breach view per rep</strong>. You can't yet see "who's slow" at a glance — coach it; a manager-view build is planned.</li>
+                <li><strong>"Copy the MD on all client emails"</strong> — not system-monitored; honour-based (tracking build planned).</li>
+                <li><strong>Logistics-confirmed-before-quote</strong> — not yet a system gate (planned build).</li>
+                <li><strong>Soft standards</strong> (never quote verbally, formal English, same-day logging) — coaching / spot-check.</li>
+            </ul>
+            <p>✅ <strong>Done when:</strong> you know your live oversight tools, your historical coaching boards, your approval controls, and which standards you coach directly because the system doesn't track them yet.</p>
+        </field>
+    </record>
+
+    <!-- ============ SECTION 6 — Check & Sign-off ============ -->
+    <record id="sec_dir_6" model="slide.slide">
+        <field name="name">Knowledge Check &amp; Director Sign-off</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">70</field>
+    </record>
+    <record id="dir_quiz" model="slide.slide">
+        <field name="name">Knowledge Check — Director</field>
+        <field name="slide_category">quiz</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">71</field>
+    </record>
+
+    <record id="dir_q1" model="slide.question">
+        <field name="question">Your dashboard's KPI tiles show…</field>
+        <field name="sequence">1</field>
+        <field name="slide_id" ref="dir_quiz"/>
+    </record>
+    <record id="dir_q1_a" model="slide.answer">
+        <field name="question_id" ref="dir_q1"/><field name="sequence">1</field>
+        <field name="text_value">Only your own deals</field>
+    </record>
+    <record id="dir_q1_b" model="slide.answer">
+        <field name="question_id" ref="dir_q1"/><field name="sequence">2</field>
+        <field name="text_value">The whole team's numbers — the tiles are team-wide</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — the tiles are team-wide, not your own deals.</field>
+    </record>
+    <record id="dir_q1_c" model="slide.answer">
+        <field name="question_id" ref="dir_q1"/><field name="sequence">3</field>
+        <field name="text_value">Nothing until you filter</field>
+    </record>
+
+    <record id="dir_q2" model="slide.question">
+        <field name="question">A rep submits a quote needing approval. How can you approve it?</field>
+        <field name="sequence">2</field>
+        <field name="slide_id" ref="dir_quiz"/>
+    </record>
+    <record id="dir_q2_a" model="slide.answer">
+        <field name="question_id" ref="dir_q2"/><field name="sequence">1</field>
+        <field name="text_value">Only by logging into a computer</field>
+    </record>
+    <record id="dir_q2_b" model="slide.answer">
+        <field name="question_id" ref="dir_q2"/><field name="sequence">2</field>
+        <field name="text_value">By email (link to the quote) or WhatsApp (ask for a view, reply to approve/decline)</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — approve by email or over WhatsApp.</field>
+    </record>
+    <record id="dir_q2_c" model="slide.answer">
+        <field name="question_id" ref="dir_q2"/><field name="sequence">3</field>
+        <field name="text_value">It approves automatically</field>
+    </record>
+
+    <record id="dir_q3" model="slide.question">
+        <field name="question">You want a live, per-rep view of who's working what. Where?</field>
+        <field name="sequence">3</field>
+        <field name="slide_id" ref="dir_quiz"/>
+    </record>
+    <record id="dir_q3_a" model="slide.answer">
+        <field name="question_id" ref="dir_q3"/><field name="sequence">1</field>
+        <field name="text_value">The Win/Loss-by-rep board</field>
+    </record>
+    <record id="dir_q3_b" model="slide.answer">
+        <field name="question_id" ref="dir_q3"/><field name="sequence">2</field>
+        <field name="text_value">Native CRM Pipeline / quotes, grouped by Salesperson</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — native CRM grouped by salesperson is your live per-rep view.</field>
+    </record>
+    <record id="dir_q3_c" model="slide.answer">
+        <field name="question_id" ref="dir_q3"/><field name="sequence">3</field>
+        <field name="text_value">The historical Client Intelligence board</field>
+    </record>
+
+    <record id="dir_q4" model="slide.question">
+        <field name="question">The Win/Loss-by-rep and Client Intelligence boards show…</field>
+        <field name="sequence">4</field>
+        <field name="slide_id" ref="dir_quiz"/>
+    </record>
+    <record id="dir_q4_a" model="slide.answer">
+        <field name="question_id" ref="dir_q4"/><field name="sequence">1</field>
+        <field name="text_value">Live current-month performance</field>
+    </record>
+    <record id="dir_q4_b" model="slide.answer">
+        <field name="question_id" ref="dir_q4"/><field name="sequence">2</field>
+        <field name="text_value">Historical patterns from before cutover — for coaching and learning, not live scorekeeping</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — these read the pre-cutover archive; coaching, not live scorekeeping.</field>
+    </record>
+    <record id="dir_q4_c" model="slide.answer">
+        <field name="question_id" ref="dir_q4"/><field name="sequence">3</field>
+        <field name="text_value">Real-time team activity</field>
+    </record>
+
+    <record id="dir_q5" model="slide.question">
+        <field name="question">The system tracks each rep's 1-hour response compliance for you.</field>
+        <field name="sequence">5</field>
+        <field name="slide_id" ref="dir_quiz"/>
+    </record>
+    <record id="dir_q5_a" model="slide.answer">
+        <field name="question_id" ref="dir_q5"/><field name="sequence">1</field>
+        <field name="text_value">True — there's a per-rep breach dashboard</field>
+    </record>
+    <record id="dir_q5_b" model="slide.answer">
+        <field name="question_id" ref="dir_q5"/><field name="sequence">2</field>
+        <field name="text_value">False — first-response flags at 2 hours, per-lead, with no manager rollup yet; you coach response time directly</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — 2h, per-lead, no manager rollup; coach it directly.</field>
+    </record>
+    <record id="dir_q5_c" model="slide.answer">
+        <field name="question_id" ref="dir_q5"/><field name="sequence">3</field>
+        <field name="text_value">True — the AI Copilot reports it hourly</field>
+    </record>
+
+    <record id="dir_q6" model="slide.question">
+        <field name="question">Disbursements / Undeposited Funds oversight in Odoo today —</field>
+        <field name="sequence">6</field>
+        <field name="slide_id" ref="dir_quiz"/>
+    </record>
+    <record id="dir_q6_a" model="slide.answer">
+        <field name="question_id" ref="dir_q6"/><field name="sequence">1</field>
+        <field name="text_value">Fully built; you manage UF in the system now</field>
+    </record>
+    <record id="dir_q6_b" model="slide.answer">
+        <field name="question_id" ref="dir_q6"/><field name="sequence">2</field>
+        <field name="text_value">The UF module isn't in Odoo yet; you oversee disbursements as you do now until it's built</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — UF isn't in Odoo yet; oversee disbursements as you do now.</field>
+    </record>
+    <record id="dir_q6_c" model="slide.answer">
+        <field name="question_id" ref="dir_q6"/><field name="sequence">3</field>
+        <field name="text_value">It's automatic, no oversight needed</field>
+    </record>
+
+    <!-- ===================== DIRECTOR SIGN-OFF ===================== -->
+    <record id="dir_signoff" model="slide.slide">
+        <field name="name">Director Sign-off — Director</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_director"/>
+        <field name="sequence">72</field>
+        <field name="html_content" type="html">
+            <p>Completed by a director, confirming Munashe can read the director dashboard, approve quotes and discounts (email + WhatsApp), run the full sales workflow, and oversee/coach the team using the live tools (native grouped CRM, alert feed, Feedback Insights, escalation queue) and historical boards — and that she knows which standards the system doesn't yet track and must be coached directly.</p>
+            <p>When marked complete, Director onboarding is signed off and recorded.</p>
+        </field>
+    </record>
+
+</odoo>
