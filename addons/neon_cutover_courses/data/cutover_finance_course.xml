@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Cutover - Finance : plain website_slides course, seeded as data.
+        Source of truth: docs/CUTOVER_FINANCE_COURSE_VERIFIED.md
+        noupdate=0 (this odoo tag) so -u re-applies and reverts UI drift.
+        Seeded UNPUBLISHED; a director publishes after a gated deploy.
+        Section grouping (category_id) is computed from `sequence` ordering.
+    -->
+
+    <!-- ===================== COURSE ===================== -->
+    <record id="course_cutover_finance" model="slide.channel">
+        <field name="name">Cutover — Finance</field>
+        <field name="channel_type">training</field>
+        <field name="enroll">invite</field>
+        <field name="is_published" eval="False"/>
+        <field name="description">Your get-ready guide for the 1 July cutover, covering the finance functions that are live today. Every item is "can you actually do this," not "did you read it." Scope: this course does NOT cover the full Undeposited-Funds routing module, the restricted-cash tiers (Special Account / Tithe / Drawings / Owner-Personal UF), bank reconciliation, or interpreting financial reports — those are not yet built or are end-of-July activities.</field>
+    </record>
+
+    <!-- ===================== SECTION A ===================== -->
+    <record id="sec_fin_a" model="slide.slide">
+        <field name="name">A — Get in &amp; oriented</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="fin_a1" model="slide.slide">
+        <field name="name">A1 · Log in &amp; confirm your dashboard</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">11</field>
+        <field name="html_content" type="html">
+            <p>Go to <strong>crm.neonhiring.com</strong>, log in with the address IT gave you, set a strong password on first login, and confirm your Bookkeeper dashboard loads. If anything doesn't load, flag Robin or Tatenda now — before cutover.</p>
+            <p><em>Note: until cutover, some dashboard figures are sample data; they become real as we go live.</em></p>
+            <p>✅ <strong>Done when:</strong> logged in, password set, dashboard visible.</p>
+        </field>
+    </record>
+
+    <record id="fin_a2" model="slide.slide">
+        <field name="name">A2 · Read your dashboard</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">12</field>
+        <field name="html_content" type="html">
+            <p>Your dashboard shows your finance picture — cash position, the USD and ZiG journals, customer invoices, vendor bills, undeposited funds and petty cash cards.</p>
+            <p>✅ <strong>Done when:</strong> you can find your dashboard and explain what the cards show.</p>
+        </field>
+    </record>
+
+    <record id="fin_a3" model="slide.slide">
+        <field name="name">A3 · Your two workspaces — Accounting and Statements</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">13</field>
+        <field name="html_content" type="html">
+            <p>Your sidebar is set up with your accounting tabs. You'll spend most of your time in two:</p>
+            <ul>
+                <li><strong>Accounting</strong> opens the Accounting Dashboard — Customer Invoices, Vendor Bills, your bank accounts (CABS USD, CABS ZWG), Undeposited Funds and Petty Cash. This is where you raise invoices, handle bills, and reconcile.</li>
+                <li><strong>Statements</strong> opens <strong>Account Ledgers</strong> — open a statement on any account (CABS USD, CABS ZWG, Petty Cash) to see its running balance and entries.</li>
+            </ul>
+            <p>Use <strong>Accounting</strong> to <em>do</em> things; use <strong>Statements</strong> to <em>read</em> an account's running ledger.</p>
+            <p>✅ <strong>Done when:</strong> you can open both, and know which you use for what.</p>
+        </field>
+    </record>
+
+    <!-- ===================== SECTION B ===================== -->
+    <record id="sec_fin_b" model="slide.slide">
+        <field name="name">B — Core daily finance tasks (what's live)</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="fin_b1" model="slide.slide">
+        <field name="name">B1 · Invoice from an accepted quote (schedule-driven, on request)</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">21</field>
+        <field name="html_content" type="html">
+            <p>You don't raise or approve quotes — that's the Sales side (the salesperson, who may be a director). Your finance work begins once a quote is <strong>Accepted</strong>.</p>
+            <ul>
+                <li>Each quote has an <strong>Invoice Schedule</strong> tab (e.g. <em>Final Balance, 100%, trigger: On Quote Acceptance</em>). When the quote is <strong>Accepted</strong>, the system <strong>auto-generates a Draft Invoice</strong> — shown as a link like <em>"Draft Invoice (SCH-000003)"</em>.</li>
+                <li><strong>You finalise on request, not on autopilot.</strong> Events often have extras or deductions on the day, so the draft amount may not be final — only post when asked and the figure is confirmed.</li>
+                <li>To finalise: open the <strong>Draft Invoice</strong> from the schedule row, <strong>review</strong> it (figures, currency, VAT treatment, the ZIMRA strip on the PDF), then <strong>confirm/post</strong>.</li>
+                <li>Read the quote's own <strong>Payment Terms</strong> and <strong>VAT treatment</strong> — both per quote/client; check, don't assume.</li>
+            </ul>
+            <p><em>Note: a standalone "New" invoice exists as a rare safety-net only — don't create one unless a director tells you to.</em></p>
+            <p>✅ <strong>Done when:</strong> you can find an accepted quote's Draft Invoice, confirm the amount reflects extras/deductions, check VAT treatment, and review + post it — on request.</p>
+        </field>
+    </record>
+
+    <record id="fin_b2" model="slide.slide">
+        <field name="name">B2 · Record a customer payment / receipt</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">22</field>
+        <field name="html_content" type="html">
+            <p>When money comes in, record it against the invoice. Two ways, both available:</p>
+            <ul>
+                <li>On the posted invoice, use <strong>Register Payment</strong> — the normal route when a client pays a specific invoice.</li>
+                <li>From the Statements / account side, use the <strong>Add-Transaction</strong> quick entries — for recording receipts and moving money between accounts.</li>
+            </ul>
+            <p>Receipts route through <strong>Undeposited Funds</strong> the way you already handle it — UF is the central account money passes through before it's settled to its final account (Petty Cash for operating float, etc.).</p>
+            <p>✅ <strong>Done when:</strong> you can record a receipt against an invoice (both ways) and know where UF sits in the flow.</p>
+        </field>
+    </record>
+
+    <record id="fin_b3" model="slide.slide">
+        <field name="name">B3 · Recording expenses and money out</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">23</field>
+        <field name="html_content" type="html">
+            <p>Alongside receipts, you record money <em>going out</em> — expenses, replenishments, vendor payments, transfers between accounts — through the quick-entry transactions on the cash/bank accounts. You already know these movements from running the books; this is just doing them in Odoo.</p>
+            <p>✅ <strong>Done when:</strong> you can record an expense / money-out entry in Odoo.</p>
+        </field>
+    </record>
+
+    <record id="fin_b4" model="slide.slide">
+        <field name="name">B4 · Import a CABS bank statement (CSV)</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">24</field>
+        <field name="html_content" type="html">
+            <p>You import CABS statements as <strong>CSV files</strong> (CSV only — a PDF or Excel statement won't import). Works for both <strong>CABS USD</strong> and <strong>CABS ZWG</strong>. Export the statement from CABS as CSV and import it; the lines appear under <strong>Statements → Account Ledgers → Open Statement</strong> as a running ledger (Date, Details, Dr, Cr, Balance).</p>
+            <p>✅ <strong>Done when:</strong> you can import a CABS CSV (USD or ZWG) and see its lines in the account's statement.</p>
+        </field>
+    </record>
+
+    <record id="fin_b5" model="slide.slide">
+        <field name="name">B5 · Financial reports — know where they are</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">25</field>
+        <field name="html_content" type="html">
+            <p>Odoo has your financial reports — <strong>P&amp;L, Balance Sheet, Cash Flow</strong> — in both <strong>USD and ZWG</strong> (under Reporting). You won't use these much at first, because accounts start fresh on 1 July. For now: know they exist and how to open them, for when transactions have built up.</p>
+            <p>✅ <strong>Done when:</strong> you can find the reports and open one — knowing real reporting starts once there's activity.</p>
+        </field>
+    </record>
+
+    <record id="fin_b6" model="slide.slide">
+        <field name="name">B6 · The USD↔ZWG rate on an invoice</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">26</field>
+        <field name="html_content" type="html">
+            <p>When invoicing across currencies, you set the <strong>exchange rate on that invoice</strong> — same idea as you've done manually before, now in Odoo. The rate applies to that invoice. Make sure you're using the correct rate for the day before you finalise.</p>
+            <p>✅ <strong>Done when:</strong> you can set the USD↔ZWG rate on an invoice and know to use the correct day's rate.</p>
+        </field>
+    </record>
+
+    <record id="fin_b6b" model="slide.slide">
+        <field name="name">B6b · Setting the rate for a report (global)</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">27</field>
+        <field name="html_content" type="html">
+            <p>Separately from the per-invoice rate, when you run a report across currencies you can set a <strong>global rate that drives the conversion for the whole report</strong>. Because it affects the entire report, <strong>always get the rate confirmed by a director (Robin or Munashe) before you set it</strong> — you enter it, but the number must be director-authorised. Never set the report rate from your own guess.</p>
+            <p>✅ <strong>Done when:</strong> you know the report rate is global and that you only set it with a director-confirmed figure.</p>
+        </field>
+    </record>
+
+    <record id="fin_b8" model="slide.slide">
+        <field name="name">B8 · Weekly cash-planning sheet</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">28</field>
+        <field name="html_content" type="html">
+            <p>Open the <strong>Weekly Budget</strong> from your sidebar — your planning sheet for the week's cash, money in and money out. You receive requests, plan purchases, and work the week's expected inflows and outflows here. It's a planning tool (not the ledger itself); use it to stay ahead of the week.</p>
+            <p>✅ <strong>Done when:</strong> you can open the Weekly Budget and add/work a week's planned money-in and money-out.</p>
+        </field>
+    </record>
+
+    <record id="fin_b9" model="slide.slide">
+        <field name="name">B9 · Outstanding payments (AR) — your oversight tool</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">29</field>
+        <field name="html_content" type="html">
+            <p>Open <strong>Collections</strong> from your sidebar — the <strong>Outstanding Payments</strong> worklist: every open client balance with the amount owed, the <strong>Sales Rep</strong> responsible, the contact, and a <strong>status</strong> (Chasing, Promised, Part Paid, PO Submitted, Cleared, Unresolved), with a running total.</p>
+            <p>Your role is oversight and backup: the named Sales Rep owns chasing their client; you make sure that's happening, and step in to chase directly when a rep needs help. You're the safety net, not the first chaser.</p>
+            <p>✅ <strong>Done when:</strong> you can open Collections, read who owes what and which rep is responsible, and you understand your job is to ensure follow-up happens (and assist when needed).</p>
+        </field>
+    </record>
+
+    <!-- ===================== SECTION C ===================== -->
+    <record id="sec_fin_c" model="slide.slide">
+        <field name="name">C — Currency &amp; compliance</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="fin_c1" model="slide.slide">
+        <field name="name">C1 · USD vs ZiG — always be explicit</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">31</field>
+        <field name="html_content" type="html">
+            <p>Always know which currency you're working in. Quotes are currency-locked; invoices carry their currency; you set the rate per-invoice when converting (B6). Never assume — check on every quote, invoice, and entry.</p>
+            <p>✅ <strong>Done when:</strong> you check currency on everything you touch.</p>
+        </field>
+    </record>
+
+    <record id="fin_c2" model="slide.slide">
+        <field name="name">C2 · VAT &amp; ZIMRA</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">32</field>
+        <field name="html_content" type="html">
+            <ul>
+                <li>VAT, when it applies, is <strong>15.5%</strong> — but whether VAT is charged is decided <strong>per client</strong>. Some clients are invoiced including VAT, some excluding. Always check; never assume.</li>
+                <li>Invoices carry <strong>ZIMRA registration</strong> (on the invoice PDF).</li>
+            </ul>
+            <p>✅ <strong>Done when:</strong> you know the rate is 15.5% when it applies, that VAT-or-not is per-client, and that ZIMRA registration is on invoices.</p>
+        </field>
+    </record>
+
+    <record id="fin_c3" model="slide.slide">
+        <field name="name">C3 · Append-only — corrections are reversals</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">33</field>
+        <field name="html_content" type="html">
+            <p>You never delete a posted financial entry. To fix a mistake you <strong>reverse and re-enter</strong> using the <strong>"Correct this entry"</strong> flow, leaving a clean audit trail. Nothing posted just disappears.</p>
+            <p>✅ <strong>Done when:</strong> you understand corrections are reversals via "Correct this entry," never deletions.</p>
+        </field>
+    </record>
+
+    <!-- ============== SECTION D: CHECK & SIGN-OFF ============== -->
+    <record id="sec_fin_d" model="slide.slide">
+        <field name="name">Knowledge Check &amp; Director Sign-off</field>
+        <field name="is_category" eval="True"/>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="fin_quiz" model="slide.slide">
+        <field name="name">Knowledge Check — Finance</field>
+        <field name="slide_category">quiz</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">41</field>
+    </record>
+
+    <!-- Q1 -->
+    <record id="fin_q1" model="slide.question">
+        <field name="question">How is VAT applied to invoices?</field>
+        <field name="sequence">1</field>
+        <field name="slide_id" ref="fin_quiz"/>
+    </record>
+    <record id="fin_q1_a" model="slide.answer">
+        <field name="question_id" ref="fin_q1"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Always 15.5% on every invoice</field>
+    </record>
+    <record id="fin_q1_b" model="slide.answer">
+        <field name="question_id" ref="fin_q1"/>
+        <field name="sequence">2</field>
+        <field name="text_value">15.5% when it applies — but whether VAT is charged is decided per client, so you check each one</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — VAT is 15.5% when charged, but VAT-or-not is a per-client decision.</field>
+    </record>
+    <record id="fin_q1_c" model="slide.answer">
+        <field name="question_id" ref="fin_q1"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Never charged</field>
+    </record>
+
+    <!-- Q2 -->
+    <record id="fin_q2" model="slide.question">
+        <field name="question">A quote reaches "Accepted." How do you invoice it?</field>
+        <field name="sequence">2</field>
+        <field name="slide_id" ref="fin_quiz"/>
+    </record>
+    <record id="fin_q2_a" model="slide.answer">
+        <field name="question_id" ref="fin_q2"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Click "New Invoice" and rebuild it from scratch</field>
+    </record>
+    <record id="fin_q2_b" model="slide.answer">
+        <field name="question_id" ref="fin_q2"/>
+        <field name="sequence">2</field>
+        <field name="text_value">Open the quote's Invoice Schedule, find the auto-generated Draft Invoice, confirm the amount reflects any extras/deductions, then review and post — when asked to</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — invoicing is schedule-driven and finalised on request.</field>
+    </record>
+    <record id="fin_q2_c" model="slide.answer">
+        <field name="question_id" ref="fin_q2"/>
+        <field name="sequence">3</field>
+        <field name="text_value">It invoices itself automatically and sends; nothing for you to do</field>
+    </record>
+
+    <!-- Q3 -->
+    <record id="fin_q3" model="slide.question">
+        <field name="question">You spot a mistake in a posted entry. What do you do?</field>
+        <field name="sequence">3</field>
+        <field name="slide_id" ref="fin_quiz"/>
+    </record>
+    <record id="fin_q3_a" model="slide.answer">
+        <field name="question_id" ref="fin_q3"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Delete it and re-enter</field>
+    </record>
+    <record id="fin_q3_b" model="slide.answer">
+        <field name="question_id" ref="fin_q3"/>
+        <field name="sequence">2</field>
+        <field name="text_value">Reverse it and re-enter using "Correct this entry" — finance is append-only</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — corrections are reversals, never deletions.</field>
+    </record>
+    <record id="fin_q3_c" model="slide.answer">
+        <field name="question_id" ref="fin_q3"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Edit the posted line directly</field>
+    </record>
+
+    <!-- Q4 -->
+    <record id="fin_q4" model="slide.question">
+        <field name="question">Setting the exchange rate — which is true?</field>
+        <field name="sequence">4</field>
+        <field name="slide_id" ref="fin_quiz"/>
+    </record>
+    <record id="fin_q4_a" model="slide.answer">
+        <field name="question_id" ref="fin_q4"/>
+        <field name="sequence">1</field>
+        <field name="text_value">The rate I set on an invoice changes every conversion in the system that day</field>
+    </record>
+    <record id="fin_q4_b" model="slide.answer">
+        <field name="question_id" ref="fin_q4"/>
+        <field name="sequence">2</field>
+        <field name="text_value">The rate I set on an invoice applies to that invoice; the global report rate is different and I only set that with a director-confirmed figure</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — per-invoice rate is local; the global report rate is director-authorised.</field>
+    </record>
+    <record id="fin_q4_c" model="slide.answer">
+        <field name="question_id" ref="fin_q4"/>
+        <field name="sequence">3</field>
+        <field name="text_value">I should never touch any rate</field>
+    </record>
+
+    <!-- Q5 -->
+    <record id="fin_q5" model="slide.question">
+        <field name="question">In Collections (Outstanding Payments), whose job is it to chase a client?</field>
+        <field name="sequence">5</field>
+        <field name="slide_id" ref="fin_quiz"/>
+    </record>
+    <record id="fin_q5_a" model="slide.answer">
+        <field name="question_id" ref="fin_q5"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Always mine</field>
+    </record>
+    <record id="fin_q5_b" model="slide.answer">
+        <field name="question_id" ref="fin_q5"/>
+        <field name="sequence">2</field>
+        <field name="text_value">The named Sales Rep owns the follow-up; I make sure it's happening and step in to help when needed</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — you are the oversight and safety net, not the first chaser.</field>
+    </record>
+    <record id="fin_q5_c" model="slide.answer">
+        <field name="question_id" ref="fin_q5"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Nobody — it clears itself</field>
+    </record>
+
+    <!-- Q6 -->
+    <record id="fin_q6" model="slide.question">
+        <field name="question">Where do imported CABS statement lines appear?</field>
+        <field name="sequence">6</field>
+        <field name="slide_id" ref="fin_quiz"/>
+    </record>
+    <record id="fin_q6_a" model="slide.answer">
+        <field name="question_id" ref="fin_q6"/>
+        <field name="sequence">1</field>
+        <field name="text_value">Posted straight into the ledger as final</field>
+    </record>
+    <record id="fin_q6_b" model="slide.answer">
+        <field name="question_id" ref="fin_q6"/>
+        <field name="sequence">2</field>
+        <field name="text_value">In the account's statement under Statements → Account Ledgers, as a running ledger</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — imported lines land in the account's statement to be worked.</field>
+    </record>
+    <record id="fin_q6_c" model="slide.answer">
+        <field name="question_id" ref="fin_q6"/>
+        <field name="sequence">3</field>
+        <field name="text_value">In the weekly cash sheet</field>
+    </record>
+
+    <!-- Q7 -->
+    <record id="fin_q7" model="slide.question">
+        <field name="question">What must every invoice carry?</field>
+        <field name="sequence">7</field>
+        <field name="slide_id" ref="fin_quiz"/>
+    </record>
+    <record id="fin_q7_a" model="slide.answer">
+        <field name="question_id" ref="fin_q7"/>
+        <field name="sequence">1</field>
+        <field name="text_value">The director's signature</field>
+    </record>
+    <record id="fin_q7_b" model="slide.answer">
+        <field name="question_id" ref="fin_q7"/>
+        <field name="sequence">2</field>
+        <field name="text_value">ZIMRA registration</field>
+        <field name="is_correct" eval="True"/>
+        <field name="comment">Correct — ZIMRA registration appears on the invoice PDF.</field>
+    </record>
+    <record id="fin_q7_c" model="slide.answer">
+        <field name="question_id" ref="fin_q7"/>
+        <field name="sequence">3</field>
+        <field name="text_value">Nothing specific</field>
+    </record>
+
+    <!-- ===================== DIRECTOR SIGN-OFF ===================== -->
+    <record id="fin_signoff" model="slide.slide">
+        <field name="name">Director Sign-off — Finance</field>
+        <field name="slide_category">article</field>
+        <field name="channel_id" ref="course_cutover_finance"/>
+        <field name="sequence">42</field>
+        <field name="html_content" type="html">
+            <p>This step is completed by a director (Robin or Munashe), confirming Kudzaiishe can independently invoice from an accepted quote, record payments, record expenses, import a CABS statement, set per-invoice rates correctly, work the weekly cash sheet, and oversee Collections — and understands the currency, VAT-per-client, and append-only rules.</p>
+            <p>When a director marks this slide complete, Finance cutover onboarding is signed off and recorded. Kudzaiishe is cleared to operate on the live system.</p>
+        </field>
+    </record>
+
+</odoo>
