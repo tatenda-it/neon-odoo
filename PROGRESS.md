@@ -53,6 +53,19 @@ From the read-only sales-management oversight discovery (what a sales line-manag
 
 ---
 
+## Cutover courses — pre-publish gates
+
+Both cutover courses (`neon_cutover_courses`) are built and seeded **UNPUBLISHED**. Finance is walkthrough-verified / deploy-ready; Sales must clear all items below before it publishes.
+
+**Cutover — Sales — pre-publish items (all must clear first):**
+1. **Rep-screen verification** — confirm A2 + B1–B6 against a real sales-rep session (Lisa/Evril or screen-share). Drafted from the director/superuser view, so the actual rep-facing screens are unconfirmed.
+2. **Munashe's discount threshold** — confirm the live figure, then fill it into B6 / C2 / Q4 (currently "above the threshold", no number).
+3. **Response standard 1h → 2h** — the built Sales seed (`data/cutover_sales_course.xml`) currently says **"1 hour"** in C1 and Q5; change to **"2 hours"** to match the system's actual SLA (2h) and the agreed standard. *(Seed not yet edited — logged here as a pre-publish fix only.)*
+
+**Cutover — Finance:** verified against the live walkthrough; deploy-ready pending the gated deploy + director review/publish.
+
+---
+
 ## Active priority — team onboarding / adoption (Phase 11 cutover, adoption half)
 
 **The problem (in plain terms):** The team is not yet onboarded onto the live ERP. The system is built and live; the people are not on it. Need a low-friction, reliable path to get current staff logged in, competent in their actual daily tasks, and re-grounded in company culture/expectations — fast — then a repeatable version for future hires. This is the adoption half of Phase 11, not a separate programme.
