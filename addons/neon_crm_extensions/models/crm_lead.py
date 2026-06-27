@@ -132,6 +132,22 @@ class CrmLead(models.Model):
         ),
     )
 
+    # DRAFT (item #3, pending Tatenda review) -- forward-looking SLA signal.
+    # NOT computed: depends on elapsed wall-clock time, so it is set by a
+    # cron (_neon_sla_open_breach_scan), never an @api.depends compute. This
+    # is a NEW field ALONGSIDE x_sla_breached -- the retroactive flag + its
+    # compute + the ribbon are untouched.
+    x_sla_open_breach = fields.Boolean(
+        string="SLA Open Breach (still unanswered)",
+        default=False,
+        copy=False,
+        help=(
+            "True when an OPEN lead is still unanswered past the 2-hour SLA "
+            "as of the last scan. Forward-looking companion to x_sla_breached "
+            "(which is retroactive). Cron-maintained; do not set manually."
+        ),
+    )
+
     x_lead_score = fields.Integer(
         string="Lead Score",
         compute="_compute_lead_score",
@@ -540,6 +556,39 @@ class CrmLead(models.Model):
             len(leads), len(matched), created,
         )
         return matched
+
+    def _neon_sla_open_breach_scan(self):
+        """Item #3 (DRAFT, additive) -- forward-looking SLA signal.
+
+        Flags OPEN opportunities still unanswered past the 2h SLA as of NOW.
+        A cron (not a compute) because it depends on elapsed wall-clock time.
+        Writes ONLY x_sla_open_breach, idempotently: sets it on matches and
+        clears it on previously-flagged leads that no longer match (answered
+        or out of scope). Does NOT read or write x_sla_breached / its compute
+        / x_first_response_time-stamping / any other cron's fields. The 2h
+        threshold is kept self-contained here (not shared with the live
+        retroactive compute)."""
+        import logging
+        cutoff = fields.Datetime.now() - timedelta(hours=2)
+        open_unanswered = self.search([
+            ("active", "=", True),
+            ("type", "=", "opportunity"),
+            ("x_first_response_time", "=", False),
+            ("create_date", "<", cutoff),
+        ])
+        flagged = self.search([("x_sla_open_breach", "=", True)])
+        to_clear = flagged - open_unanswered
+        set_true = open_unanswered.filtered(lambda l: not l.x_sla_open_breach)
+        if set_true:
+            set_true.write({"x_sla_open_breach": True})
+        if to_clear:
+            to_clear.write({"x_sla_open_breach": False})
+        logging.getLogger(__name__).info(
+            "[Neon SLA open-breach] scan: %d open-unanswered>2h, "
+            "%d newly flagged, %d cleared",
+            len(open_unanswered), len(set_true), len(to_clear),
+        )
+        return open_unanswered
 
     # --- Rule 8 -----------------------------------------------------
 

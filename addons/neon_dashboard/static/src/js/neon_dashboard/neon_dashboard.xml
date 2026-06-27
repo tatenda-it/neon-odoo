@@ -207,6 +207,7 @@
                         <th>Rep</th>
                         <th class="text-end">Overdue follow-ups</th>
                         <th class="text-end">SLA breaches</th>
+                        <th class="text-end">Open SLA (unanswered)</th>
                         <th class="text-end">Stale quotes</th>
                         <th class="text-end">Total flags</th>
                     </tr>
@@ -216,6 +217,7 @@
                         <td t-esc="row.rep_name"/>
                         <td class="text-end" t-esc="row.overdue_followups"/>
                         <td class="text-end" t-esc="row.sla_breaches"/>
+                        <td class="text-end" t-esc="row.open_sla_breaches"/>
                         <td class="text-end" t-esc="row.stale_quotes"/>
                         <td class="text-end"><strong t-esc="row.total_flags"/></td>
                     </tr>

@@ -2364,24 +2364,30 @@ class NeonDashboard(models.Model):
             [("date_deadline", "<", today_str)], [])
         sla = self._per_rep_aggregate(
             "crm.lead", "user_id", [("x_sla_breached", "=", True)], [])
+        # DRAFT item #3 (additive): forward-looking SLA signal column,
+        # alongside the retroactive sla_breaches. Reuses #1's helper.
+        open_sla = self._per_rep_aggregate(
+            "crm.lead", "user_id", [("x_sla_open_breach", "=", True)], [])
         stale = self._per_rep_aggregate(
             "neon.finance.quote", "salesperson_id",
             [("state", "in", ("draft", "sent")),
              ("write_date", "<", quote_cutoff)], [])
-        rep_ids = set(overdue) | set(sla) | set(stale)
+        rep_ids = set(overdue) | set(sla) | set(open_sla) | set(stale)
         Users = self.env["res.users"].sudo()
         rows = []
         for rid in rep_ids:
             o = overdue.get(rid, {}).get("__count", 0)
             s = sla.get(rid, {}).get("__count", 0)
+            os_ = open_sla.get(rid, {}).get("__count", 0)
             q = stale.get(rid, {}).get("__count", 0)
             rows.append({
                 "rep_id": rid,
                 "rep_name": Users.browse(rid).name or _("(unknown)"),
                 "overdue_followups": o,
                 "sla_breaches": s,
+                "open_sla_breaches": os_,
                 "stale_quotes": q,
-                "total_flags": o + s + q,
+                "total_flags": o + s + os_ + q,
             })
         rows.sort(key=lambda r: r["total_flags"], reverse=True)
         return {

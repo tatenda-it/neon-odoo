@@ -84,5 +84,20 @@
             <field name="numbercall">-1</field>
             <field name="active" eval="True"/>
         </record>
+
+        <!-- DRAFT (item #3, pending Tatenda review): forward-looking SLA
+             signal. Hourly scan; writes ONLY x_sla_open_breach. Independent
+             of the rules above. noupdate=1 means fresh install only; existing
+             installs need a migration to create it (Tatenda finalization). -->
+        <record id="ir_cron_neon_sla_open_breach" model="ir.cron">
+            <field name="name">Neon: SLA open-breach scan (DRAFT)</field>
+            <field name="model_id" ref="crm.model_crm_lead"/>
+            <field name="state">code</field>
+            <field name="code">model._neon_sla_open_breach_scan()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>
