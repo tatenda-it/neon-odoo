@@ -58,6 +58,7 @@
                 (0, 0, {'widget_key': 'kpi_hist_demand',   'order_index': 51}),
                 (0, 0, {'widget_key': 'kpi_hist_quotes',   'order_index': 52}),
                 (0, 0, {'widget_key': 'block_hist_intel',  'order_index': 60, 'size': 'large'}),
+                (0, 0, {'widget_key': 'block_per_rep',     'order_index': 18, 'size': 'large'}),
             ]"/>
         </record>
         <!-- Director Historical · Zoho import band = order_index 50-52 (KPI

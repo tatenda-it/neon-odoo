@@ -156,6 +156,41 @@
         </div>
     </t>
 
+    <!-- DRAFT (item #1, pending Tatenda review): director-only per-rep
+         performance block. getBlockTemplate is generic so this renders in
+         both rich + unified paths; the rich path adds one t-call (below). -->
+    <t t-name="neon_dashboard.block.block_per_rep">
+        <div class="o_neon_block o_neon_block_per_rep widget--block_per_rep">
+            <div class="o_neon_block_header">
+                <h3>Per-Rep Performance <small class="text-muted">(DRAFT — pending review)</small></h3>
+            </div>
+            <div t-if="perRepBlock.empty" class="o_neon_block_empty">
+                <span t-esc="perRepBlock.empty_message"/>
+            </div>
+            <table t-if="!perRepBlock.empty" class="o_neon_per_rep_table table table-sm">
+                <thead>
+                    <tr>
+                        <th>Rep</th>
+                        <th class="text-end">Pipeline (USD)</th>
+                        <th class="text-end">Win rate</th>
+                        <th class="text-end">Conversion</th>
+                        <th class="text-end">Open activities</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="perRepBlock.rows" t-as="row" t-key="row.rep_id">
+                        <td t-esc="row.rep_name"/>
+                        <td class="text-end" t-esc="row.pipeline_value"/>
+                        <td class="text-end"><t t-esc="row.win_rate"/>%</td>
+                        <td class="text-end"><t t-esc="row.conversion"/>%</td>
+                        <td class="text-end" t-esc="row.open_activities"/>
+                    </tr>
+                </tbody>
+            </table>
+            <small t-if="!perRepBlock.empty" class="text-muted" t-esc="perRepBlock.currency_note"/>
+        </div>
+    </t>
+
     <t t-name="neon_dashboard.block.block_finance">
         <div class="o_neon_block o_neon_block_finance widget--block_finance">
             <div class="o_neon_block_header">
@@ -1501,6 +1536,8 @@
                            t-call="neon_dashboard.block.block_jobs"/>
                         <t t-if="isWidgetVisible('block_sales')"
                            t-call="neon_dashboard.block.block_sales"/>
+                        <t t-if="isWidgetVisible('block_per_rep')"
+                           t-call="neon_dashboard.block.block_per_rep"/>
                     </section>
                     <section class="o_neon_row_b">
                         <t t-if="isWidgetVisible('block_finance')"

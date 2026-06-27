@@ -613,6 +613,11 @@ class NeonDashboard(models.Model):
         if resolved_type == "director":
             payload["kpi"].update(self._compute_kpi_hist())
             payload["hist_intel_block"] = self._compute_hist_intel_block()
+            # DRAFT (item #1, pending Tatenda review of dashboard scope
+            # coupling): director-only live per-rep performance block. Set
+            # here in the existing director branch so it never bleeds onto a
+            # View-As of another lens -- same containment as hist_intel_block.
+            payload["per_rep_block"] = self._compute_per_rep_block()
         return payload
 
     # ==================================================================
@@ -2235,6 +2240,97 @@ class NeonDashboard(models.Model):
             "pipeline_by_stage": self._compute_pipeline_by_stage(),
             "win_rate": self._compute_win_rate(),
             "lead_sources": self._compute_lead_sources(),
+        }
+
+    # ==================================================================
+    # DRAFT (item #1, pending Tatenda review of dashboard scope coupling):
+    # live per-rep performance. ADDITIVE -- new methods + a per_rep_block
+    # key in the EXISTING director payload branch + a new block widget.
+    # No existing compute / dispatch branch / scope rule / record rule is
+    # modified. _per_rep_aggregate is the REUSABLE helper item #5
+    # (follow-up rollup) will call with its own (model, domain, measures).
+    # ==================================================================
+    @api.model
+    def _per_rep_aggregate(self, model, rep_field, domain, measures):
+        """Generic per-rep read_group.
+
+        Returns {rep_id: {<measure_key>: value, '__count': n}}. Reusable
+        across per-rep features (item #1 here; item #5 reuses it with its
+        own domains). Runs sudo() so a director aggregates the whole team
+        -- consistent with the existing team-wide tile pattern. Unassigned
+        groups (no rep) are skipped from the per-rep table.
+        """
+        out = {}
+        for g in self.env[model].sudo().read_group(
+                domain, measures, [rep_field], lazy=False):
+            rep = g.get(rep_field)
+            if not rep:
+                continue
+            rep_id = rep[0] if isinstance(rep, (list, tuple)) else rep
+            row = {"__count": g.get("__count", 0)}
+            for m in measures:
+                k = m.split(":")[0]
+                row[k] = g.get(k) or 0
+            out[rep_id] = row
+        return out
+
+    def _compute_per_rep_block(self):
+        """Director-only per-rep table: pipeline value, win rate,
+        conversion, open-activity count -- side by side.
+
+        v1 metric definitions (a REVIEW POINT for Tatenda/Robin):
+        pipeline = open quote total (USD); win rate = accepted /
+        (accepted + rejected/expired) over 90d (mirrors _compute_win_rate);
+        conversion = accepted / all quotes; activity = open mail.activity
+        for the rep. Read-only sudo aggregate; per-rep attribution is why
+        this is director-scoped (set only in the director payload branch).
+        """
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        if not usd:
+            return {"empty": True, "rows": [],
+                    "empty_message": _("USD currency missing")}
+        cutoff = self._harare_date_to_utc_string(
+            self._today_harare() - timedelta(days=90))
+        Q = "neon.finance.quote"
+        pipe = self._per_rep_aggregate(
+            Q, "salesperson_id",
+            [("state", "in", ("pending_approval", "approved", "sent")),
+             ("currency_id", "=", usd.id)],
+            ["amount_total:sum"])
+        won90 = self._per_rep_aggregate(
+            Q, "salesperson_id",
+            [("state", "=", "accepted"), ("write_date", ">=", cutoff)], [])
+        lost90 = self._per_rep_aggregate(
+            Q, "salesperson_id",
+            [("state", "in", ("rejected", "expired")),
+             ("write_date", ">=", cutoff)], [])
+        won_all = self._per_rep_aggregate(
+            Q, "salesperson_id", [("state", "=", "accepted")], [])
+        total_q = self._per_rep_aggregate(Q, "salesperson_id", [], [])
+        acts = self._per_rep_aggregate("mail.activity", "user_id", [], [])
+        rep_ids = (set(pipe) | set(won90) | set(lost90)
+                   | set(won_all) | set(total_q) | set(acts))
+        Users = self.env["res.users"].sudo()
+        rows = []
+        for rid in rep_ids:
+            w = won90.get(rid, {}).get("__count", 0)
+            decided = w + lost90.get(rid, {}).get("__count", 0)
+            tot = total_q.get(rid, {}).get("__count", 0)
+            wa = won_all.get(rid, {}).get("__count", 0)
+            rows.append({
+                "rep_id": rid,
+                "rep_name": Users.browse(rid).name or _("(unknown)"),
+                "pipeline_value": pipe.get(rid, {}).get("amount_total", 0.0),
+                "win_rate": round(100.0 * w / decided, 1) if decided else 0.0,
+                "conversion": round(100.0 * wa / tot, 1) if tot else 0.0,
+                "open_activities": acts.get(rid, {}).get("__count", 0),
+            })
+        rows.sort(key=lambda r: r["pipeline_value"], reverse=True)
+        return {
+            "empty": not rows,
+            "empty_message": _("No per-rep activity yet"),
+            "rows": rows,
+            "currency_note": _("Pipeline + win/loss are USD-only (v1 DRAFT)"),
         }
 
     @api.model

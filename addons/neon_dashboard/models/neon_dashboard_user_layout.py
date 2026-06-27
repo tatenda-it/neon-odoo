@@ -85,6 +85,10 @@ _WIDGET_KEYS = [
     ("kpi_hist_demand", "KPI: Top Demand (Historical)"),
     ("kpi_hist_quotes", "KPI: Quotes (Historical)"),
     ("block_hist_intel", "Block: Historical Intelligence"),
+    # DRAFT (item #1, pending Tatenda review) -- director-only live per-rep
+    # performance block. getBlockTemplate is generic, so only this key +
+    # the rich-path t-call + the default_layouts.xml director row are needed.
+    ("block_per_rep", "Block: Per-Rep Performance (DRAFT)"),
 ]
 
 # Schema sketch §4.2 -- not hide-able. Set in M1 so the API contract

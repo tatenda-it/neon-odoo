@@ -902,6 +902,13 @@ export class NeonDashboard extends Component {
         };
     }
 
+    // DRAFT (item #1, pending Tatenda review): director-only per-rep block.
+    get perRepBlock() {
+        return (this.state.data && this.state.data.per_rep_block) || {
+            empty: true, rows: [],
+        };
+    }
+
     get agingQuotesBlock() {
         return (this.state.data && this.state.data.aging_quotes_block) || {
             empty: true, rows: [],
