@@ -68,6 +68,35 @@ Both cutover courses (`neon_cutover_courses`) are built and seeded **UNPUBLISHED
 
 ---
 
+## Deploy / cutover tasks
+
+### FINANCE COURSE PROD DEPLOY — ready, pending prod-box facts + execution (Tatenda)
+
+**Status:** pre-flight DONE; two blockers already caught and resolved in the plan. Needs three prod-box facts, then a gated execute sequence. Isolated/additive — touches only `neon_cutover_courses`. Target: `crm.neonhiring.com`, DB `neon_crm`, box `root@188.245.154.84:/opt/neon-odoo`.
+
+**Pre-flight resolved (do NOT re-litigate):**
+- **Draft isolation.** The deploy must **NOT** push `feat/wa6-equipment-face` — it carries **4 unreviewed dashboard/SLA DRAFT commits** (`cd33125`, `88a4d7f`, `f6cda39`, `3498078`, touching `neon_dashboard` + `neon_crm_extensions`). Cherry-pick **ONLY the 5 course commits** onto a fresh deploy branch: `9bc327b`, `4164a17`, `a1461e5`, `74b917a`, `a10ff85`. Local isolation proof PASSED — the union of files those 5 touch is exactly `addons/neon_cutover_courses/` + `PROGRESS.md` + `docs/TATENDA_WORKLIST.md`, **nothing else** (no `neon_dashboard`/`neon_crm_extensions`/other module). The 2 doc files are inert on prod.
+- **Base branch.** Do **NOT** base on `origin/main` — main is **~143 commits behind prod's live code** (HEAD `b178259`, dated 2026-06-11, *pre* banking Builds 1–5 / MIS / sidebar). Basing on main would regress live banking ~2.5 weeks. **Base the deploy branch on PROD'S ACTUAL CURRENT HEAD** so the install is purely additive (prod fast-forwards, only gains the new module). NB: cherry-picking onto main conflicted (modify/delete on `PROGRESS.md` + `docs/TATENDA_WORKLIST.md` — they don't exist at June-11 main) — extra confirmation that main ≠ live.
+
+**Facts still needed from the prod box (Tatenda has SSH/deploy access):**
+1. `git -C /opt/neon-odoo rev-parse HEAD` + `git -C /opt/neon-odoo branch --show-current` — the base commit/branch to cut from.
+2. `git -C /opt/neon-odoo status -s` — confirm the working tree is clean (no live local edits).
+3. Browser ORM on `neon_crm` (logged-in console): confirm `neon_cutover_courses` is **absent/uninstalled** (→ fresh `-i`) and `website_slides` is **installed** (the only dependency). Query:
+   `ir.module.module` `search_read` `[[["name","in",["neon_cutover_courses","website_slides"]]],["name","state"]]`.
+
+**Gated execute sequence (each step its own GO):**
+- **STEP 1 — build + PUSH deploy branch (FIRST IRREVERSIBLE).** Cut `deploy/cutover-courses-prod` from prod's actual HEAD, cherry-pick the 5 commits, re-run the footprint check locally, then `git push origin deploy/cutover-courses-prod`. Push is the external/irreversible action — present the final local diff and HOLD for GO before pushing.
+- **STEP 2 — point prod at the branch (GO).** On Hetzner: `cd /opt/neon-odoo` → `git fetch` → `git checkout deploy/cutover-courses-prod` → `git pull origin deploy/cutover-courses-prod`. Report `git status` proving the tree gained **only** the new module dir.
+- **STEP 3 — install (GO).** `odoo -d neon_crm -i neon_cutover_courses` (one process) → **one** force-recreate → confirm uptime reset.
+- **STEP 4 — verify + CHECKPOINT (no publish).** Confirm (via browser ORM) all **3 courses present, all `is_published=False`**; confirm no other module/data changed; give the director the eLearning URL to eyeball the rendered Finance course. STOP.
+- **STEP 5 — publish Finance (separate later GO, after director review).**
+
+**Publish states:** all 3 courses deploy **UNPUBLISHED**. Only **Finance** publishes after director review. **Sales + Director stay unpublished** (gates not cleared — Sales needs Munashe's rep-screen verification, the only remaining Sales gate).
+
+**⚠️ PUBLISH CAVEAT:** `is_published=False` is baked into the seed with `noupdate=0`, so a **UI publish is reverted by any future `-u`**. Durable publish = flip the seed `is_published=True` for Finance + re-deploy (not just a UI toggle).
+
+---
+
 ## Active priority — team onboarding / adoption (Phase 11 cutover, adoption half)
 
 **The problem (in plain terms):** The team is not yet onboarded onto the live ERP. The system is built and live; the people are not on it. Need a low-friction, reliable path to get current staff logged in, competent in their actual daily tasks, and re-grounded in company culture/expectations — fast — then a repeatable version for future hires. This is the adoption half of Phase 11, not a separate programme.
