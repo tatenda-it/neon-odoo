@@ -7,8 +7,9 @@
         Finance + Sales cutover). Section 3 REPLICATES the verified Sales
         selling-steps (B1-B6, B4a, C1-C2) at the 2-hour standard — plain
         slides can't be shared across channels, so this is a deliberate copy;
-        keep it in sync with cutover_sales_course.xml (esp. the discount figure
-        once Munashe confirms it). Sales-A2 (dashboard) is covered by Section 2.
+        keep it in sync with cutover_sales_course.xml. Discount figure CONFIRMED:
+        a discount above 10% needs MD approval (Section 3 + D2 below, in sync
+        with Sales B6/C2/Q4). Sales-A2 (dashboard) is covered by Section 2.
         No former-team-member names. D5.4 "does NOT track" items kept honest.
     -->
 
@@ -151,7 +152,7 @@
         <field name="channel_id" ref="course_cutover_director"/>
         <field name="sequence">38</field>
         <field name="html_content" type="html">
-            <p>A custom discount above the threshold needs <strong>MD approval</strong> — and as MD that sign-off is yours (see Section 4). Know the rule: reps can't apply an over-threshold discount without it.</p>
+            <p>A custom discount above 10% needs <strong>MD approval</strong> — and as MD that sign-off is yours (see Section 4). Know the rule: reps can't apply a discount above 10% without it.</p>
         </field>
     </record>
     <record id="dir_c1" model="slide.slide">
@@ -178,7 +179,7 @@
         <field name="html_content" type="html">
             <ul>
                 <li><strong>All client email correspondence copies the MD</strong> — the standard you set and uphold for the team (and model yourself).</li>
-                <li>Over-threshold discounts come to the <strong>MD</strong> for approval — that's you.</li>
+                <li>Discounts above 10% come to the <strong>MD</strong> for approval — that's you.</li>
                 <li>The promise every client should feel from Neon: <strong>Confidence, Clarity, Pride.</strong></li>
             </ul>
         </field>
@@ -211,7 +212,7 @@
         <field name="channel_id" ref="course_cutover_director"/>
         <field name="sequence">52</field>
         <field name="html_content" type="html">
-            <p>Over-threshold discounts come to you the same way (email or WhatsApp); reps can't apply them without your sign-off.</p>
+            <p>Discounts above 10% come to you the same way (email or WhatsApp); reps can't apply them without your sign-off.</p>
         </field>
     </record>
     <record id="dir_d3" model="slide.slide">

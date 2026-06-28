@@ -4,12 +4,12 @@
         Cutover - Sales : plain website_slides course, seeded as data.
         Source of truth: docs/CUTOVER_SALES_COURSE_SPEC.md
         noupdate=0 so -u re-applies and reverts UI drift.
-        Seeded UNPUBLISHED. DO NOT PUBLISH until BOTH gates clear:
-          (1) rep-screen verification of A2 + B1-B6 vs a real sales-rep session;
-          (2) Munashe confirms the discount threshold (then add the figure to
-              B6 / C2 / Q4).
-        Authoring QA annotations from the spec ((verify), (threshold pending
-        Munashe), etc.) are intentionally NOT in the learner-facing bodies.
+        Seeded UNPUBLISHED. DO NOT PUBLISH until the rep-screen gate clears:
+          (1) rep-screen verification of A2 + B1-B6 vs a real sales-rep session (Munashe).
+        Discount threshold gate RESOLVED: confirmed >10% (a discount above 10%
+        needs MD approval), now stated in B6 / C2 / Q4.
+        Authoring QA annotations from the spec ((verify), etc.) are
+        intentionally NOT in the learner-facing bodies.
     -->
 
     <!-- ===================== COURSE ===================== -->
@@ -134,8 +134,8 @@
         <field name="channel_id" ref="course_cutover_sales"/>
         <field name="sequence">27</field>
         <field name="html_content" type="html">
-            <p>A custom discount above the threshold needs <strong>MD approval</strong> — you can't apply it yourself. Know the rule before you promise a client a price.</p>
-            <p>✅ <strong>Done when:</strong> you can state the discount threshold and how approval is requested.</p>
+            <p>A custom discount above 10% needs <strong>MD approval</strong> — you can't apply it yourself. Know the rule before you promise a client a price.</p>
+            <p>✅ <strong>Done when:</strong> you can state the discount threshold (above 10% needs MD approval) and how approval is requested.</p>
         </field>
     </record>
 
@@ -173,7 +173,7 @@
         <field name="html_content" type="html">
             <ul>
                 <li><strong>Copy Munashe on all client email correspondence</strong> — not just proposals, regardless of value.</li>
-                <li>A custom discount above the threshold goes to the <strong>MD</strong> for approval.</li>
+                <li>A custom discount above 10% goes to the <strong>MD</strong> for approval.</li>
                 <li>The promise every client should feel from Neon: <strong>Confidence, Clarity, Pride.</strong></li>
             </ul>
             <p>✅ <strong>Done when:</strong> you know to copy Munashe on all client emails, what to escalate, and what we promise clients.</p>
@@ -269,7 +269,7 @@
 
     <!-- Q4 -->
     <record id="sales_q4" model="slide.question">
-        <field name="question">A client asks for a discount above the threshold. Can you grant it yourself?</field>
+        <field name="question">A client asks for a discount above 10%. Can you grant it yourself?</field>
         <field name="sequence">4</field>
         <field name="slide_id" ref="sales_quiz"/>
     </record>
@@ -281,9 +281,9 @@
     <record id="sales_q4_b" model="slide.answer">
         <field name="question_id" ref="sales_q4"/>
         <field name="sequence">2</field>
-        <field name="text_value">No — a discount above the threshold needs MD approval</field>
+        <field name="text_value">No — a discount above 10% needs MD approval</field>
         <field name="is_correct" eval="True"/>
-        <field name="comment">Correct — above the threshold it's the MD's call.</field>
+        <field name="comment">Correct — a discount above 10% needs MD approval; it's the MD's call.</field>
     </record>
     <record id="sales_q4_c" model="slide.answer">
         <field name="question_id" ref="sales_q4"/>

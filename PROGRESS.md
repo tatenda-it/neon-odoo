@@ -58,9 +58,11 @@ From the read-only sales-management oversight discovery (what a sales line-manag
 Both cutover courses (`neon_cutover_courses`) are built and seeded **UNPUBLISHED**. Finance is walkthrough-verified / deploy-ready; Sales must clear all items below before it publishes.
 
 **Cutover — Sales — pre-publish items (all must clear first):**
-1. **Rep-screen verification** — confirm A2 + B1–B6 against a real sales-rep session (Lisa/Evril or screen-share). Drafted from the director/superuser view, so the actual rep-facing screens are unconfirmed.
-2. **Munashe's discount threshold** — confirm the live figure, then fill it into B6 / C2 / Q4 (currently "above the threshold", no number).
-3. ✅ **DONE — Response standard 1h → 2h** — the Sales seed (`data/cutover_sales_course.xml`) now reads **"2 hours"** in C1 + Q5 (matches the system SLA). Verified clean/unpublished/idempotent in the throwaway DB. **Remaining Sales pre-publish gates: rep-screen verification + Munashe's discount threshold.**
+1. **Rep-screen verification** — confirm A2 + B1–B6 against a real sales-rep session (Lisa/Evril or screen-share). Drafted from the director/superuser view, so the actual rep-facing screens are unconfirmed. **← the only remaining Sales pre-publish gate (Munashe).**
+2. ✅ **DONE — discount threshold (confirmed >10%)** — a discount **above 10%** needs MD approval, now stated in B6 / C2 / Q4 of the Sales seed (`data/cutover_sales_course.xml`); Q4's correct answer + comment name the figure. No "above the threshold" placeholder remains. The **Director course Section 3 (+ D2) inherits the same figure** — `data/cutover_director_course.xml` kept in sync (sync coupling resolved). Verified clean/unpublished/idempotent across two `-u` runs in the sandbox.
+3. ✅ **DONE — Response standard 1h → 2h** — the Sales seed now reads **"2 hours"** in C1 + Q5 (matches the system SLA). Verified clean/unpublished/idempotent in the throwaway DB.
+
+**Remaining Sales pre-publish gate: rep-screen verification (Munashe) only.**
 
 **Cutover — Finance:** verified against the live walkthrough; deploy-ready pending the gated deploy + director review/publish.
 
