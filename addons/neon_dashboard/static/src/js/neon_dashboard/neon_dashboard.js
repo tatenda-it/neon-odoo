@@ -81,6 +81,9 @@ export class NeonDashboard extends Component {
             error: null,
             data: null,
             activeFilter: "all",
+            // DRAFT (item #1 revised): per-rep block period-toggle state.
+            perRepPeriod: "90d",
+            perRepBlockData: null,
             // M10: 'pdf' or 'xlsx' while an export is in flight;
             // null when idle. Disables both buttons during the
             // 2-5s server roundtrip to prevent double-clicks.
@@ -904,9 +907,21 @@ export class NeonDashboard extends Component {
 
     // DRAFT (item #1, pending Tatenda review): director-only per-rep block.
     get perRepBlock() {
-        return (this.state.data && this.state.data.per_rep_block) || {
-            empty: true, rows: [],
-        };
+        // DRAFT (item #1 revised): prefer the period-toggled re-fetch if set.
+        return this.state.perRepBlockData
+            || (this.state.data && this.state.data.per_rep_block)
+            || { empty: true, rows: [] };
+    }
+
+    get perRepPeriod() {
+        return this.state.perRepPeriod || "90d";
+    }
+
+    async onPerRepPeriod(period) {
+        this.state.perRepPeriod = period;
+        const r = await this.orm.call(
+            "neon.dashboard", "get_per_rep_block", [period]);
+        this.state.perRepBlockData = (r && r.per_rep_block) || null;
     }
 
     // DRAFT (item #5, paired with #1): director-only follow-up compliance.

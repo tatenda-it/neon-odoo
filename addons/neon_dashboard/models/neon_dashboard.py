@@ -2278,64 +2278,115 @@ class NeonDashboard(models.Model):
             out[rep_id] = row
         return out
 
-    def _compute_per_rep_block(self):
-        """Director-only per-rep table: pipeline value, win rate,
-        conversion, open-activity count -- side by side.
+    def _compute_per_rep_block(self, period="90d"):
+        """DRAFT (item #1, REVISED metric definitions — pending Tatenda review).
+        Director-only per-rep table, recomputed on a TOGGLEABLE `period`.
 
-        v1 metric definitions (a REVIEW POINT for Tatenda/Robin):
-        pipeline = open quote total (USD); win rate = accepted /
-        (accepted + rejected/expired) over 90d (mirrors _compute_win_rate);
-        conversion = accepted / all quotes; activity = open mail.activity
-        for the rep. Read-only sudo aggregate; per-rep attribution is why
-        this is director-scoped (set only in the director payload branch).
+        Confirmed definitions:
+        - pipeline   = open quote total (USD), current (period-independent).
+        - win rate   = accepted / (accepted + rejected/expired), over `period`.
+        - conversion = accepted / SENT (sent_at set), both within `period`.
+        - touchpoints= client touchpoints in `period`: emails
+          (mail.message message_type='email') + done calls/meetings
+          (mail.message mail_activity_type_id of category phonecall/meeting)
+          + quotes sent (sent_at). Internal notes / to-dos / generic comments
+          EXCLUDED. KNOWN LIMITATION: WhatsApp (neon.whatsapp.message) is not
+          yet reliably per-rep-attributable -> excluded, flagged for follow-up.
+        `period` in 30d / 90d / quarter / all (default 90d) governs all three
+        time-based metrics. Read-only sudo aggregate; director-scoped. Reuses
+        _per_rep_aggregate UNCHANGED, so #5 / #3 are unaffected.
         """
         usd = self.env.ref("base.USD", raise_if_not_found=False)
         if not usd:
-            return {"empty": True, "rows": [],
+            return {"empty": True, "rows": [], "period": period,
                     "empty_message": _("USD currency missing")}
-        cutoff = self._harare_date_to_utc_string(
-            self._today_harare() - timedelta(days=90))
+        today = self._today_harare()
+        if period == "30d":
+            cutoff = self._harare_date_to_utc_string(today - timedelta(days=30))
+        elif period == "quarter":
+            q_start = today.replace(
+                month=3 * ((today.month - 1) // 3) + 1, day=1)
+            cutoff = self._harare_date_to_utc_string(q_start)
+        elif period == "all":
+            cutoff = None
+        else:  # default 90d
+            cutoff = self._harare_date_to_utc_string(today - timedelta(days=90))
+
         Q = "neon.finance.quote"
+        # pipeline -- current open, period-independent
         pipe = self._per_rep_aggregate(
             Q, "salesperson_id",
             [("state", "in", ("pending_approval", "approved", "sent")),
              ("currency_id", "=", usd.id)],
             ["amount_total:sum"])
-        won90 = self._per_rep_aggregate(
-            Q, "salesperson_id",
-            [("state", "=", "accepted"), ("write_date", ">=", cutoff)], [])
-        lost90 = self._per_rep_aggregate(
-            Q, "salesperson_id",
-            [("state", "in", ("rejected", "expired")),
-             ("write_date", ">=", cutoff)], [])
-        won_all = self._per_rep_aggregate(
-            Q, "salesperson_id", [("state", "=", "accepted")], [])
-        total_q = self._per_rep_aggregate(Q, "salesperson_id", [], [])
-        acts = self._per_rep_aggregate("mail.activity", "user_id", [], [])
-        rep_ids = (set(pipe) | set(won90) | set(lost90)
-                   | set(won_all) | set(total_q) | set(acts))
+        # win rate -- won / (won + lost) within period (by write_date)
+        win_dom = [("state", "=", "accepted")]
+        lost_dom = [("state", "in", ("rejected", "expired"))]
+        # conversion -- accepted / SENT (sent_at set), both within period
+        sent_dom = [("sent_at", "!=", False)]
+        acc_sent_dom = [("sent_at", "!=", False), ("state", "=", "accepted")]
+        if cutoff:
+            win_dom += [("write_date", ">=", cutoff)]
+            lost_dom += [("write_date", ">=", cutoff)]
+            sent_dom += [("sent_at", ">=", cutoff)]
+            acc_sent_dom += [("sent_at", ">=", cutoff)]
+        won = self._per_rep_aggregate(Q, "salesperson_id", win_dom, [])
+        lost = self._per_rep_aggregate(Q, "salesperson_id", lost_dom, [])
+        sent = self._per_rep_aggregate(Q, "salesperson_id", sent_dom, [])
+        acc_sent = self._per_rep_aggregate(Q, "salesperson_id", acc_sent_dom, [])
+        # client touchpoints: emails + done calls/meetings (by create_uid).
+        # Resolve touchpoint activity-type ids (phonecall/meeting) to avoid a
+        # dotted-domain join; empty list -> emails-only, still safe.
+        tp_type_ids = self.env["mail.activity.type"].sudo().search(
+            [("category", "in", ("phonecall", "meeting"))]).ids
+        msg_dom = [("model", "in", ("crm.lead", "neon.finance.quote")),
+                   "|", ("message_type", "=", "email"),
+                   ("mail_activity_type_id", "in", tp_type_ids)]
+        if cutoff:
+            msg_dom = [("date", ">=", cutoff)] + msg_dom
+        msgs = self._per_rep_aggregate("mail.message", "create_uid", msg_dom, [])
+
+        rep_ids = (set(pipe) | set(won) | set(lost) | set(sent)
+                   | set(acc_sent) | set(msgs))
         Users = self.env["res.users"].sudo()
         rows = []
         for rid in rep_ids:
-            w = won90.get(rid, {}).get("__count", 0)
-            decided = w + lost90.get(rid, {}).get("__count", 0)
-            tot = total_q.get(rid, {}).get("__count", 0)
-            wa = won_all.get(rid, {}).get("__count", 0)
+            w = won.get(rid, {}).get("__count", 0)
+            decided = w + lost.get(rid, {}).get("__count", 0)
+            s = sent.get(rid, {}).get("__count", 0)
+            asd = acc_sent.get(rid, {}).get("__count", 0)
+            # touchpoints = email/call/meeting messages + quotes sent in period
+            touch = (msgs.get(rid, {}).get("__count", 0)
+                     + sent.get(rid, {}).get("__count", 0))
             rows.append({
                 "rep_id": rid,
                 "rep_name": Users.browse(rid).name or _("(unknown)"),
                 "pipeline_value": pipe.get(rid, {}).get("amount_total", 0.0),
                 "win_rate": round(100.0 * w / decided, 1) if decided else 0.0,
-                "conversion": round(100.0 * wa / tot, 1) if tot else 0.0,
-                "open_activities": acts.get(rid, {}).get("__count", 0),
+                "conversion": round(100.0 * asd / s, 1) if s else 0.0,
+                "client_touchpoints": touch,
             })
         rows.sort(key=lambda r: r["pipeline_value"], reverse=True)
         return {
             "empty": not rows,
             "empty_message": _("No per-rep activity yet"),
             "rows": rows,
-            "currency_note": _("Pipeline + win/loss are USD-only (v1 DRAFT)"),
+            "period": period,
+            "currency_note": _("Pipeline USD-only; win/conversion/touchpoints "
+                               "over the selected period (v1 DRAFT)"),
         }
+
+    def get_per_rep_block(self, period="90d"):
+        """DRAFT (item #1): director-gated RPC for the per-rep block period
+        toggle. Recomputes the block on the selected period. Director-only
+        (per-rep attribution), so non-superusers are refused."""
+        self._check_dashboard_access()
+        if not self._is_superuser():
+            from odoo.exceptions import AccessError
+            raise AccessError(_("Per-rep performance is director-only."))
+        if period not in ("30d", "90d", "quarter", "all"):
+            period = "90d"
+        return {"per_rep_block": self._compute_per_rep_block(period)}
 
     # ==================================================================
     # DRAFT (item #5, PAIRED with #1 -- reuses _per_rep_aggregate from the

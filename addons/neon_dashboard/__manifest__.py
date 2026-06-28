@@ -117,7 +117,7 @@
     # action area; card grid + fixed chat rail + inner block scroll unaffected.
     # Asset-bundle (SCSS) change -> -u + delete web.assets_* + force-recreate;
     # users hard-refresh once. No Python / model / RBAC change.
-    "version": "17.0.11.9.0",
+    "version": "17.0.11.10.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

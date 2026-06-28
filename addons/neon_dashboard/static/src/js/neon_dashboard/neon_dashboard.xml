@@ -163,6 +163,13 @@
         <div class="o_neon_block o_neon_block_per_rep widget--block_per_rep">
             <div class="o_neon_block_header">
                 <h3>Per-Rep Performance <small class="text-muted">(DRAFT — pending review)</small></h3>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Period">
+                    <button t-foreach="['30d','90d','quarter','all']" t-as="p" t-key="p"
+                            class="btn"
+                            t-att-class="(perRepPeriod === p) ? 'btn-primary' : 'btn-outline-secondary'"
+                            t-on-click="() => this.onPerRepPeriod(p)"
+                            t-esc="p === 'all' ? 'All' : (p === 'quarter' ? 'Quarter' : p)"/>
+                </div>
             </div>
             <div t-if="perRepBlock.empty" class="o_neon_block_empty">
                 <span t-esc="perRepBlock.empty_message"/>
@@ -174,7 +181,7 @@
                         <th class="text-end">Pipeline (USD)</th>
                         <th class="text-end">Win rate</th>
                         <th class="text-end">Conversion</th>
-                        <th class="text-end">Open activities</th>
+                        <th class="text-end">Client touchpoints</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -183,7 +190,7 @@
                         <td class="text-end" t-esc="row.pipeline_value"/>
                         <td class="text-end"><t t-esc="row.win_rate"/>%</td>
                         <td class="text-end"><t t-esc="row.conversion"/>%</td>
-                        <td class="text-end" t-esc="row.open_activities"/>
+                        <td class="text-end" t-esc="row.client_touchpoints"/>
                     </tr>
                 </tbody>
             </table>
