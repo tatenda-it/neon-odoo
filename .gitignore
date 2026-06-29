@@ -34,3 +34,9 @@ backups/
 # (committed); settings.local.json holds personal accumulated
 # allow-list entries and never goes in the repo.
 .claude/settings.local.json
+
+# Prod-only artefacts — these live in the prod repo working dir
+# (Zoho exports, DB dumps, config backups) but must NEVER be committed.
+zoho_*.json
+*.dump
+config/*.bak-*

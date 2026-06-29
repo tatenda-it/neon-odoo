@@ -13,6 +13,49 @@ milestone-specific procedural steps, see
 - Production server: Hetzner, crm.neonhiring.com
 - Phase 5 LIVE; Phase 6 local-only until P6.M12 deploy
 
+## Who's who & roles
+
+- **Munashe Goneso** — Managing Director (MD).
+- **Robin Goneso** — Operations Director (OD). Munashe and Robin have
+  **equal system permissions** (family business; Goneso is the shared
+  surname).
+- **Tatenda Ngairongwe** (`tatenda@neonhiring.co.zw`, GitHub `tatenda-it`)
+  — Sales Rep + Developer; drives the build. No finance responsibilities.
+- **Kudzaiishe** — Bookkeeper, login `admin@neonhiring.co.zw` (her work
+  address, NOT the Odoo superuser account; that drift was cleaned in
+  P6.M12). Only dual-role user in prod (Bookkeeper + HR Admin).
+- **Lisa, Evrill** — Sales Representatives (Lisa has no workshop authority).
+- **Lead Tech** (`crew_leader` group) — a **permanent role, currently
+  VACANT**. Previous holder `ranganai@neonhiring.co.zw` was offboarded
+  (user deactivated, history preserved). `lead_tech_id` default on
+  `commercial.event.job` is **none while vacant**; the role resolves
+  dynamically via the `crew_leader` **group, not a login**. Dashboard tier
+  and the finance cost-line record rule key off the same group. Hiring a
+  new Lead Tech = add them to the group; nothing else changes. Crew Chief
+  stays a per-event role (`is_crew_chief` flag), distinct from the standing
+  Lead Tech role.
+
+## Two-station collaboration & git rhythm
+
+This repo is worked from **two equal stations — Tatenda's and Robin's**.
+Both commit and deploy to production the same way; the Autonomy amendment's
+gates apply equally to whoever is driving. The remote is the single source
+of truth.
+
+- **`git pull` when you sit down**; **`git push` when you stand up**
+  (before stepping away).
+- **Deploy to prod ONE AT A TIME.** Only one station deploys at any moment.
+  Before deploying: pull latest, confirm the other person isn't mid-deploy
+  (a quick "deploying now" between the two humans suffices), deploy, and let
+  it finish completely before the other station starts. The per-action
+  gates stop *bad* changes; this rule stops *two good changes colliding* —
+  both are required.
+- **Prefer separate feature branches** so the two stations aren't editing
+  the same files at once; merge to main when ready.
+- Commits are authored as **`tatenda-it`** even when the AI session is
+  logged in under a different Anthropic account — the Anthropic login pays
+  for the tool; the git identity is whose name lands on history.
+
 ## Two-gate approval pattern
 
 Every milestone has exactly two human approval gates:
