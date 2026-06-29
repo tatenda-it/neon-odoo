@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Both crons ship INACTIVE (active=False). Activation is gated
+         (Gate 0 + cutover + written-AUP confirmation for eGP). -->
+    <data noupdate="1">
+        <record id="cron_neon_radar_classify" model="ir.cron">
+            <field name="name">Neon Radar: Classify Signals (STUB - INACTIVE)</field>
+            <field name="model_id" ref="model_neon_market_signal"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_neon_radar_classify()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="False"/>
+        </record>
+
+        <record id="cron_neon_radar_poll_egp" model="ir.cron">
+            <field name="name">Neon Radar: Poll eGP Bulletin (STUB - INACTIVE)</field>
+            <field name="model_id" ref="model_neon_market_signal"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_neon_radar_poll_egp()</field>
+            <field name="interval_number">6</field>
+            <field name="interval_type">hours</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="False"/>
+        </record>
+    </data>
+</odoo>

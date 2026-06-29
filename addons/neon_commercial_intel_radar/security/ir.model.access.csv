@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_market_source_user,neon.market.source user,model_neon_market_source,neon_commercial_intel.group_neon_ci_user,1,0,0,0
+access_neon_market_source_manager,neon.market.source manager,model_neon_market_source,neon_commercial_intel.group_neon_ci_manager,1,1,1,1
+access_neon_market_signal_user,neon.market.signal user,model_neon_market_signal,neon_commercial_intel.group_neon_ci_user,1,1,1,0
+access_neon_market_signal_manager,neon.market.signal manager,model_neon_market_signal,neon_commercial_intel.group_neon_ci_manager,1,1,1,1

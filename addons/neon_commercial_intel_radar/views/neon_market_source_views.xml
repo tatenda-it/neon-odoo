@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_neon_market_source_tree" model="ir.ui.view">
+        <field name="name">neon.market.source.tree</field>
+        <field name="model">neon.market.source</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="source_type"/>
+                <field name="ingest_method"/>
+                <field name="tos_status"
+                       decoration-success="tos_status == 'cleared'"
+                       decoration-warning="tos_status == 'check'"
+                       decoration-danger="tos_status == 'restricted'"/>
+                <field name="signal_count"/>
+                <field name="event_relevant_count"/>
+                <field name="promoted_count"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_market_source_form" model="ir.ui.view">
+        <field name="name">neon.market.source.form</field>
+        <field name="model">neon.market.source</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_radar_poll_sample" type="object"
+                            string="Poll from sample (test)" class="btn-secondary"
+                            invisible="ingest_method != 'public_poll'"
+                            help="Runs the eGP parser on a built-in sample fixture. No live fetch."/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="source_type"/>
+                            <field name="ingest_method"/>
+                            <field name="email_match"
+                                   invisible="ingest_method != 'email_alias'"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Yield (s11a)">
+                            <field name="tos_status"/>
+                            <field name="signal_count"/>
+                            <field name="event_relevant_count"/>
+                            <field name="promoted_count"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_market_source" model="ir.actions.act_window">
+        <field name="name">Radar Sources</field>
+        <field name="res_model">neon.market.source</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_market_source"
+              name="Radar Sources"
+              parent="neon_commercial_intel.menu_neon_ci_config"
+              action="action_neon_market_source"
+              groups="neon_commercial_intel.group_neon_ci_manager"
+              sequence="40"/>
+</odoo>
