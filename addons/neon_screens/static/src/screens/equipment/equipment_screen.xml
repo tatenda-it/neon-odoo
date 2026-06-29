@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_screens.EquipmentScreen">
+        <div class="o_neon_equip_screen">
+
+            <!-- Header -->
+            <div class="o_neon_equip_header">
+                <div>
+                    <h2 class="o_neon_equip_title">Equipment &amp; Inventory</h2>
+                    <div class="o_neon_equip_chips" t-if="state.data">
+                        <span class="o_neon_chip"><strong t-esc="summary.total_assets"/> assets</span>
+                        <span class="o_neon_chip"><strong t-esc="summary.workshop_items"/> items</span>
+                        <span class="o_neon_chip"><strong t-esc="summary.categories"/> categories</span>
+                        <span class="o_neon_chip o_neon_chip_muted" t-if="lastUpdated">Updated <t t-esc="lastUpdated"/></span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" t-on-click="() => this.onRefresh()" t-att-disabled="state.loading">
+                    <i t-att-class="state.loading ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <!-- Error -->
+            <div t-if="state.error" class="alert alert-danger" role="alert">
+                <i class="fa fa-exclamation-circle me-2"/>
+                <span>Failed to load: </span><span t-esc="state.error"/>
+            </div>
+
+            <!-- Loading -->
+            <div t-if="state.loading and !state.data" class="o_neon_equip_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+                <div class="mt-2 text-muted">Loading equipment…</div>
+            </div>
+
+            <div t-if="state.data" class="o_neon_equip_body">
+
+                <!-- ===== Conflict / sub-hire card ===== -->
+                <div class="o_neon_card o_neon_conflict_card"
+                     t-att-class="isClear ? 'o_neon_conflict_clear' : 'o_neon_conflict_alert'">
+                    <div class="o_neon_conflict_head">
+                        <div>
+                            <span class="o_neon_conflict_icon">
+                                <i t-att-class="isClear ? 'fa fa-check-circle' : 'fa fa-exclamation-triangle'"/>
+                            </span>
+                            <span class="o_neon_conflict_title" t-if="isClear">All clear — no equipment conflicts</span>
+                            <span class="o_neon_conflict_title" t-else="">Conflict detected — sub-hire recommended</span>
+                        </div>
+                        <div class="o_neon_conflict_meta" t-if="conflict.exists">
+                            <span t-if="conflict.window_start">Window: <t t-esc="conflict.window_start"/> → <t t-esc="conflict.window_end"/></span>
+                            <span class="ms-3" t-esc="conflict.name"/>
+                        </div>
+                    </div>
+
+                    <div t-if="!conflict.exists" class="o_neon_conflict_sub text-muted">
+                        No conflict run on record yet. Availability below reflects current stock.
+                    </div>
+                    <div t-elif="isClear" class="o_neon_conflict_sub text-muted">
+                        Latest run <t t-esc="conflict.name"/>: <t t-esc="conflict.line_count"/> item(s) evaluated, 0 deficits, 0 zero-margin.
+                    </div>
+
+                    <!-- Deficit / zero-margin lines (the real sub-hire list) -->
+                    <table t-if="!isClear and conflict.lines.length" class="table o_neon_table o_neon_conflict_lines mt-2">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Item</th><th>Category</th>
+                                <th class="text-end">Required</th>
+                                <th class="text-end">Available</th>
+                                <th class="text-end">Deficit</th>
+                                <th class="text-end">Margin</th>
+                                <th>Status</th>
+                                <th>Competing events</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="conflict.lines" t-as="l" t-key="l.product_id">
+                                <tr>
+                                    <td><span class="o_neon_priority" t-esc="l.priority"/></td>
+                                    <td t-esc="l.item"/>
+                                    <td class="text-muted" t-esc="l.category"/>
+                                    <td class="text-end" t-esc="l.required"/>
+                                    <td class="text-end" t-esc="l.available"/>
+                                    <td class="text-end"><strong t-esc="l.deficit"/></td>
+                                    <td class="text-end" t-esc="l.margin"/>
+                                    <td>
+                                        <span class="badge" t-att-class="l.status === 'deficit' ? 'text-bg-warning' : 'text-bg-danger'"
+                                              t-esc="l.status === 'deficit' ? 'SUB-HIRE' : 'ZERO MARGIN'"/>
+                                    </td>
+                                    <td class="text-muted">
+                                        <t t-esc="l.events.join(', ')"/>
+                                        <t t-if="l.event_count > l.events.length">…</t>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ===== Tabs ===== -->
+                <div class="o_neon_tabs">
+                    <button class="o_neon_tab" t-att-class="state.tab === 'availability' ? 'o_neon_tab_active' : ''"
+                            t-on-click="() => this.setTab('availability')">Availability</button>
+                    <button class="o_neon_tab" t-att-class="state.tab === 'register' ? 'o_neon_tab_active' : ''"
+                            t-on-click="() => this.setTab('register')">Asset Register</button>
+                </div>
+
+                <!-- ===== Availability (per item) ===== -->
+                <div t-if="state.tab === 'availability'" class="o_neon_card">
+                    <table class="table o_neon_table">
+                        <thead>
+                            <tr>
+                                <th>Item</th><th>Category</th>
+                                <th class="text-end">Owned</th>
+                                <th class="text-end">Available</th>
+                                <th class="text-end">Hire rate</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="availability" t-as="row" t-key="row.id">
+                                <tr>
+                                    <td><strong t-esc="row.item"/></td>
+                                    <td class="text-muted" t-esc="row.category"/>
+                                    <td class="text-end" t-esc="row.owned"/>
+                                    <td class="text-end" t-esc="row.available"/>
+                                    <td class="text-end">
+                                        <t t-if="row.rate_has_rule">$<t t-esc="row.rate"/></t>
+                                        <t t-else=""><span class="text-muted">—</span></t>
+                                    </td>
+                                    <td><span class="badge" t-att-class="toneClass(row.tone)" t-esc="row.status"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ===== Asset register (per unit) ===== -->
+                <div t-if="state.tab === 'register'" class="o_neon_card">
+                    <div class="o_neon_register_note text-muted" t-if="summary.shown_assets &lt; summary.total_assets">
+                        Showing first <t t-esc="summary.shown_assets"/> of <t t-esc="summary.total_assets"/> assets.
+                    </div>
+                    <table class="table o_neon_table">
+                        <thead>
+                            <tr><th>Asset ID</th><th>Item</th><th>Category</th><th>State</th></tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="assets" t-as="a" t-key="a.asset_id + '_' + a_index">
+                                <tr>
+                                    <td><code class="o_neon_asset_id" t-esc="a.asset_id"/></td>
+                                    <td t-esc="a.item"/>
+                                    <td class="text-muted" t-esc="a.category"/>
+                                    <td><span class="badge" t-att-class="toneClass(a.tone)" t-esc="a.state_label"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_equipment_screen_user,neon.equipment.screen user,model_neon_equipment_screen,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_equipment_screen_manager,neon.equipment.screen manager,model_neon_equipment_screen,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_neon_equipment_screen_crew_leader,neon.equipment.screen crew leader,model_neon_equipment_screen,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0

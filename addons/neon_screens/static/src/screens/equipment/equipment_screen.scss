@@ -1,0 +1,84 @@
+// Equipment & Inventory screen — layout only. Palette/shape come from the
+// neon_theme tokens (var(--neon-*)); fallbacks keep it sane if the theme is
+// absent. Status pills reuse Bootstrap .badge (themed by neon_theme).
+
+.o_neon_equip_screen {
+    padding: 20px 24px 40px;
+    background: var(--neon-page, #F6F4FB);
+    min-height: 100%;
+    overflow-y: auto;
+
+    .o_neon_equip_header {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 16px; margin-bottom: 18px;
+    }
+    .o_neon_equip_title {
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 800; color: var(--neon-ink, #1A1A1A); margin: 0;
+    }
+    .o_neon_equip_chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .o_neon_chip {
+        background: #fff; border: 1px solid #ECE8F5; border-radius: 999px;
+        padding: 3px 12px; font-size: .82rem; color: var(--neon-ink, #1A1A1A);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        strong { color: var(--neon-purple, #7A6BAE); }
+    }
+    .o_neon_chip_muted { color: var(--neon-muted, #8E89A0); box-shadow: none; }
+
+    .o_neon_equip_loading { text-align: center; padding: 60px 0; color: var(--neon-muted, #8E89A0); }
+
+    // --- cards ---
+    .o_neon_card {
+        background: #fff; border: 1px solid #ECE8F5; border-radius: var(--neon-radius-card, 14px);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        padding: 18px 20px; margin-bottom: 18px;
+    }
+
+    // --- conflict card ---
+    .o_neon_conflict_card { border-left: 5px solid var(--neon-muted, #8E89A0); }
+    .o_neon_conflict_clear { border-left-color: var(--neon-green, #2BA84A); }
+    .o_neon_conflict_alert { border-left-color: var(--neon-amber, #E8973A); background: #FFFBF5; }
+    .o_neon_conflict_head {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .o_neon_conflict_icon { font-size: 1.2rem; margin-right: 8px;
+        .fa-check-circle { color: var(--neon-green, #2BA84A); }
+        .fa-exclamation-triangle { color: var(--neon-amber, #E8973A); }
+    }
+    .o_neon_conflict_title {
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 700; color: var(--neon-ink, #1A1A1A);
+    }
+    .o_neon_conflict_meta { font-size: .8rem; color: var(--neon-muted, #8E89A0); }
+    .o_neon_conflict_sub { margin-top: 6px; font-size: .9rem; }
+    .o_neon_priority {
+        display: inline-block; min-width: 22px; text-align: center;
+        background: var(--neon-purple, #7A6BAE); color: #fff;
+        border-radius: 999px; font-size: .72rem; font-weight: 700; padding: 1px 6px;
+    }
+
+    // --- tables ---
+    .o_neon_table {
+        margin: 0;
+        thead th {
+            font-family: var(--neon-heading, 'Montserrat', sans-serif);
+            text-transform: uppercase; letter-spacing: .04em; font-size: .7rem;
+            font-weight: 700; color: var(--neon-muted, #8E89A0);
+            border-bottom: 1px solid #ECE8F5; background: #FBFAFE;
+        }
+        tbody td { vertical-align: middle; border-bottom: 1px solid #F2EFFa; }
+        tbody tr:hover { background: var(--neon-page, #F6F4FB); }
+        .badge { border-radius: 999px; font-weight: 600; }
+    }
+    .o_neon_asset_id { color: var(--neon-indigo, #4753A1); background: #F2EFFB; padding: 1px 7px; border-radius: 6px; }
+
+    // --- tabs ---
+    .o_neon_tabs { display: flex; gap: 6px; margin: 4px 0 14px; }
+    .o_neon_tab {
+        border: 0; background: transparent; padding: 7px 16px; border-radius: 999px;
+        font-family: var(--neon-heading, 'Montserrat', sans-serif); font-weight: 600;
+        color: var(--neon-muted, #8E89A0); cursor: pointer;
+    }
+    .o_neon_tab_active { background: var(--neon-purple, #7A6BAE); color: #fff; }
+    .o_neon_register_note { font-size: .82rem; margin-bottom: 8px; }
+}

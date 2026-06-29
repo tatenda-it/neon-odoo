@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Inline-return server action (no persisted client action = no
+         direct-URL bypass). Gated to the neon_jobs operational groups. -->
+    <record id="action_equipment_screen_server" model="ir.actions.server">
+        <field name="name">Equipment &amp; Inventory</field>
+        <field name="model_id" ref="model_neon_equipment_screen"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_equipment_screen()</field>
+        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_user')), (4, ref('neon_jobs.group_neon_jobs_manager')), (4, ref('neon_jobs.group_neon_jobs_crew_leader'))]"/>
+    </record>
+
+    <!-- Top-level rail entry. sequence=5 = the Equipment slot in the
+         curated 9-slot order (set by the Rail v0 hook). No web_icon: the
+         rail renders it from the menu service; raw apps remain reachable. -->
+    <menuitem id="menu_equipment_screen_root"
+              name="Equipment &amp; Inventory"
+              action="action_equipment_screen_server"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="5"/>
+
+</odoo>
