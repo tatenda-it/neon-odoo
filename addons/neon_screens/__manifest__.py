@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Screens — Equipment & Inventory",
-    "version": "17.0.1.3.0",
+    "version": "17.0.1.3.1",
     "summary": "Design-deck Equipment & Inventory screen + Rail v0 nav "
                "skeleton (additive, read-only — no new equipment fields)",
     "description": """
@@ -44,6 +44,7 @@ equipment data, no writes, no new security groups.
     ],
     "assets": {
         "web.assets_backend": [
+            "neon_screens/static/src/screens/_screen_base.scss",
             "neon_screens/static/src/screens/equipment/equipment_screen.scss",
             "neon_screens/static/src/screens/equipment/equipment_screen.js",
             "neon_screens/static/src/screens/equipment/equipment_screen.xml",

@@ -1,0 +1,25 @@
+// Shared scroll foundation for ALL neon_screens client-action screens.
+//
+// Odoo 17's .o_action_manager (the host of an ir.actions.client component)
+// has overflow:hidden and a BOUNDED clientHeight. A screen root sized by its
+// content (e.g. min-height:100%) grows past that height and is CLIPPED — no
+// scrollbar, content below the fold unreachable. See
+// [tag:odoo17-action-manager-scroll-lock]. This bit all three deck screens at
+// desktop height once their lists got long.
+//
+// Fix: bound the screen root to the action manager's height (height:100%) and
+// let the screen own its scroll. Two layout flavours share this base:
+//   .o_neon_screen_scroll — single-column screens (Equipment, Event Jobs):
+//        the whole root scrolls.
+//   .o_neon_screen_fill   — composed screens (Operations Calendar): the root
+//        fills + clips; inner regions (embedded view, Holds panel) scroll
+//        independently via their own overflow rules.
+
+.o_neon_screen {
+    height: 100%;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;   // iOS momentum scroll
+}
+
+.o_neon_screen.o_neon_screen_scroll { overflow-y: auto; }
+.o_neon_screen.o_neon_screen_fill { overflow: hidden; }

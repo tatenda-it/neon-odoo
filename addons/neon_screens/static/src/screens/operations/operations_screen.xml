@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
 
     <t t-name="neon_screens.OperationsCalendarScreen">
-        <div class="o_neon_ops_screen">
+        <div class="o_neon_screen o_neon_screen_fill o_neon_ops_screen">
             <div class="o_neon_ops_grid">
 
                 <!-- LEFT: custom view switcher + the embedded native view -->

@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
 
     <t t-name="neon_screens.EventJobsScreen">
-        <div class="o_neon_ej_screen">
+        <div class="o_neon_screen o_neon_screen_scroll o_neon_ej_screen">
 
             <div class="o_neon_ej_header">
                 <div>

@@ -1,10 +1,12 @@
 // Operations Calendar composed screen — 2-column layout (native calendar +
 // Holds-to-chase panel). Palette/shape from neon_theme tokens (with fallbacks).
 
+// Root height:100% + overflow:hidden come from the shared .o_neon_screen base
+// (_screen_base.scss) via .o_neon_screen_fill. Inner regions below scroll
+// independently (view host clips + lets the embedded view scroll; Holds body
+// is overflow-y:auto).
 .o_neon_ops_screen {
-    height: 100%;
     background: var(--neon-page, #F6F4FB);
-    overflow: hidden;
 
     .o_neon_ops_grid {
         display: flex;
