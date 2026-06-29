@@ -24,7 +24,7 @@ _logger = logging.getLogger(__name__)
 RAIL_V0_SLOTS = [
     (1, "neon_dashboard.menu_neon_dashboard_root", "My Landing"),
     (2, "crm.crm_menu_root", None),                        # CRM Pipeline (screen TBD)
-    (3, "neon_jobs.menu_operations_root", None),           # Operations Calendar (TBD)
+    (3, "neon_screens.menu_operations_calendar_root", "Operations Calendar"),  # screen #2 (built)
     # slot 4 Event Jobs — no distinct top-level menu yet; claims its slot when built
     (5, "neon_screens.menu_equipment_screen_root", "Equipment & Inventory"),
     (6, "hr.menu_hr_root", None),                          # Crew & People (TBD)
@@ -32,6 +32,14 @@ RAIL_V0_SLOTS = [
     (8, "neon_commercial_intel.menu_neon_ci_root", None),  # AI Planner (TBD)
     # slot 9 Field App — no menu; PWA-vs-WhatsApp decision pending
 ]
+
+# Menus to DEMOTE out of the business cluster back to their neon_menu_order
+# department home. Screen #1 placed the raw Operations app at slot 3 as a
+# placeholder; Operations Calendar (screen #2) now owns slot 3, so the raw app
+# drops to its 40s home (still fully visible — NO hiding).
+RAIL_V0_DEMOTE = {
+    "neon_jobs.menu_operations_root": 40,
+}
 
 
 def _apply_rail_v0(env):
@@ -46,9 +54,15 @@ def _apply_rail_v0(env):
             vals["name"] = label
         menu.sudo().write(vals)
         applied.append(xmlid)
+    demoted = []
+    for xmlid, seq in RAIL_V0_DEMOTE.items():
+        menu = env.ref(xmlid, raise_if_not_found=False)
+        if menu:
+            menu.sudo().write({"sequence": seq})
+            demoted.append(xmlid)
     _logger.info(
-        "neon_screens Rail v0: slotted %d top-level menus, skipped %d (%s)",
-        len(applied), len(skipped), ", ".join(skipped) or "none")
+        "neon_screens Rail v0: slotted %d, demoted %d, skipped %d (%s)",
+        len(applied), len(demoted), len(skipped), ", ".join(skipped) or "none")
     return applied, skipped
 
 

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Operations Calendar (design-deck screen #2).
+         Reuses the EXISTING native calendar on commercial.job (the
+         sales/calendar/money spine — NOT commercial.event.job). The
+         native calendar already colour-codes by operational_status
+         (operational_status_color) and gives month/week/day/list +
+         a native colour legend. We surface it under a business-friendly
+         top-level rail entry + a real "Holds to chase" companion view.
+         No new model/field/logic.
+         ============================================================ -->
+
+    <!-- Holds to chase: jobs with a live soft hold (real field
+         soft_hold_state) that need follow-up before they lapse.
+         Read-only chase list; soonest-expiring first. -->
+    <record id="view_holds_to_chase_tree" model="ir.ui.view">
+        <field name="name">commercial.job.holds.to.chase.tree</field>
+        <field name="model">commercial.job</field>
+        <field name="arch" type="xml">
+            <tree string="Holds to chase" create="0"
+                  default_order="soft_hold_until asc, event_date asc">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="venue_id"/>
+                <field name="event_date"/>
+                <field name="soft_hold_until"/>
+                <field name="soft_hold_extension_count" string="Extensions"/>
+                <field name="soft_hold_state" widget="badge"
+                       decoration-success="soft_hold_state == 'active'"
+                       decoration-warning="soft_hold_state == 'expiring_soon'"
+                       decoration-danger="soft_hold_state == 'expired'"/>
+                <field name="operational_status"/>
+                <field name="quoted_value" sum="Quoted value"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_holds_to_chase" model="ir.actions.act_window">
+        <field name="name">Holds to chase</field>
+        <field name="res_model">commercial.job</field>
+        <field name="view_mode">tree,calendar,form</field>
+        <field name="view_id" ref="view_holds_to_chase_tree"/>
+        <field name="domain">[('soft_hold_state', 'in', ['active', 'expiring_soon', 'expired'])]</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No soft holds to chase right now.</p>
+            <p>Jobs with an active soft hold appear here, soonest expiry first, so nothing lapses unchased.</p>
+        </field>
+    </record>
+
+    <!-- Operations Calendar action — neon_screens-OWNED (reuses the EXISTING
+         commercial.job calendar VIEW) so the screen opens under its own
+         "Operations Calendar" app context, not nested inside the raw Operations
+         app. Live pipeline = pending + active jobs. Native month/week/day +
+         colour legend come from the reused calendar view. -->
+    <record id="action_operations_calendar" model="ir.actions.act_window">
+        <field name="name">Operations Calendar</field>
+        <field name="res_model">commercial.job</field>
+        <field name="view_mode">calendar,list,kanban,form</field>
+        <field name="domain">[('state', 'in', ['pending', 'active'])]</field>
+        <field name="context">{}</field>
+    </record>
+
+    <!-- Top-level rail entry (slot 3). -->
+    <menuitem id="menu_operations_calendar_root"
+              name="Operations Calendar"
+              action="action_operations_calendar"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="3"/>
+
+    <menuitem id="menu_operations_calendar_holds"
+              name="Holds to chase"
+              parent="menu_operations_calendar_root"
+              action="action_holds_to_chase"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="20"/>
+
+</odoo>
