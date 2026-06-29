@@ -30,8 +30,9 @@ Working record between deploys. The polished programme narrative lives on the li
 
 ## Open issues — for review with Tatenda
 
-1. **Banking modules: "DEV ONLY, no prod" commit tags vs actual `installed` state on prod.** The banking Builds (`neon_banking_labels`, `neon_banking_statement`, `neon_bank_import`, `neon_mis_reports`, `neon_weekly_budget`) and UI-shell modules are tagged DEV-ONLY in commit history but are `installed` on prod. Either deployed-after-tagging (stale history), installed-but-not-exposed, or an unintended deploy. **"What we think we deployed" and "what's installed" have diverged in the record.** Needs a reconcile.
+1. **Banking modules: "DEV ONLY, no prod" commit tags vs actual `installed` state on prod.** The banking Builds (`neon_banking_labels`, `neon_banking_statement`, `neon_bank_import`, `neon_mis_reports`, `neon_weekly_budget`) and UI-shell modules are tagged DEV-ONLY in commit history but are `installed` on prod. Either deployed-after-tagging (stale history), installed-but-not-exposed, or an unintended deploy. **"What we think we deployed" and "what's installed" have diverged in the record.** Needs a reconcile. **→ CONFIRMED by live ORM read 28 Jun (see "Phase 2 — live reconciliation" below):** 28 tracked modules `installed` on prod incl. all 11 absent from `origin/main`; `origin/main` is **not** the deployment source of truth. The divergence is real; reconcile = bring `main` forward to the prod lineage (separate gated effort, needs prod git HEAD).
 2. **The `/neon/status` board narrative has drifted from prod reality.** It doesn't track the banking modules as a live track (they're live), and doesn't yet include the sales-enablement/onboarding work. Board narrative is hardcoded Python constants in `neon_status` — updating it is a code change + gated deploy.
+   - **⚠️ Candidate PROD issue (logged 28 Jun):** `/neon/insights` **froze the browser renderer on prod** (reproduced even with a no-network probe). Likely tied to `neon_insights` / `neon_status` board drift. This is a **live user-facing freeze** — higher priority than the cosmetic narrative drift. Needs a separate gated look (not investigated under the read-only discovery task that surfaced it).
 3. **Cold-install menu-load-order debt — MULTI-MODULE** (beyond the one `neon_training` typo fixed). Menu forward-references (a view/wizard file references a `menu_*` xmlid defined later in the manifest `data` order) break cold/fresh installs; masked on warm `-u`. Confirmed in **`neon_training`** (`menu_neon_training_root`, wizard view pos 25 vs menu pos 26) **and `neon_hr`** (`menu_neon_hr_root` referenced by `neon_hr_review_views.xml` before definition); a generic local pre-seed had to create **52 menu xmlids across multiple neon modules** to get a cold install through — so it's a **suite-wide load-order audit**, not a single-module fix. Permanent fix is Tatenda's (worklist P0). **NB — distinct from the local sandbox unblock:** the local `neon_db` is already working (all 30 neon modules installed, login OK) via **DB-only menu seeds** (scratchpad, outside the repo) done by Robin this session — those seeds must be re-run on any fresh rebuild until the source is hardened. The seeds work around the bug; P0 removes it.
 4. **`neon_crew_comms` manifest version (17.0.1.21.4) lags its actual WA-12/13 feature set** — version-bump audit before its next deploy.
 5. **Prod chart of accounts not confirmed.** The dev sandbox uses the generic v17 chart; prod uses whatever was applied at original install. Confirm before any tax/VAT/fiscal-bridge work.
@@ -97,6 +98,56 @@ Both cutover courses (`neon_cutover_courses`) are built and seeded **UNPUBLISHED
 
 ---
 
+## Phase 2 (Commercial Intelligence) — discovery + live reconciliation
+
+Gap analysis against the Phase-2 Commercial Intelligence brief (§6 modules, §7 objects, §9 dashboards, §10 crons, §19 gates, §20 sub-phases 2A→2F). 2A data layer prototyped as `neon_commercial_intel` (sandbox-verified; see below).
+
+### Live state RESOLVED — 2026-06-28 (read-only prod ORM; supersedes all prior UNVERIFIED-LIVE)
+
+Authoritative live read against prod `neon_crm` on 28 Jun. The earlier matrix's UNVERIFIED-LIVE columns are now filled from live evidence:
+
+- **2A objects (`neon.event.opportunity` / `neon.play` / `neon.competitor` / `neon.strategic.account.plan` / `neon.learning.record`): ABSENT on live** (ORM `ir.model` = empty) → no collision; a clean `-i` is possible.
+- **Event Job + Equipment Ops (`neon_jobs` 8.6.0): INSTALLED on live** (= repo) — §6.8 / §9.6 are BUILT + DEPLOYED (verify "confirmed-deal→Event Job" trigger + T-3 dashboard wiring during 2E).
+- **Commercial Control (`neon_crm_extensions` 1.5.0): live** — Phase-1 spine (capture/dedup/SLA/follow-up) live; the #3 SLA additions are repo-only (1.6.0), NOT on live.
+- **Intel boards (`neon_migration` 1.13.0): live but archive-only** — §9 learning dashboards remain **blocked-on-data** until post-cutover live history exists.
+- **Campaign:** native `utm.campaign` (utm 17.0.1.1) live → EXISTS-ELSEWHERE.
+- **Dashboard drafts #1/#5/#3:** `neon_dashboard` live = **11.6.2**, repo = **11.10.0** → **BUILT-NOT-DEPLOYED** (the gap = the drafts + per-rep metric revision).
+- **#3 DRAFT SLA cron (`ir_cron_neon_sla_open_breach`): did NOT leak to live** (ORM `ir.cron` = empty) — consistent with crm_extensions being 1.5.0 on live.
+
+### Repo-vs-live version-drift table (all 30 tracked modules; authoritative)
+
+**26 exact matches. Only two drifts — both repo-AHEAD-of-live & explained. No other mismatch.**
+
+| Module | Repo manifest | Live installed | Drift | Why |
+|---|---|---|---|---|
+| `neon_crm_extensions` | 1.6.0 | 1.5.0 | repo AHEAD | undeployed #3 work (`x_sla_open_breach` + DRAFT cron); cron confirmed not on live |
+| `neon_dashboard` | 11.10.0 | 11.6.2 | repo AHEAD | undeployed dashboard drafts #1/#5/#3 + per-rep metric revision |
+| *(other 26)* | — | — | MATCH | — |
+
+**Not installed on live (3):** `neon_base` (cold-install shim — never deployed), `neon_cutover_courses` (parked Finance-deploy task), `neon_commercial_intel` (2A — sandbox-only, untracked).
+
+### Gate 0 — STEP D CONFIRMED with live evidence
+
+- **28 tracked `neon_*` modules installed on prod, incl. all 11 absent from `origin/main`** → **`origin/main` is NOT the deployment source of truth (confirmed, not inferred).**
+- **Source-of-truth = the prod live lineage. 2A build base = prod's ACTUAL HEAD** (never `origin/main` — basing on main would regress live ~166 commits / drop 11 live modules).
+- **STILL OPEN:** the **prod git HEAD (STEP C)** — the one input ORM cannot supply (filesystem fact on the box). Gate 0 is **NOT closed** until the HEAD lands **and** the post-cutover hold lifts.
+
+### 2A deploy-readiness verdict: CLEAN — no blockers (HELD behind Gate 0)
+
+Readiness of the sandbox-verified `neon_commercial_intel` against live state — **NOT a clearance to deploy.**
+- **Depends present on live** (`neon_core`, `neon_crm_extensions`, `crm`, `utm`, `contacts` all `installed`) ✓
+- **No model collision** (2A objects absent → clean `-i`) ✓
+- **Base view xmlids resolve on live** (`view_partner_form`=125, `crm_lead_view_form`=830, `crm_stage_form`=829) ✓
+- **All injected-into nodes present in the LIVE composed arch** (lead `notebook`✓, partner `notebook`✓, stage `name`-field✓) → xpaths won't fail ✓
+- **No cron leak** ✓
+- **Only unverifiable-until-deploy item:** `noupdate` propagation on the installed DB — checked **during** the gated upgrade itself.
+
+**HELD:** technically deploy-clean, but blocked behind (a) the Gate 0 base decision (prod HEAD) and (b) the post-cutover window. **2A is NOT cleared past Gate 0.** Deploy is a separate gated Tatenda handoff.
+
+> **Sandbox note (not deployed, not committed):** `neon_commercial_intel` v17.0.1.0.1 was install/verified LOCAL-only — clean `-u`, partner-form render fixed (fully-qualified group ext-ids), 8 seed plays, crm.lead CI page + crm.stage gate fields render, §19 stage-gate enforces (empty→ValidationError, filled→pass, inert when unconfigured), Phase-1 smoke green, menus enumerate for a CI-group member. Module folder is untracked in `addons/`.
+
+---
+
 ## Active priority — team onboarding / adoption (Phase 11 cutover, adoption half)
 
 **The problem (in plain terms):** The team is not yet onboarded onto the live ERP. The system is built and live; the people are not on it. Need a low-friction, reliable path to get current staff logged in, competent in their actual daily tasks, and re-grounded in company culture/expectations — fast — then a repeatable version for future hires. This is the adoption half of Phase 11, not a separate programme.
@@ -137,4 +188,4 @@ The full sales-enablement vision the documents describe — a **department-agnos
 
 ---
 
-*Last updated: 27 June 2026.*
+*Last updated: 28 June 2026.*
