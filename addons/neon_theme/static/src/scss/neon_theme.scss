@@ -1,0 +1,142 @@
+// ============================================================================
+//  neon_theme — Neon ERP design language for the Odoo 17 backend.
+//
+//  Loaded into web.assets_backend (component styling + self-hosted fonts).
+//  Brand + type *variables* live in primary_variables.scss.
+//  Additive + reversible: uninstall removes this bundle; Odoo returns to stock.
+//
+//  ICON SAFETY (critical — this is the bug we are designing around):
+//  the global type change is driven by Bootstrap's $font-family-base /
+//  $headings-font-family (body + headings only) — NOT a universal `*` rule
+//  and NOT !important on font-family. Icon elements (.fa = FontAwesome,
+//  .oi = odoo_ui_icons) declare their own font-family, so they are never
+//  overridden. Section 3 is a belt-and-suspenders restore in case any future
+//  rule leaks. Never add a `* { font-family }` or `[class] { font-family }`
+//  rule to this file.
+// ============================================================================
+
+// ---- 1. Self-hosted fonts (NO runtime CDN) --------------------------------
+@font-face { font-family:'Montserrat'; font-weight:600; font-style:normal; font-display:swap;
+  src:url('/neon_theme/static/src/fonts/montserrat-600.woff2') format('woff2'); }
+@font-face { font-family:'Montserrat'; font-weight:700; font-style:normal; font-display:swap;
+  src:url('/neon_theme/static/src/fonts/montserrat-700.woff2') format('woff2'); }
+@font-face { font-family:'Montserrat'; font-weight:800; font-style:normal; font-display:swap;
+  src:url('/neon_theme/static/src/fonts/montserrat-800.woff2') format('woff2'); }
+@font-face { font-family:'Open Sans'; font-weight:400; font-style:normal; font-display:swap;
+  src:url('/neon_theme/static/src/fonts/opensans-400.woff2') format('woff2'); }
+@font-face { font-family:'Open Sans'; font-weight:600; font-style:normal; font-display:swap;
+  src:url('/neon_theme/static/src/fonts/opensans-600.woff2') format('woff2'); }
+@font-face { font-family:'Open Sans'; font-weight:700; font-style:normal; font-display:swap;
+  src:url('/neon_theme/static/src/fonts/opensans-700.woff2') format('woff2'); }
+
+// ---- 2. Design tokens (the approved Neon palette + shape) -----------------
+:root {
+  --neon-purple:#7A6BAE; --neon-indigo:#4753A1; --neon-lilac:#9E8FC4;
+  --neon-ink:#1A1A1A;    --neon-muted:#8E89A0;
+  --neon-page:#F6F4FB;   --neon-sidebar:#0E0E10;
+  --neon-green:#2BA84A;  --neon-red:#E5484D;   --neon-amber:#E8973A;
+  --neon-navbar:linear-gradient(90deg,#4753A1,#7A6BAE 55%,#AF89BE);
+  --neon-radius-card:14px; --neon-radius-input:8px; --neon-radius-pill:999px;
+  --neon-shadow:0 4px 18px rgba(71,83,161,.08);
+  --neon-card-border:1px solid #ECE8F5;
+  --neon-heading:'Montserrat','Open Sans',sans-serif;
+}
+
+// ---- 3. Icon-font guard (belt-and-suspenders; see header) -----------------
+.fa, .fas, .far, .fal, .fab { font-family:'FontAwesome' !important; }
+.oi { font-family:'odoo_ui_icons' !important; }
+
+// ---- 4. Typography: Montserrat for structure (Open Sans body comes from
+//         $font-family-base). Targeted selectors only — no `*`, no icons. ---
+h1,h2,h3,h4,h5,h6,.h1,.h2,.h3,.h4,.h5,.h6,
+.o_menu_brand,
+.o_breadcrumb, .breadcrumb,
+.o_form_view .o_horizontal_separator,
+label.o_form_label,
+.o_field_widget .o_stat_text, .o_stat_value,
+.o_kanban_record .o_primary {
+  font-family:var(--neon-heading);
+}
+.o_list_table thead th {
+  font-family:var(--neon-heading);
+  text-transform:uppercase; letter-spacing:.04em; font-weight:700;
+  font-size:.72rem; color:var(--neon-muted);
+}
+
+// ---- 5. Page / chrome — light card-on-tinted-page -------------------------
+.o_web_client, .o_action_manager, .o_content { background:var(--neon-page); }
+
+// ---- 6. Top navbar — Neon gradient ----------------------------------------
+.o_main_navbar {
+  background:var(--neon-navbar) !important;
+  border-bottom:0;
+  box-shadow:var(--neon-shadow);
+  // white wordmark + entries + glyphs for contrast on the gradient
+  .o_menu_brand, .o_nav_entry, .dropdown-toggle, > a,
+  .fa, .oi, .o_menu_systray .dropdown-toggle {
+    color:#fff !important;
+  }
+  .o_menu_brand { font-weight:800; letter-spacing:.02em; }
+  .o_nav_entry:hover, .dropdown-toggle:hover { background:rgba(255,255,255,.12); border-radius:8px; }
+}
+
+// ---- 7. Sidebar / app rail — deep ink, purple active ----------------------
+//  Targets the neon_web_sidebar rail when present (no hard dependency: rules
+//  simply no-op if those elements are absent).
+.o_neon_sidebar, .o_neon_sidebar_rail {
+  background:var(--neon-sidebar) !important;
+  color:#C9C5D6;
+  .o_neon_sidebar_item, a, .nav-link { color:#C9C5D6; border-radius:8px; }
+  .o_neon_sidebar_item:hover, a:hover { background:rgba(255,255,255,.06); color:#fff; }
+  .o_neon_sidebar_item.active, .o_neon_active, .active > a, .nav-link.active {
+    background:var(--neon-purple); color:#fff;
+  }
+  .fa, .oi { color:inherit; }
+}
+
+// ---- 8. List views — floating rounded white cards -------------------------
+.o_list_view {
+  // float the list as a rounded white card on the tinted page
+  .o_list_renderer {
+    margin:12px; background:#fff; border-radius:var(--neon-radius-card);
+    box-shadow:var(--neon-shadow); border:var(--neon-card-border); overflow:hidden;
+  }
+  .o_list_table { background:#fff; border-collapse:separate; }
+  thead th { background:#FBFAFE; border-bottom:1px solid #ECE8F5; }
+  tbody .o_data_row:hover { background:#F6F4FB; }
+}
+
+// ---- 9. Form sheet — card on tinted page ----------------------------------
+.o_form_view {
+  .o_form_sheet_bg { background:var(--neon-page); border-bottom:0; padding-top:12px; }
+  .o_form_sheet {
+    background:#fff; border:0; border-radius:var(--neon-radius-card);
+    box-shadow:var(--neon-shadow); padding:24px 28px;
+  }
+}
+
+// ---- 10. Buttons + inputs -------------------------------------------------
+.btn { border-radius:var(--neon-radius-input); font-weight:600; }
+.btn-primary {
+  background:var(--neon-purple); border-color:var(--neon-purple);
+  border-radius:var(--neon-radius-pill); padding-inline:18px;
+  &:hover, &:focus, &:active { background:#6A5C9C !important; border-color:#6A5C9C !important; }
+}
+.btn-secondary, .btn-outline-primary { border-radius:var(--neon-radius-pill); }
+.form-control, .o_input, .o_field_widget input.o_input { border-radius:var(--neon-radius-input); }
+
+// ---- 11. Badges / status pills — semantic ---------------------------------
+.badge { border-radius:var(--neon-radius-pill); font-weight:600; padding:.34em .7em; }
+.badge.text-bg-success, .badge-success, .text-bg-success { background:var(--neon-green) !important; color:#fff !important; }
+.badge.text-bg-danger,  .badge-danger,  .text-bg-danger  { background:var(--neon-red)   !important; color:#fff !important; }
+.badge.text-bg-warning, .badge-warning, .text-bg-warning { background:var(--neon-amber) !important; color:#fff !important; }
+
+// ---- 12. Search bar — rounded ---------------------------------------------
+.o_cp_searchview, .o_searchview {
+  background:#fff; border:var(--neon-card-border); border-radius:var(--neon-radius-pill);
+  box-shadow:var(--neon-shadow); padding-inline:12px;
+}
+
+// ---- 13. Control panel + breadcrumb ---------------------------------------
+.o_control_panel { background:transparent; border-bottom:0; }
+.o_breadcrumb .active, .breadcrumb-item.active { color:var(--neon-purple); font-weight:700; }

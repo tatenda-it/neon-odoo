@@ -1,0 +1,33 @@
+// ============================================================================
+//  neon_theme — brand + type variables.
+//
+//  Prepended into web._assets_primary_variables so these assignments run
+//  BEFORE Odoo's own `!default` definitions and therefore win. This is the
+//  clean, upgrade-safe override path — no brute !important for colour/type.
+//
+//  Typography note: setting $font-family-base / $headings-font-family makes
+//  Bootstrap apply the new fonts to <body> and <h1>–<h6> ONLY. It never
+//  emits a universal `*` rule, so icon fonts (.fa / .oi, which set their own
+//  font-family on the element) are left untouched — the squares bug cannot
+//  happen via this path.
+// ============================================================================
+
+// ---- Brand palette --------------------------------------------------------
+$o-brand-primary: #7A6BAE;     // Neon purple (primary)
+$o-brand-secondary: #4753A1;   // Neon indigo
+$o-community-color: #7A6BAE;   // Odoo "community" accent -> purple
+
+// ---- Bootstrap 5 theme colours (Odoo backend derives buttons / links /
+//      badges / alerts from these) ----------------------------------------
+$primary:   #7A6BAE;
+$secondary: #4753A1;
+$success:   #2BA84A;   // ok
+$danger:    #E5484D;   // alert
+$warning:   #E8973A;   // warn
+$body-color: #1A1A1A;  // --neon-ink (primary text)
+
+// ---- Typography -----------------------------------------------------------
+$font-family-sans-serif: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+$font-family-base: $font-family-sans-serif;
+$headings-font-family: 'Montserrat', 'Open Sans', sans-serif;
+$headings-font-weight: 700;
