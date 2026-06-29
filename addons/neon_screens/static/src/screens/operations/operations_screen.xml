@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_screens.OperationsCalendarScreen">
+        <div class="o_neon_ops_screen">
+            <div class="o_neon_ops_grid">
+
+                <!-- LEFT: custom view switcher + the embedded native view -->
+                <div class="o_neon_ops_calendar">
+                    <div class="o_neon_ops_viewtabs">
+                        <button class="o_neon_vtab"
+                                t-att-class="state.viewType === 'calendar' ? 'o_neon_vtab_active' : ''"
+                                t-on-click="() => this.setView('calendar')">
+                            <i class="fa fa-calendar me-1"/>Calendar
+                        </button>
+                        <button class="o_neon_vtab"
+                                t-att-class="state.viewType === 'list' ? 'o_neon_vtab_active' : ''"
+                                t-on-click="() => this.setView('list')">
+                            <i class="fa fa-list me-1"/>List
+                        </button>
+                        <button class="o_neon_vtab"
+                                t-att-class="state.viewType === 'kanban' ? 'o_neon_vtab_active' : ''"
+                                t-on-click="() => this.setView('kanban')">
+                            <i class="fa fa-th-large me-1"/>Kanban
+                        </button>
+                    </div>
+                    <div class="o_neon_ops_viewhost">
+                        <View t-props="viewProps" t-key="state.viewType"/>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Holds to chase panel (fixed beside, every mode) -->
+                <div class="o_neon_ops_holds">
+                    <div class="o_neon_ops_holds_head">
+                        <i class="fa fa-hourglass-half me-2"/>
+                        <span>Holds to chase</span>
+                        <span class="o_neon_ops_holds_count" t-esc="state.count"/>
+                    </div>
+                    <div class="o_neon_ops_holds_body">
+                        <div t-if="state.loading" class="o_neon_ops_holds_empty">Loading…</div>
+                        <div t-elif="state.error" class="o_neon_ops_holds_empty text-danger" t-esc="state.error"/>
+                        <div t-elif="!state.holds.length" class="o_neon_ops_holds_empty">
+                            No soft holds to chase right now.
+                        </div>
+                        <t t-foreach="state.holds" t-as="h" t-key="h.id">
+                            <div class="o_neon_hold_row" t-on-click="() => this.openHold(h.id)">
+                                <div class="o_neon_hold_top">
+                                    <span class="o_neon_hold_client" t-esc="h.client"/>
+                                    <span class="badge" t-att-class="toneClass(h.tone)" t-esc="h.state_label"/>
+                                </div>
+                                <div class="o_neon_hold_meta">
+                                    <span t-esc="h.name"/> · <span t-esc="h.venue"/>
+                                </div>
+                                <div class="o_neon_hold_dates">
+                                    <span>Event <strong t-esc="h.event_date"/></span>
+                                    <span class="ms-2">· Hold until <strong t-esc="h.soft_hold_until"/></span>
+                                    <span class="ms-2" t-if="h.extensions"> · <t t-esc="h.extensions"/>× ext</span>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

@@ -63,12 +63,32 @@
         <field name="context">{}</field>
     </record>
 
-    <!-- Top-level rail entry (slot 3). -->
+    <!-- Composed side-panel screen (deck #2 upgrade): native calendar + the
+         Holds-to-chase list side by side, via the OWL <View/> embed. Primary
+         Operations Calendar entry; the standalone calendar above
+         (action_operations_calendar) is retained as a fallback submenu. -->
+    <record id="action_operations_screen_server" model="ir.actions.server">
+        <field name="name">Operations Calendar</field>
+        <field name="model_id" ref="model_neon_operations_screen"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_operations_screen()</field>
+        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_user')), (4, ref('neon_jobs.group_neon_jobs_manager')), (4, ref('neon_jobs.group_neon_jobs_crew_leader'))]"/>
+    </record>
+
+    <!-- Top-level rail entry (slot 3) -> the composed side-panel screen. -->
     <menuitem id="menu_operations_calendar_root"
               name="Operations Calendar"
-              action="action_operations_calendar"
+              action="action_operations_screen_server"
               groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
               sequence="3"/>
+
+    <!-- Fallback: the standalone native calendar (companion-view version). -->
+    <menuitem id="menu_operations_calendar_classic"
+              name="Calendar (full screen)"
+              parent="menu_operations_calendar_root"
+              action="action_operations_calendar"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="10"/>
 
     <menuitem id="menu_operations_calendar_holds"
               name="Holds to chase"

@@ -1,0 +1,113 @@
+// Operations Calendar composed screen — 2-column layout (native calendar +
+// Holds-to-chase panel). Palette/shape from neon_theme tokens (with fallbacks).
+
+.o_neon_ops_screen {
+    height: 100%;
+    background: var(--neon-page, #F6F4FB);
+    overflow: hidden;
+
+    .o_neon_ops_grid {
+        display: flex;
+        height: 100%;
+        gap: 12px;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+    // LEFT — embedded native calendar. Give the embedded view a real height
+    // so the calendar grid renders (Odoo views need a sized container).
+    .o_neon_ops_calendar {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #ECE8F5;
+        border-radius: var(--neon-radius-card, 14px);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        overflow: hidden;
+    }
+
+    // Custom in-screen view switcher (the native one can't be wired inside a
+    // client action). Swaps the embedded view's type; Holds panel stays put.
+    .o_neon_ops_viewtabs {
+        display: flex;
+        gap: 6px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #ECE8F5;
+        flex: 0 0 auto;
+    }
+    .o_neon_vtab {
+        border: 0;
+        background: transparent;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 600;
+        color: var(--neon-muted, #8E89A0);
+        cursor: pointer;
+        &:hover { background: var(--neon-page, #F6F4FB); }
+    }
+    .o_neon_vtab_active, .o_neon_vtab_active:hover {
+        background: var(--neon-purple, #7A6BAE);
+        color: #fff;
+    }
+
+    // The embedded view fills the host (views need a sized container).
+    .o_neon_ops_viewhost {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+
+        > .o_view_controller,
+        .o_calendar_view, .o_list_view, .o_kanban_view {
+            height: 100%;
+            min-height: 0;
+        }
+    }
+
+    // RIGHT — Holds to chase panel.
+    .o_neon_ops_holds {
+        flex: 0 0 340px;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #ECE8F5;
+        border-radius: var(--neon-radius-card, 14px);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        overflow: hidden;
+    }
+    .o_neon_ops_holds_head {
+        display: flex;
+        align-items: center;
+        padding: 14px 16px;
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 800;
+        color: var(--neon-ink, #1A1A1A);
+        border-bottom: 1px solid #ECE8F5;
+    }
+    .o_neon_ops_holds_count {
+        margin-left: auto;
+        background: var(--neon-purple, #7A6BAE);
+        color: #fff;
+        border-radius: 999px;
+        padding: 1px 10px;
+        font-size: .8rem;
+    }
+    .o_neon_ops_holds_body { flex: 1 1 auto; overflow-y: auto; }
+    .o_neon_ops_holds_empty { padding: 18px 16px; color: var(--neon-muted, #8E89A0); }
+
+    .o_neon_hold_row {
+        padding: 11px 16px;
+        border-bottom: 1px solid #F2EFFA;
+        cursor: pointer;
+        &:hover { background: var(--neon-page, #F6F4FB); }
+    }
+    .o_neon_hold_top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .o_neon_hold_client { font-weight: 600; color: var(--neon-ink, #1A1A1A); }
+    .o_neon_hold_meta { font-size: .8rem; color: var(--neon-muted, #8E89A0); margin-top: 2px; }
+    .o_neon_hold_dates { font-size: .78rem; color: var(--neon-muted, #8E89A0); margin-top: 4px; }
+    .o_neon_ops_holds .badge { border-radius: 999px; font-weight: 600; }
+}
