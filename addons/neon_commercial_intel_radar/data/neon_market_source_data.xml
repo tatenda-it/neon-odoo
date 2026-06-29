@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- MVP seed sources (s12): UNGM email path + eGP public-poll path, proving
+         both ingestion methods. noupdate=1 so admin's source list survives -u. -->
+    <data noupdate="1">
+        <record id="source_ungm" model="neon.market.source">
+            <field name="name">UNGM (UN Global Marketplace)</field>
+            <field name="source_type">tender_alert</field>
+            <field name="ingest_method">email_alias</field>
+            <field name="email_match">ungm.org</field>
+            <field name="tos_status">cleared</field>
+            <field name="notes">Free tender-alert emails (UNGM Pro daily digest optional). Subscribe the hub inbox; attribute by sender domain.</field>
+        </record>
+
+        <record id="source_egp" model="neon.market.source">
+            <field name="name">PRAZ eGP (public bulletin)</field>
+            <field name="source_type">tender_alert</field>
+            <field name="ingest_method">public_poll</field>
+            <field name="tos_status">check</field>
+            <field name="notes">Public Latest Tenders + Award Notices. Poll politely, low frequency; NO login, no anti-bot evasion. tos_status stays 'check' until automating is confirmed against PRAZ's WRITTEN terms (s11.1).</field>
+        </record>
+
+        <record id="source_unattributed" model="neon.market.source">
+            <field name="name">Unattributed (triage)</field>
+            <field name="source_type">tender_alert</field>
+            <field name="ingest_method">email_alias</field>
+            <field name="tos_status">check</field>
+            <field name="notes">Fallback for inbound mail whose sender matched no configured source. Triage and re-attribute.</field>
+        </record>
+    </data>
+</odoo>

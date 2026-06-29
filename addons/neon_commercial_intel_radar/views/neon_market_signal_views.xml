@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_neon_market_signal_tree" model="ir.ui.view">
+        <field name="name">neon.market.signal.tree</field>
+        <field name="model">neon.market.signal</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="received_date"/>
+                <field name="name"/>
+                <field name="source_id"/>
+                <field name="sector"/>
+                <field name="event_relevant"/>
+                <field name="is_award"/>
+                <field name="fit_score"/>
+                <field name="confidence"/>
+                <field name="state"
+                       decoration-info="state == 'classified'"
+                       decoration-success="state == 'promoted'"
+                       decoration-muted="state in ('duplicate','rejected')"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_market_signal_form" model="ir.ui.view">
+        <field name="name">neon.market.signal.form</field>
+        <field name="model">neon.market.signal</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_neon_radar_classify_now" type="object"
+                            string="Classify now" class="btn-primary"
+                            invisible="state != 'new'"
+                            help="Manual classify (AI extract -> dedupe -> promote). Crons are inactive."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="new,classified,promoted"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="source_id"/>
+                            <field name="received_date"/>
+                            <field name="reference_number"/>
+                            <field name="source_url" widget="url"/>
+                        </group>
+                        <group>
+                            <field name="dedupe_hash" readonly="1"/>
+                            <field name="recommendation_id" readonly="1"/>
+                            <field name="classify_error" readonly="1"
+                                   invisible="not classify_error"/>
+                        </group>
+                    </group>
+                    <group string="AI-extracted (fit_score is a PLACEHOLDER — non-authoritative until tuned)">
+                        <group>
+                            <field name="procuring_entity"/>
+                            <field name="sector"/>
+                            <field name="event_type"/>
+                            <field name="event_relevant"/>
+                            <field name="location"/>
+                            <field name="deadline"/>
+                        </group>
+                        <group>
+                            <field name="estimated_value"/>
+                            <field name="currency_id"/>
+                            <field name="fit_score"/>
+                            <field name="confidence"/>
+                            <field name="is_award"/>
+                            <field name="awarded_to" invisible="not is_award"/>
+                        </group>
+                    </group>
+                    <group string="Summary">
+                        <field name="summary" nolabel="1"/>
+                    </group>
+                    <group string="Raw (retained for audit)">
+                        <field name="raw_subject"/>
+                        <field name="raw_body"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_market_signal" model="ir.actions.act_window">
+        <field name="name">Market Signals</field>
+        <field name="res_model">neon.market.signal</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_market_signal"
+              name="Market Radar"
+              parent="neon_commercial_intel.menu_neon_ci_root"
+              action="action_neon_market_signal"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="50"/>
+</odoo>
