@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_screens.FinanceControlScreen">
+        <!-- o_neon_screen + _scroll = mandatory shared scroll base (17.0.1.3.1) -->
+        <div class="o_neon_screen o_neon_screen_scroll o_neon_fc_screen">
+
+            <!-- Header + subheader constants -->
+            <div class="o_neon_fc_header">
+                <div>
+                    <h2 class="o_neon_fc_title">Finance Control</h2>
+                    <div class="o_neon_fc_subbar" t-if="!state.loading">
+                        <span class="o_neon_fc_const"><i class="fa fa-money me-1"/><t t-esc="constants.currencies"/></span>
+                        <span class="o_neon_fc_const">VAT <t t-esc="constants.vat"/></span>
+                        <span class="o_neon_fc_const" t-if="constants.zimra">ZIMRA-registered</span>
+                        <span class="o_neon_fc_const"><t t-esc="constants.terms"/></span>
+                        <span class="o_neon_fc_const o_neon_fc_const_lock"><i class="fa fa-lock me-1"/><t t-esc="constants.append_only"/></span>
+                        <span class="o_neon_fc_const" t-if="constants.zig_usd_rate">1 USD ≈ <t t-esc="constants.zig_usd_rate"/> ZiG</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" t-on-click="() => this.load()" t-att-disabled="state.loading">
+                    <i t-att-class="state.loading ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <div t-if="state.error" class="alert alert-danger" role="alert">
+                <i class="fa fa-exclamation-circle me-2"/><span t-esc="state.error"/>
+            </div>
+            <div t-if="state.loading and !state.data" class="o_neon_fc_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+            </div>
+
+            <t t-if="state.data">
+                <!-- PANEL 1: KPI row (current week cash-planning) -->
+                <div class="o_neon_fc_kpis" t-if="d.kpis">
+                    <div class="o_neon_kpi">
+                        <div class="o_neon_kpi_label">Planned this week</div>
+                        <div class="o_neon_kpi_value"><span class="o_neon_kpi_ccy" t-esc="d.kpis.currency"/><t t-esc="d.kpis.planned"/></div>
+                    </div>
+                    <div class="o_neon_kpi">
+                        <div class="o_neon_kpi_label">Paid this week</div>
+                        <div class="o_neon_kpi_value"><span class="o_neon_kpi_ccy" t-esc="d.kpis.currency"/><t t-esc="d.kpis.paid"/></div>
+                    </div>
+                    <div class="o_neon_kpi">
+                        <div class="o_neon_kpi_label">Outstanding</div>
+                        <div class="o_neon_kpi_value"><span class="o_neon_kpi_ccy" t-esc="d.kpis.currency"/><t t-esc="d.kpis.outstanding"/></div>
+                    </div>
+                    <div class="o_neon_kpi">
+                        <div class="o_neon_kpi_label">Open items</div>
+                        <div class="o_neon_kpi_value"><t t-esc="d.kpis.open_items"/></div>
+                    </div>
+                </div>
+                <div class="o_neon_fc_kpis_empty o_neon_card" t-if="!d.kpis">
+                    No weekly budget on record yet — KPIs appear once a week is planned.
+                </div>
+
+                <!-- PANEL 2 + 4b row -->
+                <div class="o_neon_fc_grid">
+                    <!-- Weekly Cash Planning Board -->
+                    <div class="o_neon_card o_neon_fc_board">
+                        <div class="o_neon_card_head">
+                            <span><i class="fa fa-calendar me-2"/>Weekly Cash Planning<span class="text-muted ms-2" t-if="d.kpis"> — <t t-esc="d.kpis.week_name"/></span></span>
+                            <span class="o_neon_pill" t-esc="counts.board_rows + ' lines'"/>
+                        </div>
+                        <table class="table o_neon_table">
+                            <thead><tr>
+                                <th>Day</th><th>Movement</th>
+                                <th class="text-end">Amount</th><th class="text-end">Paid</th>
+                                <th>Status</th><th class="text-end">Balance</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr t-if="!d.board.length"><td colspan="6" class="o_neon_empty text-muted">No planned movements this week.</td></tr>
+                                <t t-foreach="d.board" t-as="r" t-key="r.id">
+                                    <tr>
+                                        <td class="text-muted" t-esc="r.date"/>
+                                        <td t-esc="r.details"/>
+                                        <td class="text-end"><t t-esc="r.currency"/><t t-esc="r.amount"/></td>
+                                        <td class="text-end"><t t-esc="r.currency"/><t t-esc="r.paid"/></td>
+                                        <td><span class="badge" t-att-class="toneClass(r.status_tone)" t-esc="r.status"/></td>
+                                        <td class="text-end fw-bold"><t t-esc="r.currency"/><t t-esc="r.balance"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Governance / Restricted controls card (4b, static) -->
+                    <div class="o_neon_card o_neon_fc_gov">
+                        <div class="o_neon_card_head"><span><i class="fa fa-shield me-2"/>Controls &amp; Restrictions</span></div>
+                        <div class="o_neon_gov_body">
+                            <div class="o_neon_gov_item">
+                                <i class="fa fa-lock"/>
+                                <div><strong>Append-only</strong><div class="text-muted">Posted finance items are never deleted. Corrections are made by reversing entries, preserving the audit trail.</div></div>
+                            </div>
+                            <div class="o_neon_gov_item">
+                                <i class="fa fa-users"/>
+                                <div><strong>Multi-director authority</strong><div class="text-muted">Munashe and Robin hold equal finance authority.</div></div>
+                            </div>
+                            <div class="o_neon_gov_item">
+                                <i class="fa fa-check-circle"/>
+                                <div><strong>ZIMRA &amp; VAT</strong><div class="text-muted">ZIMRA-registered; VAT 15.5% on applicable items; 7-day default terms.</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANEL 3: Event Costing Variance -->
+                <div class="o_neon_card o_neon_fc_variance">
+                    <div class="o_neon_card_head">
+                        <span><i class="fa fa-balance-scale me-2"/>Event Costing — Variance</span>
+                        <span class="o_neon_pill" t-esc="counts.variance_rows + ' events'"/>
+                    </div>
+                    <table class="table o_neon_table">
+                        <thead><tr>
+                            <th>Event</th>
+                            <th class="text-end">Quoted</th><th class="text-end">Actual cost</th>
+                            <th class="text-end">Variance</th><th class="text-end">Margin</th><th>Budget</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr t-if="!d.variance.length"><td colspan="6" class="o_neon_empty text-muted">No event costing recorded yet.</td></tr>
+                            <t t-foreach="d.variance" t-as="v" t-key="v.id">
+                                <tr class="o_neon_fc_row" t-on-click="() => this.openEventJob(v.id)">
+                                    <td><strong t-esc="v.event"/><div class="text-muted o_neon_subref" t-esc="v.job_ref"/></td>
+                                    <td class="text-end"><t t-if="v.has_quote"><t t-esc="v.currency"/><t t-esc="v.quoted"/></t><t t-else=""><span class="text-muted">—</span></t></td>
+                                    <td class="text-end"><t t-esc="v.currency"/><t t-esc="v.actual"/></td>
+                                    <td class="text-end"><span t-att-class="v.variance_tone === 'alert' ? 'text-danger fw-bold' : 'text-success'"><t t-esc="v.currency"/><t t-esc="v.variance"/></span></td>
+                                    <td class="text-end" t-esc="v.margin_pct"/>
+                                    <td><span class="badge" t-att-class="toneClass(v.alert_tone)" t-esc="v.alert"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- PANEL 4a: Approvals -->
+                <div class="o_neon_card o_neon_fc_approvals">
+                    <div class="o_neon_card_head">
+                        <span><i class="fa fa-gavel me-2"/>Approvals</span>
+                        <span class="o_neon_pill" t-if="counts.approvals_pending"><t t-esc="counts.approvals_pending"/> pending</span>
+                        <span class="o_neon_pill o_neon_pill_muted" t-else="">none pending</span>
+                    </div>
+                    <table class="table o_neon_table">
+                        <thead><tr>
+                            <th>Ref</th><th>Quote</th>
+                            <th class="text-end">Amount</th><th>Requested by</th><th>Date</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr t-if="!d.approvals.length"><td colspan="6" class="o_neon_empty text-muted">No approvals on record.</td></tr>
+                            <t t-foreach="d.approvals" t-as="a" t-key="a.id">
+                                <tr class="o_neon_fc_row" t-on-click="() => this.openApproval(a.id)">
+                                    <td><code class="o_neon_asset_id" t-esc="a.name"/></td>
+                                    <td t-esc="a.quote"/>
+                                    <td class="text-end"><t t-esc="a.currency"/><t t-esc="a.amount"/></td>
+                                    <td class="text-muted" t-esc="a.requested_by"/>
+                                    <td class="text-muted" t-esc="a.date"/>
+                                    <td><span class="badge" t-att-class="toneClass(a.state_tone)" t-esc="a.state"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>

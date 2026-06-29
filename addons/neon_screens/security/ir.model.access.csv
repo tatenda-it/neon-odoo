@@ -8,3 +8,5 @@ access_neon_operations_screen_crew_leader,neon.operations.screen crew leader,mod
 access_neon_event_jobs_screen_user,neon.event.jobs.screen user,model_neon_event_jobs_screen,neon_jobs.group_neon_jobs_user,1,0,0,0
 access_neon_event_jobs_screen_manager,neon.event.jobs.screen manager,model_neon_event_jobs_screen,neon_jobs.group_neon_jobs_manager,1,0,0,0
 access_neon_event_jobs_screen_crew_leader,neon.event.jobs.screen crew leader,model_neon_event_jobs_screen,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_finance_control_screen_bookkeeper,neon.finance.control.screen bookkeeper,model_neon_finance_control_screen,neon_finance.group_neon_finance_bookkeeper,1,0,0,0
+access_neon_finance_control_screen_approver,neon.finance.control.screen approver,model_neon_finance_control_screen,neon_finance.group_neon_finance_approver,1,0,0,0

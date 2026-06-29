@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Finance Control (design-deck #4): inline client action over the REAL
+         live finance data. Gated to finance bookkeeper + approver (superusers
+         inherit approver via the neon_core cascade). Read under own ACL. -->
+    <record id="action_finance_control_screen_server" model="ir.actions.server">
+        <field name="name">Finance Control</field>
+        <field name="model_id" ref="model_neon_finance_control_screen"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_finance_control_screen()</field>
+        <field name="groups_id" eval="[(4, ref('neon_finance.group_neon_finance_bookkeeper')), (4, ref('neon_finance.group_neon_finance_approver'))]"/>
+    </record>
+
+    <!-- Top-level rail entry (slot 7, set by the Rail v0 hook; replaces the
+         raw Accounting menu which demotes to its 40s home). -->
+    <menuitem id="menu_finance_control_root"
+              name="Finance Control"
+              action="action_finance_control_screen_server"
+              groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"
+              sequence="7"/>
+
+</odoo>

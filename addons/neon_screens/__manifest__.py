@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Screens — Equipment & Inventory",
-    "version": "17.0.1.3.1",
+    "version": "17.0.1.4.0",
     "summary": "Design-deck Equipment & Inventory screen + Rail v0 nav "
                "skeleton (additive, read-only — no new equipment fields)",
     "description": """
@@ -34,13 +34,16 @@ equipment data, no writes, no new security groups.
     "author": "Neon Events Elements",
     "license": "LGPL-3",
     # neon_jobs = equipment models + groups; neon_menu_order = load AFTER it so
-    # the Rail v0 sequence writes are final; web = OWL assets.
-    "depends": ["neon_jobs", "neon_menu_order", "web"],
+    # the Rail v0 sequence writes are final; web = OWL assets. neon_finance +
+    # neon_weekly_budget = Finance Control (#4) data models + finance groups.
+    "depends": ["neon_jobs", "neon_menu_order", "neon_finance",
+                "neon_weekly_budget", "web"],
     "data": [
         "security/ir.model.access.csv",
         "views/neon_equipment_screen_views.xml",
         "views/operations_calendar_views.xml",
         "views/event_jobs_views.xml",
+        "views/finance_control_views.xml",
     ],
     "assets": {
         "web.assets_backend": [
@@ -54,6 +57,9 @@ equipment data, no writes, no new security groups.
             "neon_screens/static/src/screens/eventjobs/event_jobs_screen.scss",
             "neon_screens/static/src/screens/eventjobs/event_jobs_screen.js",
             "neon_screens/static/src/screens/eventjobs/event_jobs_screen.xml",
+            "neon_screens/static/src/screens/finance/finance_control_screen.scss",
+            "neon_screens/static/src/screens/finance/finance_control_screen.js",
+            "neon_screens/static/src/screens/finance/finance_control_screen.xml",
         ],
     },
     "post_init_hook": "post_init_hook",

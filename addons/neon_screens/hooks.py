@@ -28,7 +28,7 @@ RAIL_V0_SLOTS = [
     (4, "neon_screens.menu_event_jobs_root", "Event Jobs"),  # screen #3 (built)
     (5, "neon_screens.menu_equipment_screen_root", "Equipment & Inventory"),
     (6, "hr.menu_hr_root", None),                          # Crew & People (TBD)
-    (7, "account.menu_finance", None),                     # Finance Control (TBD)
+    (7, "neon_screens.menu_finance_control_root", "Finance Control"),  # screen #4 (built)
     (8, "neon_commercial_intel.menu_neon_ci_root", None),  # AI Planner (TBD)
     # slot 9 Field App — no menu; PWA-vs-WhatsApp decision pending
 ]
@@ -39,6 +39,9 @@ RAIL_V0_SLOTS = [
 # drops to its 40s home (still fully visible — NO hiding).
 RAIL_V0_DEMOTE = {
     "neon_jobs.menu_operations_root": 40,
+    # Finance Control (screen #4) owns slot 7; the raw Accounting app drops to
+    # its 40s home (still fully visible -- NO hiding).
+    "account.menu_finance": 41,
 }
 
 
