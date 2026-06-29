@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_shadow_rule_tree" model="ir.ui.view">
+        <field name="name">neon.shadow.scoring.rule.tree</field>
+        <field name="model">neon.shadow.scoring.rule</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="field_name"/>
+                <field name="operator"/>
+                <field name="value"/>
+                <field name="points"/>
+                <field name="note"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_neon_shadow_rule" model="ir.actions.act_window">
+        <field name="name">Shadow Scoring Rules</field>
+        <field name="res_model">neon.shadow.scoring.rule</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Placeholder rules - tune against live data.</p>
+            <p>Each rule awards points to a lead when its condition matches. The
+               shadow score is the sum of matched points. These seeded rules are
+               PLACEHOLDERS and are not validated until post-cutover live data exists.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_neon_shadow_rule"
+              name="Shadow Scoring Rules"
+              parent="neon_commercial_intel.menu_neon_ci_config"
+              action="action_neon_shadow_rule"
+              groups="neon_commercial_intel.group_neon_ci_manager"
+              sequence="20"/>
+
+</odoo>

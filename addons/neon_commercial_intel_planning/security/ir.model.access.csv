@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_competitor_account_map_user,neon.competitor.account.map.user,model_neon_competitor_account_map,neon_commercial_intel.group_neon_ci_user,1,1,1,0
+access_neon_competitor_account_map_manager,neon.competitor.account.map.manager,model_neon_competitor_account_map,neon_commercial_intel.group_neon_ci_manager,1,1,1,1

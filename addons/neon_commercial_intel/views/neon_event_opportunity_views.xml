@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_event_opportunity_tree" model="ir.ui.view">
+        <field name="name">neon.event.opportunity.tree</field>
+        <field name="model">neon.event.opportunity</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="event_type"/>
+                <field name="sector"/>
+                <field name="expected_date"/>
+                <field name="pursuit_stage"/>
+                <field name="strategic_value"/>
+                <field name="confidence_score"/>
+                <field name="partner_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_event_opportunity_form" model="ir.ui.view">
+        <field name="name">neon.event.opportunity.form</field>
+        <field name="model">neon.event.opportunity</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Identity">
+                            <field name="name"/>
+                            <field name="event_type"/>
+                            <field name="sector"/>
+                            <field name="partner_id"/>
+                            <field name="venue_id"/>
+                            <field name="organiser_id"/>
+                            <field name="sponsor_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Pursuit &amp; Timing">
+                            <field name="pursuit_stage"/>
+                            <field name="confidence_score"/>
+                            <field name="strategic_value"/>
+                            <field name="expected_date"/>
+                            <field name="event_month"/>
+                            <field name="frequency"/>
+                            <field name="recurrence_group"/>
+                            <field name="next_planning_window"/>
+                        </group>
+                    </group>
+                    <group string="Commercial Graph">
+                        <field name="competitor_id"/>
+                        <field name="play_id"/>
+                        <field name="account_plan_id"/>
+                        <field name="lead_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_event_opportunity" model="ir.actions.act_window">
+        <field name="name">Event Opportunities</field>
+        <field name="res_model">neon.event.opportunity</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_event_opportunity"
+              name="Event Opportunities"
+              parent="menu_neon_ci_root"
+              action="action_neon_event_opportunity"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="10"/>
+
+</odoo>

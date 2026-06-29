@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="play_annual_client_reactivation" model="neon.play">
+        <field name="name">Annual Client Reactivation</field>
+        <field name="trigger_signal">Recurring/annual client approaching its known event planning window.</field>
+        <field name="success_metric">quotes</field>
+    </record>
+
+    <record id="play_adma_expo_campaign" model="neon.play">
+        <field name="name">ADMA / Expo Campaign</field>
+        <field name="trigger_signal">Upcoming expo or industry event season.</field>
+        <field name="success_metric">meetings</field>
+    </record>
+
+    <record id="play_ngo_workshop_package" model="neon.play">
+        <field name="name">NGO Workshop Package</field>
+        <field name="trigger_signal">NGO conference/workshop budget cycle or tender signal.</field>
+        <field name="success_metric">quotes</field>
+    </record>
+
+    <record id="play_product_launch_package" model="neon.play">
+        <field name="name">Product Launch Package</field>
+        <field name="trigger_signal">Corporate product launch demand.</field>
+        <field name="product_focus">full_production</field>
+        <field name="success_metric">wins</field>
+    </record>
+
+    <record id="play_awards_dinner_package" model="neon.play">
+        <field name="name">Awards Dinner Package</field>
+        <field name="trigger_signal">Annual awards / gala season.</field>
+        <field name="product_focus">staging</field>
+        <field name="success_metric">wins</field>
+    </record>
+
+    <record id="play_venue_partner_drive" model="neon.play">
+        <field name="name">Venue Partner Drive</field>
+        <field name="trigger_signal">Build referral pipeline through venue relationships.</field>
+        <field name="success_metric">partner_intros</field>
+    </record>
+
+    <record id="play_lost_deal_recovery" model="neon.play">
+        <field name="name">Lost Deal Recovery</field>
+        <field name="trigger_signal">Lost or dormant opportunity eligible for recycle.</field>
+        <field name="success_metric">quotes</field>
+    </record>
+
+    <record id="play_competitor_account_penetration" model="neon.play">
+        <field name="name">Competitor Account Penetration</field>
+        <field name="trigger_signal">High-fit account currently served by a competitor with known weakness.</field>
+        <field name="success_metric">meetings</field>
+    </record>
+
+</odoo>

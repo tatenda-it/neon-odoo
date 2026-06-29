@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_competitor_tree" model="ir.ui.view">
+        <field name="name">neon.competitor.tree</field>
+        <field name="model">neon.competitor</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="pricing_posture"/>
+                <field name="intel_confidence"/>
+                <field name="last_intel_update"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_competitor_form" model="ir.ui.view">
+        <field name="name">neon.competitor.form</field>
+        <field name="model">neon.competitor</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Identity">
+                            <field name="name"/>
+                            <field name="service_focus"/>
+                            <field name="pricing_posture"/>
+                            <field name="intel_confidence"/>
+                            <field name="last_intel_update"/>
+                        </group>
+                        <group string="Strength">
+                            <field name="sector_strength"/>
+                            <field name="event_type_strength"/>
+                            <field name="venue_strength"/>
+                            <field name="relationship_advantage"/>
+                        </group>
+                    </group>
+                    <group string="Accounts &amp; Positioning">
+                        <field name="known_client_ids" widget="many2many_tags"/>
+                        <field name="positioning_note"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_competitor" model="ir.actions.act_window">
+        <field name="name">Competitors</field>
+        <field name="res_model">neon.competitor</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_competitor"
+              name="Competitors"
+              parent="menu_neon_ci_root"
+              action="action_neon_competitor"
+              groups="neon_commercial_intel.group_neon_ci_manager"
+              sequence="30"/>
+
+</odoo>

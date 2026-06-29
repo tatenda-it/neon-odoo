@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- 2C planning cron STUBS. All ship active=False (INERT). They only create
+         review-queue proposals; they never act. Activate post-data-gate. -->
+    <record id="ir_cron_neon_recycle_review" model="ir.cron">
+        <field name="name">Neon Planning: Recycle Review (STUB - INACTIVE)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_neon_recycle_review()</field>
+        <field name="interval_number">7</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="False"/>
+    </record>
+    <record id="ir_cron_neon_product_demand_review" model="ir.cron">
+        <field name="name">Neon Planning: Product Demand Review (STUB - INACTIVE)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_neon_product_demand_review()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="active" eval="False"/>
+    </record>
+    <record id="ir_cron_neon_monthly_planning_pack" model="ir.cron">
+        <field name="name">Neon Planning: Monthly Planning Pack (STUB - INACTIVE)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_neon_monthly_planning_pack()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="active" eval="False"/>
+    </record>
+</odoo>

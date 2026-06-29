@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Bridge fields on the 2A Commercial Intel page. -->
+    <record id="view_crm_lead_form_neon_eventops" model="ir.ui.view">
+        <field name="name">crm.lead.form.neon.eventops</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="neon_commercial_intel.view_crm_lead_form_neon_ci"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='neon_ci']" position="inside">
+                <group string="Event Ops Bridge (2E)">
+                    <field name="neon_event_job_created"/>
+                    <field name="neon_event_job_ref"/>
+                    <field name="neon_event_job_note"/>
+                    <button name="action_neon_flag_event_job" type="object"
+                            string="Flag Event Job Created" class="btn-secondary"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- "Confirmed deals not yet Event Jobs": won opportunities where the bridge
+         flag is not set. Install-safe (crm.lead only). -->
+    <record id="view_neon_conversion_gap_tree" model="ir.ui.view">
+        <field name="name">crm.lead.neon.conversion.gap.tree</field>
+        <field name="model">crm.lead</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="expected_revenue"/>
+                <field name="stage_id"/>
+                <field name="neon_event_job_created"/>
+            </tree>
+        </field>
+    </record>
+    <record id="action_neon_conversion_gap" model="ir.actions.act_window">
+        <field name="name">Confirmed Deals - Event Job Gap</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_neon_conversion_gap_tree"/>
+        <field name="domain">[('type','=','opportunity'),('stage_id.is_won','=',True),('neon_event_job_created','=',False)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No conversion gap.</p>
+            <p>Won opportunities not yet flagged as turned into an Event Job.
+               Completion step: replace the bridge flag with the real
+               commercial.event.job link + add the T-3 missing-allocation view.</p>
+        </field>
+    </record>
+    <menuitem id="menu_neon_conversion_gap"
+              name="Event Job Gap"
+              parent="neon_commercial_intel.menu_neon_ci_root"
+              action="action_neon_conversion_gap"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="80"/>
+</odoo>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+      P0-SAFE MENU ROOT.
+      - This module declares its OWN top-level root. It does NOT hang under
+        another module's menu xmlid, so it cannot forward-reference an xmlid
+        that loads later (the cold-install bug class).
+      - Carries no action= (a bare parent). Child menus in the per-model view
+        files attach under it AFTER their actions are defined.
+      - If you later want this re-parented under an existing Neon root, that is
+        a deliberate, reviewed change once load order is known-good.
+    -->
+    <menuitem id="menu_neon_ci_root"
+              name="Commercial Intel"
+              web_icon="crm,static/description/icon.png"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="55"/>
+
+    <!-- Configuration container (manager-only); populated by inherited
+         crm.stage views later in load order. -->
+    <menuitem id="menu_neon_ci_config"
+              name="Configuration"
+              parent="menu_neon_ci_root"
+              groups="neon_commercial_intel.group_neon_ci_manager"
+              sequence="99"/>
+
+</odoo>

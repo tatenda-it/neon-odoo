@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Self-contained category; no reference to other modules' xmlids. -->
+    <record id="module_category_neon_commercial_intel" model="ir.module.category">
+        <field name="name">Neon Commercial Intel</field>
+        <field name="sequence">90</field>
+    </record>
+
+    <record id="group_neon_ci_user" model="res.groups">
+        <field name="name">Commercial Intel: User</field>
+        <field name="category_id" ref="module_category_neon_commercial_intel"/>
+    </record>
+
+    <!-- Manager sees sensitive intel (competitor battlecards, strategic
+         account plans, learning records, margin) per §18. -->
+    <record id="group_neon_ci_manager" model="res.groups">
+        <field name="name">Commercial Intel: Manager (Directors / Senior Sales)</field>
+        <field name="category_id" ref="module_category_neon_commercial_intel"/>
+        <field name="implied_ids" eval="[(4, ref('group_neon_ci_user'))]"/>
+    </record>
+
+</odoo>

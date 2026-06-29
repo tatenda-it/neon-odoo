@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_neon_per_tree" model="ir.ui.view">
+        <field name="name">neon.post.event.review.tree</field>
+        <field name="model">neon.post.event.review</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="review_date"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="client_satisfaction"/>
+                <field name="profitability_signal"/>
+                <field name="repeat_likely"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_neon_per_form" model="ir.ui.view">
+        <field name="name">neon.post.event.review.form</field>
+        <field name="model">neon.post.event.review</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_capture_learning" type="object"
+                            string="Capture Learning Record" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="review_date"/>
+                            <field name="partner_id"/>
+                            <field name="lead_id"/>
+                            <field name="event_id"/>
+                        </group>
+                        <group>
+                            <field name="client_satisfaction"/>
+                            <field name="profitability_signal"/>
+                            <field name="margin_estimate"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Equipment &amp; Crew">
+                            <group>
+                                <field name="sub_hire_required"/>
+                                <field name="equipment_gaps"/>
+                                <field name="damaged_or_missing"/>
+                                <field name="execution_issues"/>
+                            </group>
+                        </page>
+                        <page string="Future &amp; Relationship">
+                            <group>
+                                <group>
+                                    <field name="repeat_likely"/>
+                                    <field name="expected_repeat_month"/>
+                                    <field name="next_event_type"/>
+                                    <field name="cross_sell"/>
+                                </group>
+                                <group>
+                                    <field name="thank_you_done"/>
+                                    <field name="testimonial_requested"/>
+                                    <field name="referral_requested"/>
+                                </group>
+                            </group>
+                            <field name="next_actions"/>
+                        </page>
+                        <page string="Satisfaction Comments">
+                            <field name="satisfaction_comments"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_neon_per" model="ir.actions.act_window">
+        <field name="name">Post-Event Reviews</field>
+        <field name="res_model">neon.post.event.review</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <menuitem id="menu_neon_per"
+              name="Post-Event Reviews"
+              parent="neon_commercial_intel.menu_neon_ci_root"
+              action="action_neon_per"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="90"/>
+</odoo>

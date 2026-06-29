@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_crm_lead_form_neon_ci" model="ir.ui.view">
+        <field name="name">crm.lead.form.neon.ci</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_lead_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Stable anchor: the lead form has a notebook. Add a page. -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Commercial Intel" name="neon_ci">
+                    <group>
+                        <group string="Classification">
+                            <field name="neon_event_type"/>
+                            <field name="neon_sector"/>
+                            <field name="neon_strategic_value"/>
+                            <field name="neon_event_opportunity_id"/>
+                        </group>
+                        <group string="Scoring &amp; Quality">
+                            <field name="neon_score_confidence"/>
+                            <field name="neon_commercial_quality"/>
+                            <field name="neon_margin_estimate"/>
+                            <field name="company_currency" invisible="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Commercial Graph">
+                            <field name="neon_competitor_id"/>
+                            <field name="neon_play_id"/>
+                            <field name="neon_outcome_tag"/>
+                        </group>
+                        <group string="Next Best Action">
+                            <field name="neon_next_action_type"/>
+                            <field name="neon_next_action_date"/>
+                        </group>
+                    </group>
+                    <group string="Learning">
+                        <field name="neon_learning_note"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

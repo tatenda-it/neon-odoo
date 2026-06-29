@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_crm_stage_form_neon_ci" model="ir.ui.view">
+        <field name="name">crm.stage.form.neon.ci</field>
+        <field name="model">crm.stage</field>
+        <field name="inherit_id" ref="crm.crm_stage_form"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="neon_gate_active"/>
+                <field name="neon_required_field_ids" widget="many2many_tags"
+                       invisible="not neon_gate_active"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="action_neon_ci_stage_gates" model="ir.actions.act_window">
+        <field name="name">Stage Data-Quality Gates</field>
+        <field name="res_model">crm.stage</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Configure §19 data-quality gates.</p>
+            <p>Turn on "Enforce Data-Quality Gate" for a stage and select the
+               fields that must be filled before a lead can enter it. Inert
+               until configured — confirm field requirements with Munashe
+               before switching any gate on.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_neon_ci_stage_gates"
+              name="Stage Data-Quality Gates"
+              parent="menu_neon_ci_config"
+              action="action_neon_ci_stage_gates"
+              groups="neon_commercial_intel.group_neon_ci_manager"
+              sequence="10"/>
+
+</odoo>

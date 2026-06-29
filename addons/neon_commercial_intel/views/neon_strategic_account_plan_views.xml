@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_sap_tree" model="ir.ui.view">
+        <field name="name">neon.strategic.account.plan.tree</field>
+        <field name="model">neon.strategic.account.plan</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="account_id"/>
+                <field name="tier"/>
+                <field name="owner_id"/>
+                <field name="last_review_date"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_sap_form" model="ir.ui.view">
+        <field name="name">neon.strategic.account.plan.form</field>
+        <field name="model">neon.strategic.account.plan</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Account">
+                            <field name="name"/>
+                            <field name="account_id"/>
+                            <field name="tier"/>
+                            <field name="current_supplier"/>
+                            <field name="current_competitor_id"/>
+                        </group>
+                        <group string="Ownership">
+                            <field name="owner_id"/>
+                            <field name="goal_90day"/>
+                            <field name="last_review_date"/>
+                            <field name="entry_point"/>
+                        </group>
+                    </group>
+                    <group string="Plan">
+                        <field name="contact_ids" widget="many2many_tags"/>
+                        <field name="target_play_id"/>
+                        <field name="next_move"/>
+                    </group>
+                    <field name="event_ids">
+                        <tree>
+                            <field name="name"/>
+                            <field name="event_type"/>
+                            <field name="expected_date"/>
+                            <field name="pursuit_stage"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_sap" model="ir.actions.act_window">
+        <field name="name">Strategic Account Plans</field>
+        <field name="res_model">neon.strategic.account.plan</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_sap"
+              name="Strategic Account Plans"
+              parent="menu_neon_ci_root"
+              action="action_neon_sap"
+              groups="neon_commercial_intel.group_neon_ci_manager"
+              sequence="40"/>
+
+</odoo>

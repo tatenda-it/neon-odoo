@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_crm_lead_form_neon_shadow" model="ir.ui.view">
+        <field name="name">crm.lead.form.neon.shadow</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="neon_commercial_intel.view_crm_lead_form_neon_ci"/>
+        <field name="arch" type="xml">
+            <!-- Append a shadow block inside the 2A Commercial Intel page. -->
+            <xpath expr="//page[@name='neon_ci']" position="inside">
+                <group string="Shadow Intelligence (2B - review only, non-authoritative)">
+                    <group>
+                        <field name="neon_shadow_score"/>
+                        <field name="neon_deal_risk"/>
+                        <field name="neon_missing_info"/>
+                    </group>
+                    <group>
+                        <button name="action_neon_shadow_rescore" type="object"
+                                string="Recompute Shadow Score" class="btn-secondary"/>
+                    </group>
+                </group>
+                <group string="AI Reason (shadow)">
+                    <field name="neon_ai_reason" nolabel="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

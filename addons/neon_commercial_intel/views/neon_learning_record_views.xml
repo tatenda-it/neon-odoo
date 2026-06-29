@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_learning_record_tree" model="ir.ui.view">
+        <field name="name">neon.learning.record.tree</field>
+        <field name="model">neon.learning.record</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="date"/>
+                <field name="name"/>
+                <field name="loop_type"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_learning_record_form" model="ir.ui.view">
+        <field name="name">neon.learning.record.form</field>
+        <field name="model">neon.learning.record</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="loop_type"/>
+                            <field name="date"/>
+                        </group>
+                        <group string="Source (optional)">
+                            <field name="lead_id"/>
+                            <field name="event_id"/>
+                            <field name="play_id"/>
+                            <field name="partner_id"/>
+                            <field name="competitor_id"/>
+                            <field name="campaign_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="captured"/>
+                        <field name="improvement"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_learning_record" model="ir.actions.act_window">
+        <field name="name">Learning Records</field>
+        <field name="res_model">neon.learning.record</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_learning_record"
+              name="Learning Records"
+              parent="menu_neon_ci_root"
+              action="action_neon_learning_record"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="50"/>
+
+</odoo>
