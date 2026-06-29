@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Event Jobs (design-deck #3) — inline client action over the REAL
+         commercial.event.job execution layer. Gated to neon_jobs groups. -->
+    <record id="action_event_jobs_screen_server" model="ir.actions.server">
+        <field name="name">Event Jobs</field>
+        <field name="model_id" ref="model_neon_event_jobs_screen"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_event_jobs_screen()</field>
+        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_user')), (4, ref('neon_jobs.group_neon_jobs_manager')), (4, ref('neon_jobs.group_neon_jobs_crew_leader'))]"/>
+    </record>
+
+    <!-- Top-level rail entry (slot 4, set by the Rail v0 hook). -->
+    <menuitem id="menu_event_jobs_root"
+              name="Event Jobs"
+              action="action_event_jobs_screen_server"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="4"/>
+
+</odoo>

@@ -25,7 +25,7 @@ RAIL_V0_SLOTS = [
     (1, "neon_dashboard.menu_neon_dashboard_root", "My Landing"),
     (2, "crm.crm_menu_root", None),                        # CRM Pipeline (screen TBD)
     (3, "neon_screens.menu_operations_calendar_root", "Operations Calendar"),  # screen #2 (built)
-    # slot 4 Event Jobs — no distinct top-level menu yet; claims its slot when built
+    (4, "neon_screens.menu_event_jobs_root", "Event Jobs"),  # screen #3 (built)
     (5, "neon_screens.menu_equipment_screen_root", "Equipment & Inventory"),
     (6, "hr.menu_hr_root", None),                          # Crew & People (TBD)
     (7, "account.menu_finance", None),                     # Finance Control (TBD)

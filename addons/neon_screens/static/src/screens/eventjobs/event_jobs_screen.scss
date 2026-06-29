@@ -1,0 +1,62 @@
+// Event Jobs screen — list + filter tabs + status pills. neon_theme tokens.
+
+.o_neon_ej_screen {
+    padding: 20px 24px 40px;
+    background: var(--neon-page, #F6F4FB);
+    min-height: 100%;
+    overflow-y: auto;
+
+    .o_neon_ej_header {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 16px; margin-bottom: 18px;
+    }
+    .o_neon_ej_title {
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 800; color: var(--neon-ink, #1A1A1A); margin: 0;
+    }
+    .o_neon_ej_chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .o_neon_chip {
+        background: #fff; border: 1px solid #ECE8F5; border-radius: 999px;
+        padding: 3px 12px; font-size: .82rem; color: var(--neon-ink, #1A1A1A);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        strong { color: var(--neon-purple, #7A6BAE); }
+    }
+    .o_neon_chip_muted { color: var(--neon-muted, #8E89A0); box-shadow: none; }
+    .o_neon_ej_loading { text-align: center; padding: 50px 0; color: var(--neon-muted, #8E89A0); }
+
+    .o_neon_card {
+        background: #fff; border: 1px solid #ECE8F5; border-radius: var(--neon-radius-card, 14px);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        overflow: hidden;
+    }
+
+    // filter tabs
+    .o_neon_ej_tabs { display: flex; gap: 6px; padding: 12px 14px; border-bottom: 1px solid #ECE8F5; flex-wrap: wrap; }
+    .o_neon_ej_tab {
+        border: 0; background: transparent; padding: 6px 14px; border-radius: 999px;
+        font-family: var(--neon-heading, 'Montserrat', sans-serif); font-weight: 600;
+        color: var(--neon-muted, #8E89A0); cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+        &:hover { background: var(--neon-page, #F6F4FB); }
+    }
+    .o_neon_ej_tab_active, .o_neon_ej_tab_active:hover { background: var(--neon-purple, #7A6BAE); color: #fff; }
+    .o_neon_ej_tabcount {
+        background: rgba(0,0,0,.08); border-radius: 999px; padding: 0 7px; font-size: .74rem; font-weight: 700;
+    }
+    .o_neon_ej_tab_active .o_neon_ej_tabcount { background: rgba(255,255,255,.25); }
+
+    // table
+    .o_neon_table {
+        margin: 0;
+        thead th {
+            font-family: var(--neon-heading, 'Montserrat', sans-serif);
+            text-transform: uppercase; letter-spacing: .04em; font-size: .7rem;
+            font-weight: 700; color: var(--neon-muted, #8E89A0);
+            border-bottom: 1px solid #ECE8F5; background: #FBFAFE;
+        }
+        tbody td { vertical-align: middle; border-bottom: 1px solid #F2EFFA; }
+        .badge { border-radius: 999px; font-weight: 600; }
+    }
+    .o_neon_ej_row { cursor: pointer; &:hover { background: var(--neon-page, #F6F4FB); } }
+    .o_neon_ej_empty { padding: 18px 16px; text-align: center; }
+    .o_neon_asset_id { color: var(--neon-indigo, #4753A1); background: #F2EFFB; padding: 1px 7px; border-radius: 6px; }
+}

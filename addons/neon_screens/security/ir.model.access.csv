@@ -5,3 +5,6 @@ access_neon_equipment_screen_crew_leader,neon.equipment.screen crew leader,model
 access_neon_operations_screen_user,neon.operations.screen user,model_neon_operations_screen,neon_jobs.group_neon_jobs_user,1,0,0,0
 access_neon_operations_screen_manager,neon.operations.screen manager,model_neon_operations_screen,neon_jobs.group_neon_jobs_manager,1,0,0,0
 access_neon_operations_screen_crew_leader,neon.operations.screen crew leader,model_neon_operations_screen,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_event_jobs_screen_user,neon.event.jobs.screen user,model_neon_event_jobs_screen,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_event_jobs_screen_manager,neon.event.jobs.screen manager,model_neon_event_jobs_screen,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_neon_event_jobs_screen_crew_leader,neon.event.jobs.screen crew leader,model_neon_event_jobs_screen,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0

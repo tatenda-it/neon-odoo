@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_screens.EventJobsScreen">
+        <div class="o_neon_ej_screen">
+
+            <div class="o_neon_ej_header">
+                <div>
+                    <h2 class="o_neon_ej_title">Event Jobs</h2>
+                    <div class="o_neon_ej_chips" t-if="!state.loading">
+                        <span class="o_neon_chip"><strong t-esc="state.total"/> event jobs</span>
+                        <span class="o_neon_chip o_neon_chip_muted" t-if="state.shown &lt; state.total">showing first <t t-esc="state.shown"/></span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" t-on-click="() => this.load()" t-att-disabled="state.loading">
+                    <i t-att-class="state.loading ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <div t-if="state.error" class="alert alert-danger" role="alert">
+                <i class="fa fa-exclamation-circle me-2"/><span t-esc="state.error"/>
+            </div>
+            <div t-if="state.loading and !state.rows.length" class="o_neon_ej_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+            </div>
+
+            <div t-if="!state.loading or state.rows.length" class="o_neon_card">
+                <!-- filter tabs -->
+                <div class="o_neon_ej_tabs">
+                    <t t-foreach="tabs" t-as="tab" t-key="tab[0]">
+                        <button class="o_neon_ej_tab"
+                                t-att-class="state.tab === tab[0] ? 'o_neon_ej_tab_active' : ''"
+                                t-on-click="() => this.setTab(tab[0])">
+                            <t t-esc="tab[1]"/>
+                            <span class="o_neon_ej_tabcount" t-esc="tabCount(tab[0])"/>
+                        </button>
+                    </t>
+                </div>
+
+                <table class="table o_neon_table">
+                    <thead>
+                        <tr>
+                            <th>Job ID</th><th>Event</th><th>Venue</th><th>Dates</th>
+                            <th class="text-end">Crew</th><th class="text-end">Value</th><th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-if="!filteredRows.length">
+                            <td colspan="7" class="text-muted o_neon_ej_empty">No event jobs in this filter.</td>
+                        </tr>
+                        <t t-foreach="filteredRows" t-as="r" t-key="r.id">
+                            <tr class="o_neon_ej_row" t-on-click="() => this.openJob(r.id)">
+                                <td><code class="o_neon_asset_id" t-esc="r.job_id"/></td>
+                                <td><strong t-esc="r.event"/></td>
+                                <td class="text-muted" t-esc="r.venue"/>
+                                <td class="text-muted" t-esc="r.dates"/>
+                                <td class="text-end" t-esc="r.crew"/>
+                                <td class="text-end">
+                                    <t t-if="r.has_value"><t t-esc="r.currency"/><t t-esc="r.value"/></t>
+                                    <t t-else=""><span class="text-muted">—</span></t>
+                                </td>
+                                <td><span class="badge" t-att-class="toneClass(r.tone)" t-esc="r.status"/></td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </t>
+
+</templates>
