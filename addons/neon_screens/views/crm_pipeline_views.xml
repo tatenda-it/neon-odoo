@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- CRM Pipeline (design-deck #5): inline client action over the REAL live
+         crm.lead / crm.stage pipeline. Gated to CRM users; reads under own ACL.
+         NO crm.stage change of any kind. -->
+    <record id="action_crm_pipeline_screen_server" model="ir.actions.server">
+        <field name="name">CRM Pipeline</field>
+        <field name="model_id" ref="model_neon_crm_pipeline_screen"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_crm_pipeline_screen()</field>
+        <field name="groups_id" eval="[(4, ref('sales_team.group_sale_salesman'))]"/>
+    </record>
+
+    <!-- Top-level rail entry (slot 2, set by the Rail v0 hook; replaces the raw
+         CRM app menu which demotes to its 40s home). -->
+    <menuitem id="menu_crm_pipeline_root"
+              name="CRM Pipeline"
+              action="action_crm_pipeline_screen_server"
+              groups="sales_team.group_sale_salesman"
+              sequence="2"/>
+
+</odoo>

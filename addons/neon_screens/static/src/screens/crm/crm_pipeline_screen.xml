@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_screens.CrmPipelineScreen">
+        <!-- o_neon_screen + _scroll = mandatory shared scroll base (17.0.1.3.1) -->
+        <div class="o_neon_screen o_neon_screen_scroll o_neon_crm_screen">
+
+            <div class="o_neon_crm_header">
+                <div>
+                    <h2 class="o_neon_crm_title">CRM Pipeline</h2>
+                    <div class="o_neon_crm_chips" t-if="state.data">
+                        <span class="o_neon_chip"><strong t-esc="totals.leads"/> leads</span>
+                        <span class="o_neon_chip"><t t-esc="totals.currency"/><t t-esc="totals.value"/> pipeline</span>
+                        <span class="o_neon_chip o_neon_chip_muted"><t t-esc="totals.stages"/> stages</span>
+                        <span class="o_neon_chip o_neon_chip_muted"><t t-esc="totals.sourced"/> of <t t-esc="totals.leads"/> have a source</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" t-on-click="() => this.load()" t-att-disabled="state.loading">
+                    <i t-att-class="state.loading ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <div t-if="state.error" class="alert alert-danger" role="alert">
+                <i class="fa fa-exclamation-circle me-2"/><span t-esc="state.error"/>
+            </div>
+            <div t-if="state.loading and !state.data" class="o_neon_crm_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+            </div>
+
+            <!-- Kanban board: columns = LIVE stages, horizontally scrollable -->
+            <div t-if="state.data" class="o_neon_crm_board">
+                <t t-foreach="d.columns" t-as="col" t-key="col.id">
+                    <div class="o_neon_crm_col">
+                        <div class="o_neon_crm_col_head">
+                            <span class="o_neon_crm_col_name" t-esc="col.name"/>
+                            <span class="o_neon_crm_col_count" t-esc="col.count"/>
+                        </div>
+                        <div class="o_neon_crm_col_value" t-if="col.count"><t t-esc="totals.currency"/><t t-esc="col.value"/></div>
+                        <div class="o_neon_crm_col_body">
+                            <div t-if="!col.cards.length" class="o_neon_crm_col_empty">No leads</div>
+                            <t t-foreach="col.cards" t-as="c" t-key="c.id">
+                                <div class="o_neon_crm_card" t-on-click="() => this.openLead(c.id)">
+                                    <div class="o_neon_crm_card_name" t-esc="c.name"/>
+                                    <div class="o_neon_crm_card_client" t-esc="c.client"/>
+                                    <div class="o_neon_crm_card_meta">
+                                        <span class="o_neon_crm_value" t-if="c.has_value"><t t-esc="c.currency"/><t t-esc="c.value"/></span>
+                                        <span class="o_neon_crm_value o_neon_crm_value_zero" t-else="">—</span>
+                                        <span class="o_neon_crm_prob" t-if="c.probability"><t t-esc="c.probability"/>%</span>
+                                    </div>
+                                    <div class="o_neon_crm_card_badges">
+                                        <span class="o_neon_crm_src" t-if="c.source"><i class="fa fa-bullseye me-1"/><t t-esc="c.source"/></span>
+                                        <t t-foreach="c.tags" t-as="tag" t-key="tag_index">
+                                            <span class="o_neon_crm_tag" t-esc="tag"/>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>

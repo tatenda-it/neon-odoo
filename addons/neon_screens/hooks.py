@@ -23,7 +23,7 @@ _logger = logging.getLogger(__name__)
 # (slot sequence, top-level menu external id, business label or None)
 RAIL_V0_SLOTS = [
     (1, "neon_dashboard.menu_neon_dashboard_root", "My Landing"),
-    (2, "crm.crm_menu_root", None),                        # CRM Pipeline (screen TBD)
+    (2, "neon_screens.menu_crm_pipeline_root", "CRM Pipeline"),  # screen #5 (built)
     (3, "neon_screens.menu_operations_calendar_root", "Operations Calendar"),  # screen #2 (built)
     (4, "neon_screens.menu_event_jobs_root", "Event Jobs"),  # screen #3 (built)
     (5, "neon_screens.menu_equipment_screen_root", "Equipment & Inventory"),
@@ -42,6 +42,9 @@ RAIL_V0_DEMOTE = {
     # Finance Control (screen #4) owns slot 7; the raw Accounting app drops to
     # its 40s home (still fully visible -- NO hiding).
     "account.menu_finance": 41,
+    # CRM Pipeline (screen #5) owns slot 2; the raw CRM app drops to its 40s
+    # home (still fully visible -- NO hiding, NO crm.stage change).
+    "crm.crm_menu_root": 42,
 }
 
 

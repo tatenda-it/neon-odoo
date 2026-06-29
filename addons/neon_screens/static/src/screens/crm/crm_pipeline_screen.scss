@@ -1,0 +1,84 @@
+// CRM Pipeline screen #5 — kanban over live crm.lead/crm.stage.
+// Root scroll/height from the shared .o_neon_screen base (vertical); the board
+// has its own horizontal overflow for the stage columns. neon_theme tokens.
+
+.o_neon_crm_screen {
+    padding: 20px 24px 40px;
+    background: var(--neon-page, #F6F4FB);
+
+    .o_neon_crm_header {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 16px; margin-bottom: 18px;
+    }
+    .o_neon_crm_title {
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 800; color: var(--neon-ink, #1A1A1A); margin: 0;
+    }
+    .o_neon_crm_chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .o_neon_chip {
+        background: #fff; border: 1px solid #ECE8F5; border-radius: 999px;
+        padding: 3px 12px; font-size: .82rem; color: var(--neon-ink, #1A1A1A);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        strong { color: var(--neon-purple, #7A6BAE); }
+    }
+    .o_neon_chip_muted { color: var(--neon-muted, #8E89A0); box-shadow: none; }
+    .o_neon_crm_loading { text-align: center; padding: 50px 0; color: var(--neon-muted, #8E89A0); }
+
+    // Board — horizontal column scroll
+    .o_neon_crm_board {
+        display: flex; gap: 14px; align-items: flex-start;
+        overflow-x: auto; padding-bottom: 12px;
+    }
+    .o_neon_crm_col {
+        flex: 0 0 268px; max-width: 268px;
+        background: #F4F1FB; border: 1px solid #ECE8F5;
+        border-radius: var(--neon-radius-card, 14px);
+        display: flex; flex-direction: column;
+    }
+    .o_neon_crm_col_head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 14px 4px;
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 700; color: var(--neon-ink, #1A1A1A);
+    }
+    .o_neon_crm_col_name { font-size: .92rem; }
+    .o_neon_crm_col_count {
+        background: var(--neon-purple, #7A6BAE); color: #fff;
+        border-radius: 999px; padding: 0 9px; font-size: .76rem; font-weight: 700;
+    }
+    .o_neon_crm_col_value {
+        padding: 0 14px 8px; font-size: .78rem; color: var(--neon-muted, #8E89A0);
+        border-bottom: 1px solid #ECE8F5;
+    }
+    .o_neon_crm_col_body { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+    .o_neon_crm_col_empty {
+        text-align: center; color: var(--neon-muted, #8E89A0);
+        font-size: .82rem; padding: 16px 8px;
+    }
+
+    // Lead card
+    .o_neon_crm_card {
+        background: #fff; border: 1px solid #ECE8F5; border-radius: 10px;
+        padding: 11px 12px; cursor: pointer;
+        box-shadow: 0 1px 3px rgba(71,83,161,.06);
+        &:hover { border-color: var(--neon-purple, #7A6BAE); box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.12)); }
+    }
+    .o_neon_crm_card_name { font-weight: 600; color: var(--neon-ink, #1A1A1A); }
+    .o_neon_crm_card_client { font-size: .82rem; color: var(--neon-muted, #8E89A0); margin-top: 1px; }
+    .o_neon_crm_card_meta {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-top: 7px;
+    }
+    .o_neon_crm_value { font-weight: 700; color: var(--neon-indigo, #4753A1); }
+    .o_neon_crm_value_zero { color: var(--neon-muted, #8E89A0); font-weight: 400; }
+    .o_neon_crm_prob { font-size: .76rem; color: var(--neon-muted, #8E89A0); }
+    .o_neon_crm_card_badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .o_neon_crm_src {
+        background: #EEF6EE; color: var(--neon-success, #2BA84A);
+        border-radius: 999px; padding: 1px 8px; font-size: .72rem; font-weight: 600;
+    }
+    .o_neon_crm_tag {
+        background: #F2EFFB; color: var(--neon-indigo, #4753A1);
+        border-radius: 999px; padding: 1px 8px; font-size: .72rem;
+    }
+}
