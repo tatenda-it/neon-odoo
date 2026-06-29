@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_play_tree" model="ir.ui.view">
+        <field name="name">neon.play.tree</field>
+        <field name="model">neon.play</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="product_focus"/>
+                <field name="success_metric"/>
+                <field name="competitor_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_play_form" model="ir.ui.view">
+        <field name="name">neon.play.form</field>
+        <field name="model">neon.play</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Motion">
+                            <field name="name"/>
+                            <field name="product_focus"/>
+                            <field name="success_metric"/>
+                            <field name="competitor_id"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Timing">
+                            <field name="trigger_signal"/>
+                            <field name="timing_window"/>
+                        </group>
+                    </group>
+                    <group string="Approach">
+                        <field name="offer_angle"/>
+                        <field name="contact_path"/>
+                        <field name="message_sequence"/>
+                    </group>
+                    <group string="Learning">
+                        <field name="historical_performance"/>
+                        <field name="recommended_changes"/>
+                        <field name="competitive_use_case"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_neon_play" model="ir.actions.act_window">
+        <field name="name">Play Library</field>
+        <field name="res_model">neon.play</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_neon_play"
+              name="Play Library"
+              parent="menu_neon_ci_root"
+              action="action_neon_play"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="20"/>
+
+</odoo>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_neon_cam_tree" model="ir.ui.view">
+        <field name="name">neon.competitor.account.map.tree</field>
+        <field name="model">neon.competitor.account.map</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="account_id"/>
+                <field name="competitor_id"/>
+                <field name="fit_score"/>
+                <field name="switching_likelihood"/>
+                <field name="status"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_neon_cam_form" model="ir.ui.view">
+        <field name="name">neon.competitor.account.map.form</field>
+        <field name="model">neon.competitor.account.map</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_propose_outreach" type="object"
+                            string="Propose for Outreach" class="btn-primary"/>
+                    <field name="status" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="account_id"/>
+                            <field name="competitor_id"/>
+                            <field name="fit_score"/>
+                        </group>
+                        <group>
+                            <field name="switching_likelihood"/>
+                            <field name="switching_reason"/>
+                            <field name="entry_point"/>
+                        </group>
+                    </group>
+                    <group string="Positioning">
+                        <field name="positioning_note" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_neon_cam" model="ir.actions.act_window">
+        <field name="name">Competitor Account Targets</field>
+        <field name="res_model">neon.competitor.account.map</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <menuitem id="menu_neon_cam"
+              name="Competitor Account Map"
+              parent="neon_commercial_intel.menu_neon_ci_root"
+              action="action_neon_cam"
+              groups="neon_commercial_intel.group_neon_ci_manager"
+              sequence="70"/>
+</odoo>

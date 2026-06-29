@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Own views for utm.campaign (no inherit of an unknown stock xmlid). -->
+    <record id="view_neon_campaign_plan_tree" model="ir.ui.view">
+        <field name="name">utm.campaign.neon.plan.tree</field>
+        <field name="model">utm.campaign</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="neon_plan_status"/>
+                <field name="neon_play_id"/>
+                <field name="neon_owner_id"/>
+                <field name="neon_target_count"/>
+                <field name="neon_is_ai_proposed"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_neon_campaign_plan_form" model="ir.ui.view">
+        <field name="name">utm.campaign.neon.plan.form</field>
+        <field name="model">utm.campaign</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_propose_campaign" type="object"
+                            string="Propose Campaign" class="btn-primary"/>
+                    <field name="neon_plan_status" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="neon_play_id"/>
+                            <field name="neon_owner_id"/>
+                            <field name="neon_target_count"/>
+                            <field name="neon_is_ai_proposed"/>
+                        </group>
+                        <group>
+                            <field name="neon_offer_angle"/>
+                        </group>
+                    </group>
+                    <group string="Rationale">
+                        <field name="neon_rationale" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_neon_campaign_plan" model="ir.actions.act_window">
+        <field name="name">Campaign Planning</field>
+        <field name="res_model">utm.campaign</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_neon_campaign_plan_tree"/>
+    </record>
+    <menuitem id="menu_neon_campaign_plan"
+              name="Campaign Planning"
+              parent="neon_commercial_intel.menu_neon_ci_root"
+              action="action_neon_campaign_plan"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="65"/>
+</odoo>

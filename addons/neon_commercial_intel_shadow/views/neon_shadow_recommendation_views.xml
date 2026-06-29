@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_neon_shadow_rec_tree" model="ir.ui.view">
+        <field name="name">neon.shadow.recommendation.tree</field>
+        <field name="model">neon.shadow.recommendation</field>
+        <field name="arch" type="xml">
+            <tree decoration-muted="state != 'new'">
+                <field name="create_date"/>
+                <field name="rec_type"/>
+                <field name="name"/>
+                <field name="lead_id"/>
+                <field name="confidence"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_neon_shadow_rec_form" model="ir.ui.view">
+        <field name="name">neon.shadow.recommendation.form</field>
+        <field name="model">neon.shadow.recommendation</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_accept" type="object" string="Accept (log only)"
+                            class="btn-primary" invisible="state != 'new'"/>
+                    <button name="action_reject" type="object" string="Reject"
+                            invisible="state != 'new'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Shadow mode: Accept records the decision only. It does NOT
+                        create tasks or act on the system (that is Phase 2D).
+                    </div>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="rec_type"/>
+                            <field name="confidence"/>
+                        </group>
+                        <group>
+                            <field name="lead_id"/>
+                            <field name="partner_id"/>
+                            <field name="competitor_id"/>
+                            <field name="reviewed_by"/>
+                            <field name="reviewed_date"/>
+                        </group>
+                    </group>
+                    <group string="Recommendation">
+                        <field name="recommendation" nolabel="1"/>
+                    </group>
+                    <group string="Rationale (traceable)">
+                        <field name="rationale" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_neon_shadow_rec_search" model="ir.ui.view">
+        <field name="name">neon.shadow.recommendation.search</field>
+        <field name="model">neon.shadow.recommendation</field>
+        <field name="arch" type="xml">
+            <search>
+                <filter name="awaiting" string="Awaiting Review" domain="[('state','=','new')]"/>
+                <field name="lead_id"/>
+                <field name="rec_type"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_type" string="Type" context="{'group_by':'rec_type'}"/>
+                    <filter name="g_state" string="State" context="{'group_by':'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_neon_shadow_rec" model="ir.actions.act_window">
+        <field name="name">Review Queue</field>
+        <field name="res_model">neon.shadow.recommendation</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_awaiting': 1}</field>
+    </record>
+
+    <menuitem id="menu_neon_shadow_rec"
+              name="Review Queue (Shadow)"
+              parent="neon_commercial_intel.menu_neon_ci_root"
+              action="action_neon_shadow_rec"
+              groups="neon_commercial_intel.group_neon_ci_user"
+              sequence="60"/>
+
+</odoo>

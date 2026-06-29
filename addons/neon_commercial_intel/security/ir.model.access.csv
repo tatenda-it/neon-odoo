@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_event_opportunity_user,neon.event.opportunity.user,model_neon_event_opportunity,group_neon_ci_user,1,1,1,0
+access_neon_event_opportunity_manager,neon.event.opportunity.manager,model_neon_event_opportunity,group_neon_ci_manager,1,1,1,1
+access_neon_play_user,neon.play.user,model_neon_play,group_neon_ci_user,1,0,0,0
+access_neon_play_manager,neon.play.manager,model_neon_play,group_neon_ci_manager,1,1,1,1
+access_neon_competitor_user,neon.competitor.user,model_neon_competitor,group_neon_ci_user,1,0,0,0
+access_neon_competitor_manager,neon.competitor.manager,model_neon_competitor,group_neon_ci_manager,1,1,1,1
+access_neon_strategic_account_plan_user,neon.strategic.account.plan.user,model_neon_strategic_account_plan,group_neon_ci_user,0,0,0,0
+access_neon_strategic_account_plan_manager,neon.strategic.account.plan.manager,model_neon_strategic_account_plan,group_neon_ci_manager,1,1,1,1
+access_neon_learning_record_user,neon.learning.record.user,model_neon_learning_record,group_neon_ci_user,1,0,0,0
+access_neon_learning_record_manager,neon.learning.record.manager,model_neon_learning_record,group_neon_ci_manager,1,1,1,1

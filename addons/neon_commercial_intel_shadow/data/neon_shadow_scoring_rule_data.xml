@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+      PLACEHOLDER scoring rules (2B). These are illustrative weights ONLY.
+      They CANNOT be validated until ~3-4 weeks of clean post-cutover live data
+      exist. Tune (or delete) every rule below against real win/loss outcomes
+      before treating any shadow score as meaningful.
+    -->
+
+    <record id="rule_has_sector" model="neon.shadow.scoring.rule">
+        <field name="name">[PLACEHOLDER] Sector identified</field>
+        <field name="field_name">neon_sector</field>
+        <field name="operator">set</field>
+        <field name="points">10</field>
+        <field name="note">Sector known</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="rule_strategic_high_profile" model="neon.shadow.scoring.rule">
+        <field name="name">[PLACEHOLDER] High-profile strategic value</field>
+        <field name="field_name">neon_strategic_value</field>
+        <field name="operator">equals</field>
+        <field name="value">high_profile</field>
+        <field name="points">20</field>
+        <field name="note">High-profile account</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="rule_repeat_potential" model="neon.shadow.scoring.rule">
+        <field name="name">[PLACEHOLDER] Repeat potential</field>
+        <field name="field_name">neon_strategic_value</field>
+        <field name="operator">equals</field>
+        <field name="value">repeat_potential</field>
+        <field name="points">15</field>
+        <field name="note">Repeat-potential account</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="rule_has_expected_revenue" model="neon.shadow.scoring.rule">
+        <field name="name">[PLACEHOLDER] Expected revenue captured</field>
+        <field name="field_name">expected_revenue</field>
+        <field name="operator">gt</field>
+        <field name="value">0</field>
+        <field name="points">10</field>
+        <field name="note">Budget captured</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="rule_has_next_action" model="neon.shadow.scoring.rule">
+        <field name="name">[PLACEHOLDER] Next action set</field>
+        <field name="field_name">neon_next_action_type</field>
+        <field name="operator">set</field>
+        <field name="points">5</field>
+        <field name="note">Next action defined</field>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="rule_competitor_present" model="neon.shadow.scoring.rule">
+        <field name="name">[PLACEHOLDER] Competitor in play (risk flag)</field>
+        <field name="field_name">neon_competitor_id</field>
+        <field name="operator">set</field>
+        <field name="points">-5</field>
+        <field name="note">Competitor present - contested</field>
+        <field name="sequence">60</field>
+    </record>
+
+</odoo>

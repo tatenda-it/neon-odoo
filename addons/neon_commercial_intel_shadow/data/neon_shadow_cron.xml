@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+      Cron STUBS for 2B. Both ship active=False (INERT). They only create
+      review-queue items; they never act on the system. Do NOT activate until:
+      (a) the data gate clears, and (b) the leak watcher is reconciled with the
+      existing #3/#5 dashboard drafts so logic is not duplicated.
+    -->
+
+    <record id="ir_cron_neon_shadow_daily_brief" model="ir.cron">
+        <field name="name">Neon Shadow: Daily Brief (STUB - INACTIVE)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_neon_shadow_daily_brief()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="False"/>
+    </record>
+
+    <record id="ir_cron_neon_shadow_leak_watch" model="ir.cron">
+        <field name="name">Neon Shadow: Leak Watch (STUB - INACTIVE)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_neon_shadow_leak_watch()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="False"/>
+    </record>
+
+</odoo>

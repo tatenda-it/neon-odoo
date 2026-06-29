@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Add the Execute button + execution trace to the 2B recommendation form. -->
+    <record id="view_neon_shadow_rec_form_exec" model="ir.ui.view">
+        <field name="name">neon.shadow.recommendation.form.exec</field>
+        <field name="model">neon.shadow.recommendation</field>
+        <field name="inherit_id" ref="neon_commercial_intel_shadow.view_neon_shadow_rec_form"/>
+        <field name="arch" type="xml">
+            <button name="action_reject" position="after">
+                <button name="action_execute" type="object" string="Execute (create artifact)"
+                        class="btn-primary"
+                        invisible="state != 'accepted' or neon_executed"/>
+            </button>
+            <field name="reviewed_date" position="after">
+                <field name="neon_executed"/>
+                <field name="neon_executed_by"/>
+                <field name="neon_executed_date"/>
+                <field name="neon_execution_note"/>
+            </field>
+        </field>
+    </record>
+</odoo>

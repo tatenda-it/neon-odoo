@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_crm_lead_form_neon_planning" model="ir.ui.view">
+        <field name="name">crm.lead.form.neon.planning</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="neon_commercial_intel.view_crm_lead_form_neon_ci"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='neon_ci']" position="inside">
+                <group string="Planning (2C - propose only)">
+                    <button name="action_neon_recommend_play" type="object"
+                            string="Recommend a Play" class="btn-secondary"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

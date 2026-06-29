@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_partner_form_neon_ci" model="ir.ui.view">
+        <field name="name">res.partner.form.neon.ci</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Partner Intelligence" name="neon_partner_intel"
+                      groups="neon_commercial_intel.group_neon_ci_user">
+                    <group>
+                        <group string="Profile">
+                            <field name="neon_partner_type"/>
+                            <field name="neon_relationship_owner_id"/>
+                            <field name="neon_relationship_strength"/>
+                            <field name="neon_relationship_velocity"/>
+                            <field name="neon_last_interaction_date"/>
+                        </group>
+                        <group string="Value">
+                            <field name="neon_quality_score"/>
+                            <field name="neon_strategic_value"/>
+                            <field name="neon_competitor_overlap_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="neon_referral_history"/>
+                        <field name="neon_next_move"/>
+                        <field name="neon_competitor_overlap_note"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
