@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """P6.M5 -- event cost line (Schema Sketch §6.1).
 
-One record per discrete cost incurred against an event_job. Ranganai
-(Lead Tech) records cost lines as they materialise during prep,
-event, and strike; the create() override dispatches a mail.activity
+One record per discrete cost incurred against an event_job. The Lead
+Tech (crew_leader group) records cost lines as they materialise during
+prep, event, and strike; the create() override dispatches a mail.activity
 TODO to every user in the Approver group (Robin / Munashe) AND the
 Bookkeeper group (Kudzi) so finance has oversight without depending
-on Ranganai to ping them manually.
+on the Lead Tech to ping them manually.
 
 ⚠️ DECISION (P6.M5, pre-approved at design pause):
 Notification dispatch is scheduled on the cost.line record itself
@@ -167,7 +167,7 @@ class NeonFinanceCostLine(models.Model):
         per-line record (one activity per recipient per cost.line)
         rather than batching one activity per event_job for the
         recipient. Per-line notifications match the spec's intent
-        (Ranganai records discrete items, finance reviews each); a
+        (the Lead Tech records discrete items, finance reviews each); a
         bulk-import flow that wants to avoid notification storm
         should pass ``skip_finance_notification=True`` in context.
         """

@@ -39,8 +39,7 @@
                         <strong><t t-out="object.date_expires or ''"/></strong>
                         (<t t-out="object.days_to_expiry or ''"/> days from now).
                     </p>
-                    <p>Please plan renewal in good time. Contact Ranganai
-                        (Lead Tech) to schedule re-certification. Most
+                    <p>Please plan renewal in good time. Contact the Lead Tech to schedule re-certification. Most
                         equipment certifications can be re-tested in-house;
                         safety and driving certifications require an
                         external trainer booking arranged via the office.
@@ -73,7 +72,7 @@
                         this qualification (gating takes effect on the
                         expiry day).
                     </p>
-                    <p>Please contact Ranganai (Lead Tech) or the office
+                    <p>Please contact the Lead Tech or the office
                         immediately to confirm renewal arrangements:
                         equipment certifications retest in-house; safety
                         and driving certifications need an external trainer
@@ -110,10 +109,10 @@
                         this at assignment, quote-acceptance, and event-
                         start checkpoints).
                     </p>
-                    <p>Contact Ranganai or the office TODAY to confirm
+                    <p>Contact the Lead Tech or the office TODAY to confirm
                         renewal. If you have already completed the renewal
                         but the new certificate has not yet been recorded
-                        in the system, send Ranganai the certificate so it
+                        in the system, send the Lead Tech the certificate so it
                         can be added before the deadline.
                     </p>
                     <p style="margin-top: 16px; color: #7165AC; font-size: 0.9em;">

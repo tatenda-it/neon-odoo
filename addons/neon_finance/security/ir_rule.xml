@@ -128,8 +128,8 @@
         </record>
 
         <!--
-            P6.M5 — cost.line scoping. Crew leader (Ranganai) sees +
-            records cost on event_jobs where they are the lead_tech.
+            P6.M5 — cost.line scoping. The crew leader (Lead Tech group
+            member) sees + records cost on event_jobs where they are the lead_tech.
             Bookkeeper + Approver see all. perm_unlink=False on every
             rule: append-only audit trail.
 

@@ -9,8 +9,8 @@ automatically. This migration:
 1. Inserts a `block_conflicts` line into the lead_tech default seed
    (so future first-time lead_tech users get the panel).
 2. Inserts a `block_conflicts` user_layout row into every EXISTING
-   lead_tech user's layout (so Robin / Munashe / Ranganai see the
-   panel without manual Edit-Layout interaction).
+   lead_tech user's layout (so existing lead-tech / director users see
+   the panel without manual Edit-Layout interaction).
 
 Both inserts are idempotent: if the row already exists, skip.
 """

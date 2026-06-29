@@ -273,7 +273,7 @@ class NeonTrainingEventStartGateOverrideWizard(models.TransientModel):
                         "%(n)d. Cross-competency softeners did "
                         "NOT bypass the gate. Consider "
                         "escalation: replacement crew, client "
-                        "conversation, or Ranganai dispatch. "
+                        "conversation, or the Lead Tech dispatch. "
                         "See the Training Gate Log tab for "
                         "detail."
                     ) % {

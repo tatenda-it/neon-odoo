@@ -170,7 +170,7 @@ class CommercialJobCrew(models.Model):
         equipment_model_id matches; union the results.
 
         Pre-deploy reality: M1/M3 seeded cert types with
-        equipment_model_id NULL (Ranganai populates via UI post-
+        equipment_model_id NULL (the Lead Tech populates via UI post-
         deploy). Until then this method returns empty for all
         crew records, which is code-correct (no equipment certs
         currently required from the system's perspective). Logged

@@ -4,8 +4,8 @@
 
     ⚠️ DECISION (M1, marker 2 repeated): NO new groups defined here.
     Five tier meta-groups in neon_core already own the cascade for
-    Robin / Munashe / Tatenda / Kudzaiishe / Lisa / Evrill /
-    Ranganai. Creating shadow group_neon_dashboard_* would split
+    the directors, bookkeeper, and sales reps; the Lead Tech tier is
+    group-driven (currently vacant). Creating shadow group_neon_dashboard_* would split
     that single source of truth into two and require duplicate
     migration scripts for every future user.
 

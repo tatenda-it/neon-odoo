@@ -24,8 +24,9 @@ reference_owl_dashboard_pattern.md. Three-layer enforcement holds.
 ``_is_superuser`` reads ``neon_core.group_neon_superuser``;
 ``_default_dashboard_type_for_user`` walks the five existing tier
 meta-groups. Cuts user-grant maintenance to zero -- neon_core's
-post_init_hook already cascades robin@/munashe@/tatenda@/admin@/
-lisar@/evrill@/ranganai@ into the right tier.
+post_init_hook already cascades the canonical logins (directors,
+bookkeeper, sales reps) into the right tier; the Lead Tech tier is
+group-driven and currently has no person assigned (role vacant).
 
 ⚠️ DECISION (M1, marker 6): no ``user_id``-based XML grants in
 security XML. The M1-M3 prompt's ``neon_partners.user_robin`` etc.

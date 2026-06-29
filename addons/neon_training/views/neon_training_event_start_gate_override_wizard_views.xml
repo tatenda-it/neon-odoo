@@ -25,7 +25,7 @@
                        readonly="1"/>
                 <group>
                     <field name="override_reason"
-                           placeholder="Explain why this event must start despite the training gaps. Robin / Munashe will see this on the notification TODO and may escalate (replacement crew, client conversation, Ranganai dispatch). Be specific."
+                           placeholder="Explain why this event must start despite the training gaps. Robin / Munashe will see this on the notification TODO and may escalate (replacement crew, client conversation, the Lead Tech dispatch). Be specific."
                            required="1"/>
                 </group>
                 <footer>

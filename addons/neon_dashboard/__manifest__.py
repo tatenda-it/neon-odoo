@@ -157,8 +157,8 @@ precedent documented at reference_owl_dashboard_pattern.md):
 Group strategy (locked at gate 1): reuse the five neon_core tier
 meta-groups instead of inventing five new group_neon_dashboard_*
 groups. Cuts user-grant maintenance to zero (neon_core already
-cascades robin / munashe / tatenda / admin / lisa / evrill /
-ranganai by login).
+cascades the directors / bookkeeper / sales reps by login; the
+Lead Tech tier is group-driven and currently vacant).
     """,
     "author": "Neon Events Elements Pvt Ltd",
     "website": "https://neonhiring.com",

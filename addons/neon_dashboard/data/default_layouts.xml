@@ -115,7 +115,7 @@
         </record>
 
         <!-- ============================================================
-             Lead Tech (Ranganai).
+             Lead Tech (role-based; currently vacant - no person assigned).
              ============================================================ -->
         <record id="default_layout_lead_tech"
                 model="neon.dashboard.default.layout">

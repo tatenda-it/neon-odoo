@@ -53,7 +53,7 @@ Tier mapping:
 * group_neon_sales_rep    (Lisa, Evrill)
   CRM + own quotes + Training user, NO finance / NO dev
 
-* group_neon_lead_tech    (Ranganai, when created)
+* group_neon_lead_tech    (permanent role; currently VACANT)
   Crew leader + Training signoff, NO finance / NO CRM
 
 * group_neon_crew         (9 paused users + future hires)

@@ -228,9 +228,9 @@ class CommercialEventJob(models.Model):
     def _default_lead_tech_id(self):
         """Pick the current Lead Tech / Crew Leader at create time.
 
-        Dynamic group lookup rather than a hardcoded user id, so when
-        the role moves between people (Ranganai today, somebody else
-        tomorrow) the model picks up the new person automatically.
+        Dynamic group lookup rather than a hardcoded user id, so as the
+        Lead Tech role moves between holders (currently VACANT) the model
+        picks up whoever is in the crew_leader group automatically.
         Returns False gracefully if no crew_leader user exists yet —
         the field remains required at the state machine level
         (draft → planning), not at create.

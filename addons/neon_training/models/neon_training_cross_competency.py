@@ -8,7 +8,7 @@ analytics should also record if someone has been tested in other
 field and has done job successfully.'
 
 Example: Bob runs the MA3 console at the Standard Bank dinner;
-Ranganai observes and records a cross-competency for (Bob, MA3
+the Lead Tech observes and records a cross-competency for (Bob, MA3
 Console, that event). Bob does not gain a formal MA3 certification
 but the system has structured evidence that he can operate one
 under live conditions.

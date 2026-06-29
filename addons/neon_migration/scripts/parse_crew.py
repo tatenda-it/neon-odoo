@@ -50,9 +50,11 @@ _NCUR = {}  # normalized spelling -> canonical (for scan validation)
 ACTIVE = {"Oswel Kauni", "Stanley Phiri", "Trymore Mukungu",
           "Bothwell Kaposora", "Kudzai Mushore", "John Gatsi", "Tadiwa Marisa",
           "Kelvin Maibeki", "Anyway Nyaguwo", "Adam Manwere", "Arnold Mutasa",
-          "Kelvin Mushore", "Ranganai"}
+          "Kelvin Mushore"}
+# Ranganai offboarded -> FORMER (active=False, name preserved as historical
+# audit, like the other former crew). Lead Tech role is now vacant.
 FORMER = {"Romo", "Simba", "Hailey", "Brian", "Ricky", "Doubt", "Steven",
-          "Tawanda", "Kudzai Nyanguwo"}
+          "Tawanda", "Kudzai Nyanguwo", "Ranganai"}
 
 
 def _norm(s):

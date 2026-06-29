@@ -5,7 +5,7 @@
 
         Loaded with noupdate="1" so subsequent `-u neon_training`
         reinstalls do NOT stomp manual edits made via the UI by
-        Ranganai / Robin / Munashe post-install. Adding NEW rows
+        the Lead Tech / Robin / Munashe post-install. Adding NEW rows
         in a later milestone requires either a new <record> here
         (will be created fresh on first install of that build) or
         manual UI creation — append-only audit discipline.
@@ -363,7 +363,7 @@
         </record>
 
         <!-- ============================================================
-             P7a.M3 equipment additions (Ranganai-knowledge polish
+             P7a.M3 equipment additions (Lead-Tech-knowledge polish
              from M1 polish backlog)
              ============================================================ -->
 
@@ -374,7 +374,7 @@
             <field name="category_id" ref="cert_category_equipment"/>
             <field name="skill_level_mode">tiered_3</field>
             <field name="sign_off_authority">lead_tech</field>
-            <field name="description">MA Lighting grandMA2 console -- predecessor to MA3. Still in inventory pending audit by Ranganai.</field>
+            <field name="description">MA Lighting grandMA2 console -- predecessor to MA3. Still in inventory pending audit by the Lead Tech.</field>
         </record>
 
         <record id="cert_type_truss_climbing_prolyte"

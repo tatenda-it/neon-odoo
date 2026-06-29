@@ -68,7 +68,7 @@ M3 (17.0.7.2.0): per-category level UX + seed completion.
   Leadership, Client-Facing Comfort, Photography / Videography,
   Cash Handling / Financial Responsibility.
 
-* Ranganai-knowledge seed polish: MA2 Console, Truss Climbing
+* Lead-Tech-knowledge seed polish: MA2 Console, Truss Climbing
   -- Prolyte, Class 2 / 3 / 5 Driver Licences, PSV Endorsement.
 
 M4 (17.0.7.3.0): expiry tracking + daily cron + lifecycle states.

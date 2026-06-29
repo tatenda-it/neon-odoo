@@ -79,7 +79,7 @@ class NeonTrainingCertificationType(models.Model):
     # the established "model / SKU / nickname" layer per Phase 5
     # hybrid granularity (product.template = model, neon.equipment
     # .unit = serialised instance). Seed leaves this null on M1;
-    # Ranganai populates post-install via UI.
+    # the Lead Tech populates post-install via UI.
     equipment_model_id = fields.Many2one(
         "product.template",
         string="Equipment Model",
@@ -89,7 +89,7 @@ class NeonTrainingCertificationType(models.Model):
         help="Specific workshop SKU this certification covers (e.g. "
         "the 'MA Lighting grandMA3 Light' product). Filtered to the "
         "selected equipment_category_id. Populate post-install once "
-        "Ranganai audits which product.template rows correspond.",
+        "the Lead Tech audits which product.template rows correspond.",
     )
     validity_months = fields.Integer(
         string="Validity (months)",

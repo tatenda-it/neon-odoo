@@ -24,7 +24,11 @@ _TIER_ASSIGNMENTS = {
         "evrill@neonhiring.co.zw",
     ],
     "neon_core.group_neon_lead_tech": [
-        "ranganai@neonhiring.co.zw",  # Created in Phase 7b
+        # Lead Tech is a PERMANENT role but currently VACANT (no person
+        # assigned). The previous holder was offboarded (user deactivated,
+        # history preserved). When the role is filled, add the new hire's
+        # login here -- nothing else changes (lead_tech_id default + dashboard
+        # tier + finance cost-line rule all resolve via the group).
     ],
     # Crew assignments handled at user creation time (Phase 7b
     # onboarding). Too many to enumerate and crew users may
@@ -87,7 +91,8 @@ def _strip_base_user_leaks(env):
 def _assign_tier_users(env):
     """Assign canonical users to their meta-group by login
     lookup. Skips silently when a target user doesn't exist
-    yet (e.g., Ranganai pre-Phase-7b). Logs each grant action.
+    yet (e.g. a tier with no current person, like a vacant role).
+    Logs each grant action.
 
     Reference: reference_odoo17_implied_ids_orm_vs_sql.md --
     raw SQL bypasses propagation; ORM write is mandatory for

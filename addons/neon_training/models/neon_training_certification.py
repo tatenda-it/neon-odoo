@@ -75,7 +75,7 @@ _LEVELS_BY_MODE = {
 # decisions. Update here, every consumer follows.
 #
 # Routing per Phase 7 ANSWERS document + walkthrough:
-#   lead_tech         -> Ranganai (and any other Lead Tech)
+#   lead_tech         -> the Lead Tech (and any other Lead Tech)
 #   od_md             -> Robin + Munashe (and any other approver)
 #   external_trainer  -> admin tier (no internal trainer; admin
 #                                    coordinates externally)
@@ -998,7 +998,7 @@ class NeonTrainingCertification(models.Model):
           self_with_peer    -> neon_training.group_neon_training_admin
 
         Admin bypass (and SUPERUSER) preserves emergency edits
-        when the proper authority is unavailable -- e.g. Ranganai
+        when the proper authority is unavailable -- e.g. the Lead Tech
         out of office, or production deploy before crew_leader
         users exist.
         """

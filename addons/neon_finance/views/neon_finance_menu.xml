@@ -133,8 +133,8 @@
               groups="neon_finance.group_neon_finance_bookkeeper,neon_finance.group_neon_finance_approver"/>
 
     <!--
-        P6.M5 — Cost Lines menu. Crew leader (Ranganai) sees the menu
-        but the record rule filters to their own event_jobs;
+        P6.M5 — Cost Lines menu. The crew leader (Lead Tech group member)
+        sees the menu but the record rule filters to their own event_jobs;
         bookkeeper + approver + jobs manager see all.
 
         Sales tier is intentionally absent (Option A from M5 design
