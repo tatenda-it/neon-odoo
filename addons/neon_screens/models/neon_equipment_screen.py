@@ -102,7 +102,10 @@ class NeonEquipmentScreen(models.Model):
             elif avail > 0:
                 pill, tone = "IN STOCK", "ok"
             else:
-                pill, tone = "OUT OF STOCK", "alert"
+                # available==0: we may own units but none are free right now
+                # (out on jobs / reserved / in maintenance). "None free" is
+                # honest — "out of stock" would wrongly imply we own none.
+                pill, tone = "None free", "alert"
             rows.append({
                 "id": p.id,
                 "item": p.workshop_name or p.name,
