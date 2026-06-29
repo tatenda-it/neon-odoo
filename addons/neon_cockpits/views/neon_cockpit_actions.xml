@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- All actions target REAL models from existing modules. Personal cockpits
+         scope by uid; Sales pipeline groups by the live (canonical) crm.stage. -->
+
+    <!-- Director: business overview = full pipeline by canonical stage -->
+    <record id="action_cockpit_pipeline_all" model="ir.actions.act_window">
+        <field name="name">Business Overview - Pipeline</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="domain">[('type','=','opportunity')]</field>
+        <field name="context">{'group_by': ['stage_id']}</field>
+    </record>
+
+    <!-- Sales: MY pipeline (uid-scoped) by canonical stage -->
+    <record id="action_cockpit_pipeline_mine" model="ir.actions.act_window">
+        <field name="name">My Pipeline</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="domain">[('type','=','opportunity'),('user_id','=',uid)]</field>
+        <field name="context">{'group_by': ['stage_id']}</field>
+    </record>
+
+    <!-- Sales: my quotes (quote-to-close) -->
+    <record id="action_cockpit_quotes_mine" model="ir.actions.act_window">
+        <field name="name">My Quotes</field>
+        <field name="res_model">neon.finance.quote</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('salesperson_id','=',uid)]</field>
+    </record>
+
+    <!-- Approvals - CRM (Payment Pending Verification; two-step via the existing
+         neon.payment.confirm.wizard - not rebuilt here) -->
+    <record id="action_cockpit_approvals_crm" model="ir.actions.act_window">
+        <field name="name">Approvals - CRM (Payment Verification)</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('stage_id.name','=','Payment Pending Verification')]</field>
+    </record>
+
+    <!-- Approvals - Finance (existing neon.finance.approval) -->
+    <record id="action_cockpit_approvals_finance" model="ir.actions.act_window">
+        <field name="name">Approvals - Finance</field>
+        <field name="res_model">neon.finance.approval</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- AI Planner = the existing 2B review queue (read-only surface here) -->
+    <record id="action_cockpit_ai_planner" model="ir.actions.act_window">
+        <field name="name">AI Planner (Review Queue)</field>
+        <field name="res_model">neon.shadow.recommendation</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- Finance: debtors (outstanding balance) -->
+    <record id="action_cockpit_debtors" model="ir.actions.act_window">
+        <field name="name">Debtors</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('x_outstanding_balance','>',0)]</field>
+    </record>
+
+    <!-- Finance: wages + bank rec (existing models) -->
+    <record id="action_cockpit_wages" model="ir.actions.act_window">
+        <field name="name">Wages</field>
+        <field name="res_model">neon.hr.payslip</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <record id="action_cockpit_bank_rec" model="ir.actions.act_window">
+        <field name="name">Bank Reconciliation</field>
+        <field name="res_model">account.bank.statement</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- Finance<->HR toggle: People surface -->
+    <record id="action_cockpit_people" model="ir.actions.act_window">
+        <field name="name">People / HR</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">kanban,tree,form</field>
+    </record>
+
+    <!-- Technician: my jobs (uid-scoped to lead_tech) -->
+    <record id="action_cockpit_jobs_mine" model="ir.actions.act_window">
+        <field name="name">My Jobs</field>
+        <field name="res_model">commercial.event.job</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">['|',('lead_tech_id','=',uid),('crew_chief_id','=',uid)]</field>
+    </record>
+</odoo>

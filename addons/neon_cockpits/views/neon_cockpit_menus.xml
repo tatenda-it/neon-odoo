@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ==================== DIRECTOR cockpit (MD/OD = superuser tier) ==================== -->
+    <menuitem id="menu_cockpit_director" name="Director Cockpit" sequence="1"
+              groups="neon_core.group_neon_superuser"/>
+    <menuitem id="menu_dir_overview" name="Business Overview" parent="menu_cockpit_director"
+              action="action_cockpit_pipeline_all" sequence="10"
+              groups="neon_core.group_neon_superuser"/>
+    <menuitem id="menu_dir_appr_crm" name="Approvals - CRM" parent="menu_cockpit_director"
+              action="action_cockpit_approvals_crm" sequence="20"
+              groups="neon_core.group_neon_superuser"/>
+    <menuitem id="menu_dir_appr_fin" name="Approvals - Finance" parent="menu_cockpit_director"
+              action="action_cockpit_approvals_finance" sequence="21"
+              groups="neon_core.group_neon_superuser"/>
+    <menuitem id="menu_dir_planner" name="AI Planner" parent="menu_cockpit_director"
+              action="action_cockpit_ai_planner" sequence="30"
+              groups="neon_core.group_neon_superuser"/>
+    <menuitem id="menu_dir_money" name="Money Rules" parent="menu_cockpit_director"
+              action="action_neon_cockpit_money_rules" sequence="40"
+              groups="neon_core.group_neon_superuser"/>
+    <menuitem id="menu_dir_deferred" name="Deferred (UF / SA tier)" parent="menu_cockpit_director"
+              action="action_neon_cockpit_money_rules" sequence="90"
+              groups="neon_core.group_neon_superuser"/>
+
+    <!-- ==================== FINANCE cockpit (Bookkeeper; +HR toggle) ==================== -->
+    <menuitem id="menu_cockpit_finance" name="Finance Cockpit" sequence="2"
+              groups="neon_core.group_neon_bookkeeper"/>
+    <menuitem id="menu_fin_money" name="Money Rules / Cash Board" parent="menu_cockpit_finance"
+              action="action_neon_cockpit_money_rules" sequence="10"
+              groups="neon_core.group_neon_bookkeeper"/>
+    <menuitem id="menu_fin_appr" name="Approvals - Finance" parent="menu_cockpit_finance"
+              action="action_cockpit_approvals_finance" sequence="20"
+              groups="neon_core.group_neon_bookkeeper"/>
+    <menuitem id="menu_fin_debtors" name="Debtors" parent="menu_cockpit_finance"
+              action="action_cockpit_debtors" sequence="30"
+              groups="neon_core.group_neon_bookkeeper"/>
+    <menuitem id="menu_fin_bankrec" name="Bank Reconciliation" parent="menu_cockpit_finance"
+              action="action_cockpit_bank_rec" sequence="40"
+              groups="neon_core.group_neon_bookkeeper"/>
+    <menuitem id="menu_fin_wages" name="Wages" parent="menu_cockpit_finance"
+              action="action_cockpit_wages" sequence="50"
+              groups="neon_core.group_neon_bookkeeper"/>
+    <!-- Finance <-> HR/People surface toggle (Kudzaiishe is Bookkeeper + HR Admin) -->
+    <menuitem id="menu_fin_people" name="People / HR (toggle)" parent="menu_cockpit_finance"
+              action="action_cockpit_people" sequence="60"
+              groups="neon_core.group_neon_bookkeeper"/>
+
+    <!-- ==================== SALES cockpit (Lisa, Evrill; Tatenda) ==================== -->
+    <menuitem id="menu_cockpit_sales" name="Sales Cockpit" sequence="3"
+              groups="neon_core.group_neon_sales_rep"/>
+    <menuitem id="menu_sales_pipeline" name="My Pipeline" parent="menu_cockpit_sales"
+              action="action_cockpit_pipeline_mine" sequence="10"
+              groups="neon_core.group_neon_sales_rep"/>
+    <menuitem id="menu_sales_quotes" name="Quote to Close" parent="menu_cockpit_sales"
+              action="action_cockpit_quotes_mine" sequence="20"
+              groups="neon_core.group_neon_sales_rep"/>
+    <menuitem id="menu_sales_planner" name="AI Planner" parent="menu_cockpit_sales"
+              action="action_cockpit_ai_planner" sequence="30"
+              groups="neon_core.group_neon_sales_rep"/>
+
+    <!-- ==================== TECHNICIAN cockpit (Lead Tech / crew; no money/CRM/approvals) ==================== -->
+    <menuitem id="menu_cockpit_tech" name="Technician Cockpit" sequence="4"
+              groups="neon_core.group_neon_lead_tech"/>
+    <menuitem id="menu_tech_jobs" name="My Jobs" parent="menu_cockpit_tech"
+              action="action_cockpit_jobs_mine" sequence="10"
+              groups="neon_core.group_neon_lead_tech"/>
+</odoo>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Single money-rules record. VAT bound to the ONE shared tax record;
+             admin fills ZIMRA reg post-install. -->
+        <record id="cockpit_money_rules" model="neon.cockpit.info">
+            <field name="name">Neon Money Rules</field>
+            <field name="vat_tax_id" ref="neon_finance.tax_vat_15_5_sale"/>
+            <field name="currency_primary_id" ref="base.USD"/>
+            <field name="payment_terms_days">7</field>
+        </record>
+    </data>
+</odoo>

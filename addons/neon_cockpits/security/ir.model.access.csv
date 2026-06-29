@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_neon_cockpit_info_all,neon.cockpit.info read,model_neon_cockpit_info,base.group_user,1,0,0,0
+access_neon_cockpit_info_admin,neon.cockpit.info admin,model_neon_cockpit_info,neon_core.group_neon_superuser,1,1,1,0
+access_shadow_rec_planner_director,planner read director,neon_commercial_intel_shadow.model_neon_shadow_recommendation,neon_core.group_neon_superuser,1,0,0,0
+access_shadow_rec_planner_sales,planner read sales,neon_commercial_intel_shadow.model_neon_shadow_recommendation,neon_core.group_neon_sales_rep,1,0,0,0
