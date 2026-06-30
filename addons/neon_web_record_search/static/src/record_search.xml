@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- The record-search widget: core AutoComplete (input + dropdown). -->
+    <t t-name="neon_web_record_search.NeonRecordSearch">
+        <div class="o_neon_recsearch" t-if="resModel">
+            <i class="fa fa-search o_neon_recsearch_icon"/>
+            <AutoComplete
+                value="''"
+                sources="sources"
+                placeholder="'Jump to record…'"
+                onSelect.bind="onSelect"
+                resetOnSelect="true"
+                class="'o_neon_recsearch_ac'"
+            />
+        </div>
+    </t>
+
+    <!-- ONE global injection point: add the widget into every control panel's
+         navigation area. Additive — the facet SearchBar is not referenced or
+         altered. Guarded to views that have an active model (list/kanban). -->
+    <t t-inherit="web.ControlPanel" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('o_control_panel_navigation')]" position="inside">
+            <NeonRecordSearch t-if="env.searchModel and env.searchModel.resModel"/>
+        </xpath>
+    </t>
+
+</templates>

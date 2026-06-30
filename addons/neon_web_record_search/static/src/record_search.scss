@@ -1,0 +1,47 @@
+// Control-panel record search (Path B). Scoped to .o_neon_recsearch so it can't
+// affect the facet SearchBar or any other autocomplete. Reuses the same
+// in-dropdown scroll pattern as neon_web_autocomplete (plain px max-height; a
+// SASS min(px,vh) silently fails to compile).
+
+.o_neon_recsearch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    // sits in the flex .o_control_panel_navigation; min-width:0 + shrinkable
+    // flex basis lets it compress instead of wrapping to its own row on
+    // narrow / mobile control panels (adversarial-review UX finding).
+    min-width: 0;
+    flex: 0 1 220px;
+
+    @media (max-width: 767px) {
+        flex-basis: 150px;
+    }
+
+    .o_neon_recsearch_icon {
+        position: absolute;
+        left: 9px;
+        color: var(--neon-muted, #8E89A0);
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .o-autocomplete { width: 100%; }
+
+    .o-autocomplete--input {
+        width: 100%;
+        padding-left: 26px;              // room for the search icon
+        border: 1px solid #ECE8F5;
+        border-radius: 999px;
+        background: #fff;
+        height: 30px;
+    }
+
+    // in-dropdown scroll for the (up to 50) record rows
+    .o-autocomplete--dropdown-menu {
+        max-height: 360px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-width: 280px;
+        -webkit-overflow-scrolling: touch;
+    }
+}
