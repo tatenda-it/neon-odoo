@@ -1,0 +1,52 @@
+// Crew & People screen #6 — honest directory (name/role/lead/status).
+// Root scroll/height from the shared .o_neon_screen base. neon_theme tokens.
+
+.o_neon_crew_screen {
+    padding: 20px 24px 40px;
+    background: var(--neon-page, #F6F4FB);
+
+    .o_neon_crew_header {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 16px; margin-bottom: 18px;
+    }
+    .o_neon_crew_title {
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 800; color: var(--neon-ink, #1A1A1A); margin: 0;
+    }
+    .o_neon_crew_chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .o_neon_chip {
+        background: #fff; border: 1px solid #ECE8F5; border-radius: 999px;
+        padding: 3px 12px; font-size: .82rem; color: var(--neon-ink, #1A1A1A);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        strong { color: var(--neon-purple, #7A6BAE); }
+    }
+    .o_neon_chip_muted { color: var(--neon-muted, #8E89A0); box-shadow: none; }
+    .o_neon_crew_loading { text-align: center; padding: 50px 0; color: var(--neon-muted, #8E89A0); }
+
+    .o_neon_card {
+        background: #fff; border: 1px solid #ECE8F5;
+        border-radius: var(--neon-radius-card, 14px);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71,83,161,.08));
+        overflow: hidden;
+    }
+
+    .o_neon_table {
+        margin: 0;
+        thead th {
+            font-family: var(--neon-heading, 'Montserrat', sans-serif);
+            text-transform: uppercase; letter-spacing: .04em; font-size: .7rem;
+            font-weight: 700; color: var(--neon-muted, #8E89A0);
+            border-bottom: 1px solid #ECE8F5; background: #FBFAFE;
+        }
+        tbody td { vertical-align: middle; border-bottom: 1px solid #F2EFFA; }
+        .badge { border-radius: 999px; font-weight: 600; }
+    }
+    .o_neon_crew_former td { opacity: .62; }
+    .o_neon_crew_empty { padding: 18px 16px; text-align: center; }
+
+    .o_neon_crew_note {
+        margin-top: 14px; padding: 11px 14px;
+        background: #FBFAFE; border: 1px dashed #DCD6EC; border-radius: 10px;
+        color: var(--neon-muted, #8E89A0); font-size: .82rem;
+    }
+}

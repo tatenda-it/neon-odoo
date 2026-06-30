@@ -18,6 +18,13 @@
     <record id="view_holds_to_chase_tree" model="ir.ui.view">
         <field name="name">commercial.job.holds.to.chase.tree</field>
         <field name="model">commercial.job</field>
+        <!-- High priority number = low precedence. ir.ui.view _order is
+             (priority,name,id); at the default 16 this "holds" tree tied with
+             the standard commercial.job tree (1099) and won on name-tiebreak
+             ("h" < "t"), clobbering the default tree picker for every role
+             (p2m7_8 T62). 100 keeps it out of the default picker;
+             action_holds_to_chase still references it explicitly by view_id. -->
+        <field name="priority">100</field>
         <field name="arch" type="xml">
             <tree string="Holds to chase" create="0"
                   default_order="soft_hold_until asc, event_date asc">

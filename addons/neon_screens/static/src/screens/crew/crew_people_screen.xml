@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_screens.CrewPeopleScreen">
+        <!-- o_neon_screen + _scroll = mandatory shared scroll base (17.0.1.3.1) -->
+        <div class="o_neon_screen o_neon_screen_scroll o_neon_crew_screen">
+
+            <div class="o_neon_crew_header">
+                <div>
+                    <h2 class="o_neon_crew_title">Crew &amp; People</h2>
+                    <div class="o_neon_crew_chips" t-if="state.data">
+                        <span class="o_neon_chip"><strong t-esc="counts.total"/> crew</span>
+                        <span class="o_neon_chip o_neon_chip_muted"><t t-esc="counts.active"/> active</span>
+                        <span class="o_neon_chip o_neon_chip_muted" t-if="counts.former"><t t-esc="counts.former"/> former</span>
+                        <span class="o_neon_chip o_neon_chip_muted"><t t-esc="counts.leads"/> lead</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" t-on-click="() => this.load()" t-att-disabled="state.loading">
+                    <i t-att-class="state.loading ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <div t-if="state.error" class="alert alert-danger" role="alert">
+                <i class="fa fa-exclamation-circle me-2"/><span t-esc="state.error"/>
+            </div>
+            <div t-if="state.loading and !state.data" class="o_neon_crew_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+            </div>
+
+            <div t-if="state.data" class="o_neon_card">
+                <table class="table o_neon_table">
+                    <thead>
+                        <tr><th>Name</th><th>Role</th><th>Lead Tech</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr t-if="!d.rows.length">
+                            <td colspan="4" class="o_neon_crew_empty text-muted">
+                                No crew on record in this environment.
+                            </td>
+                        </tr>
+                        <t t-foreach="d.rows" t-as="r" t-key="r.id">
+                            <tr t-att-class="r.is_former ? 'o_neon_crew_former' : ''">
+                                <td><strong t-esc="r.name"/></td>
+                                <td>
+                                    <span t-if="r.role_known" t-esc="r.role"/>
+                                    <span t-else="" class="text-muted">Unknown</span>
+                                </td>
+                                <td>
+                                    <span t-if="r.is_lead" class="badge text-bg-info">Lead Tech</span>
+                                    <span t-else="" class="text-muted">—</span>
+                                </td>
+                                <td>
+                                    <span class="badge" t-att-class="r.is_former ? 'text-bg-secondary' : 'text-bg-success'" t-esc="r.status"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Honest note: the deck's performance surface is deliberately absent. -->
+            <div t-if="state.data" class="o_neon_crew_note">
+                <i class="fa fa-info-circle me-2"/>Roster directory over the canonical crew list.
+                Performance scoring, availability (On Site / Available / On Leave) and activity
+                metrics are a planned capability pending an HR-policy decision — shown as nothing
+                here rather than estimated.
+            </div>
+        </div>
+    </t>
+
+</templates>

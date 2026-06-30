@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Crew & People (design-deck #6): HONEST DIRECTORY v1 over the REAL
+         neon.crew.member roster. Gated to neon_jobs operations groups; reads
+         under own ACL. Performance scores/metrics/availability deliberately
+         NOT shown (absent/would be fabricated); scoped future milestone. -->
+    <record id="action_crew_people_screen_server" model="ir.actions.server">
+        <field name="name">Crew &amp; People</field>
+        <field name="model_id" ref="model_neon_crew_people_screen"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_crew_people_screen()</field>
+        <field name="groups_id" eval="[(4, ref('neon_jobs.group_neon_jobs_user')), (4, ref('neon_jobs.group_neon_jobs_manager')), (4, ref('neon_jobs.group_neon_jobs_crew_leader'))]"/>
+    </record>
+
+    <!-- Top-level rail entry (slot 6, set by the Rail v0 hook; replaces the raw
+         Employees/HR app menu which demotes to its 40s home). -->
+    <menuitem id="menu_crew_people_root"
+              name="Crew &amp; People"
+              action="action_crew_people_screen_server"
+              groups="neon_jobs.group_neon_jobs_user,neon_jobs.group_neon_jobs_manager,neon_jobs.group_neon_jobs_crew_leader"
+              sequence="6"/>
+
+</odoo>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Screens — Equipment & Inventory",
-    "version": "17.0.1.5.0",
+    "version": "17.0.1.6.0",
     "summary": "Design-deck Equipment & Inventory screen + Rail v0 nav "
                "skeleton (additive, read-only — no new equipment fields)",
     "description": """
@@ -37,7 +37,7 @@ equipment data, no writes, no new security groups.
     # the Rail v0 sequence writes are final; web = OWL assets. neon_finance +
     # neon_weekly_budget = Finance Control (#4) data models + finance groups.
     "depends": ["neon_jobs", "neon_menu_order", "neon_finance",
-                "neon_weekly_budget", "crm", "web"],
+                "neon_weekly_budget", "crm", "neon_migration", "web"],
     "data": [
         "security/ir.model.access.csv",
         "views/neon_equipment_screen_views.xml",
@@ -45,6 +45,7 @@ equipment data, no writes, no new security groups.
         "views/event_jobs_views.xml",
         "views/finance_control_views.xml",
         "views/crm_pipeline_views.xml",
+        "views/crew_people_views.xml",
     ],
     "assets": {
         "web.assets_backend": [
@@ -64,6 +65,9 @@ equipment data, no writes, no new security groups.
             "neon_screens/static/src/screens/crm/crm_pipeline_screen.scss",
             "neon_screens/static/src/screens/crm/crm_pipeline_screen.js",
             "neon_screens/static/src/screens/crm/crm_pipeline_screen.xml",
+            "neon_screens/static/src/screens/crew/crew_people_screen.scss",
+            "neon_screens/static/src/screens/crew/crew_people_screen.js",
+            "neon_screens/static/src/screens/crew/crew_people_screen.xml",
         ],
     },
     "post_init_hook": "post_init_hook",

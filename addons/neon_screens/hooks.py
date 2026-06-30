@@ -27,7 +27,7 @@ RAIL_V0_SLOTS = [
     (3, "neon_screens.menu_operations_calendar_root", "Operations Calendar"),  # screen #2 (built)
     (4, "neon_screens.menu_event_jobs_root", "Event Jobs"),  # screen #3 (built)
     (5, "neon_screens.menu_equipment_screen_root", "Equipment & Inventory"),
-    (6, "hr.menu_hr_root", None),                          # Crew & People (TBD)
+    (6, "neon_screens.menu_crew_people_root", "Crew & People"),  # screen #6 (built: directory v1)
     (7, "neon_screens.menu_finance_control_root", "Finance Control"),  # screen #4 (built)
     (8, "neon_commercial_intel.menu_neon_ci_root", None),  # AI Planner (TBD)
     # slot 9 Field App — no menu; PWA-vs-WhatsApp decision pending
@@ -45,6 +45,9 @@ RAIL_V0_DEMOTE = {
     # CRM Pipeline (screen #5) owns slot 2; the raw CRM app drops to its 40s
     # home (still fully visible -- NO hiding, NO crm.stage change).
     "crm.crm_menu_root": 42,
+    # Crew & People (screen #6) owns slot 6; the raw Employees/HR app drops to
+    # its 40s home (still fully visible -- NO hiding).
+    "hr.menu_hr_root": 43,
 }
 
 
