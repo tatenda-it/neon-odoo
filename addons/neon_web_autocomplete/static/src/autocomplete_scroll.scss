@@ -1,0 +1,20 @@
+// Neon global field-picker type-ahead (Approach B) — in-dropdown scroll.
+//
+// The core AutoComplete dropdown (.o-autocomplete--dropdown-menu, the <ul>)
+// has no max-height in stock web, so with the raised 50-result cap it would
+// grow tall and overflow the viewport. Cap its height and scroll the results
+// in place. Composes with web_responsive's item-wrapping rule on the same
+// element (that targets the inner .ui-menu-item-wrapper white-space; this
+// targets the <ul> height) -- no clip, no double-style. Loaded after
+// web_responsive via the manifest dependency.
+
+// NB: a SASS `min(360px, 60vh)` here silently fails to compile (mixed units),
+// dropping the whole rule -> use a plain px cap (escape CSS min() if vh is ever
+// wanted: `max-height: #{"min(360px, 60vh)"}`).
+.o-autocomplete--dropdown-menu {
+    // ~10-11 rows visible, the rest scroll in-dropdown.
+    max-height: 360px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;  // iOS momentum
+}
