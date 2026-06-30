@@ -62,12 +62,16 @@ export class EventJobsScreen extends Component {
         }[tone] || "text-bg-secondary";
     }
     openJob(id) {
+        // Open the Event Job DETAIL screen (#10), NOT the native form. The
+        // native commercial.event.job form trips a neon_training access-error
+        // for non-Training users (gate-log field on the form); the detail
+        // screen reads via RPC and renders OWL, avoiding it entirely.
         this.action.doAction({
-            type: "ir.actions.act_window",
-            res_model: "commercial.event.job",
-            res_id: id,
-            views: [[false, "form"]],
-            target: "current",
+            type: "ir.actions.client",
+            tag: "neon_event_job_detail_screen",
+            name: "Event Job",
+            params: { event_job_id: id },
+            context: { event_job_id: id },
         });
     }
 }

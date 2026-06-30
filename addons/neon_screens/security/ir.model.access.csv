@@ -14,3 +14,6 @@ access_neon_crm_pipeline_screen_salesman,neon.crm.pipeline.screen salesman,model
 access_neon_crew_people_screen_user,neon.crew.people.screen user,model_neon_crew_people_screen,neon_jobs.group_neon_jobs_user,1,0,0,0
 access_neon_crew_people_screen_manager,neon.crew.people.screen manager,model_neon_crew_people_screen,neon_jobs.group_neon_jobs_manager,1,0,0,0
 access_neon_crew_people_screen_crew_leader,neon.crew.people.screen crew leader,model_neon_crew_people_screen,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0
+access_neon_event_job_detail_screen_user,neon.event.job.detail.screen user,model_neon_event_job_detail_screen,neon_jobs.group_neon_jobs_user,1,0,0,0
+access_neon_event_job_detail_screen_manager,neon.event.job.detail.screen manager,model_neon_event_job_detail_screen,neon_jobs.group_neon_jobs_manager,1,0,0,0
+access_neon_event_job_detail_screen_crew_leader,neon.event.job.detail.screen crew leader,model_neon_event_job_detail_screen,neon_jobs.group_neon_jobs_crew_leader,1,0,0,0

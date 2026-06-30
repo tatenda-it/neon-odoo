@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="neon_screens.EventJobDetailScreen">
+        <!-- o_neon_screen + _scroll = mandatory shared scroll base (17.0.1.3.1) -->
+        <div class="o_neon_screen o_neon_screen_scroll o_neon_ejd_screen">
+
+            <div class="o_neon_ejd_topbar">
+                <button class="btn btn-link o_neon_ejd_back" t-on-click="() => this.backToList()">
+                    <i class="fa fa-arrow-left me-2"/>Event Jobs
+                </button>
+                <button class="btn btn-primary" t-on-click="() => this.load()" t-att-disabled="state.loading">
+                    <i t-att-class="state.loading ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                    <span class="ms-2">Refresh</span>
+                </button>
+            </div>
+
+            <div t-if="state.error" class="alert alert-danger" role="alert">
+                <i class="fa fa-exclamation-circle me-2"/><span t-esc="state.error"/>
+            </div>
+            <div t-if="state.loading and !state.data" class="o_neon_ejd_loading">
+                <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+            </div>
+
+            <t t-if="state.data">
+                <!-- HEADER CARD -->
+                <div class="o_neon_card o_neon_ejd_header">
+                    <div class="o_neon_ejd_head_top">
+                        <div>
+                            <div class="o_neon_ejd_jobid"><code class="o_neon_asset_id" t-esc="d.header.job_id"/></div>
+                            <h2 class="o_neon_ejd_client" t-esc="d.header.client"/>
+                            <div class="o_neon_ejd_meta">
+                                <span><i class="fa fa-map-marker me-1"/><t t-esc="d.header.venue"/></span>
+                                <span><i class="fa fa-users me-1"/><t t-esc="d.header.guests"/> guests</span>
+                            </div>
+                        </div>
+                        <span class="badge o_neon_ejd_status" t-att-class="toneClass(d.header.status_tone)" t-esc="d.header.status"/>
+                    </div>
+                    <!-- TIMELINE -->
+                    <div class="o_neon_ejd_timeline">
+                        <t t-foreach="d.header.timeline" t-as="t" t-key="t.label">
+                            <div class="o_neon_ejd_tl_stage">
+                                <div class="o_neon_ejd_tl_dot"/>
+                                <div class="o_neon_ejd_tl_label" t-esc="t.label"/>
+                                <div class="o_neon_ejd_tl_dt">
+                                    <t t-if="t.estimated"><span class="o_neon_ejd_est">~ </span></t><t t-esc="t.dt"/>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                    <div class="o_neon_ejd_tl_note" t-if="d.header.timeline.length">
+                        <i class="fa fa-info-circle me-1"/><span class="o_neon_ejd_est">~</span> = estimated from the event window (no explicit time set).
+                    </div>
+                </div>
+
+                <div class="o_neon_ejd_grid">
+                    <!-- EQUIPMENT ALLOCATION -->
+                    <div class="o_neon_card">
+                        <div class="o_neon_card_head"><span><i class="fa fa-cubes me-2"/>Equipment Allocation</span><span class="o_neon_pill" t-esc="counts.equipment + ' lines'"/></div>
+                        <table class="table o_neon_table">
+                            <thead><tr><th>Item</th><th class="text-end">Planned</th><th class="text-end">Allocated</th><th class="text-end">Remaining</th><th>Status</th></tr></thead>
+                            <tbody>
+                                <tr t-if="!d.equipment.length"><td colspan="5" class="o_neon_empty text-muted">No equipment assigned to this job yet.</td></tr>
+                                <t t-foreach="d.equipment" t-as="e" t-key="e.id">
+                                    <tr>
+                                        <td t-esc="e.item"/>
+                                        <td class="text-end" t-esc="e.planned"/>
+                                        <td class="text-end" t-esc="e.allocated"/>
+                                        <td class="text-end" t-esc="e.remaining"/>
+                                        <td><span class="badge" t-att-class="toneClass(e.state_tone)" t-esc="e.state"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ASSIGNED CREW -->
+                    <div class="o_neon_card">
+                        <div class="o_neon_card_head"><span><i class="fa fa-user me-2"/>Assigned Crew</span><span class="o_neon_pill" t-esc="counts.crew + ' crew'"/></div>
+                        <table class="table o_neon_table">
+                            <thead><tr><th>Name</th><th>Role</th><th>Status</th></tr></thead>
+                            <tbody>
+                                <tr t-if="!d.crew.length"><td colspan="3" class="o_neon_empty text-muted">No crew assigned to this job yet.</td></tr>
+                                <t t-foreach="d.crew" t-as="c" t-key="c.id">
+                                    <tr>
+                                        <td><strong t-esc="c.name"/><span t-if="c.is_chief" class="badge text-bg-info ms-2">Chief</span></td>
+                                        <td t-esc="c.role"/>
+                                        <td><span class="badge" t-att-class="toneClass(c.state_tone)" t-esc="c.state"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- EVENT COSTING -->
+                <div class="o_neon_card">
+                    <div class="o_neon_card_head"><span><i class="fa fa-balance-scale me-2"/>Event Costing — Budget vs Actual</span>
+                        <span class="badge" t-att-class="toneClass(d.costing.alert_tone)" t-esc="d.costing.alert"/>
+                    </div>
+                    <div t-if="!d.costing.has_data" class="o_neon_empty text-muted">No costing recorded for this job yet.</div>
+                    <div t-if="d.costing.has_data" class="o_neon_ejd_costing">
+                        <div class="o_neon_ejd_cost_summary">
+                            <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Quoted</div><div class="o_neon_ejd_cstat_v"><t t-if="d.costing.has_quote"><t t-esc="d.costing.currency"/><t t-esc="d.costing.quoted"/></t><t t-else=""><span class="text-muted">—</span></t></div></div>
+                            <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Actual cost</div><div class="o_neon_ejd_cstat_v"><t t-esc="d.costing.currency"/><t t-esc="d.costing.actual"/></div></div>
+                            <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Variance</div><div class="o_neon_ejd_cstat_v" t-att-class="d.costing.variance_tone === 'alert' ? 'text-danger' : 'text-success'"><t t-esc="d.costing.currency"/><t t-esc="d.costing.variance"/></div></div>
+                            <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Margin</div><div class="o_neon_ejd_cstat_v" t-esc="d.costing.margin_pct"/></div>
+                        </div>
+                        <div class="o_neon_ejd_cats" t-if="d.costing.categories.length">
+                            <div class="o_neon_ejd_cat" t-foreach="d.costing.categories" t-as="cat" t-key="cat.category">
+                                <div class="o_neon_ejd_cat_top"><span t-esc="cat.category"/><span><t t-esc="d.costing.currency"/><t t-esc="cat.amount"/></span></div>
+                                <div class="o_neon_ejd_bar"><div class="o_neon_ejd_bar_fill" t-attf-style="width: {{cat.pct}}%;"/></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COMMERCIAL -->
+                <div class="o_neon_card">
+                    <div class="o_neon_card_head"><span><i class="fa fa-file-text-o me-2"/>Commercial</span></div>
+                    <div class="o_neon_ejd_commercial">
+                        <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Quoted value</div><div class="o_neon_ejd_cstat_v"><t t-esc="d.commercial.currency"/><t t-esc="d.commercial.quoted_value"/></div></div>
+                        <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">VAT</div><div class="o_neon_ejd_cstat_v" t-esc="d.commercial.vat"/></div>
+                        <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Deposit received</div><div class="o_neon_ejd_cstat_v"><t t-esc="d.commercial.currency"/><t t-esc="d.commercial.deposit"/></div></div>
+                        <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Balance</div><div class="o_neon_ejd_cstat_v"><t t-esc="d.commercial.currency"/><t t-esc="d.commercial.balance"/></div></div>
+                        <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">Finance status</div><div class="o_neon_ejd_cstat_v" t-esc="d.commercial.finance_status"/></div>
+                        <div class="o_neon_ejd_cstat"><div class="o_neon_ejd_cstat_l">ZIMRA BP (company)</div><div class="o_neon_ejd_cstat_v" t-esc="d.commercial.zimra_bp"/></div>
+                    </div>
+                </div>
+
+                <!-- ACTIONS: Brief crew = DRAFT-ONLY (composes + preview, human sends);
+                     AI plan = deferred (placeholder intelligence). -->
+                <div class="o_neon_ejd_actions">
+                    <button class="btn btn-primary" t-on-click="() => this.briefCrew()">
+                        <i class="fa fa-whatsapp me-2"/>Brief crew on WhatsApp
+                    </button>
+                    <button class="btn btn-outline-secondary" disabled="disabled" title="Deferred — AI Planner intelligence is not yet trustworthy">
+                        <i class="fa fa-magic me-2"/>AI plan
+                    </button>
+                    <span class="o_neon_ejd_soon">AI plan coming later</span>
+                </div>
+            </t>
+
+            <!-- DRAFT-ONLY crew brief preview. Composed from real job data; the
+                 screen sends NOTHING — the human copies and sends from WhatsApp. -->
+            <div t-if="state.brief.open" class="o_neon_ejd_modal_backdrop" t-on-click="() => this.closeBrief()">
+                <div class="o_neon_ejd_modal" t-on-click.stop="">
+                    <div class="o_neon_ejd_modal_head">
+                        <span><i class="fa fa-whatsapp me-2"/>Crew briefing — draft</span>
+                        <button class="btn btn-link o_neon_ejd_modal_x" t-on-click="() => this.closeBrief()"><i class="fa fa-times"/></button>
+                    </div>
+                    <div class="o_neon_ejd_modal_body">
+                        <div t-if="state.brief.loading" class="text-muted"><i class="fa fa-circle-o-notch fa-spin me-2"/>Composing from job data…</div>
+                        <div t-if="state.brief.error" class="alert alert-danger" t-esc="state.brief.error"/>
+                        <textarea t-if="!state.brief.loading and !state.brief.error" class="o_neon_ejd_brief_text" readonly="readonly" t-esc="state.brief.text"/>
+                    </div>
+                    <div class="o_neon_ejd_modal_foot">
+                        <span class="o_neon_ejd_nosend"><i class="fa fa-lock me-1"/>Nothing is sent automatically — copy and send from WhatsApp / the channel yourself.</span>
+                        <span class="o_neon_ejd_foot_btns">
+                            <button class="btn btn-outline-secondary" t-on-click="() => this.closeBrief()">Close</button>
+                            <button class="btn btn-primary" t-on-click="() => this.copyBrief()" t-att-disabled="state.brief.loading or !!state.brief.error">
+                                <i t-att-class="state.brief.copied ? 'fa fa-check me-2' : 'fa fa-copy me-2'"/><t t-esc="state.brief.copied ? 'Copied' : 'Copy briefing'"/>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>
