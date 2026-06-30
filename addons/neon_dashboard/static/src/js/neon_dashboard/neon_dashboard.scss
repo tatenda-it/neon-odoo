@@ -1549,3 +1549,126 @@ $neon-bg:            #FAFAFC;
         }
     }
 }
+
+// =====================================================================
+// SALES-LENS design-fidelity restyle (deck). EVERYTHING scoped under
+// .o_neon_dash_sales so the Director/Bookkeeper/HR/Tech lenses are
+// untouched. Uses neon_theme CSS vars (with fallbacks) for cohesion
+// with the neon_screens programme. Presentation only.
+// =====================================================================
+.o_neon_dashboard.o_neon_dash_sales {
+
+    // --- Header: greeting + cockpit subtitle ---
+    .o_neon_sales_brand {
+        .o_neon_sales_greeting {
+            font-family: var(--neon-heading, 'Montserrat', sans-serif);
+            font-weight: 800;
+            color: var(--neon-ink, #1A1A1A);
+            margin: 0;
+        }
+        .o_neon_dashboard_subtitle {
+            color: var(--neon-purple, #7A6BAE);
+            font-weight: 600;
+        }
+    }
+
+    // --- KPI tiles: deck card look ---
+    .o_neon_kpi_strip { gap: 14px; }
+    .o_neon_kpi_tile {
+        background: #fff;
+        border: 1px solid #ECE8F5;
+        border-top: 3px solid var(--neon-purple, #7A6BAE);
+        border-radius: var(--neon-radius-card, 14px);
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71, 83, 161, .08));
+        padding: 14px 16px;
+        transition: transform .12s ease, box-shadow .12s ease;
+
+        &.o_neon_kpi_clickable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 26px rgba(71, 83, 161, .16);
+        }
+        .o_neon_kpi_label {
+            font-size: .74rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 600;
+            color: var(--neon-muted, #8E89A0);
+        }
+        .o_neon_kpi_value {
+            font-family: var(--neon-heading, 'Montserrat', sans-serif);
+            font-weight: 800;
+            color: var(--neon-ink, #1A1A1A);
+        }
+        .o_neon_kpi_subtitle { color: var(--neon-muted, #8E89A0); }
+    }
+
+    // Commission "coming soon" placeholder — visibly inert, never a number
+    .o_neon_kpi_soon {
+        border-top-style: dashed;
+        border-top-color: #CFC8E6;
+        background: #FBFAFE;
+        .o_neon_kpi_value { color: var(--neon-muted, #8E89A0); font-weight: 700; }
+        .o_neon_kpi_subtitle { font-style: italic; color: var(--neon-purple, #7A6BAE); }
+    }
+
+    // --- Pipeline by stage: horizontal bars ---
+    .o_neon_sales_pipebars {
+        .o_neon_pipebar_list { display: flex; flex-direction: column; gap: 9px; margin-top: 6px; }
+        .o_neon_pipebar_row {
+            display: grid;
+            grid-template-columns: 170px 1fr 90px;
+            align-items: center;
+            gap: 10px;
+            @media (max-width: 767.98px) { grid-template-columns: 110px 1fr 70px; }
+        }
+        .o_neon_pipebar_label {
+            font-size: .84rem;
+            color: var(--neon-ink, #1A1A1A);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .o_neon_pipebar_count { color: var(--neon-muted, #8E89A0); font-size: .78rem; }
+        .o_neon_pipebar_track {
+            height: 12px;
+            background: #F2EFFA;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .o_neon_pipebar_fill {
+            height: 100%;
+            min-width: 2px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--neon-indigo, #4753A1), var(--neon-purple, #7A6BAE));
+        }
+        .o_neon_pipebar_value {
+            text-align: right;
+            font-weight: 700;
+            font-size: .84rem;
+            color: var(--neon-ink, #1A1A1A);
+        }
+    }
+
+    // --- Sales content cards (blocks) ---
+    .o_neon_block {
+        border-radius: var(--neon-radius-card, 14px);
+        border: 1px solid #ECE8F5;
+        box-shadow: var(--neon-shadow, 0 4px 18px rgba(71, 83, 161, .08));
+        .o_neon_block_header h3 {
+            font-family: var(--neon-heading, 'Montserrat', sans-serif);
+            font-weight: 700;
+            color: var(--neon-ink, #1A1A1A);
+        }
+    }
+    .o_neon_sales_subwidget h4 {
+        font-family: var(--neon-heading, 'Montserrat', sans-serif);
+        font-weight: 700;
+        font-size: .9rem;
+        color: var(--neon-purple, #7A6BAE);
+    }
+
+    // --- Follow-ups Due (alerts block) — red-flag list, deck styling ---
+    .o_neon_block_alerts {
+        border-top: 3px solid var(--neon-danger, #E5484D);
+    }
+}

@@ -2231,11 +2231,19 @@ class NeonDashboard(models.Model):
     # ==================================================================
     @api.model
     def _compute_sales_block(self, dashboard_type):
-        return {
+        block = {
             "pipeline_by_stage": self._compute_pipeline_by_stage(),
             "win_rate": self._compute_win_rate(),
             "lead_sources": self._compute_lead_sources(),
         }
+        # Sales-lens design-fidelity (deck): a crm.lead x crm.stage pipeline
+        # showing ALL live stages. Computed ONLY for the sales lens so the
+        # director lens (which also renders block_sales) keeps its existing
+        # quote-state pipeline_by_stage untouched. Reuses crm.lead.stage_id +
+        # expected_revenue -- no new model/field.
+        if dashboard_type == "sales":
+            block["pipeline_by_crm_stage"] = self._compute_pipeline_by_crm_stage()
+        return block
 
     @api.model
     def _compute_pipeline_by_stage(self):
@@ -2299,6 +2307,51 @@ class NeonDashboard(models.Model):
             "stages": stages,
             "currency_note": _(
                 "USD only -- ZWG totals ship in M6"),
+        }
+
+    @api.model
+    def _compute_pipeline_by_crm_stage(self):
+        """Sales-lens (deck) pipeline: ALL live crm.stage stages with summed
+        crm.lead.expected_revenue + horizontal-bar percentages. Reuses
+        existing fields only (stage_id, expected_revenue) -- NO new model/
+        field. Sudo read mirrors the existing sales-block convention; renders
+        only in the sales lens (see _compute_sales_block)."""
+        Lead = self.env["crm.lead"].sudo()
+        Stage = self.env["crm.stage"].sudo()
+        stage_recs = Stage.search([], order="sequence, id")
+        groups = Lead.read_group(
+            [("type", "=", "opportunity"), ("active", "=", True)],
+            ["expected_revenue:sum"], ["stage_id"])
+        by_stage = {}
+        for g in groups:
+            sid = g["stage_id"][0] if g.get("stage_id") else False
+            by_stage[sid] = {
+                "count": g.get("stage_id_count", 0),
+                "value": g.get("expected_revenue") or 0.0,
+            }
+        rows, max_val, total = [], 0.0, 0
+        for st in stage_recs:
+            d = by_stage.get(st.id, {"count": 0, "value": 0.0})
+            max_val = max(max_val, d["value"])
+            total += d["count"]
+            rows.append({
+                "stage_id": st.id, "label": st.name,
+                "count": d["count"], "value": d["value"],
+            })
+        if total == 0:
+            return {
+                "empty": True,
+                "empty_message": _("No open opportunities in the pipeline"),
+                "stages": [],
+            }
+        ccy = (self.env.company.currency_id.name or "USD")
+        for r in rows:
+            r["value_display"] = self._format_money(r["value"], ccy)
+            r["pct"] = round(100.0 * r["value"] / max_val, 1) if max_val > 0 else 0.0
+        return {
+            "empty": False,
+            "stages": rows,
+            "currency_note": _("crm.lead expected revenue -- all live stages"),
         }
 
     @api.model

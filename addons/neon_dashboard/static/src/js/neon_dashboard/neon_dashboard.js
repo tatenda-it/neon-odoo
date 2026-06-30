@@ -1102,6 +1102,17 @@ export class NeonDashboard extends Component {
         return (this.state.data && this.state.data.user_name) || "";
     }
 
+    // Sales-lens design-fidelity restyle (scoped under .o_neon_dash_sales).
+    get isSales() {
+        return !!(this.state.data && this.state.data.dashboard_type === "sales");
+    }
+    get salesGreeting() {
+        const h = new Date().getHours();
+        const part = h < 12 ? "Good morning" : (h < 17 ? "Good afternoon" : "Good evening");
+        const first = (this.userName || "").trim().split(/\s+/)[0] || "";
+        return first ? `${part}, ${first}` : part;
+    }
+
     get lastUpdated() {
         return (this.state.data && this.state.data.last_updated) || "";
     }

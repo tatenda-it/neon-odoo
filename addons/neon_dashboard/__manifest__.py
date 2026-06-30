@@ -117,7 +117,21 @@
     # action area; card grid + fixed chat rail + inner block scroll unaffected.
     # Asset-bundle (SCSS) change -> -u + delete web.assets_* + force-recreate;
     # users hard-refresh once. No Python / model / RBAC change.
-    "version": "17.0.11.6.2",
+    # 17.0.11.7.0 = SALES-LENS design-fidelity restyle (deck). Match the deck's
+    # Sales cockpit visuals while keeping the real-data RPCs + role-gating. ALL
+    # changes scoped under a new root class `o_neon_dash_sales` so the Director/
+    # Bookkeeper/HR/Tech lenses are byte-identical. Adds: greeting header +
+    # "Sales & Client Relations cockpit" subtitle (sales-gated); deck KPI card
+    # styling (neon_theme tokens); sales-gated relabels (Pipeline Value->My
+    # Pipeline, Win Rate->Quote-to-Close); a Commission Pending "coming soon"
+    # placeholder tile (NO model, NO fabricated number -- money+policy decision
+    # deferred to Munashe+Robin); a horizontal-bar "My Pipeline by stage" panel
+    # over ALL live crm.stage stages (new sales-only _compute_pipeline_by_crm_stage
+    # reusing crm.lead.stage_id+expected_revenue -- NO new model/field; director's
+    # quote-state pipeline_by_stage untouched); follow-ups/alerts deck styling.
+    # Deferred (NOT this pass): ZiG sub-values, per-tile deltas, action buttons.
+    # Asset-bundle + tiny RPC-key add -> -u + delete web.assets_* + force-recreate.
+    "version": "17.0.11.7.0",
     "summary": "Phase 8A Director Dashboard + Phase 8B role variants "
                "(Sales / Bookkeeper / Lead Tech) on the shared "
                "neon.dashboard framework -- per-variant KPI strips, "

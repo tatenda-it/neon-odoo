@@ -75,7 +75,8 @@
                 <h3>Sales Pipeline</h3>
             </div>
             <div class="o_neon_block_body">
-                <div class="o_neon_sales_subwidget">
+                <!-- Director/other lenses: quote-state pipeline table (UNCHANGED) -->
+                <div class="o_neon_sales_subwidget" t-if="!isSales">
                     <h4>Pipeline by stage</h4>
                     <div t-if="salesBlock.pipeline_by_stage.empty"
                          class="o_neon_block_empty">
@@ -105,6 +106,34 @@
                     </table>
                     <small class="text-muted o_neon_sales_currency_note"
                            t-esc="salesBlock.pipeline_by_stage.currency_note"/>
+                </div>
+                <!-- Sales lens (deck): horizontal bars over ALL live crm.stage stages -->
+                <div class="o_neon_sales_subwidget o_neon_sales_pipebars" t-if="isSales">
+                    <h4>My Pipeline by stage</h4>
+                    <div t-if="salesBlock.pipeline_by_crm_stage.empty"
+                         class="o_neon_block_empty">
+                        <p class="o_neon_block_empty_msg"
+                           t-esc="salesBlock.pipeline_by_crm_stage.empty_message"/>
+                    </div>
+                    <div t-if="!salesBlock.pipeline_by_crm_stage.empty"
+                         class="o_neon_pipebar_list">
+                        <t t-foreach="salesBlock.pipeline_by_crm_stage.stages"
+                           t-as="st" t-key="st.stage_id">
+                            <div class="o_neon_pipebar_row">
+                                <div class="o_neon_pipebar_label">
+                                    <t t-esc="st.label"/>
+                                    <span class="o_neon_pipebar_count">(<t t-esc="st.count"/>)</span>
+                                </div>
+                                <div class="o_neon_pipebar_track">
+                                    <div class="o_neon_pipebar_fill"
+                                         t-attf-style="width: {{st.pct}}%;"/>
+                                </div>
+                                <div class="o_neon_pipebar_value" t-esc="st.value_display"/>
+                            </div>
+                        </t>
+                    </div>
+                    <small class="text-muted o_neon_sales_currency_note"
+                           t-esc="salesBlock.pipeline_by_crm_stage.currency_note"/>
                 </div>
                 <div class="o_neon_sales_subrow">
                     <div class="o_neon_sales_subwidget">
@@ -1033,11 +1062,12 @@
 
     <t t-name="neon_dashboard.NeonDashboard">
         <div class="o_neon_dashboard"
-             t-att-class="(isChatVisible ? (state.chatExpanded ? 'o_neon_dashboard_chat_expanded ' : 'o_neon_dashboard_chat_rail ') : '') + 'o_neon_dashboard__filter_' + state.activeFilter + (state.editMode ? ' o_neon_dashboard_editing' : '')">
+             t-att-class="(isChatVisible ? (state.chatExpanded ? 'o_neon_dashboard_chat_expanded ' : 'o_neon_dashboard_chat_rail ') : '') + 'o_neon_dashboard__filter_' + state.activeFilter + (state.editMode ? ' o_neon_dashboard_editing' : '') + (state.data and state.data.dashboard_type ? ' o_neon_dash_' + state.data.dashboard_type : '')">
 
             <!-- ===================================================== Header -->
             <div class="o_neon_dashboard_header">
-                <div class="o_neon_dashboard_brand">
+                <!-- Generic brand (all lenses EXCEPT sales) -->
+                <div class="o_neon_dashboard_brand" t-if="!isSales">
                     <h1>
                         Neon
                         <span class="o_neon_dashboard_sep">—</span>
@@ -1045,6 +1075,11 @@
                     </h1>
                     <p class="o_neon_dashboard_subtitle"
                        t-esc="subtitleText"/>
+                </div>
+                <!-- Sales-lens deck header: greeting + cockpit subtitle -->
+                <div class="o_neon_dashboard_brand o_neon_sales_brand" t-if="isSales">
+                    <h1 class="o_neon_sales_greeting" t-esc="salesGreeting"/>
+                    <p class="o_neon_dashboard_subtitle">Sales &amp; Client Relations cockpit</p>
                 </div>
                 <div class="o_neon_dashboard_header_right">
                     <div class="o_neon_dashboard_user_line">
@@ -1220,7 +1255,7 @@
                          t-if="isWidgetVisible('kpi_pipeline')"
                          t-att-class="kpi.kpi_pipeline and kpi.kpi_pipeline.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_pipeline)">
-                        <div class="o_neon_kpi_label">Pipeline Value</div>
+                        <div class="o_neon_kpi_label"><t t-if="isSales">My Pipeline</t><t t-else="">Pipeline Value</t></div>
                         <div class="o_neon_kpi_value"
                              t-att-class="kpi.kpi_pipeline and kpi.kpi_pipeline.empty ? 'o_neon_kpi_empty' : ''"
                              t-esc="kpi.kpi_pipeline and kpi.kpi_pipeline.value_display"/>
@@ -1331,12 +1366,23 @@
                          t-if="isWidgetVisible('kpi_win_rate')"
                          t-att-class="kpi.kpi_win_rate and kpi.kpi_win_rate.deeplink_action ? 'o_neon_kpi_clickable' : ''"
                          t-on-click="() => this.onKpiClick(kpi.kpi_win_rate)">
-                        <div class="o_neon_kpi_label">Win Rate (90d)</div>
+                        <div class="o_neon_kpi_label"><t t-if="isSales">Quote-to-Close</t><t t-else="">Win Rate (90d)</t></div>
                         <div class="o_neon_kpi_value"
                              t-att-class="kpi.kpi_win_rate and kpi.kpi_win_rate.empty ? 'o_neon_kpi_empty' : ''"
                              t-esc="kpi.kpi_win_rate and kpi.kpi_win_rate.value_display"/>
                         <div class="o_neon_kpi_subtitle"
                              t-esc="kpi.kpi_win_rate and kpi.kpi_win_rate.subtitle"/>
+                    </div>
+
+                    <!-- Commission Pending: SALES-ONLY "coming soon" placeholder.
+                         No commission model/data exists (money + policy decision
+                         for Munashe + Robin). Styled placeholder, NO fabricated
+                         number. -->
+                    <div class="o_neon_kpi_tile o_neon_kpi_soon widget--kpi_commission"
+                         t-if="isSales">
+                        <div class="o_neon_kpi_label">Commission Pending</div>
+                        <div class="o_neon_kpi_value o_neon_kpi_empty">&#8212;</div>
+                        <div class="o_neon_kpi_subtitle">Coming soon</div>
                     </div>
 
                     <div class="o_neon_kpi_tile widget--kpi_overdue_60"
