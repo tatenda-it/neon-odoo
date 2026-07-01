@@ -1,39 +1,40 @@
-// Control-panel record search (Path B). Scoped to .o_neon_recsearch so it can't
-// affect the facet SearchBar or any other autocomplete. Reuses the same
-// in-dropdown scroll pattern as neon_web_autocomplete (plain px max-height; a
-// SASS min(px,vh) silently fails to compile).
+// Record search as the PRIMARY search box, living INSIDE the native
+// .o_searchview. Hide the native facet typing input + its autocomplete so there
+// is ONE visible search; keep the facet chips + the SearchBarMenu button.
+// (Plain px max-height for the dropdown scroll -- a SASS min(px,vh) silently
+// fails to compile.)
+
+.o_cp_searchview .o_searchview {
+    // hide the native facet typing input + its dropdown (record-search replaces
+    // it visually). The element stays in the DOM (display:none) so SearchBar.js
+    // refs/handlers are untouched.
+    .o_searchview_input { display: none; }
+    .o_searchview_autocomplete { display: none; }
+}
 
 .o_neon_recsearch {
-    position: relative;
-    display: inline-flex;
+    flex: 1 1 auto;
+    min-width: 120px;
+    display: flex;
     align-items: center;
-    // sits in the flex .o_control_panel_navigation; min-width:0 + shrinkable
-    // flex basis lets it compress instead of wrapping to its own row on
-    // narrow / mobile control panels (adversarial-review UX finding).
-    min-width: 0;
-    flex: 0 1 220px;
-
-    @media (max-width: 767px) {
-        flex-basis: 150px;
-    }
-
-    .o_neon_recsearch_icon {
-        position: absolute;
-        left: 9px;
-        color: var(--neon-muted, #8E89A0);
-        pointer-events: none;
-        z-index: 1;
-    }
 
     .o-autocomplete { width: 100%; }
 
+    // borderless / transparent -> blends into the native search box (it IS the
+    // search input now, not a separate pill).
     .o-autocomplete--input {
         width: 100%;
-        padding-left: 26px;              // room for the search icon
-        border: 1px solid #ECE8F5;
-        border-radius: 999px;
-        background: #fff;
-        height: 30px;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        line-height: 1.5;
+        box-shadow: none;
+
+        &:focus,
+        &:focus-visible {
+            outline: none;
+            box-shadow: none;
+        }
     }
 
     // in-dropdown scroll for the (up to 50) record rows

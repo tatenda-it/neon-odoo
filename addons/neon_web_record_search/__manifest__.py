@@ -1,32 +1,32 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Web — Control-Panel Record Search",
-    "version": "17.0.1.0.0",
-    "summary": "A record-search affordance in the list/kanban control panel: "
-               "type a name -> scrollable dropdown of matching records -> click "
-               "to open. Additive (the facet SearchBar is untouched). Reversible "
-               "by uninstall.",
+    "version": "17.0.1.1.2",
+    "summary": "Record search AS the primary search box: click -> the record "
+               "list appears, type -> it narrows, click a row -> opens it. One "
+               "clean search (native facet input hidden; Filters button + chips "
+               "kept). Reversible by uninstall.",
     "description": """
-Neon Web — Control-Panel Record Search (Path B)
-===============================================
-Injects a record-search widget into the control panel of EVERY list/kanban view
-at one global point (OWL t-inherit of web.ControlPanel), reading the active model
-dynamically via env.searchModel.resModel. Reuses the core @web/core/autocomplete
-AutoComplete component:
+Neon Web — Record Search (primary search box)
+=============================================
+Makes the record-search the PRIMARY visible search box, matching the quote-picker
+reference behaviour:
 
-* click the input -> dropdown populated on click (name_search active model, cap 50)
-* scrollable record rows (display_name; per-model sub-labels are a follow-up)
-* filter-as-you-type (server-side name_search)
-* click a record -> doAction opens its form
+* click -> the record list appears (name_search '', cap 50)
+* type  -> the list narrows to matching records (name_search re-queries)
+* click a row -> opens that record's form (doAction)
+* zero results -> a "No records found" feedback row (the one nicety)
 
-ADDITIVE ONLY: the facet SearchBar (filters / multi-field search / group-by /
-favorites / saved searches / Enter semantics / keyboard-nav) is COMPLETELY
-untouched -- this is a separate affordance alongside it. NO "add new" option
-(scope decision: no create in either surface). NO full-dataset load (cap 50 +
-name_search; refine by typing).
+Mounted INSIDE the native web.SearchBar (one global OWL t-inherit), reading the
+active model dynamically via env.searchModel.resModel. ONE clean visible search:
+the native facet typing input is hidden via scss, while the facet CHIPS and the
+SearchBarMenu (Filters / Group By / Comparison / Favorites / Saved searches) are
+KEPT untouched -- the menu is searchModel-driven and independent of the input, so
+all filtering still works, reached via the Filters button. Reads under the acting
+user's own ACL (name_search). NO "add new", NO operational-model search rewrite.
 
 Companion to neon_web_autocomplete (which enhances in-FORM field pickers) -- a
-different surface; both stay. Loads after web_responsive so the control-panel
+different surface; both stay. Loads after web_responsive so the SearchBar
 inheritance + dropdown scroll compose cleanly.
 """,
     "category": "Neon/UI",

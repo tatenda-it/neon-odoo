@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
-    <!-- The record-search widget: core AutoComplete (input + dropdown). -->
+    <!-- The record-search widget: core AutoComplete, no chrome of its own
+         (it blends into the native .o_searchview box; the native search icon
+         sits to its left, the Filters button to its right). -->
     <t t-name="neon_web_record_search.NeonRecordSearch">
         <div class="o_neon_recsearch" t-if="resModel">
-            <i class="fa fa-search o_neon_recsearch_icon"/>
             <AutoComplete
                 value="''"
                 sources="sources"
-                placeholder="'Jump to record…'"
+                placeholder="'Search…'"
                 onSelect.bind="onSelect"
                 resetOnSelect="true"
                 class="'o_neon_recsearch_ac'"
@@ -16,11 +17,13 @@
         </div>
     </t>
 
-    <!-- ONE global injection point: add the widget into every control panel's
-         navigation area. Additive — the facet SearchBar is not referenced or
-         altered. Guarded to views that have an active model (list/kanban). -->
-    <t t-inherit="web.ControlPanel" t-inherit-mode="extension">
-        <xpath expr="//div[hasclass('o_control_panel_navigation')]" position="inside">
+    <!-- Make the record-search the PRIMARY visible search: inject it into the
+         native SearchBar's input container. Facet chips (web.SearchBar.Facets)
+         and the SearchBarMenu (Filters / Group By / Favorites / Saved searches)
+         are KEPT; the native facet typing input is hidden via scss. Guarded to
+         search views that have an active model. -->
+    <t t-inherit="web.SearchBar" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('o_searchview_input_container')]" position="inside">
             <NeonRecordSearch t-if="env.searchModel and env.searchModel.resModel"/>
         </xpath>
     </t>
