@@ -5,14 +5,12 @@ import { AutoComplete } from "@web/core/autocomplete/autocomplete";
 import { SearchBar } from "@web/search/search_bar/search_bar";
 import { useService } from "@web/core/utils/hooks";
 
-const RECORD_SEARCH_LIMIT = 50;
-
 /**
  * Record search as the PRIMARY visible search box. Mounted INSIDE the native
  * web.SearchBar (the normal search position), reusing the core AutoComplete:
  *
- *   click -> the record list appears (name-prefix '%', cap 50)
- *   type  -> the list narrows to NAME-prefix matches (re-queries each keystroke)
+ *   click -> the FULL record list appears (name-prefix '%', UNCAPPED, scrollable)
+ *   type  -> narrows to ALL NAME-prefix matches (uncapped; re-queries each keystroke)
  *   click a row -> opens that record's form
  *
  * Matching = NAME-ONLY + PREFIX: search_read [('name','=ilike','term%')] (not
@@ -58,26 +56,24 @@ export class NeonRecordSearch extends Component {
                     //      display_name. Fallback to prefix name_search for any
                     //      exotic model without a 'name' field (so it never errors).
                     const term = (request || "").trim();
-                    // Empty click (before typing) -> load the FULL list, no cap
-                    // (explicit Tatenda+Robin decision; perf risk accepted). The
-                    // dropdown scrolls (plain overflow-y + content-visibility on
-                    // rows, see scss) so a large list doesn't freeze the browser.
-                    // Typing -> keep the prefix-filter cap (matching unchanged).
-                    const kw = term ? { limit: RECORD_SEARCH_LIMIT } : {};
+                    // UNCAPPED for BOTH click (full list) and typing (all
+                    // prefix matches) -- explicit Tatenda+Robin decision, perf
+                    // risk accepted. No {limit}. The dropdown scrolls (plain
+                    // overflow-y + content-visibility on rows, see scss) so a
+                    // large list doesn't freeze the browser.
                     let rows;
                     try {
                         const recs = await this.orm.searchRead(
                             model,
                             [["name", "=ilike", term + "%"]],
-                            ["display_name"],
-                            kw
+                            ["display_name"]
                         );
                         rows = recs.map((r) => [r.id, r.display_name]);
                     } catch {
                         const ns = await this.orm.call(model, "name_search", [], {
                             name: term + "%",
                             operator: "=ilike",
-                            limit: term ? RECORD_SEARCH_LIMIT : false,
+                            limit: false,
                         });
                         rows = ns;
                     }

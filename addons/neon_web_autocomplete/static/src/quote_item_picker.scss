@@ -1,0 +1,15 @@
+// neon_quote_item picker — option-row styling. Scoped STRICTLY to
+// .o_neon_item_option, which is rendered ONLY by the QuoteItemOption
+// optionTemplate (this widget's dropdown rows). No list-renderer, page, or
+// other-picker selectors -> it cannot leak (unlike the earlier neon_theme
+// .o_list_renderer overflow bug).
+.o_neon_item_option {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+
+    .o_neon_item_rate {
+        font-size: 0.8em;
+        color: var(--neon-muted, #8E89A0);
+    }
+}

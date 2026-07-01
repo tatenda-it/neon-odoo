@@ -99,7 +99,12 @@ label.o_form_label,
   // float the list as a rounded white card on the tinted page
   .o_list_renderer {
     margin:12px; background:#fff; border-radius:var(--neon-radius-card);
-    box-shadow:var(--neon-shadow); border:var(--neon-card-border); overflow:hidden;
+    box-shadow:var(--neon-shadow); border:var(--neon-card-border);
+    // overflow:auto (NOT hidden) so the list scrolls -- the renderer becomes the
+    // scroll container (sticky header preserved) and auto still clips to the
+    // rounded-card radius. hidden trapped the scroll (rows below the fold
+    // unreachable). Fixed 2026-07-01.
+    overflow:auto;
   }
   .o_list_table { background:#fff; border-collapse:separate; }
   thead th { background:#FBFAFE; border-bottom:1px solid #ECE8F5; }

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Web — Field Autocomplete Type-ahead",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "Global field-picker type-ahead: raise the Many2one autocomplete "
                "result cap to a scrollable page (~50) + in-dropdown scroll. "
                "Reversible by uninstall.",
@@ -39,6 +39,11 @@ item-wrapping rule.
         "web.assets_backend": [
             "neon_web_autocomplete/static/src/autocomplete_searchlimit.js",
             "neon_web_autocomplete/static/src/autocomplete_scroll.scss",
+            # neon_quote_item scoped picker widget (rate sub-label + full list),
+            # applied ONLY via widget="neon_quote_item" on the quote-line item field.
+            "neon_web_autocomplete/static/src/quote_item_picker.js",
+            "neon_web_autocomplete/static/src/quote_item_picker.xml",
+            "neon_web_autocomplete/static/src/quote_item_picker.scss",
         ],
     },
     "installable": True,

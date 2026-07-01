@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Per-option row for the neon_quote_item picker: item name + a rate
+         sub-label on EVERY real record. Create/"Search More" rows (no numeric
+         value) fall back to the plain label. `option` is in scope (core
+         AutoComplete renders this via source.optionTemplate). -->
+    <t t-name="neon_web_autocomplete.QuoteItemOption">
+        <t t-if="option.value">
+            <span class="o_neon_item_option">
+                <span class="o_neon_item_name" t-esc="option.label"/>
+                <span class="o_neon_item_rate">
+                    <t t-if="option.hasRule">Rate: USD <t t-esc="option.rate.toFixed(2)"/></t>
+                    <t t-else="">Rate: —</t>
+                </span>
+            </span>
+        </t>
+        <t t-else="">
+            <t t-esc="option.label"/>
+        </t>
+    </t>
+
+</templates>

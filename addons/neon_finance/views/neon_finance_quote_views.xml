@@ -159,6 +159,7 @@
                                          existing catalogue items, never mints a
                                          product from the quote line. -->
                                     <field name="product_template_id"
+                                           widget="neon_quote_item"
                                            options="{'no_create': True, 'no_open': True}"/>
                                     <field name="name"/>
                                     <field name="quantity"/>

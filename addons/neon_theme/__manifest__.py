@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Theme",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.0.1",
     "summary": "Global Neon ERP design language for the Odoo backend "
                "(additive, reversible, no data models)",
     "description": """
