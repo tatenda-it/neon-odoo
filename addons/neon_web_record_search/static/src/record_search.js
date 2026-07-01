@@ -58,20 +58,26 @@ export class NeonRecordSearch extends Component {
                     //      display_name. Fallback to prefix name_search for any
                     //      exotic model without a 'name' field (so it never errors).
                     const term = (request || "").trim();
+                    // Empty click (before typing) -> load the FULL list, no cap
+                    // (explicit Tatenda+Robin decision; perf risk accepted). The
+                    // dropdown scrolls (plain overflow-y + content-visibility on
+                    // rows, see scss) so a large list doesn't freeze the browser.
+                    // Typing -> keep the prefix-filter cap (matching unchanged).
+                    const kw = term ? { limit: RECORD_SEARCH_LIMIT } : {};
                     let rows;
                     try {
                         const recs = await this.orm.searchRead(
                             model,
                             [["name", "=ilike", term + "%"]],
                             ["display_name"],
-                            { limit: RECORD_SEARCH_LIMIT }
+                            kw
                         );
                         rows = recs.map((r) => [r.id, r.display_name]);
                     } catch {
                         const ns = await this.orm.call(model, "name_search", [], {
                             name: term + "%",
                             operator: "=ilike",
-                            limit: RECORD_SEARCH_LIMIT,
+                            limit: term ? RECORD_SEARCH_LIMIT : false,
                         });
                         rows = ns;
                     }

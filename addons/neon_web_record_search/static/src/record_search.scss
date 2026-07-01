@@ -37,12 +37,20 @@
         }
     }
 
-    // in-dropdown scroll for the (up to 50) record rows
+    // in-dropdown scroll. On empty click the FULL list loads (can be 1000s of
+    // rows on Contacts) -> plain overflow-y scroll + content-visibility so the
+    // browser skips rendering off-screen rows (smooth scroll without a custom
+    // virtualized list, which core AutoComplete doesn't provide).
     .o-autocomplete--dropdown-menu {
         max-height: 360px;
         overflow-y: auto;
         overflow-x: hidden;
         min-width: 280px;
         -webkit-overflow-scrolling: touch;
+
+        li {
+            content-visibility: auto;
+            contain-intrinsic-size: 0 30px; // est. row height -> correct scrollbar + skip off-screen paint
+        }
     }
 }

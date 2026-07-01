@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Web — Control-Panel Record Search",
-    "version": "17.0.1.1.2",
+    "version": "17.0.1.1.3",
     "summary": "Record search AS the primary search box: click -> the record "
                "list appears, type -> it narrows, click a row -> opens it. One "
                "clean search (native facet input hidden; Filters button + chips "
