@@ -25,15 +25,19 @@ milestone-specific procedural steps, see
   address, NOT the Odoo superuser account; that drift was cleaned in
   P6.M12). Only dual-role user in prod (Bookkeeper + HR Admin).
 - **Lisa, Evrill** — Sales Representatives (Lisa has no workshop authority).
-- **Lead Tech** (`crew_leader` group) — a **permanent role, currently
-  VACANT**. Previous holder `ranganai@neonhiring.co.zw` was offboarded
-  (user deactivated, history preserved). `lead_tech_id` default on
-  `commercial.event.job` is **none while vacant**; the role resolves
-  dynamically via the `crew_leader` **group, not a login**. Dashboard tier
-  and the finance cost-line record rule key off the same group. Hiring a
-  new Lead Tech = add them to the group; nothing else changes. Crew Chief
-  stays a per-event role (`is_crew_chief` flag), distinct from the standing
-  Lead Tech role.
+- **Lead Tech — POSITION ABOLISHED company-wide (Robin, 2026-07-02).**
+  Decisions that went to Lead Tech now route to **Robin (Operations)**.
+  Previous holder `ranganai@neonhiring.co.zw` was offboarded 2026-07-02
+  (user 13 deactivated, Lead-Tech/Training groups stripped, WhatsApp
+  bot.user 7 deactivated, hr.employee 14 archived, EVT-000001 lead_tech
+  cleared, neon_core grant-map entry emptied; ALL history preserved —
+  wages/job-history/authored docs stay archived per the append-only
+  discipline). System echoes of the role (lead_tech_id field, Event Jobs
+  LEAD TECH column, "Set Lead Tech" create-activity, `crew_leader` WA role
+  concept, dashboard tier + cost-line record rule keyed on the group) are
+  a NAMED BACKLOG ITEM to retire/repoint in a future pass — needs its own
+  GATE-0. Crew Chief stays a per-event role (`is_crew_chief` flag),
+  unrelated to the abolished standing role.
 
 ## Two-station collaboration & git rhythm
 

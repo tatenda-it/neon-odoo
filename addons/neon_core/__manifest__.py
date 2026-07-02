@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Core",
-    "version": "17.0.1.0.1",
+    "version": "17.0.1.0.2",
     "summary": "Neon RBAC meta-groups + ACL hygiene. Defines "
                "5 tier meta-groups (superuser / bookkeeper / "
                "sales_rep / lead_tech / crew) that cascade "

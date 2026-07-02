@@ -23,9 +23,12 @@ _TIER_ASSIGNMENTS = {
         "lisar@neonhiring.co.zw",
         "evrill@neonhiring.co.zw",
     ],
-    "neon_core.group_neon_lead_tech": [
-        "ranganai@neonhiring.co.zw",  # Created in Phase 7b
-    ],
+    # Lead Tech: the POSITION WAS ABOLISHED company-wide (Robin, 2026-07-02;
+    # its decisions route to Robin/Operations). Ranganai was offboarded the
+    # same day (user 13 deactivated, groups stripped, bot access killed,
+    # history preserved). Keep the key with NO members so a hook re-run can
+    # never re-grant the group -- the map entry was the re-arm trap.
+    "neon_core.group_neon_lead_tech": [],
     # Crew assignments handled at user creation time (Phase 7b
     # onboarding). Too many to enumerate and crew users may
     # not exist yet at install time.
