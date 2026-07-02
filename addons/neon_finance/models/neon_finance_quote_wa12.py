@@ -29,7 +29,7 @@ accept/death lifecycle hooks.
 """
 import logging
 
-from odoo import _, api, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -179,6 +179,65 @@ class NeonFinanceQuoteWA12(models.Model):
     # ============================================================
     # === QUOTE-UX-3b — whole-quote discount (shared WA + form)
     # ============================================================
+    # PART 2 header polish (2026-07-02): the form's discount entry moved
+    # from the header wizard button to this INLINE summary field
+    # (Zoho-style, between Untaxed Total and Total). Editing it and
+    # saving runs the SAME shared apply_whole_quote_discount below with
+    # the wizard's DEFAULT semantics (a VAT-inclusive amount off the
+    # client total) — identical repricing/spreading, same guardrails
+    # (UserError surfaces as the standard dialog). 0 clears the
+    # discount. The wizard model stays (WA + the target/ex-VAT modes
+    # remain available programmatically); only the header button went.
+    whole_quote_discount = fields.Monetary(
+        string="Discount",
+        compute="_compute_whole_quote_discount",
+        inverse="_inverse_whole_quote_discount",
+        currency_field="currency_id",
+        help="Whole-quote discount, as a VAT-inclusive amount off the "
+        "client total. Type the amount and save: it is distributed "
+        "uniformly across the line discounts (the same engine the "
+        "WhatsApp flow uses). Set 0 to remove the discount. Editable "
+        "while the quote is a draft.",
+    )
+
+    @api.depends("line_ids.quantity", "line_ids.unit_rate",
+                 "line_ids.duration_days", "line_ids.line_subtotal",
+                 "line_ids.line_total_taxed", "line_ids.discount_pct",
+                 "line_ids.discount_amount")
+    def _compute_whole_quote_discount(self):
+        """The realized VAT-inclusive drop currently baked into the lines:
+        per line, (undiscounted subtotal - discounted subtotal) scaled by
+        the line's own tax multiplier. Exact for both pct and amount line
+        discounts, uniform or hand-mixed; 0 when nothing is discounted."""
+        for rec in self:
+            drop = 0.0
+            for line in rec.line_ids:
+                undisc = ((line.quantity or 0.0) * (line.unit_rate or 0.0)
+                          * (line.duration_days or 1))
+                sub = line.line_subtotal or 0.0
+                mult = (line.line_total_taxed / sub) if sub else 1.0
+                drop += (undisc - sub) * mult
+            rec.whole_quote_discount = drop if drop > 0.005 else 0.0
+
+    def _inverse_whole_quote_discount(self):
+        for rec in self:
+            val = rec.whole_quote_discount or 0.0
+            if val < 0:
+                raise UserError(_("The discount must be a positive amount "
+                                  "(or 0 to remove it)."))
+            if not val:
+                # clear an existing discount only (avoid recalc side-effects
+                # on quotes that never had one)
+                if rec.line_ids and (
+                        any(l.discount_pct for l in rec.line_ids)
+                        or any(l.discount_amount for l in rec.line_ids)):
+                    rec.line_ids.write(
+                        {"discount_pct": 0.0, "discount_amount": 0.0})
+                    rec.action_recalculate_pricing()
+                    rec.wa12_discount_note = False
+                continue
+            rec.apply_whole_quote_discount(val)
+
     def apply_whole_quote_discount(self, value, ex_vat=False,
                                    is_target=False):
         """Apply a WHOLE-QUOTE discount, distributing it uniformly across the

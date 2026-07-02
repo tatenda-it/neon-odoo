@@ -91,20 +91,16 @@
                             string="Cancel"
                             invisible="state in ('accepted','rejected','expired','cancelled')"
                             context="{'cancelled_reason': 'Cancelled via form'}"/>
-                    <button name="action_open_payment_term_wizard"
-                            type="object"
-                            string="Set Payment Terms"
-                            invisible="state != 'draft'"/>
-                    <!-- QUOTE-UX-3b: whole-quote discount, the form face of the
-                         shared neon.finance.quote.apply_whole_quote_discount
-                         (same method WhatsApp uses). Distributes a uniform
-                         per-line discount_pct + sets wa12_discount_note.
-                         Draft-only. NOT the stock account global discount. -->
-                    <button name="action_open_whole_quote_discount_wizard"
-                            type="object"
-                            string="Apply Whole-Quote Discount"
-                            invisible="state != 'draft'"
-                            help="Take a single discount off the whole quote (a fixed amount or a target total, VAT-inclusive or ex-VAT). It is distributed across the line discounts; the achieved drop is labelled on the summary and the PDF."/>
+                    <!-- PART 2 header polish (2026-07-02): "Set Payment Terms"
+                         button removed (Payment Terms is a visible field in the
+                         ADVANCED group; the wizard action method stays on the
+                         model). "Apply Whole-Quote Discount" button removed:
+                         the discount is now the INLINE "Discount" field in the
+                         totals summary, wired to the SAME shared
+                         apply_whole_quote_discount. Header keeps Preview,
+                         Submit for Approval, Recalculate Pricing, Cancel, plus
+                         the state-gated workflow actions (Approve / Reject /
+                         Send / Mark Accepted appear only in their states). -->
                     <button name="action_recalculate_pricing"
                             type="object"
                             string="Recalculate Pricing"
@@ -117,24 +113,44 @@
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
+                    <!-- PART 2 (layout-only, Zoho-clean): Customer prominent
+                         first; essentials in a clean grid (no Scope/Schedule
+                         split); advanced fields tucked into a secondary
+                         "Advanced" group, still on the form and reachable. No
+                         data/behaviour change. -->
                     <group>
-                        <group string="Scope">
-                            <field name="event_job_id"
-                                   readonly="state != 'draft'"/>
+                        <group>
                             <field name="partner_id"/>
                             <field name="salesperson_id"
                                    readonly="state != 'draft'"/>
                             <field name="currency_id"
                                    readonly="id"/>
                         </group>
-                        <group string="Schedule">
+                        <group>
                             <field name="quotation_date"
                                    readonly="state != 'draft'"/>
                             <field name="expires_at"
                                    readonly="state != 'draft'"/>
-                            <field name="crew_display_mode"
+                        </group>
+                    </group>
+                    <!-- Advanced (tucked, less prominent, still reachable).
+                         NOTE: event_job_id is kept EDITABLE in draft (NOT
+                         read only) on purpose: until Part 1 mints it
+                         automatically it is still the required entry point and
+                         the partner_id source, so locking it now would strand
+                         quote creation. Part 1 makes it read only when
+                         customer first minting lands. payment_term_id stays
+                         reachable here AND via the header "Set Payment Terms"
+                         wizard (it is required before submit). -->
+                    <group string="Advanced">
+                        <group>
+                            <field name="event_job_id"
                                    readonly="state != 'draft'"/>
                             <field name="payment_term_id"
+                                   readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="crew_display_mode"
                                    readonly="state != 'draft'"/>
                             <field name="conversion_rate_id"
                                    readonly="state != 'draft'"/>
@@ -149,7 +165,7 @@
                                       editable="bottom">
                                     <field name="sequence"
                                            widget="handle"/>
-                                    <field name="line_type"/>
+                                    <field name="line_type" optional="hide"/>
                                     <!-- FIX-S1: catalogue picker. Selecting a
                                          product fires the pricing engine via
                                          the line's _onchange_product_template_id
@@ -161,9 +177,17 @@
                                     <field name="product_template_id"
                                            widget="neon_quote_item"
                                            options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="name"/>
+                                    <!-- PART 2 round 2 (Zoho shape): Name hidden
+                                         by default; it duplicates Product
+                                         visually (auto-filled from the product
+                                         by _onchange_product_template_id). Still
+                                         in the data + reachable via the optional
+                                         columns toggle for reps customising the
+                                         client-facing wording (and for manual
+                                         free-text lines, which need it). -->
+                                    <field name="name" optional="hide"/>
+                                    <field name="duration_days" string="Days"/>
                                     <field name="quantity"/>
-                                    <field name="duration_days"/>
                                     <field name="unit_rate"
                                            widget="monetary"/>
                                     <!-- QUOTE-UX-3: the ENGINE line discount.
@@ -172,32 +196,46 @@
                                          engine unit_rate is never overwritten);
                                          they are mutually exclusive (the sibling
                                          auto-clears on edit, _check_discount
-                                         blocks both/over-base). Default-VISIBLE
-                                         (optional="show": shown, user may hide)
-                                         so a WA-originated discount is never
-                                         silently off-screen. This is NOT the
-                                         stock account global discount. -->
+                                         blocks both/over-base). This is NOT the
+                                         stock account global discount.
+                                         PART 2 (Zoho-clean): ONE visible discount
+                                         input = discount_pct (the % case, also
+                                         what the whole-quote WA discount
+                                         distributes). discount_amount (absolute
+                                         case) is tucked to an optional column,
+                                         still reachable via the column toggle;
+                                         the mutual-exclusion constraint is
+                                         untouched. -->
                                     <field name="discount_pct"
                                            optional="show"/>
                                     <field name="discount_amount"
                                            widget="monetary"
-                                           optional="show"/>
+                                           optional="hide"/>
+                                    <!-- PART 2 round 2 (Zoho shape): Tax before
+                                         the amount; Subtotal (pre-tax) is the
+                                         LAST data column: the line's answer
+                                         lands at the row end, like Zoho's
+                                         Amount. The per-line taxed Total is
+                                         tucked (redundant with the bottom
+                                         summary's Untaxed/Tax/Total). -->
+                                    <field name="tax_id"/>
                                     <field name="line_subtotal"
                                            widget="monetary"
                                            sum="Subtotal"/>
-                                    <field name="tax_id"/>
                                     <field name="line_total_taxed"
                                            widget="monetary"
+                                           optional="hide"
                                            sum="Total"/>
                                     <field name="pricing_status"
                                            widget="badge"
+                                           optional="hide"
                                            decoration-success="pricing_status == 'priced'"
                                            decoration-warning="pricing_status == 'manual'"
                                            decoration-danger="pricing_status == 'no_rule'"
                                            decoration-muted="pricing_status == 'not_yet'"/>
                                     <field name="bracket_multiplier"
                                            readonly="1"
-                                           optional="show"/>
+                                           optional="hide"/>
                                     <field name="currency_id"
                                            column_invisible="True"/>
                                 </tree>
@@ -210,10 +248,26 @@
                                      above; this just names the basis the rep
                                      chose). Shown only when set; display-only,
                                      mirrors the PDF summary label. -->
+                                <!-- PART 2: the note row is hidden on the FORM;
+                                     it still feeds the PDF summary label. The
+                                     inline Discount row below shows the applied
+                                     amount on-screen (its compute derives from
+                                     the lines, so WA-originated discounts are
+                                     never silently off-screen either). -->
                                 <field name="wa12_discount_note" readonly="1"
-                                       invisible="not wa12_discount_note"/>
+                                       invisible="1"/>
                                 <field name="amount_untaxed"
                                        widget="monetary"/>
+                                <!-- PART 2: inline whole-quote Discount
+                                     (Zoho-style, between Untaxed Total and
+                                     Total). Type + SAVE runs the shared
+                                     apply_whole_quote_discount (VAT-inclusive
+                                     amount off the client total; distributes
+                                     across line discounts; 0 clears).
+                                     Draft-only editable. -->
+                                <field name="whole_quote_discount"
+                                       widget="monetary"
+                                       readonly="state != 'draft'"/>
                                 <field name="amount_tax"
                                        widget="monetary"/>
                                 <field name="amount_total"

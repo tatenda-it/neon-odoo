@@ -11,9 +11,19 @@
             restrictive rule on one group still applies unless an
             unconditional rule on another group lifts it).
 
-            None of these rules grant unlink — perm_unlink=0 on every
-            CSV row already blocks it. Listing perm_unlink=False here
-            is documentation, not enforcement.
+            Unlink: quote-LEVEL rules stay perm_unlink=False (CSV
+            perm_unlink=0 blocks quote deletion — append-only). Quote
+            LINES were amended 2026-07-02 (director approval, Robin):
+            lines ARE deletable while the parent quote is DRAFT — a
+            draft is not yet an approved financial record. The three
+            quote.line group rules below carry perm_unlink=True so
+            their visibility domains also govern unlink (sales =
+            own-quote only), and the GLOBAL rule
+            quote_line_rule_unlink_draft_only hard-ANDs the draft-state
+            scope for everyone. From submission onward lines are
+            immutable as before. NOTE noupdate="1": the perm_unlink
+            flips on the three existing rules reach existing installs
+            via the 17.0.7.17.6 migration, not -u.
         -->
 
         <record id="quote_rule_sales_own_only" model="ir.rule">
@@ -62,7 +72,7 @@
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
-            <field name="perm_unlink" eval="False"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <record id="quote_line_rule_bookkeeper_all" model="ir.rule">
@@ -73,7 +83,7 @@
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
-            <field name="perm_unlink" eval="False"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <record id="quote_line_rule_approver_all" model="ir.rule">
@@ -84,7 +94,26 @@
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
-            <field name="perm_unlink" eval="False"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!--
+            2026-07-02 (director approval, Robin) — draft-only line
+            delete. GLOBAL rule (no groups) = hard AND for every
+            non-superuser: quote LINES may be unlinked ONLY while the
+            parent quote is still a draft. From submit_for_approval
+            onward lines are immutable (append-only), matching the
+            form view which already locks line_ids post-draft. Applies
+            only to unlink; read/write/create are untouched.
+        -->
+        <record id="quote_line_rule_unlink_draft_only" model="ir.rule">
+            <field name="name">Quote Line: unlink only while quote is draft</field>
+            <field name="model_id" ref="model_neon_finance_quote_line"/>
+            <field name="domain_force">[('quote_id.state', '=', 'draft')]</field>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <!--

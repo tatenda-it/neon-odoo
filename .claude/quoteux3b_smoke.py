@@ -137,13 +137,21 @@ try:
         and bool(q.wa12_discount_note))
     env.cr.rollback()
 
-    # G. the form button is draft-only
+    # G. PART 2 header polish (2026-07-02, Tatenda): the header BUTTON was
+    # REMOVED; the form face of the whole-quote discount is now the INLINE
+    # whole_quote_discount field in the totals summary (draft-only editable),
+    # wired to the SAME shared apply_whole_quote_discount. The wizard model +
+    # action method stay on the model (WA + programmatic modes) -- only the
+    # form button went. New-spec assertions:
     arch = env.ref('neon_finance.neon_finance_quote_view_form').arch
-    seg = (arch.split('action_open_whole_quote_discount_wizard', 1)[1][:160]
-           if 'action_open_whole_quote_discount_wizard' in arch else '')
-    chk("G: form lists the whole-quote-discount button",
-        'action_open_whole_quote_discount_wizard' in arch)
-    chk("G: button is draft-only (invisible state != draft)",
+    # split on the FIELD TAG, not the bare name (an arch comment mentions
+    # apply_whole_quote_discount, which contains the name as a substring)
+    tag = 'name="whole_quote_discount"'
+    seg = arch.split(tag, 1)[1][:200] if tag in arch else ''
+    chk("G: header button REMOVED; inline whole_quote_discount field present",
+        'action_open_whole_quote_discount_wizard' not in arch
+        and tag in arch)
+    chk("G: inline discount is draft-only (readonly state != draft)",
         "state != 'draft'" in seg)
 finally:
     env.cr.rollback()

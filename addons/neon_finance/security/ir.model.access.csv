@@ -17,9 +17,9 @@ access_neon_finance_payment_term_approver,neon.finance.payment.term approver (R/
 access_neon_finance_quote_sales,neon.finance.quote sales (R/W/C own only via ir.rule),model_neon_finance_quote,neon_finance.group_neon_finance_sales,1,1,1,0
 access_neon_finance_quote_bookkeeper,neon.finance.quote bookkeeper (R/W/C),model_neon_finance_quote,neon_finance.group_neon_finance_bookkeeper,1,1,1,0
 access_neon_finance_quote_approver,neon.finance.quote approver (R/W/C),model_neon_finance_quote,neon_finance.group_neon_finance_approver,1,1,1,0
-access_neon_finance_quote_line_sales,neon.finance.quote.line sales (R/W/C own quote via ir.rule),model_neon_finance_quote_line,neon_finance.group_neon_finance_sales,1,1,1,0
-access_neon_finance_quote_line_bookkeeper,neon.finance.quote.line bookkeeper (R/W/C),model_neon_finance_quote_line,neon_finance.group_neon_finance_bookkeeper,1,1,1,0
-access_neon_finance_quote_line_approver,neon.finance.quote.line approver (R/W/C),model_neon_finance_quote_line,neon_finance.group_neon_finance_approver,1,1,1,0
+access_neon_finance_quote_line_sales,neon.finance.quote.line sales (R/W/C own quote; unlink draft-only via ir.rule),model_neon_finance_quote_line,neon_finance.group_neon_finance_sales,1,1,1,1
+access_neon_finance_quote_line_bookkeeper,neon.finance.quote.line bookkeeper (R/W/C; unlink draft-only via ir.rule),model_neon_finance_quote_line,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
+access_neon_finance_quote_line_approver,neon.finance.quote.line approver (R/W/C; unlink draft-only via ir.rule),model_neon_finance_quote_line,neon_finance.group_neon_finance_approver,1,1,1,1
 access_neon_finance_payment_term_wizard_sales,neon.finance.payment.term.wizard sales,model_neon_finance_payment_term_wizard,neon_finance.group_neon_finance_sales,1,1,1,1
 access_neon_finance_payment_term_wizard_bookkeeper,neon.finance.payment.term.wizard bookkeeper,model_neon_finance_payment_term_wizard,neon_finance.group_neon_finance_bookkeeper,1,1,1,1
 access_neon_finance_payment_term_wizard_approver,neon.finance.payment.term.wizard approver,model_neon_finance_payment_term_wizard,neon_finance.group_neon_finance_approver,1,1,1,1
