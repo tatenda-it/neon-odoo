@@ -3,14 +3,19 @@
 // body.o_neon_sidebar_open gate). We deliberately do NOT touch web_responsive's
 // surface: no .o_main_navbar, no .o_grid_apps_menu, no .o_apps_menu_opened.
 
+// Phase 12 shell restyle (2026-07-02): EXACT tokens from Neon_ERP.html.
+// neon_theme's old section-7 rail rules were REMOVED in the same change --
+// this file is now the single owner of the rail's look.
 $o-neon-sidebar-width: 224px;
-$o-neon-sidebar-navbar-h: 46px;        // stock Odoo 17 backend navbar height
-$o-neon-sidebar-bg: #1e2430;           // dark slate
-$o-neon-sidebar-bg-hover: #2a3242;
-$o-neon-sidebar-bg-active: #313c52;
-$o-neon-sidebar-fg: #c3cad8;
+$o-neon-sidebar-navbar-h: 62px;        // matches the Phase-12 white 62px topbar
+$o-neon-sidebar-bg: #15131C;           // warm plum-black (design)
+$o-neon-sidebar-fg: #9D98B0;           // inactive item (design)
+$o-neon-sidebar-fg-hover: #C9C4D6;     // hover text (addendum: design has no
+$o-neon-sidebar-bg-hover: rgba(122,107,174,.16); // hover state; palette-derived)
 $o-neon-sidebar-fg-active: #ffffff;
-$o-neon-sidebar-accent: #3b82f6;       // active accent bar
+$o-neon-sidebar-active-bg: linear-gradient(135deg, rgba(71,83,161,.95), rgba(122,107,174,.9));
+$o-neon-sidebar-active-glow: 0 6px 16px rgba(122,107,174,.4);
+$o-neon-sidebar-heading: 'Montserrat','Open Sans',sans-serif;
 $o-neon-sidebar-z: 90;                 // below navbar dropdowns/palette/modals
 
 // Hidden by default; shown only when the user has the rail open.
@@ -34,7 +39,7 @@ body.o_neon_sidebar_open {
         overflow-y: auto;
         overflow-x: hidden;
         padding: 8px 0;
-        box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+        border-right: 1px solid rgba(255, 255, 255, 0.06);  // design
 
         // slim, unobtrusive scrollbar
         scrollbar-width: thin;
@@ -46,6 +51,62 @@ body.o_neon_sidebar_open {
         }
     }
 
+    // ---- corner branding block (design: 34px gradient tile + wordmark) ----
+    .o_neon_sidebar_logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px 12px;
+        flex: 0 0 auto;
+    }
+    .o_neon_sidebar_logo_tile {
+        flex: 0 0 34px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #4753A1, #7A6BAE 45%, #9E8FC4 75%, #AF89BE);
+        box-shadow: 0 6px 18px rgba(122, 107, 174, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: $o-neon-sidebar-heading;
+        font-weight: 800;
+        font-size: 16px;
+        color: #fff;
+    }
+    .o_neon_sidebar_wordmark {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+        min-width: 0;
+    }
+    .o_neon_sidebar_wordmark_name {
+        font-family: $o-neon-sidebar-heading;
+        font-weight: 800;
+        font-size: 15px;
+        color: #fff;
+    }
+    .o_neon_sidebar_wordmark_sub {
+        font-family: $o-neon-sidebar-heading;
+        font-weight: 600;
+        font-size: 8px;
+        letter-spacing: 2.5px;
+        text-transform: uppercase;
+        color: #9E8FC4;
+    }
+
+    // ---- section label (design: "WORKSPACE") -------------------------------
+    .o_neon_sidebar_section {
+        font-family: $o-neon-sidebar-heading;
+        font-weight: 700;
+        font-size: 9px;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        color: #5C566E;
+        padding: 10px 16px 6px;
+        flex: 0 0 auto;
+    }
+
     .o_neon_sidebar_apps {
         display: flex;
         flex-direction: column;
@@ -55,27 +116,37 @@ body.o_neon_sidebar_open {
     .o_neon_sidebar_app {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 9px 14px 9px 12px;
-        margin: 0 6px;
-        border-radius: 8px;
-        color: $o-neon-sidebar-fg;
+        gap: 12px;                                  // design
+        padding: 10px 13px;                         // design
+        margin: 0 10px;
+        border-radius: 10px;                        // design
+        font-family: $o-neon-sidebar-heading;       // design: Montserrat 600 13px
+        font-weight: 600;
+        font-size: 13px;
+        color: $o-neon-sidebar-fg;                  // inactive #9D98B0
         text-decoration: none;
         cursor: pointer;
         white-space: nowrap;
-        border-left: 3px solid transparent;
-        transition: background-color 0.12s ease, color 0.12s ease;
+        transition: all 0.15s;                      // design
 
+        // hover: NOT in the design file (only active/inactive defined) --
+        // palette-derived faint purple wash, quieter than the active pill.
+        // Flagged for Tatenda's eyeball; one-line tweak if wanted.
         &:hover {
-            background: $o-neon-sidebar-bg-hover;
-            color: $o-neon-sidebar-fg-active;
+            background: $o-neon-sidebar-bg-hover;   // rgba(122,107,174,.16)
+            color: $o-neon-sidebar-fg-hover;        // #C9C4D6
         }
 
+        // ACTIVE: the design's gradient pill + glow (verbatim values)
         &.o_neon_sidebar_app_active {
-            background: $o-neon-sidebar-bg-active;
+            background: $o-neon-sidebar-active-bg;
             color: $o-neon-sidebar-fg-active;
-            border-left-color: $o-neon-sidebar-accent;
-            font-weight: 500;
+            box-shadow: $o-neon-sidebar-active-glow;
+
+            &:hover {
+                background: $o-neon-sidebar-active-bg;   // unchanged on hover
+                color: $o-neon-sidebar-fg-active;
+            }
         }
     }
 

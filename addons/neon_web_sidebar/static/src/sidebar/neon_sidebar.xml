@@ -3,6 +3,17 @@
 
     <t t-name="neon_web_sidebar.NeonSidebar">
         <div class="o_neon_sidebar">
+            <!-- Phase 12 shell restyle: corner branding block + section label
+                 (Neon_ERP.html spec). Static blocks in the scroll flow above the
+                 app list; no flex/height traps, scroll seam untouched. -->
+            <div class="o_neon_sidebar_logo">
+                <span class="o_neon_sidebar_logo_tile">N</span>
+                <span class="o_neon_sidebar_wordmark">
+                    <span class="o_neon_sidebar_wordmark_name">NEON ERP</span>
+                    <span class="o_neon_sidebar_wordmark_sub">Events Elements</span>
+                </span>
+            </div>
+            <div class="o_neon_sidebar_section">Workspace</div>
             <div class="o_neon_sidebar_apps">
                 <t t-foreach="apps" t-as="app" t-key="app.id">
                     <a class="o_neon_sidebar_app"

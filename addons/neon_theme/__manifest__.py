@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Theme",
-    "version": "17.0.1.0.1",
+    "version": "17.0.1.1.0",
     "summary": "Global Neon ERP design language for the Odoo backend "
                "(additive, reversible, no data models)",
     "description": """
 Neon Theme
 ==========
-Dresses the whole Odoo 17 backend in the Neon ERP design language: purple
-gradient navbar, deep-ink app rail, floating rounded white list cards,
-card-on-tinted-page form sheets, pill primary buttons, semantic status pills,
-Montserrat headings + Open Sans body.
+Dresses the whole Odoo 17 backend in the Neon ERP design language (Phase 12
+shell restyle, exact tokens from Neon_ERP.html): WHITE 62px topbar with the
+"Neon ERP / {module}" breadcrumb, floating rounded white cards (radius 15,
+hover lift) on the tinted #F6F4FB page, pill primary buttons, semantic status
+palette (green/orange/red triads), Montserrat structure + Open Sans body.
+The plum-black app rail (#15131C, gradient active pill) is styled by its
+owner module neon_web_sidebar; this theme only supplies the shared tokens.
 
 Design principles
 -----------------

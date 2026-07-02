@@ -31,3 +31,17 @@ $font-family-sans-serif: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe 
 $font-family-base: $font-family-sans-serif;
 $headings-font-family: 'Montserrat', 'Open Sans', sans-serif;
 $headings-font-weight: 700;
+
+// ---- Topbar (Phase 12 shell restyle: WHITE 62px bar, Neon_ERP.html spec) ---
+//      Set via the core navbar knobs (navbar.variables.scss) so every widget
+//      that reads them — core entries/brand/apps glyph AND web_responsive's
+//      grid-launcher button (color: $o-navbar-brand-color; sized off
+//      $o-navbar-height) — flips to dark-on-white together, no !important.
+$o-navbar-height: 62px;
+$o-navbar-background: #fff;
+$o-navbar-border-bottom: 1px solid #ECE8F5;
+$o-navbar-entry-color: #1A1A1A;
+$o-navbar-entry-color--hover: #1A1A1A;
+$o-navbar-entry-bg--hover: #F6F4FB;
+$o-navbar-brand-color: #1A1A1A;
+$o-navbar-badge-text-shadow: none;

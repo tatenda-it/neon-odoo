@@ -29,15 +29,19 @@
 @font-face { font-family:'Open Sans'; font-weight:700; font-style:normal; font-display:swap;
   src:url('/neon_theme/static/src/fonts/opensans-700.woff2') format('woff2'); }
 
-// ---- 2. Design tokens (the approved Neon palette + shape) -----------------
+// ---- 2. Design tokens — EXACT values from Neon_ERP.html (Phase 12 shell
+//         restyle 2026-07-02; do not improvise) ----------------------------
 :root {
   --neon-purple:#7A6BAE; --neon-indigo:#4753A1; --neon-lilac:#9E8FC4;
   --neon-ink:#1A1A1A;    --neon-muted:#8E89A0;
-  --neon-page:#F6F4FB;   --neon-sidebar:#0E0E10;
-  --neon-green:#2BA84A;  --neon-red:#E5484D;   --neon-amber:#E8973A;
-  --neon-navbar:linear-gradient(90deg,#4753A1,#7A6BAE 55%,#AF89BE);
-  --neon-radius-card:14px; --neon-radius-input:8px; --neon-radius-pill:999px;
+  --neon-page:#F6F4FB;   --neon-sidebar:#15131C;   // warm plum-black (was #0E0E10)
+  // status palette: base / dark / bg-tint triads
+  --neon-green:#2BA84A;  --neon-green-dark:#1E7E37; --neon-green-bg:#E6F4EA;
+  --neon-amber:#E8973A;  --neon-amber-dark:#C9781E; --neon-amber-bg:#FDEEDD;
+  --neon-red:#E5484D;    --neon-red-dark:#C7363B;   --neon-red-bg:#FCE8E9;
+  --neon-radius-card:15px; --neon-radius-input:8px; --neon-radius-pill:999px;
   --neon-shadow:0 4px 18px rgba(71,83,161,.08);
+  --neon-shadow-hover:0 16px 40px rgba(122,107,174,.16);
   --neon-card-border:1px solid #ECE8F5;
   --neon-heading:'Montserrat','Open Sans',sans-serif;
 }
@@ -59,40 +63,55 @@ label.o_form_label,
 }
 .o_list_table thead th {
   font-family:var(--neon-heading);
-  text-transform:uppercase; letter-spacing:.04em; font-weight:700;
-  font-size:.72rem; color:var(--neon-muted);
+  // design "labels": Montserrat 700 10.5px letter-spacing 1.2px uppercase
+  text-transform:uppercase; letter-spacing:1.2px; font-weight:700;
+  font-size:10.5px; color:var(--neon-muted);
 }
+// design key sizes: page h1 800 25px ls -.4px; card/section h2 800 16px.
+// Scoped to content areas (never dialogs/chrome).
+.o_content h1, .o_content .h1 { font-weight:800; font-size:25px; letter-spacing:-.4px; }
+.o_content h2, .o_content .h2 { font-weight:800; font-size:16px; }
 
 // ---- 5. Page / chrome — light card-on-tinted-page -------------------------
 .o_web_client, .o_action_manager, .o_content { background:var(--neon-page); }
 
-// ---- 6. Top navbar — Neon gradient ----------------------------------------
+// ---- 6. Top navbar — WHITE 62px bar (Neon_ERP.html spec) -------------------
+//  Height/background/entry colours come from the $o-navbar-* overrides in
+//  primary_variables.scss (core + web_responsive widgets read those). This
+//  block adds the breadcrumb face + glyph forcing on the bar itself.
 .o_main_navbar {
-  background:var(--neon-navbar) !important;
-  border-bottom:0;
-  box-shadow:var(--neon-shadow);
-  // white wordmark + entries + glyphs for contrast on the gradient
+  background:#fff !important;
+  border-bottom:1px solid #ECE8F5;
+  box-shadow:none;
+  // dark ink for entries + glyphs on the white bar (inverts the old gradient-era
+  // white forcing; open dropdown PANELS are core light styling and unaffected)
   .o_menu_brand, .o_nav_entry, .dropdown-toggle, > a,
   .fa, .oi, .o_menu_systray .dropdown-toggle {
-    color:#fff !important;
+    color:var(--neon-ink) !important;
   }
-  .o_menu_brand { font-weight:800; letter-spacing:.02em; }
-  .o_nav_entry:hover, .dropdown-toggle:hover { background:rgba(255,255,255,.12); border-radius:8px; }
+  // breadcrumb: "Neon ERP / {module}" — prefix Open Sans 13px #A39FB5,
+  // module Montserrat 700 16px ink. (Single ::before cannot two-tone the
+  // separator #D6CFE6 vs prefix #A39FB5 — 1% deviation, flagged.)
+  .o_menu_brand {
+    font-family:var(--neon-heading); font-weight:700; font-size:16px;
+    letter-spacing:0;
+    &::before {
+      content:"Neon ERP / ";
+      font-family:'Open Sans',sans-serif; font-weight:400; font-size:13px;
+      color:#A39FB5; margin-right:2px; align-self:center;
+    }
+  }
+  .o_nav_entry:hover, .dropdown-toggle:hover { background:#F6F4FB; border-radius:8px; }
+  .o_menu_systray .badge { text-shadow:none; }
 }
 
-// ---- 7. Sidebar / app rail — deep ink, purple active ----------------------
-//  Targets the neon_web_sidebar rail when present (no hard dependency: rules
-//  simply no-op if those elements are absent).
-.o_neon_sidebar, .o_neon_sidebar_rail {
-  background:var(--neon-sidebar) !important;
-  color:#C9C5D6;
-  .o_neon_sidebar_item, a, .nav-link { color:#C9C5D6; border-radius:8px; }
-  .o_neon_sidebar_item:hover, a:hover { background:rgba(255,255,255,.06); color:#fff; }
-  .o_neon_sidebar_item.active, .o_neon_active, .active > a, .nav-link.active {
-    background:var(--neon-purple); color:#fff;
-  }
-  .fa, .oi { color:inherit; }
-}
+// ---- 7. Sidebar / app rail --------------------------------------------------
+//  REMOVED (Phase 12 restyle): the rail is styled ENTIRELY by neon_web_sidebar
+//  (neon_sidebar.scss) with the Neon_ERP.html tokens. The old block here fought
+//  it — background !important + a bare `a` selector that out-specified the
+//  module's own .o_neon_sidebar_app rules, while its "active" selectors matched
+//  nothing (stale class names). One owner now; --neon-sidebar token kept above
+//  for reference.
 
 // ---- 8. List views — floating rounded white cards -------------------------
 .o_list_view {
@@ -108,7 +127,22 @@ label.o_form_label,
   }
   .o_list_table { background:#fff; border-collapse:separate; }
   thead th { background:#FBFAFE; border-bottom:1px solid #ECE8F5; }
-  tbody .o_data_row:hover { background:#F6F4FB; }
+  // row hover: VERBATIM design value (background only — never overflow/scroll)
+  tbody .o_data_row:hover { background:#FAF8FE; }
+}
+
+// ---- 8b. Card system (global, Neon_ERP.html): white, #ECE8F5 border,
+//          radius 15 (token), hover lift on interactive cards. Background /
+//          border / transform / shadow ONLY — no overflow, no scroll. --------
+.o_kanban_view .o_kanban_record {
+  background:#fff; border:1px solid #ECE8F5; border-radius:var(--neon-radius-card);
+  padding:22px; box-shadow:var(--neon-shadow);
+  transition:all .18s ease;
+  &:hover {
+    transform:translateY(-2px);
+    box-shadow:var(--neon-shadow-hover);
+    border-color:#D6CFE6;
+  }
 }
 
 // ---- 9. Form sheet — card on tinted page ----------------------------------
@@ -136,10 +170,11 @@ label.o_form_label,
 .badge.text-bg-danger,  .badge-danger,  .text-bg-danger  { background:var(--neon-red)   !important; color:#fff !important; }
 .badge.text-bg-warning, .badge-warning, .text-bg-warning { background:var(--neon-amber) !important; color:#fff !important; }
 
-// ---- 12. Search bar — rounded ---------------------------------------------
+// ---- 12. Search box — Neon_ERP.html spec: #F6F4FB bg, #ECE8F5 border,
+//          radius 9px (the design specs OUR record-search box) --------------
 .o_cp_searchview, .o_searchview {
-  background:#fff; border:var(--neon-card-border); border-radius:var(--neon-radius-pill);
-  box-shadow:var(--neon-shadow); padding-inline:12px;
+  background:#F6F4FB; border:1px solid #ECE8F5; border-radius:9px;
+  box-shadow:none; padding-inline:12px;
 }
 
 // ---- 13. Control panel + breadcrumb ---------------------------------------

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Neon Web Sidebar",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "summary": "Persistent Zoho-style left module rail (coexists with web_responsive)",
     "description": """
 Persistent left vertical sidebar for switching modules, rendered as a sibling
